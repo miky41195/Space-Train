@@ -1,0 +1,18 @@
+# Build e dipendenze
+node_modules/
+app/build/
+app/.svelte-kit/
+app/src-tauri/target/
+app/src-tauri/gen/schemas/
+
+# Eseguibili costruiti in locale: le versioni pubbliche stanno nelle release
+*.exe
+
+# Chiavi di firma degli aggiornamenti: mai nel repository
+*.key
+.env
+.env.*
+
+# Local notes, not published
+docs/
+registry/

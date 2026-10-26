@@ -1,0 +1,54 @@
+# Pubblica una release quando si spinge un tag `v*` (per esempio v0.2.0).
+#
+# Costruisce l'installatore Windows, lo firma con la chiave degli
+# aggiornamenti e carica `latest.json`: è il file che le copie installate
+# leggono per sapere che c'è una versione nuova.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri -> target
+
+      - name: Dipendenze
+        working-directory: app
+        run: npm ci
+
+      - name: Test
+        working-directory: app
+        run: npx vitest run
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+        with:
+          projectPath: app
+          tagName: ${{ github.ref_name }}
+          releaseName: Space Train ${{ github.ref_name }}
+          releaseBody: Scarica e avvia l'installatore `.exe`. Le copie già installate si aggiornano da sole.
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true

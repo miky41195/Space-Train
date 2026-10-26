@@ -1,0 +1,85 @@
+:root {
+	/* Lo spazio fra le stazioni. */
+	--void: #0c0a13;
+	/* Le superfici dell'app: la fiancata del convoglio. */
+	--hull: #171420;
+	--hull-glass: rgba(23, 20, 32, 0.72);
+	/* Binario spento. */
+	--rail-metal: #3a3350;
+	/* La corrente che ci passa dentro. */
+	--current: #7cf5ff;
+	/* Struttura e selezione. */
+	--plasma: #8b5cf6;
+	--signal: #ffb454;
+
+	/* Nomi funzionali usati dai componenti. */
+	--bg: var(--void);
+	--surface: var(--hull);
+	--surface-glass: var(--hull-glass);
+	--accent: var(--plasma);
+	--accent-soft: rgba(139, 92, 246, 0.18);
+	--border: rgba(255, 255, 255, 0.08);
+	--text: #e9e6f0;
+	--text-dim: #948da8;
+	--row-hover: rgba(255, 255, 255, 0.05);
+	--scroll: rgba(255, 255, 255, 0.12);
+	/* Testo degli avvisi d'errore, leggibile sul fondo del tema. */
+	--errore-testo: #ffb4ab;
+	--radius: 12px;
+	--radius-sm: 8px;
+
+	/* Bahnschrift è l'implementazione Windows del DIN 1451, il carattere
+	   della segnaletica ferroviaria. Già presente nel sistema: nessun
+	   download, che la CSP dell'app non permetterebbe comunque. */
+	--font-display: 'Bahnschrift', 'DIN Alternate', 'Segoe UI Variable Display', system-ui,
+		sans-serif;
+	--font-ui: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	height: 100%;
+	overflow: hidden;
+}
+
+body {
+	background: transparent;
+	color: var(--text);
+	font-family: var(--font-ui);
+	font-size: 13px;
+}
+
+.app {
+	display: flex;
+	flex-direction: column;
+	height: 100vh;
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	overflow: hidden;
+}
+
+/* Il focus da tastiera deve restare visibile ovunque. */
+:focus-visible {
+	outline: 2px solid var(--current);
+	outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+	width: 10px;
+}
+::-webkit-scrollbar-thumb {
+	background: var(--scroll);
+	border-radius: 5px;
+	border: 3px solid transparent;
+	background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+	background: var(--text-dim);
+	background-clip: content-box;
+}

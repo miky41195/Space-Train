@@ -1,0 +1,337 @@
+<script lang="ts">
+	import type { Backend, Drive, KnownFolder, Pari, StatoLan } from '../ipc';
+	import type { TabsStore } from '../stores/tabs.svelte';
+	import { QUESTO_PC, RETE, CESTINO, RETE_LOCALE, byte, stessoPath, nomeDi } from '../posizioni';
+
+	let {
+		store,
+		backend,
+		bersaglio = null,
+		aggiornamento = 0,
+		coloreDi = undefined,
+		lan = null,
+		pari = [],
+		ontogglevisibile = undefined,
+		accessoRapido = [],
+		onmenuaccesso = undefined
+	}: {
+		store: TabsStore;
+		backend: Backend;
+		/** Cartella sopra cui passa un trascinamento. */
+		bersaglio?: string | null;
+		/** Cambia quando lo spazio sui dischi può essere cambiato. */
+		aggiornamento?: number;
+		/** Colore che l'utente ha dato a una cartella. */
+		coloreDi?: (path: string) => string | undefined;
+		/** Stato della rete locale di questo PC, se il servizio risponde. */
+		lan?: StatoLan | null;
+		/** Gli altri PC con Space Train trovati in rete locale. */
+		pari?: Pari[];
+		ontogglevisibile?: () => void;
+		/** Le cartelle fissate dall'utente, nell'ordine scelto. */
+		accessoRapido?: string[];
+		/** Clic destro su una voce dell'Accesso rapido. */
+		onmenuaccesso?: (path: string, evento: MouseEvent) => void;
+	} = $props();
+
+	let drives = $state<Drive[]>([]);
+	let folders = $state<KnownFolder[]>([]);
+
+	$effect(() => {
+		backend.knownFolders().then((f) => (folders = f));
+	});
+
+	// Lo spazio libero cambia con ogni copia: si rilegge quando la pagina
+	// segnala un'operazione conclusa, non a intervalli.
+	$effect(() => {
+		aggiornamento;
+		backend.drives().then((d) => (drives = d));
+	});
+
+	function vai(path: string) {
+		if (store.activeId !== null) store.navigate(store.activeId, path);
+	}
+
+	/** La cartella condivisa da un altro PC, vista come posizione virtuale. */
+	function pathPari(p: Pari): string {
+		return RETE_LOCALE + '\\' + p.id;
+	}
+
+	function corrente(path: string): boolean {
+		return store.activeTab ? stessoPath(store.activeTab.path, path) : false;
+	}
+
+	const posizioni = [
+		{ path: QUESTO_PC, label: 'Questo PC' },
+		{ path: RETE, label: 'Rete' },
+		{ path: CESTINO, label: 'Cestino' }
+	];
+</script>
+
+<nav class="sidebar">
+	{#if accessoRapido.length > 0}
+		<div class="gruppo">
+			<div class="titolo">Accesso rapido</div>
+			{#each accessoRapido as p (p)}
+				<button
+					class="voce"
+					class:corrente={corrente(p)}
+					class:bersaglio={bersaglio === p}
+					data-cartella={p}
+					title={p}
+					onclick={() => vai(p)}
+					oncontextmenu={(e) => {
+						e.preventDefault();
+						onmenuaccesso?.(p, e);
+					}}
+				>
+					<span class="spillo" aria-hidden="true">📌</span>
+					{#if coloreDi?.(p)}<span class="pallino" style:background={coloreDi(p)}></span>{/if}
+					{nomeDi(p)}
+				</button>
+			{/each}
+		</div>
+	{/if}
+
+	<div class="gruppo">
+		<div class="titolo">Posizioni</div>
+		{#each posizioni as p (p.path)}
+			<button
+				class="voce"
+				class:corrente={corrente(p.path)}
+				class:bersaglio={bersaglio === p.path}
+				data-cartella={p.path === CESTINO ? CESTINO : undefined}
+				onclick={() => vai(p.path)}>{p.label}</button
+			>
+		{/each}
+	</div>
+
+	{#if lan}
+		<div class="gruppo">
+			<div class="titolo riga-titolo">
+				<span>Rete locale</span>
+				<!-- Interruttore: finché è spento questo PC non si annuncia e non
+				     risponde a nessuno. -->
+				<button
+					class="interruttore"
+					class:acceso={lan.visibile}
+					role="switch"
+					aria-checked={lan.visibile}
+					aria-label="Rendi visibile questo PC in rete locale"
+					title={lan.visibile ? 'Visibile agli altri PC con Space Train' : 'Invisibile in rete locale'}
+					onclick={ontogglevisibile}
+				><span></span></button>
+			</div>
+			<div class="stato-lan">
+				{lan.visibile ? `Visibile come ${lan.nome}` : 'Questo PC è invisibile'}
+				{#if lan.visibile && lan.condivisa}
+					<br />Condivide «{nomeDi(lan.condivisa)}»
+				{/if}
+			</div>
+			{#each pari as p (p.id)}
+				<button
+					class="voce"
+					class:corrente={store.activeTab?.path.toLowerCase().startsWith(pathPari(p).toLowerCase())}
+					onclick={() => vai(pathPari(p))}
+					title={p.condivisa ? `${p.nome} — condivide «${p.condivisa}»` : `${p.nome} — nessuna cartella condivisa`}
+				>
+					<span class="pc" aria-hidden="true">🖥</span>{p.nome}
+				</button>
+			{:else}
+				<div class="vuoto-lan">
+					{lan.visibile ? 'Nessun altro PC con Space Train trovato.' : 'Accendi per trovare gli altri PC.'}
+				</div>
+			{/each}
+		</div>
+	{/if}
+
+	<div class="gruppo">
+		<div class="titolo">Cartelle</div>
+		{#each folders as f (f.path)}
+			<button
+				class="voce"
+				class:corrente={corrente(f.path)}
+				class:bersaglio={bersaglio === f.path}
+				data-cartella={f.path}
+				onclick={() => vai(f.path)}
+			>
+				{#if coloreDi?.(f.path)}<span class="pallino" style:background={coloreDi(f.path)}></span>{/if}
+				{f.label}
+			</button>
+		{/each}
+	</div>
+
+	<div class="gruppo">
+		<div class="titolo">Unità</div>
+		{#each drives as d (d.path)}
+			{@const occupato = d.totale && d.libero !== null ? 1 - d.libero / d.totale : null}
+			<button
+				class="voce disco"
+				class:corrente={corrente(d.path)}
+				class:bersaglio={bersaglio === d.path}
+				data-cartella={d.path}
+				onclick={() => vai(d.path)}
+				title={d.libero !== null && d.totale ? `${byte(d.libero)} liberi di ${byte(d.totale)}` : d.label}
+			>
+				<span class="etichetta">{d.label}</span>
+				{#if occupato !== null && d.libero !== null}
+					<span class="riempimento" class:pieno={occupato > 0.9}>
+						<span style:width="{Math.round(occupato * 100)}%"></span>
+					</span>
+					<span class="libero">{byte(d.libero)} liberi</span>
+				{/if}
+			</button>
+		{/each}
+	</div>
+</nav>
+
+<style>
+	.sidebar {
+		width: 200px;
+		flex-shrink: 0;
+		padding: 12px 8px;
+		background: var(--surface-glass);
+		backdrop-filter: blur(24px) saturate(160%);
+		overflow-y: auto;
+	}
+	.gruppo + .gruppo {
+		margin-top: 16px;
+	}
+	.titolo {
+		padding: 0 12px 6px;
+		color: var(--text-dim);
+		font-size: 11px;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+	.voce {
+		display: block;
+		width: 100%;
+		min-height: 30px;
+		padding: 0 12px;
+		border: none;
+		border-radius: var(--radius-sm);
+		background: transparent;
+		color: var(--text);
+		font: inherit;
+		text-align: left;
+		cursor: default;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.voce:hover {
+		background: var(--row-hover);
+	}
+	.riga-titolo {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+	/* Interruttore a slitta, come nelle impostazioni di Windows. */
+	.interruttore {
+		position: relative;
+		width: 30px;
+		height: 16px;
+		padding: 0;
+		border: 1px solid var(--text-dim);
+		border-radius: 8px;
+		background: transparent;
+		cursor: default;
+	}
+	.interruttore span {
+		position: absolute;
+		top: 2px;
+		left: 2px;
+		width: 10px;
+		height: 10px;
+		border-radius: 50%;
+		background: var(--text-dim);
+		transition: transform 120ms ease;
+	}
+	.interruttore.acceso {
+		border-color: var(--accent);
+		background: var(--accent);
+	}
+	.interruttore.acceso span {
+		background: #fff;
+		transform: translateX(14px);
+	}
+	.stato-lan,
+	.vuoto-lan {
+		padding: 0 12px 6px;
+		color: var(--text-dim);
+		font-size: 11px;
+		line-height: 1.4;
+	}
+	.pc,
+	.spillo {
+		margin-right: 8px;
+	}
+	.spillo {
+		font-size: 11px;
+	}
+	.pallino {
+		display: inline-block;
+		width: 8px;
+		height: 8px;
+		margin-right: 8px;
+		border-radius: 50%;
+		vertical-align: middle;
+	}
+	.voce.bersaglio {
+		background: color-mix(in srgb, var(--current) 14%, transparent);
+		box-shadow: inset 0 0 0 1px var(--current);
+	}
+	/* La stazione in cui ti trovi: un contatto acceso sul binario. */
+	.voce.corrente {
+		position: relative;
+		background: var(--accent-soft);
+		color: var(--text);
+	}
+	.voce.corrente::before {
+		content: '';
+		position: absolute;
+		left: 0;
+		top: 50%;
+		width: 3px;
+		height: 14px;
+		transform: translateY(-50%);
+		border-radius: 2px;
+		background: var(--current);
+		box-shadow: 0 0 8px var(--current);
+	}
+
+	/* Il disco mostra quanto è pieno: la barra diventa rossa oltre il 90%. */
+	.disco {
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		gap: 3px;
+		padding-top: 6px;
+		padding-bottom: 6px;
+	}
+	.etichetta {
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.riempimento {
+		display: block;
+		height: 4px;
+		border-radius: 2px;
+		background: var(--border);
+		overflow: hidden;
+	}
+	.riempimento span {
+		display: block;
+		height: 100%;
+		background: var(--current);
+	}
+	.riempimento.pieno span {
+		background: #ff5f6e;
+	}
+	.libero {
+		color: var(--text-dim);
+		font-size: 11px;
+	}
+</style>
