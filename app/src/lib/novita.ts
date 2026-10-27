@@ -17,8 +17,7 @@ export const NOVITA: Novita[] = [
 		versione: '0.2.2',
 		voci: [
 			'L’editor dei temi si sposta trascinandolo per la testata: scostalo per vedere il tema applicato dietro.',
-			'L’anteprima di uno spritesheet nell’editor non fa più muovere i campi accanto mentre si anima.',
-			'Dopo ogni aggiornamento questa finestra ti racconta cosa c’è di nuovo.'
+			'L’anteprima di uno spritesheet nell’editor non fa più muovere i campi accanto mentre si anima.'
 		]
 	},
 	{
