@@ -36,9 +36,9 @@ sostituisci('src-tauri/Cargo.toml', /^version = "[^"]+"/m, `version = "${version
 execFileSync('cargo', ['update', '-p', 'app', '--offline'], { cwd: join(app, 'src-tauri'), stdio: 'inherit' });
 
 git('add', 'package.json', 'src-tauri/tauri.conf.json', 'src-tauri/Cargo.toml', 'src-tauri/Cargo.lock');
-git('commit', '-m', `Versione ${versione}`);
+git('commit', '-m', `Release ${versione}`);
 git('tag', `v${versione}`);
-git('push');
+git('push', 'origin', 'HEAD');
 git('push', 'origin', `v${versione}`);
 
 console.log(`\nv${versione} inviata. La release compare fra qualche minuto su GitHub (scheda Actions).`);
