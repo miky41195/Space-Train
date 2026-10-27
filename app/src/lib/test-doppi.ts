@@ -102,7 +102,8 @@ export function backendFinto(over: Partial<Backend> = {}): Backend {
 				cartellaRicevuti: 'C:\\Ricevuti',
 				visibile: false,
 				condivisa: null,
-				ricevuti: null
+				ricevuti: null,
+				indirizzi: []
 			};
 		},
 		async lanImposta(config) {

@@ -1779,7 +1779,7 @@ describe('rete locale', () => {
 	it('condividere una cartella la rende visibile in rete, in sola lettura', async () => {
 		await monta();
 		await voceMenu(riga('Dati'), 'Condividi in rete locale');
-		await waitFor(() => expect(disco.lan).toEqual({ visibile: true, condivisa: 'C:\\Dati', ricevuti: null }));
+		await waitFor(() => expect(disco.lan).toEqual({ visibile: true, condivisa: 'C:\\Dati', ricevuti: null, indirizzi: [] }));
 		expect(await screen.findByText(/Condivide «Dati»/)).toBeTruthy();
 
 		await voceMenu(riga('Dati'), 'Smetti di condividere in rete locale');
@@ -2435,5 +2435,30 @@ describe('novità dopo un aggiornamento', () => {
 		await monta();
 		await waitFor(() => expect(localStorage.getItem('space-train.versione-vista')).toBe('0.2.2'));
 		expect(screen.queryByRole('dialog', { name: 'Novità di Space Train' })).toBeNull();
+	});
+});
+
+// ── PC aggiunti per indirizzo ────────────────────────────────────────
+
+describe('PC aggiunti per indirizzo', () => {
+	const barra = () => document.querySelector<HTMLElement>('.sidebar')!;
+
+	it('si aggiunge un indirizzo dalla barra laterale, e chi lo aggiunge diventa visibile', async () => {
+		await monta();
+		await fireEvent.click(await within(barra()).findByRole('button', { name: '+ Aggiungi PC per indirizzo' }));
+		const campo = within(barra()).getByRole('textbox', { name: 'Indirizzo del PC da aggiungere' }) as HTMLInputElement;
+		await fireEvent.input(campo, { target: { value: '100.64.0.2' } });
+		await fireEvent.submit(campo.closest('form')!);
+
+		await waitFor(() => expect(disco.lan.indirizzi).toEqual(['100.64.0.2']));
+		expect(disco.lan.visibile).toBe(true);
+		expect(barra().textContent).toContain('100.64.0.2');
+	});
+
+	it('si toglie con la crocetta', async () => {
+		disco.lan = { visibile: true, condivisa: null, ricevuti: null, indirizzi: ['100.64.0.2'] };
+		await monta();
+		await fireEvent.click(await within(barra()).findByRole('button', { name: 'Togli 100.64.0.2' }));
+		await waitFor(() => expect(disco.lan.indirizzi).toEqual([]));
 	});
 });

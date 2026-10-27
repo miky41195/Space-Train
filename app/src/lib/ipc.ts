@@ -103,6 +103,8 @@ export interface ConfigLan {
 	visibile: boolean;
 	condivisa: string | null;
 	ricevuti: string | null;
+	/** PC da raggiungere per indirizzo: un IP o un nome, anche di una VPN. */
+	indirizzi: string[];
 }
 
 export interface StatoLan extends ConfigLan {

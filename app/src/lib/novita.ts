@@ -14,6 +14,14 @@ export interface Novita {
 
 export const NOVITA: Novita[] = [
 	{
+		versione: '0.2.3',
+		voci: [
+			'Rete locale → «Aggiungi PC per indirizzo»: raggiungi un PC fuori casa attraverso una VPN come Tailscale, scrivendo il suo IP o il suo nome.',
+			'Basta che uno dei due PC aggiunga l’altro: la risposta torna da sola.',
+			'Se il PC aggiunto resta in attesa, controlla che Space Train sia consentito nel firewall di Windows anche per la rete della VPN.'
+		]
+	},
+	{
 		versione: '0.2.2',
 		voci: [
 			'L’editor dei temi si sposta trascinandolo per la testata: scostalo per vedere il tema applicato dietro.',

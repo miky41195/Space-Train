@@ -41,7 +41,7 @@ export class DiscoFinto {
 	/** Cartelle che la pagina ha chiesto di osservare. */
 	osservate: string[] = [];
 	/** Rete locale: preferenze di questo PC e altri PC trovati. */
-	lan: ConfigLan = { visibile: false, condivisa: null, ricevuti: null };
+	lan: ConfigLan = { visibile: false, condivisa: null, ricevuti: null, indirizzi: [] };
 	pari: Pari[] = [];
 	/** Invii verso altri PC e risposte alle richieste ricevute. */
 	inviati: Array<{ peer: string; paths: string[] }> = [];

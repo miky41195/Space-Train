@@ -12,6 +12,7 @@
 		lan = null,
 		pari = [],
 		ontogglevisibile = undefined,
+		onindirizzi = undefined,
 		accessoRapido = [],
 		onmenuaccesso = undefined
 	}: {
@@ -28,6 +29,8 @@
 		/** Gli altri PC con Space Train trovati in rete locale. */
 		pari?: Pari[];
 		ontogglevisibile?: () => void;
+		/** La lista nuova dei PC aggiunti per indirizzo. */
+		onindirizzi?: (indirizzi: string[]) => void;
 		/** Le cartelle fissate dall'utente, nell'ordine scelto. */
 		accessoRapido?: string[];
 		/** Clic destro su una voce dell'Accesso rapido. */
@@ -47,6 +50,27 @@
 		aggiornamento;
 		backend.drives().then((d) => (drives = d));
 	});
+
+	/** Il campo per aggiungere un PC per indirizzo, aperto o chiuso. */
+	let aggiungendo = $state(false);
+	let nuovoIndirizzo = $state('');
+
+	function aggiungiIndirizzo() {
+		const t = nuovoIndirizzo.trim();
+		const gia = lan?.indirizzi ?? [];
+		if (t && !gia.some((i) => i.toLowerCase() === t.toLowerCase())) onindirizzi?.([...gia, t]);
+		nuovoIndirizzo = '';
+		aggiungendo = false;
+	}
+
+	function togliIndirizzo(i: string) {
+		onindirizzi?.((lan?.indirizzi ?? []).filter((x) => x !== i));
+	}
+
+	/** Un PC aggiunto per indirizzo risponde: è fra quelli trovati con quell'IP. */
+	function raggiunto(indirizzo: string): boolean {
+		return pari.some((p) => p.ip === indirizzo.trim().split(':')[0]);
+	}
 
 	function vai(path: string) {
 		if (store.activeId !== null) store.navigate(store.activeId, path);
@@ -118,6 +142,30 @@
 					{lan.visibile ? 'Nessun altro PC con Space Train trovato.' : 'Accendi per trovare gli altri PC.'}
 				</div>
 			{/each}
+			<!-- PC lontani, raggiunti per indirizzo: per esempio attraverso una VPN
+			     come Tailscale, che non porta gli annunci a tutta la rete. -->
+			{#each lan.indirizzi ?? [] as i (i)}
+				<div class="indirizzo" title={raggiunto(i) ? 'Raggiunto' : 'In attesa di risposta: Space Train acceso e visibile anche dall’altra parte?'}>
+					<span class="pallino-stato" class:acceso={raggiunto(i)}></span>
+					<span class="testo-indirizzo">{i}</span>
+					<button class="togli" aria-label="Togli {i}" onclick={() => togliIndirizzo(i)}>×</button>
+				</div>
+			{/each}
+			{#if aggiungendo}
+				<form class="nuovo-indirizzo" onsubmit={(e) => { e.preventDefault(); aggiungiIndirizzo(); }}>
+					<!-- svelte-ignore a11y_autofocus -->
+					<input
+						bind:value={nuovoIndirizzo}
+						placeholder="IP o nome, es. 100.64.0.2"
+						aria-label="Indirizzo del PC da aggiungere"
+						autofocus
+						onkeydown={(e) => e.key === 'Escape' && (aggiungendo = false)}
+						onblur={() => !nuovoIndirizzo.trim() && (aggiungendo = false)}
+					/>
+				</form>
+			{:else}
+				<button class="voce aggiungi-pc" onclick={() => (aggiungendo = true)}>+ Aggiungi PC per indirizzo</button>
+			{/if}
 		</div>
 	{/if}
 
@@ -189,6 +237,59 @@
 		background: var(--surface-glass);
 		backdrop-filter: blur(24px) saturate(160%);
 		overflow-y: auto;
+	}
+	.indirizzo {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 2px 10px;
+		font-size: 12px;
+		color: var(--text-dim);
+	}
+	.testo-indirizzo {
+		flex: 1;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.pallino-stato {
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+		background: var(--text-dim);
+		opacity: 0.5;
+	}
+	.pallino-stato.acceso {
+		background: #22c55e;
+		opacity: 1;
+	}
+	.togli {
+		border: none;
+		background: transparent;
+		color: var(--text-dim);
+		font: inherit;
+		cursor: default;
+		padding: 0 4px;
+	}
+	.togli:hover {
+		color: var(--text);
+	}
+	.aggiungi-pc {
+		color: var(--text-dim);
+		font-size: 12px;
+	}
+	.nuovo-indirizzo input {
+		width: 100%;
+		box-sizing: border-box;
+		height: 26px;
+		padding: 0 8px;
+		border: 1px solid var(--accent);
+		border-radius: var(--radius-sm);
+		background: var(--bg);
+		color: var(--text);
+		font: inherit;
+		font-size: 12px;
+		outline: none;
 	}
 	.gruppo + .gruppo {
 		margin-top: 16px;

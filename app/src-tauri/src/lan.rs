@@ -57,6 +57,11 @@ pub struct Config {
     pub condivisa: Option<String>,
     /// Dove finiscono i file ricevuti. Assente = Download\Space Train.
     pub ricevuti: Option<String>,
+    /// PC da raggiungere per indirizzo, oltre a quelli trovati in casa: un IP
+    /// o un nome, come quelli di Tailscale o di un'altra VPN, che non
+    /// trasportano gli annunci a tutta la rete.
+    #[serde(default)]
+    pub indirizzi: Vec<String>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -225,6 +230,9 @@ pub struct Lan {
     pari: Mutex<HashMap<String, (Pari, Instant)>>,
     richieste: Mutex<HashMap<u64, mpsc::Sender<bool>>>,
     prossima: AtomicU64,
+    /// Chi ci ha annunciato di persona, non in broadcast: gli si risponde
+    /// allo stesso modo, così basta che uno solo dei due aggiunga l'altro.
+    ritorni: Mutex<HashMap<IpAddr, Instant>>,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -285,6 +293,7 @@ impl Lan {
             pari: Mutex::new(HashMap::new()),
             richieste: Mutex::new(HashMap::new()),
             prossima: AtomicU64::new(1),
+            ritorni: Mutex::new(HashMap::new()),
         }
     }
 
@@ -373,23 +382,19 @@ fn avvia_scoperta(avvisi: Avvisi, lan: Arc<Lan>) {
     let _ = socket.set_read_timeout(Some(Duration::from_secs(1)));
     let Ok(invio) = socket.try_clone() else { return };
 
-    // Annunci periodici, solo se l'utente ha reso visibile questo PC.
+    // Annunci periodici, solo se l'utente ha reso visibile questo PC: a tutta
+    // la rete di casa, e uno per uno ai PC aggiunti per indirizzo.
     let lan_a = lan.clone();
     std::thread::Builder::new()
         .name("lan-annunci".into())
         .spawn(move || loop {
             let c = lan_a.config();
             if c.visibile {
-                let a = Annuncio {
-                    app: "space-train".into(),
-                    v: 1,
-                    id: lan_a.id.clone(),
-                    nome: lan_a.nome.clone(),
-                    porta: PORTA_DATI,
-                    condivisa: c.condivisa.as_deref().map(crate::shell::nome_di),
-                };
-                if let Ok(d) = serde_json::to_vec(&a) {
+                if let Ok(d) = serde_json::to_vec(&annuncio(&lan_a, &c)) {
                     let _ = invio.send_to(&d, ("255.255.255.255", PORTA_ANNUNCI));
+                    for destinazione in destinazioni_dirette(&lan_a, &c) {
+                        let _ = invio.send_to(&d, destinazione);
+                    }
                 }
             }
             std::thread::sleep(OGNI);
@@ -405,6 +410,12 @@ fn avvia_scoperta(avvisi: Avvisi, lan: Arc<Lan>) {
                 if let Ok((n, da)) = socket.recv_from(&mut buf) {
                     if let Ok(a) = serde_json::from_slice::<Annuncio>(&buf[..n]) {
                         if a.app == "space-train" && a.id != lan.id {
+                            // Gli si risponde di persona finché si fa sentire:
+                            // un annuncio arrivato dalla VPN non tornerebbe
+                            // indietro col broadcast.
+                            if let Ok(mut r) = lan.ritorni.lock() {
+                                r.insert(da.ip(), Instant::now());
+                            }
                             let p = Pari {
                                 id: a.id.clone(),
                                 nome: a.nome,
@@ -427,6 +438,48 @@ fn avvia_scoperta(avvisi: Avvisi, lan: Arc<Lan>) {
             }
         })
         .ok();
+}
+
+fn annuncio(lan: &Lan, c: &Config) -> Annuncio {
+    Annuncio {
+        app: "space-train".into(),
+        v: 1,
+        id: lan.id.clone(),
+        nome: lan.nome.clone(),
+        porta: PORTA_DATI,
+        condivisa: c.condivisa.as_deref().map(crate::shell::nome_di),
+    }
+}
+
+/// Un indirizzo scritto dall'utente nella forma che serve all'annuncio:
+/// `100.64.0.2`, `pc-di-casa` o `pc-di-casa.tail1234.ts.net`, anche con una
+/// porta. `None` se non si risolve (nome sconosciuto, rete assente).
+fn indirizzo_annunci(testo: &str) -> Option<SocketAddr> {
+    use std::net::ToSocketAddrs;
+    let t = testo.trim();
+    if t.is_empty() {
+        return None;
+    }
+    if let Ok(a) = t.parse::<SocketAddr>() {
+        return Some(SocketAddr::new(a.ip(), PORTA_ANNUNCI));
+    }
+    (t, PORTA_ANNUNCI)
+        .to_socket_addrs()
+        .ok()?
+        .find(|a| a.is_ipv4())
+}
+
+/// A chi mandare l'annuncio di persona: i PC aggiunti per indirizzo e chi ci
+/// ha annunciato di recente da fuori della rete di casa.
+fn destinazioni_dirette(lan: &Lan, c: &Config) -> Vec<SocketAddr> {
+    let mut out: Vec<SocketAddr> = c.indirizzi.iter().filter_map(|t| indirizzo_annunci(t)).collect();
+    if let Ok(mut r) = lan.ritorni.lock() {
+        r.retain(|_, visto| visto.elapsed() < SCADENZA);
+        out.extend(r.keys().map(|ip| SocketAddr::new(*ip, PORTA_ANNUNCI)));
+    }
+    out.sort();
+    out.dedup();
+    out
 }
 
 // ── Server ───────────────────────────────────────────────────────────
@@ -908,6 +961,32 @@ mod tests {
     }
 
     #[test]
+    fn gli_indirizzi_scritti_a_mano_vanno_alla_porta_degli_annunci() {
+        assert_eq!(indirizzo_annunci("100.64.0.2"), Some("100.64.0.2:47820".parse().unwrap()));
+        assert_eq!(indirizzo_annunci(" 100.64.0.2:9999 "), Some("100.64.0.2:47820".parse().unwrap()));
+        assert_eq!(indirizzo_annunci("localhost").map(|a| a.port()), Some(PORTA_ANNUNCI));
+        assert_eq!(indirizzo_annunci(""), None);
+    }
+
+    #[test]
+    fn un_lan_json_senza_indirizzi_si_legge_ancora() {
+        let c: Config = serde_json::from_str(r#"{"visibile":true,"condivisa":null,"ricevuti":null}"#).unwrap();
+        assert!(c.indirizzi.is_empty());
+    }
+
+    #[test]
+    fn chi_annuncia_da_fuori_riceve_la_risposta_di_persona() {
+        let dir = tempdir().unwrap();
+        let lan = Lan::nuovo("A".into(), "A".into(), Config::default(), dir.path().join("lan.json"));
+        lan.ritorni.lock().unwrap().insert("100.64.0.9".parse().unwrap(), Instant::now());
+        let c = Config { indirizzi: vec!["100.64.0.2".into(), "100.64.0.2".into()], ..Default::default() };
+        assert_eq!(
+            destinazioni_dirette(&lan, &c),
+            vec!["100.64.0.2:47820".parse().unwrap(), "100.64.0.9:47820".parse().unwrap()]
+        );
+    }
+
+    #[test]
     fn le_intestazioni_viaggiano_con_la_loro_lunghezza() {
         let mut b = Vec::new();
         scrivi_json(&mut b, &Richiesta::Elenca { path: "x/y".into() }).unwrap();
@@ -956,6 +1035,7 @@ mod tests {
                 visibile: true,
                 condivisa: Some(condivisa.to_string_lossy().into_owned()),
                 ricevuti: Some(ricevuti.to_string_lossy().into_owned()),
+                ..Default::default()
             },
             true,
         );
@@ -1017,7 +1097,7 @@ mod tests {
         let ricevuti = d.path().join("ricevuti");
         let (server, porta) = pc_di_prova(
             "RIFIUTA",
-            Config { visibile: true, condivisa: None, ricevuti: Some(ricevuti.to_string_lossy().into_owned()) },
+            Config { visibile: true, ricevuti: Some(ricevuti.to_string_lossy().into_owned()), ..Default::default() },
             false,
         );
         let (client, _) = pc_di_prova("MANDA", Config::default(), true);

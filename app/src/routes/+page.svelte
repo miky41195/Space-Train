@@ -784,8 +784,8 @@
 	async function impostaLan(modifica: Partial<StatoLan>) {
 		if (!statoLan) return;
 		try {
-			const { visibile, condivisa, ricevuti } = { ...statoLan, ...modifica };
-			statoLan = await tauriBackend.lanImposta({ visibile, condivisa, ricevuti });
+			const { visibile, condivisa, ricevuti, indirizzi } = { ...statoLan, ...modifica };
+			statoLan = await tauriBackend.lanImposta({ visibile, condivisa, ricevuti, indirizzi: indirizzi ?? [] });
 		} catch (e) {
 			erroreOp = descriviErrore(e);
 		}
@@ -1987,6 +1987,9 @@
 			lan={statoLan}
 			pari={pariLan}
 			ontogglevisibile={() => impostaLan({ visibile: !statoLan?.visibile })}
+			onindirizzi={(indirizzi) =>
+				// Chi aggiunge un PC lontano vuole farsi trovare: si rende visibile.
+				impostaLan(indirizzi.length > (statoLan?.indirizzi?.length ?? 0) ? { indirizzi, visibile: true } : { indirizzi })}
 			accessoRapido={accessoRapido.cartelle}
 			onmenuaccesso={apriMenuAccesso}
 		/>
