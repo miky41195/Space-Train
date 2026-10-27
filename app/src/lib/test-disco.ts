@@ -247,6 +247,15 @@ export class DiscoFinto {
 			case 'lan_rispondi':
 				this.risposte.push({ id: args.id as number, accetta: args.accetta as boolean });
 				return null;
+			case 'lan_prepara_trascina': {
+				const dest = 'C:\\Temp';
+				if (!this.esiste(dest)) this.nodi.set(dest, nodo('dir'));
+				return (args.paths as string[]).map((src) => {
+					const arrivo = this.#libero(dest, nome(src));
+					this.#copia(src, arrivo);
+					return arrivo;
+				});
+			}
 			case 'lan_apri':
 				this.aperti.push(args.path as string);
 				return null;

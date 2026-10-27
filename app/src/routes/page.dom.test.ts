@@ -1725,6 +1725,23 @@ describe('rete locale', () => {
 		expect(disco.esiste('C:\\Dati\\relazione.docx')).toBe(true);
 	});
 
+	it('trascinato fuori dall app, un file dell altro PC arriva a Windows come file vero', async () => {
+		conAltroPc();
+		await monta();
+		await fireEvent.click(await screen.findByRole('button', { name: /PC2/ }));
+		await waitFor(() => expect(nomi()).toContain('relazione.docx'));
+		const nome = riga('relazione.docx').querySelector('.name')!;
+		fireEvent.mouseDown(nome, { button: 0, clientX: 10, clientY: 10 });
+		fireEvent.mouseMove(window, { buttons: 1, clientX: 40, clientY: 10 });
+
+		// Prima si scarica in una cartella temporanea, poi parte il
+		// trascinamento con quel path: un `::lan\…` Windows non lo conosce.
+		await waitFor(() =>
+			expect(disco.shell[0]).toEqual({ cmd: 'start_drag', args: { paths: ['C:\\Temp\\relazione.docx'] } })
+		);
+		expect(disco.esiste('C:\\Temp\\relazione.docx')).toBe(true);
+	});
+
 	it('un file dell altro PC si apre col doppio clic', async () => {
 		conAltroPc();
 		await monta();

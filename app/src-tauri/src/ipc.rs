@@ -419,6 +419,48 @@ pub async fn lan_apri(lan: tauri::State<'_, Arc<Lan>>, path: String) -> Result<(
     fuori_dalla_finestra(move || crate::lan::apri(&lan, &path)).await
 }
 
+/// Scarica in una cartella temporanea gli elementi della cartella condivisa
+/// da un altro PC, e ritorna i loro path sul disco.
+///
+/// Serve a trascinarli fuori dall'app, sul desktop o in Esplora: Windows
+/// accetta solo file veri, e un path `::lan\…` per lui non esiste
+/// («Elemento non raggiungibile»). Le cartelle temporanee vecchie di un
+/// giorno si buttano via a ogni nuovo trascinamento.
+#[tauri::command]
+pub async fn lan_prepara_trascina(lan: tauri::State<'_, Arc<Lan>>, paths: Vec<String>) -> Result<Vec<String>, FsError> {
+    let lan = lan.inner().clone();
+    fuori_dalla_finestra(move || {
+        let base = std::env::temp_dir().join("SpaceTrain-trascina");
+        if let Ok(vecchie) = std::fs::read_dir(&base) {
+            for v in vecchie.filter_map(|v| v.ok()) {
+                let scaduta = v
+                    .metadata()
+                    .and_then(|m| m.modified())
+                    .map(|t| t.elapsed().map(|d| d.as_secs() > 24 * 3600).unwrap_or(false))
+                    .unwrap_or(false);
+                if scaduta {
+                    let _ = std::fs::remove_dir_all(v.path());
+                }
+            }
+        }
+        let istante = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let dir = base.join(istante.to_string());
+        std::fs::create_dir_all(&dir).map_err(|e| crate::fs::error::from_io(&e))?;
+        let coppie = crate::lan::scarica(
+            &lan,
+            &paths,
+            &dir.to_string_lossy(),
+            &std::sync::atomic::AtomicBool::new(false),
+            &mut |_, _| {},
+        )?;
+        Ok(coppie.into_iter().map(|c| c[1].clone()).collect())
+    })
+    .await
+}
+
 /// La cartella con cui Windows ha avviato l'app, se gliene ha passata una.
 #[tauri::command]
 pub async fn initial_path() -> Result<Option<ops::Destinazione>, FsError> {

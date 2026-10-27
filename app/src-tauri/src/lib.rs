@@ -136,6 +136,7 @@ pub fn run() {
             ipc::lan_pari,
             ipc::lan_rispondi,
             ipc::lan_apri,
+            ipc::lan_prepara_trascina,
             transfer::lan_invia,
             transfer::lan_scarica,
             transfer::search,

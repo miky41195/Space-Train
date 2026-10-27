@@ -70,6 +70,7 @@
 		CESTINO,
 		QUESTO_PC,
 		RETE,
+		RETE_LOCALE,
 		cartellaDi,
 		eReteLocale,
 		eVirtuale,
@@ -865,9 +866,18 @@
 	 */
 	async function trascina(voce: Entry) {
 		if (posizione === 'cestino' || posizione === 'rete' || posizione === 'pc') return;
+		// L'elenco dei PC in rete locale: trascinarne uno vorrebbe dire
+		// scaricare tutta la sua cartella condivisa.
+		if (posizione === 'lan' && store.activeTab?.path === RETE_LOCALE) return;
 		if (!insiemeSelezione.has(voce.path)) seleziona(voce);
-		const paths = insiemeSelezione.has(voce.path) ? selezionate().map((e) => e.path) : [voce.path];
+		let paths = insiemeSelezione.has(voce.path) ? selezionate().map((e) => e.path) : [voce.path];
 		try {
+			// I file della cartella condivisa da un altro PC non esistono su
+			// questo disco: Windows li accetta solo dopo averli scaricati.
+			if (posizione === 'lan') {
+				avvisa('Preparo i file da trascinare…');
+				paths = await tauriBackend.lanPreparaTrascina(paths);
+			}
 			await tauriBackend.startDrag(paths);
 		} catch (e) {
 			erroreOp = descriviErrore(e);
