@@ -86,6 +86,9 @@ export class DiscoFinto {
 		);
 	}
 
+	/** Le ricezioni fermate da questo lato. */
+	ricezioniAnnullate: number[] = [];
+
 	/** La versione che l'app dice di avere; vuota = sconosciuta. */
 	versioneApp = '';
 
@@ -256,6 +259,9 @@ export class DiscoFinto {
 					return arrivo;
 				});
 			}
+			case 'lan_annulla_ricezione':
+				this.ricezioniAnnullate.push(args.id as number);
+				return true;
 			case 'lan_apri':
 				this.aperti.push(args.path as string);
 				return null;

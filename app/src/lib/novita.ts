@@ -14,6 +14,13 @@ export interface Novita {
 
 export const NOVITA: Novita[] = [
 	{
+		versione: '0.2.4',
+		voci: [
+			'Chi riceve file da un altro PC può annullare dalla barra d’avanzamento; chi invia viene avvisato.',
+			'Un trasferimento interrotto non lascia file a metà nella cartella di arrivo.'
+		]
+	},
+	{
 		versione: '0.2.3',
 		voci: [
 			'Rete locale → «Aggiungi PC per indirizzo»: raggiungi un PC fuori casa attraverso una VPN come Tailscale, scrivendo il suo IP o il suo nome.',

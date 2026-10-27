@@ -113,6 +113,8 @@ pub struct Ricevuto {
     pub cartella: String,
     pub quanti: usize,
     pub errore: Option<String>,
+    /// Chi riceveva l'ha fermata: non è un errore da segnalare.
+    pub annullato: bool,
 }
 
 // ── Protocollo ───────────────────────────────────────────────────────
@@ -233,6 +235,8 @@ pub struct Lan {
     /// Chi ci ha annunciato di persona, non in broadcast: gli si risponde
     /// allo stesso modo, così basta che uno solo dei due aggiunga l'altro.
     ritorni: Mutex<HashMap<IpAddr, Instant>>,
+    /// Le ricezioni in corso, per poterle fermare da questo lato.
+    ricezioni: Mutex<HashMap<u64, Arc<AtomicBool>>>,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -294,6 +298,7 @@ impl Lan {
             richieste: Mutex::new(HashMap::new()),
             prossima: AtomicU64::new(1),
             ritorni: Mutex::new(HashMap::new()),
+            ricezioni: Mutex::new(HashMap::new()),
         }
     }
 
@@ -361,6 +366,17 @@ impl Lan {
                 let casa = std::env::var("USERPROFILE").unwrap_or_else(|_| ".".into());
                 Path::new(&casa).join("Downloads").join("Space Train")
             })
+    }
+
+    /// Ferma una ricezione in corso. Ritorna falso se era già finita.
+    pub fn annulla_ricezione(&self, id: u64) -> bool {
+        match self.ricezioni.lock().ok().and_then(|m| m.get(&id).cloned()) {
+            Some(f) => {
+                f.store(true, Ordering::Relaxed);
+                true
+            }
+            None => false,
+        }
     }
 
     /// La risposta dell'utente a una richiesta d'invio.
@@ -618,6 +634,9 @@ fn manda_file(
 
 /// Legge i byte annunciati e li scrive sotto `dest`. Ritorna i path di
 /// primo livello creati, già con il nome libero scelto.
+///
+/// Se si interrompe (annullato, rete caduta) toglie ciò che aveva iniziato
+/// a scrivere: un file a metà sembrerebbe buono e non lo è.
 fn prendi_file(
     s: &mut impl Read,
     dest: &Path,
@@ -625,11 +644,28 @@ fn prendi_file(
     annulla: &AtomicBool,
     avanzamento: &mut dyn FnMut(u64),
 ) -> io::Result<Vec<PathBuf>> {
+    let mut creati = Vec::new();
+    let esito = prendi_file_in(s, dest, voci, annulla, avanzamento, &mut creati);
+    if esito.is_err() {
+        for c in &creati {
+            let _ = crate::fs::copy::rimuovi(c);
+        }
+    }
+    esito.map(|_| creati)
+}
+
+fn prendi_file_in(
+    s: &mut impl Read,
+    dest: &Path,
+    voci: &[Voce],
+    annulla: &AtomicBool,
+    avanzamento: &mut dyn FnMut(u64),
+    creati: &mut Vec<PathBuf>,
+) -> io::Result<()> {
     std::fs::create_dir_all(paths::extended(dest))?;
     // Ogni elemento di primo livello riceve un nome libero a destinazione;
     // tutto ciò che sta sotto segue il nome scelto.
     let mut rinomine: HashMap<String, String> = HashMap::new();
-    let mut creati = Vec::new();
     let mut fatti = 0u64;
     let mut buf = vec![0u8; 256 * 1024];
 
@@ -669,7 +705,7 @@ fn prendi_file(
             avanzamento(fatti);
         }
     }
-    Ok(creati)
+    Ok(())
 }
 
 fn ricevi(
@@ -713,7 +749,11 @@ fn ricevi(
     let dest = lan.cartella_ricevuti();
     let _ = s.set_read_timeout(Some(Duration::from_secs(60)));
     let mut ultimo = Instant::now();
-    let esito = prendi_file(&mut s, &dest, &voci, &AtomicBool::new(false), &mut |fatti| {
+    let annulla = Arc::new(AtomicBool::new(false));
+    if let Ok(mut m) = lan.ricezioni.lock() {
+        m.insert(id, annulla.clone());
+    }
+    let esito = prendi_file(&mut s, &dest, &voci, &annulla, &mut |fatti| {
         if ultimo.elapsed() >= Duration::from_millis(100) {
             ultimo = Instant::now();
             avvisa(&avvisi, "lan-ricezione", Ricezione { id, fatti, totale });
@@ -728,9 +768,15 @@ fn ricevi(
             da,
             cartella: paths::display(&dest),
             quanti: esito.as_ref().map(|c| c.len()).unwrap_or(0),
-            errore: esito.as_ref().err().map(|e| e.to_string()),
+            errore: if annulla.load(Ordering::Relaxed) { None } else { esito.as_ref().err().map(|e| e.to_string()) },
+            annullato: annulla.load(Ordering::Relaxed),
         },
     );
+    if let Ok(mut m) = lan.ricezioni.lock() {
+        m.remove(&id);
+    }
+    // Chiudere la connessione è il modo in cui chi invia sa dell'annullamento.
+    let _ = s.shutdown(std::net::Shutdown::Both);
     Ok(())
 }
 
@@ -873,7 +919,14 @@ pub fn invia(
     let mut gia = 0u64;
     for (base, voci) in &piani {
         let parte: u64 = voci.iter().map(|v| v.dimensione).sum();
-        manda_file(&mut s, base, voci, annulla, &mut |f| avanzamento(gia + f, totale)).map_err(errore_io)?;
+        manda_file(&mut s, base, voci, annulla, &mut |f| avanzamento(gia + f, totale)).map_err(|e| {
+            use io::ErrorKind::*;
+            if matches!(e.kind(), BrokenPipe | ConnectionReset | ConnectionAborted) {
+                FsError::Io { message: "L'altro PC ha interrotto il trasferimento.".to_string() }
+            } else {
+                errore_io(e)
+            }
+        })?;
         gia += parte;
     }
     Ok(())
@@ -949,6 +1002,35 @@ mod tests {
         // Una seconda volta il nome è occupato: arriva numerato.
         let creati = prendi_file(&mut flusso.as_slice(), &dest, &voci, &AtomicBool::new(false), &mut |_| {}).unwrap();
         assert_eq!(creati, vec![dest.join("progetto (2)")]);
+    }
+
+    #[test]
+    fn una_ricezione_interrotta_non_lascia_file_a_meta() {
+        let d = tempdir().unwrap();
+        let src = d.path().join("progetto");
+        fs::create_dir_all(&src).unwrap();
+        fs::write(src.join("grande.bin"), vec![1u8; 600_000]).unwrap();
+        let voci = piano(&src);
+        let mut flusso = Vec::new();
+        manda_file(&mut flusso, d.path(), &voci, &AtomicBool::new(false), &mut |_| {}).unwrap();
+
+        // Si annulla dopo il primo blocco ricevuto.
+        let dest = d.path().join("arrivo");
+        let annulla = AtomicBool::new(false);
+        let esito = prendi_file(&mut flusso.as_slice(), &dest, &voci, &annulla, &mut |_| annulla.store(true, Ordering::Relaxed));
+        assert!(esito.is_err());
+        assert!(!dest.join("progetto").exists());
+    }
+
+    #[test]
+    fn la_ricezione_si_annulla_dal_lato_di_chi_riceve() {
+        let dir = tempdir().unwrap();
+        let lan = Lan::nuovo("A".into(), "A".into(), Config::default(), dir.path().join("lan.json"));
+        let flag = Arc::new(AtomicBool::new(false));
+        lan.ricezioni.lock().unwrap().insert(7, flag.clone());
+        assert!(lan.annulla_ricezione(7));
+        assert!(flag.load(Ordering::Relaxed));
+        assert!(!lan.annulla_ricezione(8));
     }
 
     #[test]

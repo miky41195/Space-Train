@@ -1793,6 +1793,18 @@ describe('rete locale', () => {
 		expect(await screen.findByText('Ricevuti 1 elemento da PC2 in C:\\Ricevuti.')).toBeTruthy();
 	});
 
+	it('chi riceve può annullare dalla barra d avanzamento', async () => {
+		await monta();
+		ascoltatori.get('lan-ricezione')?.({ payload: { id: 9, fatti: 10, totale: 100 } });
+		await fireEvent.click(await screen.findByRole('button', { name: 'Annulla' }));
+		await waitFor(() => expect(disco.ricezioniAnnullate).toEqual([9]));
+
+		ascoltatori.get('lan-ricevuto')?.({
+			payload: { id: 9, da: 'PC2', cartella: 'C:\\Ricevuti', quanti: 0, errore: null, annullato: true }
+		});
+		expect(await screen.findByText('Ricezione da PC2 annullata.')).toBeTruthy();
+	});
+
 	it('condividere una cartella la rende visibile in rete, in sola lettura', async () => {
 		await monta();
 		await voceMenu(riga('Dati'), 'Condividi in rete locale');

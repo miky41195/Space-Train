@@ -762,16 +762,19 @@
 
 		void ascolta<Pari[]>('lan-pari', (p) => (pariLan = p));
 		void ascolta<RichiestaInvio>('lan-richiesta', (r) => (richiesteLan = [...richiesteLan, r]));
-		void ascolta<{ fatti: number; totale: number }>('lan-ricezione', (r) => {
+		void ascolta<{ id: number; fatti: number; totale: number }>('lan-ricezione', (r) => {
 			if (opInCorso !== null && modoInCorso !== 'ricezione') return;
 			modoInCorso = 'ricezione';
+			ricezioneInCorso = r.id;
 			progresso = { transferred: r.fatti, total: r.totale };
 		});
-		void ascolta<{ da: string; cartella: string; quanti: number; errore: string | null }>(
+		void ascolta<{ id: number; da: string; cartella: string; quanti: number; errore: string | null; annullato?: boolean }>(
 			'lan-ricevuto',
 			(r) => {
+				if (ricezioneInCorso === r.id) ricezioneInCorso = null;
 				if (opInCorso === null) progresso = null;
-				if (r.errore) erroreOp = `Ricezione da ${r.da} interrotta: ${r.errore}`;
+				if (r.annullato) avvisa(`Ricezione da ${r.da} annullata.`);
+				else if (r.errore) erroreOp = `Ricezione da ${r.da} interrotta: ${r.errore}`;
 				else avvisa(`Ricevuti ${r.quanti === 1 ? '1 elemento' : `${r.quanti} elementi`} da ${r.da} in ${r.cartella}.`);
 				void store.aggiornaCartella(r.cartella);
 			}
@@ -808,8 +811,16 @@
 		void tauriBackend.lanRispondi(r.id, accetta);
 	}
 
+	/**
+	 * La ricezione da un altro PC che si sta mostrando nella barra. Non è
+	 * un'operazione partita da qui: si ferma col suo id, e chi invia lo
+	 * scopre quando la connessione si chiude.
+	 */
+	let ricezioneInCorso = $state<number | null>(null);
+
 	async function annullaTrasferimento() {
 		if (opInCorso !== null) await tauriBackend.cancelTransfer(opInCorso);
+		else if (ricezioneInCorso !== null) await tauriBackend.lanAnnullaRicezione(ricezioneInCorso);
 	}
 
 	/** Comprime o estrae con la stessa barra d'avanzamento dei trasferimenti. */

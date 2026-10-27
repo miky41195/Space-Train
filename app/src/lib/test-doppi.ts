@@ -114,6 +114,9 @@ export function backendFinto(over: Partial<Backend> = {}): Backend {
 		},
 		async lanRispondi() {},
 		async lanApri() {},
+		async lanAnnullaRicezione() {
+			return true;
+		},
 		async lanPreparaTrascina(paths: string[]) {
 			return paths;
 		},

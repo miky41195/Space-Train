@@ -412,6 +412,12 @@ pub fn lan_rispondi(lan: tauri::State<'_, Arc<Lan>>, id: u64, accetta: bool) {
     lan.rispondi(id, accetta);
 }
 
+/// Ferma da questo lato una ricezione in corso da un altro PC.
+#[tauri::command]
+pub fn lan_annulla_ricezione(lan: tauri::State<'_, Arc<Lan>>, id: u64) -> bool {
+    lan.annulla_ricezione(id)
+}
+
 /// Apre un file della cartella condivisa da un altro PC.
 #[tauri::command]
 pub async fn lan_apri(lan: tauri::State<'_, Arc<Lan>>, path: String) -> Result<(), FsError> {

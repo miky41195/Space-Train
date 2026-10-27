@@ -208,6 +208,8 @@ export interface Backend {
 	lanPari(): Promise<Pari[]>;
 	lanRispondi(id: number, accetta: boolean): Promise<void>;
 	lanApri(path: string): Promise<void>;
+	/** Ferma da questo lato una ricezione in corso. */
+	lanAnnullaRicezione(id: number): Promise<boolean>;
 	/** Scarica in una cartella temporanea, per trascinare fuori dall'app. Ritorna i path locali. */
 	lanPreparaTrascina(paths: string[]): Promise<string[]>;
 	lanInvia(opts: {
@@ -292,6 +294,7 @@ export const tauriBackend: Backend = {
 	lanPari: () => invoke('lan_pari'),
 	lanRispondi: (id, accetta) => invoke('lan_rispondi', { id, accetta }),
 	lanApri: (path) => invoke('lan_apri', { path }),
+	lanAnnullaRicezione: (id) => invoke('lan_annulla_ricezione', { id }),
 	lanPreparaTrascina: (paths) => invoke('lan_prepara_trascina', { paths }),
 	lanInvia: ({ opId, peer, paths, onProgress }) =>
 		invoke('lan_invia', { opId, peer, paths, onProgress: canale(onProgress) }),
