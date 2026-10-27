@@ -2491,3 +2491,81 @@ describe('PC aggiunti per indirizzo', () => {
 		await waitFor(() => expect(disco.lan.indirizzi).toEqual([]));
 	});
 });
+
+describe('amici', () => {
+	const codice = 'k'.repeat(52);
+	const anna = { id: codice, nome: 'Anna', stato: 'confermato' as const, condividi: false, inLinea: true };
+
+	/** Un'amica che condivide una cartella con foto e un documento. */
+	function conAnna() {
+		disco.amici = [{ ...anna }];
+		for (const [p, dir] of [
+			[`::amici\\${codice}`, true],
+			[`::amici\\${codice}\\Foto`, true],
+			[`::amici\\${codice}\\relazione.docx`, false]
+		] as const) {
+			disco.nodi.set(p, { kind: dir ? 'dir' : 'file', size: 100, hidden: false, modified: 0 });
+		}
+	}
+
+	it('dal pannello si vede il proprio codice e si chiede un amicizia', async () => {
+		await monta();
+		await fireEvent.click(await screen.findByRole('button', { name: '+ Aggiungi amici' }));
+		const pannello = await screen.findByRole('dialog', { name: 'Amici' });
+		// Il codice si legge a gruppi di quattro.
+		expect(within(pannello).getByText(/^codi-ce-d/)).toBeTruthy();
+
+		await fireEvent.input(within(pannello).getByRole('textbox', { name: "Codice dell'amico" }), {
+			target: { value: codice }
+		});
+		await fireEvent.click(within(pannello).getByRole('button', { name: 'Chiedi amicizia' }));
+		await waitFor(() => expect(disco.amici.map((a) => a.stato)).toEqual(['inviata']));
+	});
+
+	it('una richiesta ricevuta si accetta dal pannello', async () => {
+		disco.amici = [{ ...anna, stato: 'ricevuta', inLinea: false }];
+		await monta();
+		await fireEvent.click(await screen.findByRole('button', { name: '1 richiesta d’amicizia' }));
+		const pannello = await screen.findByRole('dialog', { name: 'Amici' });
+		await fireEvent.click(within(pannello).getByRole('button', { name: 'Accetta' }));
+		await waitFor(() => expect(disco.amici[0].stato).toBe('confermato'));
+	});
+
+	it('la richiesta in arrivo si fa notare', async () => {
+		await monta();
+		ascoltatori.get('amici-richiesta')?.({ payload: { id: codice, nome: 'Anna' } });
+		expect(await screen.findByText(/Anna ti ha chiesto l’amicizia/)).toBeTruthy();
+	});
+
+	it('si sfoglia la cartella di un amica, col suo nome nel percorso', async () => {
+		conAnna();
+		await monta();
+		await fireEvent.click(await screen.findByRole('button', { name: /Anna/ }));
+		await waitFor(() => expect(nomi()).toEqual(['Foto', 'relazione.docx']));
+		expect(screen.getAllByText('Anna').length).toBeGreaterThan(0);
+		expect(screen.queryByText(codice)).toBeNull();
+
+		await fireEvent.dblClick(riga('relazione.docx'));
+		await waitFor(() => expect(disco.aperti).toEqual([`::amici\\${codice}\\relazione.docx`]));
+	});
+
+	it('Invia a manda la selezione all amica', async () => {
+		conAnna();
+		await monta();
+		await screen.findByRole('button', { name: /Anna/ });
+		await fireEvent.click(riga('alfa.txt'));
+		await voceMenu(riga('alfa.txt'), 'Invia a Anna');
+		await waitFor(() => expect(disco.inviati).toEqual([{ peer: '@' + codice, paths: ['C:\\alfa.txt'] }]));
+	});
+
+	it('togliere un amico chiede conferma', async () => {
+		conAnna();
+		await monta();
+		await fireEvent.click(await screen.findByRole('button', { name: 'Gestisci amici' }));
+		const pannello = await screen.findByRole('dialog', { name: 'Amici' });
+		await fireEvent.click(within(pannello).getByRole('button', { name: 'Togli' }));
+		expect(disco.amici).toHaveLength(1);
+		await fireEvent.click(within(pannello).getByRole('button', { name: 'Conferma' }));
+		await waitFor(() => expect(disco.amici).toHaveLength(0));
+	});
+});

@@ -29,7 +29,7 @@ use tauri::Emitter;
 /// test una funzione qualsiasi, così il server gira senza una finestra.
 pub type Avvisi = Arc<dyn Fn(&str, serde_json::Value) + Send + Sync>;
 
-fn avvisa<T: Serialize>(avvisi: &Avvisi, nome: &str, dato: T) {
+pub(crate) fn avvisa<T: Serialize>(avvisi: &Avvisi, nome: &str, dato: T) {
     if let Ok(v) = serde_json::to_value(dato) {
         avvisi(nome, v);
     }
@@ -131,57 +131,69 @@ struct Annuncio {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "tipo", rename_all = "camelCase")]
-enum Richiesta {
+pub(crate) enum Richiesta {
     Elenca { path: String },
     Scarica { path: String },
     Invia { da: String, voci: Vec<Voce>, totale: u64 },
+    /// Fra amici: «ci sei?», con il nome con cui ci si presenta.
+    Ciao { nome: String },
+    /// Fra amici: chiedere l'amicizia, o accettarla chiedendola a propria volta.
+    Amicizia { nome: String },
+    /// Fra amici: chi la manda ci ha tolti dai suoi amici.
+    Rimuovi,
 }
 
 /// Un elemento in viaggio. `rel` usa `/` come separatore e parte dal nome
 /// dell'elemento scelto, così la destinazione ricostruisce l'albero.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
-struct Voce {
-    rel: String,
-    dimensione: u64,
-    cartella: bool,
+pub(crate) struct Voce {
+    pub(crate) rel: String,
+    pub(crate) dimensione: u64,
+    pub(crate) cartella: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-struct VoceRemota {
-    nome: String,
-    cartella: bool,
-    dimensione: u64,
-    modificato: Option<i64>,
+pub(crate) struct VoceRemota {
+    pub(crate) nome: String,
+    pub(crate) cartella: bool,
+    pub(crate) dimensione: u64,
+    pub(crate) modificato: Option<i64>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
-struct Risposta {
-    ok: bool,
+pub(crate) struct Risposta {
+    pub(crate) ok: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    errore: Option<String>,
+    pub(crate) errore: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    voci: Vec<VoceRemota>,
+    pub(crate) voci: Vec<VoceRemota>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    contenuto: Vec<Voce>,
+    pub(crate) contenuto: Vec<Voce>,
+    /// Fra amici: il nome con cui si presenta chi risponde.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) nome: Option<String>,
+    /// Fra amici: l'amicizia è confermata da entrambe le parti.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub(crate) confermato: bool,
 }
 
 impl Risposta {
-    fn errore(msg: impl Into<String>) -> Self {
+    pub(crate) fn errore(msg: impl Into<String>) -> Self {
         Risposta { ok: false, errore: Some(msg.into()), ..Default::default() }
     }
 }
 
-fn scrivi_json<T: Serialize>(s: &mut impl Write, v: &T) -> io::Result<()> {
+pub(crate) fn scrivi_json<T: Serialize>(s: &mut impl Write, v: &T) -> io::Result<()> {
     let dati = serde_json::to_vec(v).map_err(io::Error::other)?;
     s.write_all(&(dati.len() as u32).to_be_bytes())?;
     s.write_all(&dati)?;
     s.flush()
 }
 
-fn leggi_json<T: for<'de> Deserialize<'de>>(s: &mut impl Read) -> io::Result<T> {
+pub(crate) fn leggi_json<T: for<'de> Deserialize<'de>>(s: &mut impl Read) -> io::Result<T> {
     let mut lunghezza = [0u8; 4];
     s.read_exact(&mut lunghezza)?;
     let n = u32::from_be_bytes(lunghezza) as usize;
@@ -218,7 +230,7 @@ fn dentro(radice: &Path, rel: &str) -> Option<PathBuf> {
     reale.starts_with(&base).then_some(unito)
 }
 
-fn errore_io(e: io::Error) -> FsError {
+pub(crate) fn errore_io(e: io::Error) -> FsError {
     FsError::Io { message: format!("Rete locale: {}", e) }
 }
 
@@ -269,16 +281,7 @@ impl Lan {
         let lan = Arc::new(Lan::nuovo(id, nome, salvato.config, file_config));
         lan.salva();
 
-        let avvisi: Avvisi = Arc::new(move |nome: &str, dato: serde_json::Value| {
-            // Il consenso e l'avanzamento di una ricezione si mostrano in una
-            // finestra sola, l'ultima usata; la lista dei PC vale per tutte.
-            if nome == "lan-pari" {
-                let _ = app.emit(nome, dato);
-            } else {
-                let w = crate::finestre::ultima(&app);
-                let _ = app.emit_to(w.label(), nome, dato);
-            }
-        });
+        let avvisi = avvisi_app(app);
         avvia_scoperta(avvisi.clone(), lan.clone());
         if let Ok(server) = TcpListener::bind(("0.0.0.0", PORTA_DATI)) {
             avvia_server(avvisi, lan.clone(), server);
@@ -288,7 +291,12 @@ impl Lan {
         lan
     }
 
-    fn nuovo(id: String, nome: String, config: Config, file_config: PathBuf) -> Lan {
+    /// Il nome con cui questo PC si presenta agli altri.
+    pub fn nome(&self) -> &str {
+        &self.nome
+    }
+
+    pub(crate) fn nuovo(id: String, nome: String, config: Config, file_config: PathBuf) -> Lan {
         Lan {
             id,
             nome,
@@ -385,6 +393,20 @@ impl Lan {
             let _ = tx.send(accetta);
         }
     }
+}
+
+/// Come i servizi di rete avvisano il frontend. Il consenso e l'avanzamento
+/// di una ricezione si mostrano in una finestra sola, l'ultima usata; le
+/// liste di PC e di amici valgono per tutte.
+pub fn avvisi_app(app: tauri::AppHandle) -> Avvisi {
+    Arc::new(move |nome: &str, dato: serde_json::Value| {
+        if nome == "lan-pari" || nome == "amici" {
+            let _ = app.emit(nome, dato);
+        } else {
+            let w = crate::finestre::ultima(&app);
+            let _ = app.emit_to(w.label(), nome, dato);
+        }
+    })
 }
 
 // ── Scoperta ─────────────────────────────────────────────────────────
@@ -516,39 +538,75 @@ fn avvia_server(avvisi: Avvisi, lan: Arc<Lan>, server: TcpListener) {
 }
 
 fn servi(avvisi: Avvisi, lan: Arc<Lan>, mut s: TcpStream) -> io::Result<()> {
-    let _ = s.set_read_timeout(Some(Duration::from_secs(30)));
+    let _ = s.set_read_timeout(Some(Duration::from_secs(60)));
     let richiesta: Richiesta = leggi_json(&mut s)?;
-    let config = lan.config();
 
     // Un PC non visibile non risponde a nessuno: invisibile davvero.
-    if !config.visibile {
+    if !lan.config().visibile {
         return scrivi_json(&mut s, &Risposta::errore("Questo PC non è visibile in rete locale."));
     }
+    let esito = match richiesta {
+        // Le richieste degli amici non passano dalla rete di casa.
+        Richiesta::Ciao { .. } | Richiesta::Amicizia { .. } | Richiesta::Rimuovi => {
+            scrivi_json(&mut s, &Risposta::errore("Richiesta non valida."))
+        }
+        r => servi_richiesta(&avvisi, &lan, &mut s, r, &Permessi { condivisione: true, mittente: None }),
+    };
+    // Chiudere la connessione è il modo in cui chi invia sa dell'annullamento.
+    let _ = s.shutdown(std::net::Shutdown::Both);
+    esito
+}
 
+/// Chi chiede, e cosa può avere.
+pub(crate) struct Permessi {
+    /// Può sfogliare e scaricare la cartella condivisa.
+    pub(crate) condivisione: bool,
+    /// Il nome sicuro di chi chiede (un amico, riconosciuto dalla sua
+    /// chiave): vale al posto di quello che dichiara nella richiesta.
+    pub(crate) mittente: Option<String>,
+}
+
+/// Risponde a una richiesta di cartella condivisa o d'invio, su qualsiasi
+/// connessione: un socket della rete di casa o un flusso cifrato fra amici.
+pub(crate) fn servi_richiesta<S: Read + Write>(
+    avvisi: &Avvisi,
+    lan: &Arc<Lan>,
+    s: &mut S,
+    richiesta: Richiesta,
+    permessi: &Permessi,
+) -> io::Result<()> {
+    let config = lan.config();
+    let condivisa = config.condivisa.as_deref().map(PathBuf::from).filter(|_| permessi.condivisione);
     match richiesta {
         Richiesta::Elenca { path } => {
-            let Some(radice) = config.condivisa.as_deref().map(PathBuf::from) else {
-                return scrivi_json(&mut s, &Risposta::errore("Questo PC non condivide nessuna cartella."));
+            let Some(radice) = condivisa else {
+                return scrivi_json(s, &Risposta::errore("Questo PC non condivide nessuna cartella."));
             };
             let Some(cartella) = dentro(&radice, &path) else {
-                return scrivi_json(&mut s, &Risposta::errore("Cartella non trovata."));
+                return scrivi_json(s, &Risposta::errore("Cartella non trovata."));
             };
             let voci = elenca_locale(&cartella);
-            scrivi_json(&mut s, &Risposta { ok: true, voci, ..Default::default() })
+            scrivi_json(s, &Risposta { ok: true, voci, ..Default::default() })
         }
         Richiesta::Scarica { path } => {
-            let Some(radice) = config.condivisa.as_deref().map(PathBuf::from) else {
-                return scrivi_json(&mut s, &Risposta::errore("Questo PC non condivide nessuna cartella."));
+            let Some(radice) = condivisa else {
+                return scrivi_json(s, &Risposta::errore("Questo PC non condivide nessuna cartella."));
             };
             let Some(sorgente) = dentro(&radice, &path) else {
-                return scrivi_json(&mut s, &Risposta::errore("Elemento non trovato."));
+                return scrivi_json(s, &Risposta::errore("Elemento non trovato."));
             };
             let contenuto = piano(&sorgente);
-            scrivi_json(&mut s, &Risposta { ok: true, contenuto: contenuto.clone(), ..Default::default() })?;
+            scrivi_json(s, &Risposta { ok: true, contenuto: contenuto.clone(), ..Default::default() })?;
             let base = sorgente.parent().unwrap_or(&sorgente).to_path_buf();
-            manda_file(&mut s, &base, &contenuto, &AtomicBool::new(false), &mut |_| {})
+            manda_file(s, &base, &contenuto, &AtomicBool::new(false), &mut |_| {})
         }
-        Richiesta::Invia { da, voci, totale } => ricevi(avvisi, lan, s, da, voci, totale),
+        Richiesta::Invia { da, voci, totale } => {
+            let da = permessi.mittente.clone().unwrap_or(da);
+            ricevi(avvisi.clone(), lan.clone(), s, da, voci, totale)
+        }
+        Richiesta::Ciao { .. } | Richiesta::Amicizia { .. } | Richiesta::Rimuovi => {
+            scrivi_json(s, &Risposta::errore("Richiesta non valida."))
+        }
     }
 }
 
@@ -568,7 +626,7 @@ fn elenca_locale(cartella: &Path) -> Vec<VoceRemota> {
 
 /// Tutto ciò che va spedito per `sorgente`: lei stessa e, se è una
 /// cartella, il suo contenuto. I path partono dal nome di `sorgente`.
-fn piano(sorgente: &Path) -> Vec<Voce> {
+pub(crate) fn piano(sorgente: &Path) -> Vec<Voce> {
     let base = sorgente.parent().unwrap_or(sorgente);
     let mut out = Vec::new();
     let mut pila = vec![sorgente.to_path_buf()];
@@ -596,7 +654,7 @@ fn piano(sorgente: &Path) -> Vec<Voce> {
 
 /// Spedisce i byte dei file del piano, uno dopo l'altro, nella stessa
 /// misura annunciata: chi riceve legge esattamente `dimensione` byte.
-fn manda_file(
+pub(crate) fn manda_file(
     s: &mut impl Write,
     base: &Path,
     voci: &[Voce],
@@ -637,7 +695,7 @@ fn manda_file(
 ///
 /// Se si interrompe (annullato, rete caduta) toglie ciò che aveva iniziato
 /// a scrivere: un file a metà sembrerebbe buono e non lo è.
-fn prendi_file(
+pub(crate) fn prendi_file(
     s: &mut impl Read,
     dest: &Path,
     voci: &[Voce],
@@ -708,17 +766,17 @@ fn prendi_file_in(
     Ok(())
 }
 
-fn ricevi(
+fn ricevi<S: Read + Write>(
     avvisi: Avvisi,
     lan: Arc<Lan>,
-    mut s: TcpStream,
+    s: &mut S,
     da: String,
     voci: Vec<Voce>,
     totale: u64,
 ) -> io::Result<()> {
     // Tutti i path vengono controllati prima di chiedere il consenso.
     if voci.iter().any(|v| rel_sicuro(&v.rel).is_none_or(|r| r.as_os_str().is_empty())) {
-        return scrivi_json(&mut s, &Risposta::errore("Richiesta non valida."));
+        return scrivi_json(s, &Risposta::errore("Richiesta non valida."));
     }
 
     let id = lan.prossima.fetch_add(1, Ordering::Relaxed);
@@ -742,18 +800,17 @@ fn ricevi(
         m.remove(&id);
     }
     if !accetta {
-        return scrivi_json(&mut s, &Risposta::errore("Il destinatario ha rifiutato."));
+        return scrivi_json(s, &Risposta::errore("Il destinatario ha rifiutato."));
     }
-    scrivi_json(&mut s, &Risposta { ok: true, ..Default::default() })?;
+    scrivi_json(s, &Risposta { ok: true, ..Default::default() })?;
 
     let dest = lan.cartella_ricevuti();
-    let _ = s.set_read_timeout(Some(Duration::from_secs(60)));
     let mut ultimo = Instant::now();
     let annulla = Arc::new(AtomicBool::new(false));
     if let Ok(mut m) = lan.ricezioni.lock() {
         m.insert(id, annulla.clone());
     }
-    let esito = prendi_file(&mut s, &dest, &voci, &annulla, &mut |fatti| {
+    let esito = prendi_file(s, &dest, &voci, &annulla, &mut |fatti| {
         if ultimo.elapsed() >= Duration::from_millis(100) {
             ultimo = Instant::now();
             avvisa(&avvisi, "lan-ricezione", Ricezione { id, fatti, totale });
@@ -775,8 +832,6 @@ fn ricevi(
     if let Ok(mut m) = lan.ricezioni.lock() {
         m.remove(&id);
     }
-    // Chiudere la connessione è il modo in cui chi invia sa dell'annullamento.
-    let _ = s.shutdown(std::net::Shutdown::Both);
     Ok(())
 }
 
@@ -810,7 +865,7 @@ fn connetti(lan: &Lan, id: &str) -> Result<TcpStream, FsError> {
     Ok(s)
 }
 
-fn controlla(r: Risposta) -> Result<Risposta, FsError> {
+pub(crate) fn controlla(r: Risposta) -> Result<Risposta, FsError> {
     if r.ok {
         Ok(r)
     } else {

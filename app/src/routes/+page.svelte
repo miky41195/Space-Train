@@ -11,7 +11,8 @@
 		type TipoNuovo,
 		type StatoLan,
 		type Pari,
-		type RichiestaInvio
+		type RichiestaInvio,
+		type StatoAmici
 	} from '$lib/ipc';
 	import { TabsStore } from '$lib/stores/tabs.svelte';
 	import TitleBar from '$lib/components/TitleBar.svelte';
@@ -21,6 +22,7 @@
 	import BarraRecenti from '$lib/components/BarraRecenti.svelte';
 	import RichiestaLan from '$lib/components/RichiestaLan.svelte';
 	import NovitaFinestra from '$lib/components/Novita.svelte';
+	import AmiciFinestra from '$lib/components/Amici.svelte';
 	import { NOVITA, novitaDaMostrare, type Novita } from '$lib/novita';
 	import FileList from '$lib/components/FileList.svelte';
 	import SearchBar from '$lib/components/SearchBar.svelte';
@@ -71,6 +73,8 @@
 		QUESTO_PC,
 		RETE,
 		RETE_LOCALE,
+		AMICI,
+		impostaNomiAmici,
 		cartellaDi,
 		eReteLocale,
 		eVirtuale,
@@ -713,7 +717,7 @@
 	async function inviaA(peer: string) {
 		const scelte = selezionate();
 		if (scelte.length === 0 || opInCorso !== null) return;
-		const nome = pariLan.find((p) => p.id === peer)?.nome ?? peer;
+		const nome = destinatari.find((p) => p.id === peer)?.nome ?? peer;
 		const opId = prossimoOpId++;
 		modoInCorso = 'invio';
 		opInCorso = opId;
@@ -756,11 +760,19 @@
 		// La lista dei PC vale per tutte le finestre; consenso e ricezione
 		// arrivano solo all'ultima usata, a cui Rust li indirizza.
 		const ascolta = <T,>(nome: string, f: (payload: T) => void) =>
-			(nome === 'lan-pari' ? listen<T>(nome, (e) => f(e.payload)) : soloQui<T>(nome, f))
+			(nome === 'lan-pari' || nome === 'amici' ? listen<T>(nome, (e) => f(e.payload)) : soloQui<T>(nome, f))
 				.then((u) => (attivo ? smonta.push(u) : u()))
 				.catch(() => {});
 
 		void ascolta<Pari[]>('lan-pari', (p) => (pariLan = p));
+		void ascolta<StatoAmici>('amici', (s) => {
+			statoAmici = s;
+			// La posizione «Amici» elenca gli amici confermati: si aggiorna con loro.
+			void store.aggiornaCartella(AMICI);
+		});
+		void ascolta<{ id: string; nome: string }>('amici-richiesta', (r) =>
+			avvisa(`${r.nome} ti ha chiesto l’amicizia: rispondi da Amici nella barra laterale.`)
+		);
 		void ascolta<RichiestaInvio>('lan-richiesta', (r) => (richiesteLan = [...richiesteLan, r]));
 		void ascolta<{ id: number; fatti: number; totale: number }>('lan-ricezione', (r) => {
 			if (opInCorso !== null && modoInCorso !== 'ricezione') return;
@@ -784,6 +796,31 @@
 			smonta.forEach((u) => u());
 		};
 	});
+
+	// ── Amici ────────────────────────────────────────────────────────
+
+	let statoAmici = $state<StatoAmici | null>(null);
+	let amiciAperti = $state(false);
+
+	$effect(() => {
+		tauriBackend.amiciStato().then((s) => (statoAmici = s)).catch(() => {});
+	});
+
+	// Le briciole e le schede mostrano il nome dell'amico, non il suo codice.
+	$effect(() => {
+		impostaNomiAmici(Object.fromEntries((statoAmici?.amici ?? []).map((a) => [a.id, a.nome])));
+	});
+
+	/**
+	 * A chi si può inviare: i PC della rete locale e gli amici confermati.
+	 * Un amico ha `@` davanti al codice, per distinguerlo da un PC di casa.
+	 */
+	let destinatari = $derived([
+		...pariLan,
+		...(statoAmici?.amici ?? [])
+			.filter((a) => a.stato === 'confermato')
+			.map((a) => ({ id: '@' + a.id, nome: a.nome }))
+	]);
 
 	async function impostaLan(modifica: Partial<StatoLan>) {
 		if (!statoLan) return;
@@ -1530,7 +1567,7 @@
 				ricerca: inRicerca,
 				annullabile: annulla.prossima(),
 				coloreAttuale: coloreComune(scelte),
-				pari: pariLan,
+				pari: destinatari,
 				condivisa: statoLan?.condivisa ?? null,
 				condivisaQui:
 					!!statoLan?.condivisa &&
@@ -2008,6 +2045,8 @@
 			lan={statoLan}
 			pari={pariLan}
 			ontogglevisibile={() => impostaLan({ visibile: !statoLan?.visibile })}
+			amici={statoAmici}
+			onapriamici={() => (amiciAperti = true)}
 			onindirizzi={(indirizzi) =>
 				// Chi aggiunge un PC lontano vuole farsi trovare: si rende visibile.
 				impostaLan(indirizzi.length > (statoLan?.indirizzi?.length ?? 0) ? { indirizzi, visibile: true } : { indirizzi })}
@@ -2204,6 +2243,16 @@
 
 	{#if daCestinare.length > 0}
 		<ConfermaCestino voci={daCestinare} onconfirm={() => cestina()} oncancel={() => (daCestinare = [])} />
+	{/if}
+
+	{#if amiciAperti && statoAmici}
+		<AmiciFinestra
+			backend={tauriBackend}
+			stato={statoAmici}
+			condivisa={statoLan?.condivisa ?? null}
+			onchiudi={() => (amiciAperti = false)}
+			onerrore={(e) => (erroreOp = descriviErrore(e))}
+		/>
 	{/if}
 
 	{#if novitaAperte.length > 0}

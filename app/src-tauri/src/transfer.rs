@@ -226,6 +226,7 @@ pub async fn extract(
 pub async fn lan_invia(
     state: tauri::State<'_, Operazioni>,
     lan: tauri::State<'_, Arc<crate::lan::Lan>>,
+    amici: tauri::State<'_, Arc<crate::amici::Amici>>,
     op_id: u64,
     peer: String,
     paths: Vec<String>,
@@ -233,14 +234,20 @@ pub async fn lan_invia(
 ) -> Result<(), FsError> {
     let annulla = state.registra(op_id);
     let lan = lan.inner().clone();
+    let amici = amici.inner().clone();
     let esito = tauri::async_runtime::spawn_blocking(move || {
         let mut ultimo = Instant::now();
-        crate::lan::invia(&lan, &peer, &paths, &annulla, &mut |fatti, total| {
+        let mut avanza = |fatti, total| {
             if ultimo.elapsed() >= INTERVALLO_AVANZAMENTO {
                 ultimo = Instant::now();
                 let _ = on_progress.send(Progresso { transferred: fatti, total });
             }
-        })
+        };
+        // Un amico arriva come `@codice`, un PC della rete locale col suo id.
+        match peer.strip_prefix(crate::amici::PREFISSO_INVIO) {
+            Some(amico) => amici.invia(amico, &paths, &annulla, &mut avanza),
+            None => crate::lan::invia(&lan, &peer, &paths, &annulla, &mut avanza),
+        }
     })
     .await;
     state.dimentica(op_id);
@@ -252,6 +259,7 @@ pub async fn lan_invia(
 pub async fn lan_scarica(
     state: tauri::State<'_, Operazioni>,
     lan: tauri::State<'_, Arc<crate::lan::Lan>>,
+    amici: tauri::State<'_, Arc<crate::amici::Amici>>,
     op_id: u64,
     sources: Vec<String>,
     dest: String,
@@ -259,9 +267,10 @@ pub async fn lan_scarica(
 ) -> Result<Esito, FsError> {
     let annulla = state.registra(op_id);
     let lan = lan.inner().clone();
+    let amici = amici.inner().clone();
     let esito = tauri::async_runtime::spawn_blocking(move || {
         let mut ultimo = Instant::now();
-        let coppie = crate::lan::scarica(&lan, &sources, &dest, &annulla, &mut |fatti, total| {
+        let coppie = crate::ipc::scarica_remoto(&lan, &amici, &sources, &dest, &annulla, &mut |fatti, total| {
             if ultimo.elapsed() >= INTERVALLO_AVANZAMENTO {
                 ultimo = Instant::now();
                 let _ = on_progress.send(Progresso { transferred: fatti, total });

@@ -123,6 +123,28 @@ export interface Pari {
 	condivisa: string | null;
 }
 
+/**
+ * Un amico su Space Train, raggiungibile anche fuori casa.
+ * `inviata`: l'abbiamo chiesta noi; `ricevuta`: tocca a noi rispondere.
+ */
+export interface Amico {
+	/** Il suo codice personale. */
+	id: string;
+	nome: string;
+	stato: 'confermato' | 'inviata' | 'ricevuta';
+	/** Può sfogliare e scaricare la nostra cartella condivisa. */
+	condividi: boolean;
+	inLinea: boolean;
+}
+
+export interface StatoAmici {
+	/** Il nostro codice personale, da dare agli amici. */
+	codice: string;
+	/** La connessione è pronta: senza, gli amici non si raggiungono. */
+	pronto: boolean;
+	amici: Amico[];
+}
+
 /** Un altro PC vuole inviarci dei file: serve il nostro consenso. */
 export interface RichiestaInvio {
 	id: number;
@@ -203,6 +225,15 @@ export interface Backend {
 	saveThemeImage(nome: string, base64: string): Promise<string>;
 	/** Rilegge in base64 un'immagine salvata con `saveThemeImage`. */
 	readThemeImage(path: string): Promise<string>;
+	amiciStato(): Promise<StatoAmici>;
+	/** Chiede l'amicizia a chi ha questo codice. */
+	amiciAggiungi(codice: string): Promise<void>;
+	amiciAccetta(id: string): Promise<void>;
+	/** Toglie un amico o rifiuta la sua richiesta. */
+	amiciRimuovi(id: string): Promise<void>;
+	amiciCondividi(id: string, si: boolean): Promise<StatoAmici>;
+	/** Il QR code del nostro codice, in SVG. */
+	amiciQr(): Promise<string>;
 	lanStato(): Promise<StatoLan>;
 	lanImposta(config: ConfigLan): Promise<StatoLan>;
 	lanPari(): Promise<Pari[]>;
@@ -289,6 +320,12 @@ export const tauriBackend: Backend = {
 	newWindow: (path) => invoke('new_window', { path }),
 	saveThemeImage: (nome, base64) => invoke('save_theme_image', { nome, dati: base64 }),
 	readThemeImage: (path) => invoke('read_theme_image', { path }),
+	amiciStato: () => invoke('amici_stato'),
+	amiciAggiungi: (codice) => invoke('amici_aggiungi', { codice }),
+	amiciAccetta: (id) => invoke('amici_accetta', { id }),
+	amiciRimuovi: (id) => invoke('amici_rimuovi', { id }),
+	amiciCondividi: (id, si) => invoke('amici_condividi', { id, si }),
+	amiciQr: () => invoke('amici_qr'),
 	lanStato: () => invoke('lan_stato'),
 	lanImposta: (config) => invoke('lan_imposta', { config }),
 	lanPari: () => invoke('lan_pari'),

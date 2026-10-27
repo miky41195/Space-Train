@@ -26,14 +26,24 @@ async fn fuori_dalla_finestra<T: Send + 'static>(
 #[tauri::command]
 pub async fn list_dir(
     lan: tauri::State<'_, std::sync::Arc<crate::lan::Lan>>,
+    amici: tauri::State<'_, std::sync::Arc<crate::amici::Amici>>,
     path: String,
     sort: SortSpec,
     show_hidden: bool,
 ) -> Result<Listing, FsError> {
     let lan = lan.inner().clone();
+    let amici = amici.inner().clone();
     fuori_dalla_finestra(move || {
-        // La rete locale ha bisogno dello stato del servizio: la si
-        // gestisce qui, il resto passa da `elenca`.
+        // Rete locale e amici hanno bisogno dello stato dei loro servizi:
+        // li si gestisce qui, il resto passa da `elenca`.
+        if path == crate::amici::RADICE {
+            return Ok(Listing { path, entries: amici.voci() });
+        }
+        if crate::amici::dividi(&path).is_some() {
+            let mut entries = amici.elenca(&path)?;
+            crate::fs::sort::sort_entries(&mut entries, &sort);
+            return Ok(Listing { path, entries });
+        }
         if path == crate::lan::RADICE {
             return Ok(Listing { path, entries: crate::lan::voci_pari(&lan) });
         }
@@ -77,7 +87,7 @@ pub fn open_entry(path: String) -> Result<(), FsError> {
 pub fn navigate(path: String, direction: String) -> Result<String, FsError> {
     match direction.as_str() {
         "up" => {
-            if let Some(g) = crate::lan::genitore(&path) {
+            if let Some(g) = crate::lan::genitore(&path).or_else(|| crate::amici::genitore(&path)) {
                 return Ok(g);
             }
             if path.starts_with("::") {
@@ -418,11 +428,88 @@ pub fn lan_annulla_ricezione(lan: tauri::State<'_, Arc<Lan>>, id: u64) -> bool {
     lan.annulla_ricezione(id)
 }
 
-/// Apre un file della cartella condivisa da un altro PC.
+use crate::amici::Amici;
+
+/// Scarica elementi condivisi da un altro PC, in rete locale o da un amico:
+/// lo dice il path.
+pub fn scarica_remoto(
+    lan: &Lan,
+    amici: &Amici,
+    sorgenti: &[String],
+    dest: &str,
+    annulla: &std::sync::atomic::AtomicBool,
+    avanzamento: &mut dyn FnMut(u64, u64),
+) -> Result<Vec<[String; 2]>, FsError> {
+    if sorgenti.first().is_some_and(|p| crate::amici::dividi(p).is_some()) {
+        amici.scarica(sorgenti, dest, annulla, avanzamento)
+    } else {
+        crate::lan::scarica(lan, sorgenti, dest, annulla, avanzamento)
+    }
+}
+
+/// Apre un file della cartella condivisa da un altro PC: lo scarica in una
+/// cartella temporanea e lo apre da lì.
 #[tauri::command]
-pub async fn lan_apri(lan: tauri::State<'_, Arc<Lan>>, path: String) -> Result<(), FsError> {
+pub async fn lan_apri(
+    lan: tauri::State<'_, Arc<Lan>>,
+    amici: tauri::State<'_, Arc<Amici>>,
+    path: String,
+) -> Result<(), FsError> {
     let lan = lan.inner().clone();
-    fuori_dalla_finestra(move || crate::lan::apri(&lan, &path)).await
+    let amici = amici.inner().clone();
+    fuori_dalla_finestra(move || {
+        let temp = std::env::temp_dir().join("SpaceTrain-rete");
+        let coppie = scarica_remoto(
+            &lan,
+            &amici,
+            &[path],
+            &temp.to_string_lossy(),
+            &std::sync::atomic::AtomicBool::new(false),
+            &mut |_, _| {},
+        )?;
+        let locale = coppie.first().map(|c| c[1].clone()).ok_or(FsError::NotFound)?;
+        open::open_default(&locale)
+    })
+    .await
+}
+
+#[tauri::command]
+pub fn amici_stato(amici: tauri::State<'_, Arc<Amici>>) -> crate::amici::StatoAmici {
+    amici.stato()
+}
+
+/// Aggiunge un amico dal suo codice personale e gli chiede l'amicizia.
+#[tauri::command]
+pub async fn amici_aggiungi(amici: tauri::State<'_, Arc<Amici>>, codice: String) -> Result<(), FsError> {
+    let amici = amici.inner().clone();
+    fuori_dalla_finestra(move || amici.aggiungi(&codice)).await
+}
+
+/// Accetta la richiesta d'amicizia di `id`.
+#[tauri::command]
+pub async fn amici_accetta(amici: tauri::State<'_, Arc<Amici>>, id: String) -> Result<(), FsError> {
+    let amici = amici.inner().clone();
+    fuori_dalla_finestra(move || amici.accetta(&id)).await
+}
+
+/// Toglie un amico, o rifiuta la sua richiesta.
+#[tauri::command]
+pub async fn amici_rimuovi(amici: tauri::State<'_, Arc<Amici>>, id: String) -> Result<(), FsError> {
+    let amici = amici.inner().clone();
+    fuori_dalla_finestra(move || amici.rimuovi(&id)).await
+}
+
+/// Lascia o toglie a un amico la cartella condivisa.
+#[tauri::command]
+pub fn amici_condividi(amici: tauri::State<'_, Arc<Amici>>, id: String, si: bool) -> crate::amici::StatoAmici {
+    amici.condividi(&id, si);
+    amici.stato()
+}
+
+/// Il QR code del nostro codice personale, in SVG.
+#[tauri::command]
+pub fn amici_qr(amici: tauri::State<'_, Arc<Amici>>) -> Result<String, FsError> {
+    crate::amici::qr(&amici.stato().codice)
 }
 
 /// Scarica in una cartella temporanea gli elementi della cartella condivisa
@@ -433,8 +520,13 @@ pub async fn lan_apri(lan: tauri::State<'_, Arc<Lan>>, path: String) -> Result<(
 /// («Elemento non raggiungibile»). Le cartelle temporanee vecchie di un
 /// giorno si buttano via a ogni nuovo trascinamento.
 #[tauri::command]
-pub async fn lan_prepara_trascina(lan: tauri::State<'_, Arc<Lan>>, paths: Vec<String>) -> Result<Vec<String>, FsError> {
+pub async fn lan_prepara_trascina(
+    lan: tauri::State<'_, Arc<Lan>>,
+    amici: tauri::State<'_, Arc<Amici>>,
+    paths: Vec<String>,
+) -> Result<Vec<String>, FsError> {
     let lan = lan.inner().clone();
+    let amici = amici.inner().clone();
     fuori_dalla_finestra(move || {
         let base = std::env::temp_dir().join("SpaceTrain-trascina");
         if let Ok(vecchie) = std::fs::read_dir(&base) {
@@ -455,8 +547,9 @@ pub async fn lan_prepara_trascina(lan: tauri::State<'_, Arc<Lan>>, paths: Vec<St
             .unwrap_or(0);
         let dir = base.join(istante.to_string());
         std::fs::create_dir_all(&dir).map_err(|e| crate::fs::error::from_io(&e))?;
-        let coppie = crate::lan::scarica(
+        let coppie = scarica_remoto(
             &lan,
+            &amici,
             &paths,
             &dir.to_string_lossy(),
             &std::sync::atomic::AtomicBool::new(false),

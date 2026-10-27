@@ -1,4 +1,5 @@
 import type {
+	Amico,
 	ConfigLan,
 	ContenutoAppunti,
 	Entry,
@@ -43,6 +44,9 @@ export class DiscoFinto {
 	/** Rete locale: preferenze di questo PC e altri PC trovati. */
 	lan: ConfigLan = { visibile: false, condivisa: null, ricevuti: null, indirizzi: [] };
 	pari: Pari[] = [];
+	/** Amici: il codice di questo PC e la lista, come la tiene il backend. */
+	codiceAmici = 'codice-di-questo-pc';
+	amici: Amico[] = [];
 	/** Invii verso altri PC e risposte alle richieste ricevute. */
 	inviati: Array<{ peer: string; paths: string[] }> = [];
 	risposte: Array<{ id: number; accetta: boolean }> = [];
@@ -98,7 +102,7 @@ export class DiscoFinto {
 				return this.#listDir(args.path as string, args.sort as SortSpec);
 			case 'navigate': {
 				const path = args.path as string;
-				if (path.startsWith('::lan\\')) return genitore(path);
+				if (path.startsWith('::lan\\') || path.startsWith('::amici\\')) return genitore(path);
 				if (path.startsWith('::')) throw errore({ kind: 'notFound' });
 				// Sopra la radice del disco c'è Questo PC, come nel backend.
 				if (path === 'C:\\') return '::pc';
@@ -245,6 +249,28 @@ export class DiscoFinto {
 					cartellaRicevuti: this.lan.ricevuti ?? 'C:\\Ricevuti',
 					...this.lan
 				};
+			case 'amici_stato':
+				return { codice: this.codiceAmici, pronto: true, amici: this.amici };
+			case 'amici_aggiungi':
+				this.amici.push({
+					id: args.codice as string,
+					nome: `Amico ${(args.codice as string).slice(0, 6)}`,
+					stato: 'inviata',
+					condividi: false,
+					inLinea: false
+				});
+				return null;
+			case 'amici_accetta':
+				this.amici = this.amici.map((a) => (a.id === args.id ? { ...a, stato: 'confermato' } : a));
+				return null;
+			case 'amici_rimuovi':
+				this.amici = this.amici.filter((a) => a.id !== args.id);
+				return null;
+			case 'amici_condividi':
+				this.amici = this.amici.map((a) => (a.id === args.id ? { ...a, condividi: args.si as boolean } : a));
+				return { codice: this.codiceAmici, pronto: true, amici: this.amici };
+			case 'amici_qr':
+				return '<svg xmlns="http://www.w3.org/2000/svg"></svg>';
 			case 'lan_pari':
 				return this.pari;
 			case 'lan_rispondi':
@@ -309,6 +335,21 @@ export class DiscoFinto {
 					hidden: false,
 					origine: genitore(v.originale)
 				}))
+			};
+		}
+		if (path === '::amici') {
+			return {
+				path,
+				entries: this.amici
+					.filter((a) => a.stato === 'confermato')
+					.map((a) => ({
+						name: a.nome,
+						path: `::amici\\${a.id}`,
+						kind: 'dir' as const,
+						size: 0,
+						modified: null,
+						hidden: false
+					}))
 			};
 		}
 		if (path === '::lan') {

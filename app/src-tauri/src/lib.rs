@@ -1,3 +1,4 @@
+pub mod amici;
 pub mod avvio;
 pub mod finestre;
 pub mod fs;
@@ -86,7 +87,16 @@ pub fn run() {
                 .path()
                 .app_local_data_dir()
                 .unwrap_or_else(|_| std::env::temp_dir().join("space-train"));
-            app.manage(lan::Lan::avvia(app.handle().clone(), dati));
+            let lan = lan::Lan::avvia(app.handle().clone(), dati.clone());
+            // Gli amici usano la stessa cartella condivisa e lo stesso nome
+            // della rete locale, ma viaggiano su internet, cifrati.
+            app.manage(amici::Amici::avvia(
+                tauri::async_runtime::handle().inner().clone(),
+                dati,
+                lan.clone(),
+                lan::avvisi_app(app.handle().clone()),
+            ));
+            app.manage(lan);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -138,6 +148,12 @@ pub fn run() {
             ipc::lan_apri,
             ipc::lan_annulla_ricezione,
             ipc::lan_prepara_trascina,
+            ipc::amici_stato,
+            ipc::amici_aggiungi,
+            ipc::amici_accetta,
+            ipc::amici_rimuovi,
+            ipc::amici_condividi,
+            ipc::amici_qr,
             transfer::lan_invia,
             transfer::lan_scarica,
             transfer::search,

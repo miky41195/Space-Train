@@ -95,6 +95,18 @@ export function backendFinto(over: Partial<Backend> = {}): Backend {
 		async readThemeImage() {
 			return '';
 		},
+		async amiciStato() {
+			return { codice: 'codice-di-questo-pc', pronto: true, amici: [] };
+		},
+		async amiciAggiungi() {},
+		async amiciAccetta() {},
+		async amiciRimuovi() {},
+		async amiciCondividi() {
+			return { codice: 'codice-di-questo-pc', pronto: true, amici: [] };
+		},
+		async amiciQr() {
+			return '';
+		},
 		async lanStato() {
 			return {
 				id: 'QUESTO-0000',

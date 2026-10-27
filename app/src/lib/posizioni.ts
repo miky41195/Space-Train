@@ -8,17 +8,33 @@ export const RETE = '::rete';
 export const CESTINO = '::cestino';
 /** I PC con Space Train trovati in rete locale. */
 export const RETE_LOCALE = '::lan';
+/** Gli amici su Space Train, ovunque siano. */
+export const AMICI = '::amici';
 
 const NOMI_VIRTUALI: Record<string, string> = {
 	[QUESTO_PC]: 'Questo PC',
 	[RETE]: 'Rete',
 	[CESTINO]: 'Cestino',
-	[RETE_LOCALE]: 'Rete locale'
+	[RETE_LOCALE]: 'Rete locale',
+	[AMICI]: 'Amici'
 };
 
-/** Vero per la Rete locale e per tutto ciò che vi si sfoglia dentro. */
+/**
+ * Vero per ciò che sta su un altro PC: la Rete locale, gli Amici e tutto ciò
+ * che vi si sfoglia dentro. Si apre, si copia e si trascina allo stesso modo.
+ */
 export function eReteLocale(path: string): boolean {
-	return path === RETE_LOCALE || path.startsWith(RETE_LOCALE + '\\');
+	return [RETE_LOCALE, AMICI].some((r) => path === r || path.startsWith(r + '\\'));
+}
+
+/**
+ * I nomi degli amici per codice: il path porta il codice, lungo e
+ * illeggibile, le briciole e le schede mostrano il nome.
+ */
+let nomiAmici: Record<string, string> = {};
+
+export function impostaNomiAmici(nomi: Record<string, string>) {
+	nomiAmici = nomi;
 }
 
 export function eVirtuale(path: string): boolean {
@@ -37,14 +53,16 @@ export interface Briciola {
  * la catena arriva sempre fino a una radice cliccabile.
  */
 export function briciole(path: string): Briciola[] {
-	if (path.startsWith(RETE_LOCALE + '\\')) {
-		const parti = path.slice(RETE_LOCALE.length + 1).split('\\').filter(Boolean);
-		const out: Briciola[] = [{ nome: 'Rete locale', path: RETE_LOCALE }];
-		let corrente = RETE_LOCALE;
-		for (const p of parti) {
+	for (const radice of [RETE_LOCALE, AMICI]) {
+		if (!path.startsWith(radice + '\\')) continue;
+		const parti = path.slice(radice.length + 1).split('\\').filter(Boolean);
+		const out: Briciola[] = [{ nome: NOMI_VIRTUALI[radice], path: radice }];
+		let corrente = radice;
+		parti.forEach((p, i) => {
 			corrente = `${corrente}\\${p}`;
-			out.push({ nome: p, path: corrente });
-		}
+			const nome = radice === AMICI && i === 0 ? (nomiAmici[p] ?? 'Amico') : p;
+			out.push({ nome, path: corrente });
+		});
 		return out;
 	}
 	if (eVirtuale(path)) {

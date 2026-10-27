@@ -1,7 +1,7 @@
 <script lang="ts">
-	import type { Backend, Drive, KnownFolder, Pari, StatoLan } from '../ipc';
+	import type { Backend, Drive, KnownFolder, Pari, StatoAmici, StatoLan } from '../ipc';
 	import type { TabsStore } from '../stores/tabs.svelte';
-	import { QUESTO_PC, RETE, CESTINO, RETE_LOCALE, byte, stessoPath, nomeDi } from '../posizioni';
+	import { QUESTO_PC, RETE, CESTINO, RETE_LOCALE, AMICI, byte, stessoPath, nomeDi } from '../posizioni';
 
 	let {
 		store,
@@ -13,6 +13,8 @@
 		pari = [],
 		ontogglevisibile = undefined,
 		onindirizzi = undefined,
+		amici = null,
+		onapriamici = undefined,
 		accessoRapido = [],
 		onmenuaccesso = undefined
 	}: {
@@ -31,6 +33,10 @@
 		ontogglevisibile?: () => void;
 		/** La lista nuova dei PC aggiunti per indirizzo. */
 		onindirizzi?: (indirizzi: string[]) => void;
+		/** Amici su Space Train, se il servizio risponde. */
+		amici?: StatoAmici | null;
+		/** Apre il pannello con il codice personale e la lista completa. */
+		onapriamici?: () => void;
 		/** Le cartelle fissate dall'utente, nell'ordine scelto. */
 		accessoRapido?: string[];
 		/** Clic destro su una voce dell'Accesso rapido. */
@@ -79,6 +85,14 @@
 	/** La cartella condivisa da un altro PC, vista come posizione virtuale. */
 	function pathPari(p: Pari): string {
 		return RETE_LOCALE + '\\' + p.id;
+	}
+
+	let confermati = $derived(amici?.amici.filter((a) => a.stato === 'confermato') ?? []);
+	let inAttesa = $derived(amici?.amici.filter((a) => a.stato === 'ricevuta').length ?? 0);
+
+	function dentro(path: string): boolean {
+		const t = store.activeTab?.path.toLowerCase();
+		return !!t && (t === path.toLowerCase() || t.startsWith(path.toLowerCase() + '\\'));
 	}
 
 	function corrente(path: string): boolean {
@@ -166,6 +180,30 @@
 			{:else}
 				<button class="voce aggiungi-pc" onclick={() => (aggiungendo = true)}>+ Aggiungi PC per indirizzo</button>
 			{/if}
+		</div>
+	{/if}
+
+	{#if amici}
+		<div class="gruppo">
+			<div class="titolo">Amici</div>
+			{#each confermati as a (a.id)}
+				<button
+					class="voce"
+					class:corrente={dentro(AMICI + '\\' + a.id)}
+					onclick={() => vai(AMICI + '\\' + a.id)}
+					title={a.inLinea ? `${a.nome} — in linea` : `${a.nome} — non in linea`}
+				>
+					<span class="pallino-stato amico" class:acceso={a.inLinea}></span>{a.nome}
+				</button>
+			{/each}
+			{#if inAttesa > 0}
+				<button class="voce richieste" onclick={onapriamici}>
+					{inAttesa === 1 ? '1 richiesta d’amicizia' : `${inAttesa} richieste d’amicizia`}
+				</button>
+			{/if}
+			<button class="voce aggiungi-pc" onclick={onapriamici}>
+				{confermati.length === 0 ? '+ Aggiungi amici' : 'Gestisci amici'}
+			</button>
 		</div>
 	{/if}
 
@@ -258,6 +296,15 @@
 		border-radius: 50%;
 		background: var(--text-dim);
 		opacity: 0.5;
+	}
+	.pallino-stato.amico {
+		display: inline-block;
+		margin-right: 8px;
+		vertical-align: middle;
+	}
+	.richieste {
+		color: var(--accent);
+		font-size: 12px;
 	}
 	.pallino-stato.acceso {
 		background: #22c55e;

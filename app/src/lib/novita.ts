@@ -16,6 +16,10 @@ export const NOVITA: Novita[] = [
 	{
 		versione: '0.2.4',
 		voci: [
+			'Amici: scambia file e cartelle con altri PC ovunque siano, senza VPN né porte da aprire. Barra laterale → Aggiungi amici: dai il tuo codice (anche come QR) e incolla il loro.',
+			'L’amicizia vale solo se confermata da entrambi; il collegamento è cifrato da un capo all’altro.',
+			'Ogni amico vede la tua cartella condivisa solo se glielo permetti, e i file che ti manda vanno sempre accettati.',
+			'Clic destro → Invia a un amico, come in rete locale.',
 			'Chi riceve file da un altro PC può annullare dalla barra d’avanzamento; chi invia viene avvisato.',
 			'Un trasferimento interrotto non lascia file a metà nella cartella di arrivo.'
 		]
