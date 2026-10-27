@@ -20,6 +20,8 @@ export const NOVITA: Novita[] = [
 			'L’amicizia vale solo se confermata da entrambi; il collegamento è cifrato da un capo all’altro.',
 			'Ogni amico vede la tua cartella condivisa solo se glielo permetti, e i file che ti manda vanno sempre accettati.',
 			'Clic destro → Invia a un amico, come in rete locale.',
+			'Editor dei temi: immagini e spritesheet fermi o che attraversano possono restare sempre in scena, in loop senza durata; chi attraversa riparte all’infinito, con una pausa a scelta fra un giro e l’altro.',
+			'Nuove regolazioni per ogni voce del corteo: verso destra o sinistra, altezza dal binario e immagine allo specchio.',
 			'Chi riceve file da un altro PC può annullare dalla barra d’avanzamento; chi invia viene avvisato.',
 			'Un trasferimento interrotto non lascia file a metà nella cartella di arrivo.'
 		]

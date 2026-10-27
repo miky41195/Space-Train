@@ -4,7 +4,7 @@
 	import { convertFileSrc } from '@tauri-apps/api/core';
 	import { FIGURE, svgFigura } from '../figure';
 	import { decodifica, misuraBinario, stile } from '../spritesheet';
-	import { fineInScena, leggiMovimento } from '../movimento';
+	import { fineInScena, giroContinuo, leggiMovimento } from '../movimento';
 
 	/**
 	 * Il convoglio che percorre la linea principale.
@@ -51,7 +51,15 @@
 
 	/** Chi sfila col convoglio, e chi ha un movimento suo: fermo o di corsa. */
 	let camminatori = $derived(sfilata.filter((f) => f.movimento.tipo === 'cammina'));
-	let scena = $derived(sfilata.filter((f) => f.movimento.tipo !== 'cammina'));
+	let scena = $derived(sfilata.filter((f) => f.movimento.tipo !== 'cammina' && !f.movimento.continuo));
+	/** Chi resta sempre in scena, fuori dai passaggi: fermo o in loop. */
+	let continui = $derived(sfilata.filter((f) => f.movimento.tipo !== 'cammina' && f.movimento.continuo));
+	/** Le animazioni di chi attraversa in continuo, una per voce. */
+	let giri = $derived(
+		continui
+			.map((f, i) => (f.movimento.tipo === 'attraversa' ? giroContinuo(`giro-${i}`, f.movimento) : ''))
+			.join('')
+	);
 	/** Senza corteo passa il treno; con un corteo tutto fermo, nessun convoglio. */
 	let conConvoglio = $derived(sfilata.length === 0 || camminatori.length > 0);
 	/** Secondi dall'inizio del passaggio all'uscita dell'ultimo della scena. */
@@ -62,7 +70,10 @@
 	 * ingrandito la alza, e sporge verso l'alto restando in piedi sul binario.
 	 */
 	let altezzaLinea = $derived(
-		Math.max(40, ...sfilata.map((f) => ('alto' in f && f.alto ? f.alto + 10 : 0)))
+		Math.max(
+			40,
+			...sfilata.map((f) => ('alto' in f && f.alto ? f.alto : 30) + 10 + f.movimento.altezza)
+		)
 	);
 
 	/** Cambia a ogni partenza: rimonta l'SVG e fa ripartire l'animazione. */
@@ -180,23 +191,45 @@
 			     in fondo, ognuno coi suoi tempi dall'inizio del passaggio. -->
 			{#each scena as f, i (i)}
 				<span
-					class="in-scena {f.movimento.tipo}"
+					class="in-scena {f.movimento.tipo} {f.movimento.verso}"
 					style:--da={f.movimento.posizione}
+					style:bottom="{f.movimento.altezza}px"
 					style:animation-delay="{f.movimento.ritardo}s"
 					style:animation-duration="{f.movimento.durata}s"
 				>
-					{#if f.tipo === 'sprite'}
-						<span class="sprite" style={f.stile}></span>
-					{:else if f.tipo === 'immagine'}
-						<img src={f.src} alt="" draggable="false" />
-					{:else}
-						<span class="figura-ferma">{@html f.svg}</span>
-					{/if}
+					{@render aspetto(f)}
 				</span>
 			{/each}
 		{/if}
 	{/key}
+	<!-- Chi resta sempre in scena: non aspetta i passaggi e non ha durata.
+	     Chi attraversa ricomincia all'infinito, col suo giro e la sua pausa. -->
+	{#if giri}{@html `<style>${giri}</style>`}{/if}
+	{#each continui as f, i (i)}
+		<span
+			class="in-scena continuo {f.movimento.tipo}"
+			style:--da={f.movimento.posizione}
+			style:bottom="{f.movimento.altezza}px"
+			style:animation-name={f.movimento.tipo === 'attraversa' ? `giro-${i}` : undefined}
+			style:animation-delay="{f.movimento.ritardo}s"
+			style:animation-duration="{f.movimento.durata + f.movimento.pausa}s"
+		>
+			{@render aspetto(f)}
+		</span>
+	{/each}
 </div>
+
+{#snippet aspetto(f: (typeof sfilata)[number])}
+	<span class="aspetto" class:specchiato={f.movimento.specchia}>
+		{#if f.tipo === 'sprite'}
+			<span class="sprite" style={f.stile}></span>
+		{:else if f.tipo === 'immagine'}
+			<img src={f.src} alt="" draggable="false" />
+		{:else}
+			<span class="figura-ferma">{@html f.svg}</span>
+		{/if}
+	</span>
+{/snippet}
 
 <style>
 	.linea {
@@ -235,9 +268,38 @@
 		transform: translateX(calc(var(--da) * -1%));
 		animation-name: in-scena;
 	}
-	/* Attraversa: dal punto scelto fino oltre il bordo destro. */
+	/* Attraversa: dal punto scelto fino oltre il bordo, destro o sinistro. */
 	.in-scena.attraversa {
 		animation-name: attraversa;
+	}
+	.in-scena.attraversa.sinistra {
+		animation-name: attraversa-sinistra;
+	}
+	/* Sempre in scena: il fermo si vede e basta, chi attraversa gira
+	   all'infinito con le chiavi calcolate per lui. */
+	.in-scena.continuo {
+		animation-iteration-count: infinite;
+	}
+	.in-scena.continuo.fermo {
+		visibility: visible;
+		animation-name: none;
+	}
+	.aspetto {
+		display: flex;
+		align-items: flex-end;
+	}
+	.aspetto.specchiato {
+		transform: scaleX(-1);
+	}
+	@keyframes attraversa-sinistra {
+		from {
+			visibility: visible;
+			transform: translateX(calc(var(--da) * (100cqw - 100%) / 100));
+		}
+		to {
+			visibility: visible;
+			transform: translateX(calc(-100% - 20px));
+		}
 	}
 	@keyframes in-scena {
 		from,

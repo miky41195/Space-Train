@@ -114,3 +114,45 @@ describe('scena: chi resta fermo e chi attraversa', () => {
 		expect(container.querySelector('.in-scena')).toBeNull();
 	});
 });
+
+describe('scena continua: senza durata, in loop', () => {
+	beforeEach(() => vi.useFakeTimers());
+	afterEach(() => {
+		cleanup();
+		vi.useRealTimers();
+	});
+
+	const guerriero = conMovimento('img:C:\\guerriero.gif', { tipo: 'fermo', posizione: 20, continuo: true });
+	const onda = conMovimento('img:C:\\onda.gif', {
+		tipo: 'attraversa',
+		posizione: 25,
+		durata: 1.5,
+		pausa: 0.5,
+		continuo: true,
+		verso: 'sinistra',
+		specchia: true,
+		altezza: 12
+	});
+
+	it('si vede da subito e non sparisce mai, passaggi o no', async () => {
+		const { container } = render(Treno, { pausa: 5000, corteo: [guerriero, onda] });
+		expect(container.querySelectorAll('.in-scena.continuo')).toHaveLength(2);
+		await vi.advanceTimersByTimeAsync(120_000);
+		expect(container.querySelectorAll('.in-scena.continuo')).toHaveLength(2);
+	});
+
+	it('l onda gira all infinito: viaggio, pausa, verso, altezza e specchio', async () => {
+		const { container } = render(Treno, { pausa: 5000, corteo: [guerriero, onda] });
+		const o = container.querySelector<HTMLElement>('.in-scena.continuo.attraversa')!;
+		expect(o.style.animationName).toBe('giro-1');
+		// Il giro è viaggio più pausa.
+		expect(o.style.animationDuration).toBe('2s');
+		expect(o.style.bottom).toBe('12px');
+		expect(o.querySelector('.aspetto.specchiato')).not.toBeNull();
+		const chiavi = container.querySelector('style')!.textContent!;
+		// Arriva al 75% del giro, verso sinistra, poi resta nascosta fino alla fine.
+		expect(chiavi).toContain('@keyframes giro-1{');
+		expect(chiavi).toContain('75.000%{visibility:visible;transform:translateX(calc(-100% - 20px))}');
+		expect(chiavi).toContain('75.010%,100%{visibility:hidden');
+	});
+});

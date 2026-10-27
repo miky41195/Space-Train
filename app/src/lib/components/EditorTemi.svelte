@@ -143,6 +143,12 @@
 		movimenti = movimenti.map((m, j) => (j === i ? nuovo : m));
 	}
 
+	/** Il giro completo di chi attraversa in continuo: viaggio più pausa. */
+	function giroDi(m: Movimento): string {
+		const s = m.durata + m.pausa;
+		return `${Number.isInteger(s) ? s : s.toFixed(1)} s`;
+	}
+
 	const TIPI_MOVIMENTO: Array<[TipoMovimento, string]> = [
 		['cammina', 'Cammina con gli altri'],
 		['fermo', 'Resta fermo in un punto'],
@@ -565,27 +571,69 @@
 										</select>
 									</label>
 									{#if m.tipo !== 'cammina'}
-										<label title={m.tipo === 'fermo' ? 'Dove sta sul binario' : 'Da dove parte: poi va fino al bordo destro'}>
+										<label title="Sempre: resta in scena senza durata, e chi attraversa riparte all'infinito. Col passaggio: compare solo quando passa il corteo.">
+											Quando
+											<select value={m.continuo ? 'sempre' : 'passaggio'} aria-label="Quando compare {nome}"
+												onchange={(e) => impostaMovimento(i, { continuo: e.currentTarget.value === 'sempre' })}>
+												<option value="sempre">Sempre, in loop</option>
+												<option value="passaggio">Col passaggio del corteo</option>
+											</select>
+										</label>
+										{#if m.tipo === 'attraversa'}
+											<label title="Verso quale bordo va">
+												Verso
+												<select value={m.verso} aria-label="Verso di {nome}"
+													onchange={(e) => impostaMovimento(i, { verso: e.currentTarget.value as 'destra' | 'sinistra' })}>
+													<option value="destra">Destra</option>
+													<option value="sinistra">Sinistra</option>
+												</select>
+											</label>
+										{/if}
+										<label title={m.tipo === 'fermo' ? 'Dove sta sul binario' : 'Da dove parte: poi va fino al bordo'}>
 											{m.tipo === 'fermo' ? 'Posizione' : 'Parte da'}
 											<input type="range" min="0" max="100" value={m.posizione}
 												aria-label="{m.tipo === 'fermo' ? 'Posizione' : 'Partenza'} di {nome}"
 												oninput={(e) => impostaMovimento(i, { posizione: Number(e.currentTarget.value) })} />
 											{m.posizione}%
 										</label>
-										<label title="Secondi dall'inizio del passaggio prima di comparire">
-											Dopo
-											<input type="number" min="0" max="60" step="0.5" value={m.ritardo}
+										<label title="Pixel sopra il binario: per esempio un'onda all'altezza delle mani">
+											Altezza
+											<input type="range" min="0" max="200" value={m.altezza}
+												aria-label="Altezza di {nome}"
+												oninput={(e) => impostaMovimento(i, { altezza: Number(e.currentTarget.value) })} />
+											{m.altezza} px
+										</label>
+										<label title="Disegnato allo specchio, rivolto dall'altra parte">
+											<input type="checkbox" checked={m.specchia} aria-label="Specchia {nome}"
+												onchange={(e) => impostaMovimento(i, { specchia: e.currentTarget.checked })} />
+											Specchia
+										</label>
+										<label title={m.continuo ? "Secondi dall'apertura prima della prima comparsa: sfasa più voci fra loro" : "Secondi dall'inizio del passaggio prima di comparire"}>
+											{m.continuo ? 'Prima volta dopo' : 'Dopo'}
+											<input type="number" min="0" max="60" step="0.1" value={m.ritardo}
 												aria-label="Ritardo di {nome}"
 												onchange={(e) => impostaMovimento(i, { ritardo: Number(e.currentTarget.value) })} />
 											s
 										</label>
-										<label title={m.tipo === 'fermo' ? 'Quanto resta in scena' : 'Quanto ci mette ad arrivare in fondo: meno secondi, più veloce'}>
-											{m.tipo === 'fermo' ? 'Per' : 'In'}
-											<input type="number" min="0.5" max="120" step="0.5" value={m.durata}
-												aria-label="Durata di {nome}"
-												onchange={(e) => impostaMovimento(i, { durata: Number(e.currentTarget.value) })} />
-											s
-										</label>
+										{#if !(m.continuo && m.tipo === 'fermo')}
+											<label title={m.tipo === 'fermo' ? 'Quanto resta in scena' : 'Quanto ci mette ad arrivare in fondo: meno secondi, più veloce'}>
+												{m.tipo === 'fermo' ? 'Per' : 'In'}
+												<input type="number" min="0.5" max="120" step="0.1" value={m.durata}
+													aria-label="Durata di {nome}"
+													onchange={(e) => impostaMovimento(i, { durata: Number(e.currentTarget.value) })} />
+												s
+											</label>
+										{/if}
+										{#if m.continuo && m.tipo === 'attraversa'}
+											<label title="Attesa fra un lancio e l'altro: con viaggio + pausa uguali al ciclo dello spritesheet, l'onda parte sempre allo stesso gesto">
+												Pausa
+												<input type="number" min="0" max="120" step="0.1" value={m.pausa}
+													aria-label="Pausa di {nome}"
+													onchange={(e) => impostaMovimento(i, { pausa: Number(e.currentTarget.value) })} />
+												s
+											</label>
+											<span title="Ogni quanto riparte">giro {giroDi(m)}</span>
+										{/if}
 									{/if}
 								</div>
 								{#if foglio}
