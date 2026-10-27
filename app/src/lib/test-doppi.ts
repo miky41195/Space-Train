@@ -71,6 +71,9 @@ export function backendFinto(over: Partial<Backend> = {}): Backend {
 			return { eseguito: false, apri: null };
 		},
 		async openTerminal() {},
+		async appVersion() {
+			return '0.0.0';
+		},
 		async showProperties() {},
 		async openWith() {},
 		async runAsAdmin() {},

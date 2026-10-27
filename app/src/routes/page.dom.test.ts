@@ -2410,3 +2410,30 @@ describe('avvio con le schede', () => {
 		expect(schede()).toEqual(['C:']);
 	});
 });
+
+// ── Novità dopo un aggiornamento ─────────────────────────────────────
+
+describe('novità dopo un aggiornamento', () => {
+	it('alla prima apertura della versione nuova spiega cosa è cambiato, una volta sola', async () => {
+		disco.versioneApp = '0.2.2';
+		localStorage.setItem('space-train.versione-vista', '0.2.1');
+		const { unmount } = await monta();
+		const finestra = await screen.findByRole('dialog', { name: 'Novità di Space Train' });
+		expect(finestra.textContent).toContain('0.2.2');
+		await fireEvent.click(within(finestra).getByRole('button', { name: 'Ho capito' }));
+		await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Novità di Space Train' })).toBeNull());
+		expect(localStorage.getItem('space-train.versione-vista')).toBe('0.2.2');
+
+		unmount();
+		await monta();
+		await new Promise((r) => setTimeout(r, 20));
+		expect(screen.queryByRole('dialog', { name: 'Novità di Space Train' })).toBeNull();
+	});
+
+	it('a chi installa l app per la prima volta non mostra niente', async () => {
+		disco.versioneApp = '0.2.2';
+		await monta();
+		await waitFor(() => expect(localStorage.getItem('space-train.versione-vista')).toBe('0.2.2'));
+		expect(screen.queryByRole('dialog', { name: 'Novità di Space Train' })).toBeNull();
+	});
+});

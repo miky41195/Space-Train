@@ -20,6 +20,8 @@
 	import BarraComandi from '$lib/components/BarraComandi.svelte';
 	import BarraRecenti from '$lib/components/BarraRecenti.svelte';
 	import RichiestaLan from '$lib/components/RichiestaLan.svelte';
+	import NovitaFinestra from '$lib/components/Novita.svelte';
+	import { novitaDaMostrare, type Novita } from '$lib/novita';
 	import FileList from '$lib/components/FileList.svelte';
 	import SearchBar from '$lib/components/SearchBar.svelte';
 	import ConfermaCestino from '$lib/components/ConfermaCestino.svelte';
@@ -1147,6 +1149,49 @@
 		}
 	});
 
+	/**
+	 * Dopo un aggiornamento, alla prima apertura, si racconta cosa è
+	 * cambiato. Solo nella finestra principale, una volta per versione.
+	 */
+	const CHIAVE_VERSIONE = 'space-train.versione-vista';
+	let novitaAperte = $state<Novita[]>([]);
+	let versioneAttuale = '';
+
+	function chiudiNovita() {
+		novitaAperte = [];
+		try {
+			localStorage.setItem(CHIAVE_VERSIONE, versioneAttuale);
+		} catch {
+			// Archivio negato: le novità si riproporranno, pazienza.
+		}
+	}
+
+	$effect(() => {
+		if (!avviato || finestra !== 'main') return;
+		untrack(() => {
+			tauriBackend
+				.appVersion()
+				.then((v) => {
+					if (typeof v !== 'string' || !v) return;
+					versioneAttuale = v;
+					let vista: string | null = null;
+					let giaUsata = false;
+					try {
+						vista = localStorage.getItem(CHIAVE_VERSIONE);
+						giaUsata = localStorage.getItem('space-train.impostazioni') !== null;
+					} catch {
+						return;
+					}
+					const da = novitaDaMostrare(vista, v, giaUsata);
+					if (da.length > 0) novitaAperte = da;
+					// Alla prima installazione non c'è niente da raccontare: si
+					// ricorda la versione e basta.
+					else if (vista !== v) localStorage.setItem(CHIAVE_VERSIONE, v);
+				})
+				.catch(() => {});
+		});
+	});
+
 	/** Le schede aperte, per riprenderle al prossimo avvio. */
 	const CHIAVE_SESSIONE = 'space-train.sessione';
 
@@ -2129,6 +2174,10 @@
 
 	{#if daCestinare.length > 0}
 		<ConfermaCestino voci={daCestinare} onconfirm={() => cestina()} oncancel={() => (daCestinare = [])} />
+	{/if}
+
+	{#if novitaAperte.length > 0}
+		<NovitaFinestra novita={novitaAperte} onchiudi={chiudiNovita} />
 	{/if}
 
 	{#if richiesteLan[0] && statoLan}

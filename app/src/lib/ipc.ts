@@ -186,6 +186,8 @@ export interface Backend {
 	showShellMenu(paths: string[], folder: string, x: number, y: number): Promise<EsitoMenu>;
 	/** Apre un terminale nella cartella indicata. */
 	openTerminal(path: string): Promise<void>;
+	/** La versione dell'app installata, es. «0.2.2». */
+	appVersion(): Promise<string>;
 	showProperties(paths: string[]): Promise<void>;
 	openWith(path: string): Promise<void>;
 	runAsAdmin(path: string): Promise<void>;
@@ -245,6 +247,8 @@ export const tauriBackend: Backend = {
 	knownFolders: () => invoke('known_folders'),
 	revealInExplorer: (path) => invoke('reveal_in_explorer', { path }),
 	openTerminal: (path) => invoke('open_terminal', { path }),
+	// Lo stesso comando che usa `getVersion` del pacchetto `@tauri-apps/api/app`.
+	appVersion: () => invoke('plugin:app|version'),
 	createFolder: (parent, name) => invoke('create_folder', { parent, name }),
 	renameEntry: (path, name) => invoke('rename_entry', { path, name }),
 	moveToTrash: (paths) => invoke('move_to_trash', { paths }),

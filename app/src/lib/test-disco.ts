@@ -86,6 +86,9 @@ export class DiscoFinto {
 		);
 	}
 
+	/** La versione che l'app dice di avere; vuota = sconosciuta. */
+	versioneApp = '';
+
 	async invoke(cmd: string, args: Record<string, unknown> = {}): Promise<unknown> {
 		switch (cmd) {
 			case 'list_dir':
@@ -269,6 +272,10 @@ export class DiscoFinto {
 			case 'run_as_admin':
 				this.shell.push({ cmd, args });
 				return cmd === 'start_drag' ? 'nessuno' : cmd === 'show_shell_menu' ? false : null;
+			case 'plugin:app|version':
+				// Senza versione impostata l'app non sa quale è: niente novità.
+				if (this.versioneApp) return this.versioneApp;
+				throw new Error('versione non disponibile');
 			default:
 				throw new Error(`Comando non gestito dal disco finto: ${cmd}`);
 		}

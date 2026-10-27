@@ -17,6 +17,12 @@ if (!/^\d+\.\d+\.\d+$/.test(versione ?? '')) {
 const app = join(dirname(fileURLToPath(import.meta.url)), '..');
 const git = (...args) => execFileSync('git', args, { cwd: app, stdio: 'inherit' });
 
+// Chi aggiorna vede le novità di questa versione: devono esserci.
+if (!readFileSync(join(app, 'src/lib/novita.ts'), 'utf8').includes(`versione: '${versione}'`)) {
+	console.error(`Mancano le novità della ${versione}: aggiungile in cima a src/lib/novita.ts.`);
+	process.exit(1);
+}
+
 if (execFileSync('git', ['status', '--porcelain'], { cwd: app }).toString().trim()) {
 	console.error('Ci sono modifiche non salvate: fai prima un commit.');
 	process.exit(1);

@@ -30,9 +30,11 @@
 		scriviOrdine,
 		stile,
 		zona,
+		disegno,
 		type Spritesheet
 	} from '../spritesheet';
 	import SelettoreFotogrammi from './SelettoreFotogrammi.svelte';
+	import { spostabile } from '../spostabile';
 	import { coloreSfondo, colorePixel, daEsadecimale, esadecimale, togliSfondo } from '../trasparenza';
 	import { leggiPixel, scriviPng } from '../pixel';
 
@@ -339,8 +341,8 @@
 </script>
 
 <div class="sfondo" role="presentation">
-	<div class="finestra" role="dialog" aria-modal="true" aria-label="Editor dei temi">
-		<header>
+	<div class="finestra" role="dialog" aria-modal="true" aria-label="Editor dei temi" use:spostabile>
+		<header title="Trascina per spostare l'editor e vedere il tema dietro">
 			<h2>{modifica ? 'Modifica tema' : 'Nuovo tema'}</h2>
 			<button class="chiudi" onclick={onchiudi} aria-label="Chiudi l'editor">×</button>
 		</header>
@@ -513,13 +515,19 @@
 									{/if}
 								</div>
 								{#if foglio}
+									{@const d = disegno(foglio, 48)}
 									<div class="foglio">
 										<!-- Anteprima: il personaggio cammina qui come sul binario. -->
-										<span
-											class="anteprima-sprite"
-											style={stile(foglio, convertFileSrc(foglio.src), 48)}
-											aria-label="Anteprima di {nome}"
-										></span>
+										<!-- Cornice grande quanto il fotogramma più grande: coi
+										     fotogrammi a mano la misura cambia a ogni passo, e senza
+										     cornice tutta la riga si muoveva insieme all'anteprima. -->
+										<span class="cornice-anteprima" style:width="{d.larghezza}px" style:height="{d.altezza}px">
+											<span
+												class="anteprima-sprite"
+												style={stile(foglio, convertFileSrc(foglio.src), 48)}
+												aria-label="Anteprima di {nome}"
+											></span>
+										</span>
 										<div class="campi">
 												<label class="campo-a-mano">
 													<input type="checkbox" checked={!!foglio.riquadri}
@@ -732,6 +740,11 @@
 	}
 	header {
 		border-bottom: 1px solid var(--border);
+		cursor: grab;
+		user-select: none;
+	}
+	.finestra:global(.in-spostamento) header {
+		cursor: grabbing;
 	}
 	footer {
 		border-top: 1px solid var(--border);
@@ -902,13 +915,20 @@
 		margin-top: 8px;
 	}
 	/* Riquadro a scacchi: si vede dove lo sprite è trasparente. */
+	.cornice-anteprima {
+		flex-shrink: 0;
+		display: flex;
+		align-items: flex-end;
+		justify-content: center;
+		overflow: hidden;
+		background-color: var(--bg);
+		border-radius: 6px;
+		outline: 1px solid var(--border);
+	}
 	.anteprima-sprite {
 		flex-shrink: 0;
 		display: block;
 		background-repeat: no-repeat;
-		background-color: var(--bg);
-		border-radius: 6px;
-		outline: 1px solid var(--border);
 		animation-name: fotogrammi-anteprima;
 		animation-iteration-count: infinite;
 	}
