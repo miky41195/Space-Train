@@ -35,6 +35,15 @@
 	} from '../spritesheet';
 	import SelettoreFotogrammi from './SelettoreFotogrammi.svelte';
 	import { spostabile } from '../spostabile';
+	import {
+		CAMMINA,
+		conMovimento,
+		leggiMovimento,
+		movimentoPredefinito,
+		normalizzaMovimento,
+		type Movimento,
+		type TipoMovimento
+	} from '../movimento';
 	import { coloreSfondo, colorePixel, daEsadecimale, esadecimale, togliSfondo } from '../trasparenza';
 	import { leggiPixel, scriviPng } from '../pixel';
 
@@ -88,6 +97,8 @@
 	let corteoTipo = $state<'treno' | 'figure' | 'immagini'>('treno');
 	let figure = $state<string[]>([]);
 	let immagini = $state<string[]>([]);
+	/** Come si muove ogni immagine sul binario, nello stesso ordine di `immagini`. */
+	let movimenti = $state<Movimento[]>([]);
 	let motivo = $state('');
 	let caricando = $state(false);
 	let errore = $state<string | null>(null);
@@ -113,11 +124,30 @@
 		carattere = t.forme?.carattere ?? FORME_BASE.carattere;
 		carattereTitoli = t.forme?.carattereTitoli ?? FORME_BASE.carattereTitoli;
 		const voci = t.corteo ?? [];
-		immagini = voci.filter((v) => mia(v));
-		figure = voci.filter((v) => !mia(v));
+		const lette = voci.map((v) => leggiMovimento(v));
+		const mie = lette.filter((l) => mia(l.voce));
+		immagini = mie.map((l) => l.voce);
+		movimenti = mie.map((l) => l.movimento);
+		figure = voci.filter((v) => !mia(leggiMovimento(v).voce));
 		corteoTipo = immagini.length > 0 ? 'immagini' : figure.length > 0 ? 'figure' : 'treno';
 		motivo = t.motivo ?? '';
 	}
+
+	/** Cambia il movimento di un'immagine; scegliendo un tipo si riparte dai suoi valori. */
+	function impostaMovimento(i: number, parziale: Partial<Movimento>) {
+		const attuale = movimenti[i] ?? CAMMINA;
+		const nuovo =
+			parziale.tipo && parziale.tipo !== attuale.tipo
+				? movimentoPredefinito(parziale.tipo)
+				: normalizzaMovimento({ ...attuale, ...parziale });
+		movimenti = movimenti.map((m, j) => (j === i ? nuovo : m));
+	}
+
+	const TIPI_MOVIMENTO: Array<[TipoMovimento, string]> = [
+		['cammina', 'Cammina con gli altri'],
+		['fermo', 'Resta fermo in un punto'],
+		['attraversa', 'Attraversa da solo fino in fondo']
+	];
 
 	/** Il selettore di colore vuole sempre `#rrggbb`. */
 	function solo6(c: string): string {
@@ -134,7 +164,12 @@
 		gruppo: 'personale',
 		variabili: variabiliDa(tavolozza, chiaro),
 		forme: { raggio, raggioPiccolo, carattere, carattereTitoli },
-		corteo: corteoTipo === 'treno' ? undefined : corteoTipo === 'figure' ? figure : immagini,
+		corteo:
+			corteoTipo === 'treno'
+				? undefined
+				: corteoTipo === 'figure'
+					? figure
+					: immagini.map((v, i) => conMovimento(v, movimenti[i] ?? CAMMINA)),
 		motivo: motivo || undefined
 	});
 
@@ -318,6 +353,7 @@
 				const proposta = d ? indovina(path, d.w, d.h) : null;
 				const voce = proposta && proposta.fotogrammi > 1 ? codifica(proposta) : `img:${path}`;
 				immagini = [...immagini, voce].slice(0, 8);
+				movimenti = [...movimenti, CAMMINA].slice(0, 8);
 			}
 			corteoTipo = 'immagini';
 		} catch {
@@ -458,6 +494,7 @@
 						{#each immagini as voce, i (i)}
 							{@const foglio = decodifica(voce)}
 							{@const o = sfondoDi(i)}
+							{@const m = movimenti[i] ?? CAMMINA}
 							{@const nome = percorsoDi(voce).split('\\').pop() ?? ''}
 							<li>
 								<div class="testa">
@@ -472,7 +509,10 @@
 										Spritesheet
 									</label>
 									<button
-										onclick={() => (immagini = immagini.filter((_, j) => j !== i))}
+										onclick={() => {
+											immagini = immagini.filter((_, j) => j !== i);
+											movimenti = movimenti.filter((_, j) => j !== i);
+										}}
 										aria-label="Togli {nome}">×</button
 									>
 								</div>
@@ -512,6 +552,40 @@
 									</label>
 									{#if originali[percorsoDi(voce)]}
 										<button class="piccolo" onclick={() => ripristinaOriginale(i)}>Ripristina originale</button>
+									{/if}
+								</div>
+								<div class="movimento">
+									<label>
+										Movimento
+										<select value={m.tipo} aria-label="Movimento di {nome}"
+											onchange={(e) => impostaMovimento(i, { tipo: e.currentTarget.value as TipoMovimento })}>
+											{#each TIPI_MOVIMENTO as [tipo, etichetta] (tipo)}
+												<option value={tipo}>{etichetta}</option>
+											{/each}
+										</select>
+									</label>
+									{#if m.tipo !== 'cammina'}
+										<label title={m.tipo === 'fermo' ? 'Dove sta sul binario' : 'Da dove parte: poi va fino al bordo destro'}>
+											{m.tipo === 'fermo' ? 'Posizione' : 'Parte da'}
+											<input type="range" min="0" max="100" value={m.posizione}
+												aria-label="{m.tipo === 'fermo' ? 'Posizione' : 'Partenza'} di {nome}"
+												oninput={(e) => impostaMovimento(i, { posizione: Number(e.currentTarget.value) })} />
+											{m.posizione}%
+										</label>
+										<label title="Secondi dall'inizio del passaggio prima di comparire">
+											Dopo
+											<input type="number" min="0" max="60" step="0.5" value={m.ritardo}
+												aria-label="Ritardo di {nome}"
+												onchange={(e) => impostaMovimento(i, { ritardo: Number(e.currentTarget.value) })} />
+											s
+										</label>
+										<label title={m.tipo === 'fermo' ? 'Quanto resta in scena' : 'Quanto ci mette ad arrivare in fondo: meno secondi, più veloce'}>
+											{m.tipo === 'fermo' ? 'Per' : 'In'}
+											<input type="number" min="0.5" max="120" step="0.5" value={m.durata}
+												aria-label="Durata di {nome}"
+												onchange={(e) => impostaMovimento(i, { durata: Number(e.currentTarget.value) })} />
+											s
+										</label>
 									{/if}
 								</div>
 								{#if foglio}
@@ -915,6 +989,26 @@
 		margin-top: 8px;
 	}
 	/* Riquadro a scacchi: si vede dove lo sprite è trasparente. */
+	.movimento {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 6px 14px;
+		margin: 6px 0;
+		font-size: 12px;
+		color: var(--text-dim);
+	}
+	.movimento label {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+	.movimento input[type='number'] {
+		width: 56px;
+	}
+	.movimento input[type='range'] {
+		width: 110px;
+	}
 	.cornice-anteprima {
 		flex-shrink: 0;
 		display: flex;

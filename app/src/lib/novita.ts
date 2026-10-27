@@ -19,6 +19,7 @@ export const NOVITA: Novita[] = [
 			'Rete locale → «Aggiungi PC per indirizzo»: raggiungi un PC fuori casa attraverso una VPN come Tailscale, scrivendo il suo IP o il suo nome.',
 			'Basta che uno dei due PC aggiunga l’altro: la risposta torna da sola.',
 			'I file di una cartella condivisa da un altro PC si possono trascinare sul desktop o in Esplora.',
+			'Editor dei temi: ogni immagine o spritesheet del corteo può camminare con gli altri, restare ferma in un punto del binario o attraversarlo da sola fino in fondo, con ritardo e durata a scelta.',
 			'Se il PC aggiunto resta in attesa, controlla che Space Train sia consentito nel firewall di Windows anche per la rete della VPN.'
 		]
 	},

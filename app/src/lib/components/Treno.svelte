@@ -4,6 +4,7 @@
 	import { convertFileSrc } from '@tauri-apps/api/core';
 	import { FIGURE, svgFigura } from '../figure';
 	import { decodifica, misuraBinario, stile } from '../spritesheet';
+	import { fineInScena, leggiMovimento } from '../movimento';
 
 	/**
 	 * Il convoglio che percorre la linea principale.
@@ -32,19 +33,29 @@
 	/** Le voci del corteo pronte da disegnare; quelle sconosciute si saltano. */
 	let sfilata = $derived(
 		(corteo ?? [])
-			.map((v) => {
-				if (v.startsWith('img:')) return { tipo: 'immagine' as const, src: convertFileSrc(v.slice(4)) };
+			.map((voce) => {
+				const { movimento, voce: v } = leggiMovimento(voce);
+				if (v.startsWith('img:')) return { tipo: 'immagine' as const, src: convertFileSrc(v.slice(4)), movimento };
 				const foglio = decodifica(v);
 				if (foglio)
 					return {
 						tipo: 'sprite' as const,
 						stile: stile(foglio, convertFileSrc(foglio.src)),
-						alto: misuraBinario(foglio).altezza
+						alto: misuraBinario(foglio).altezza,
+						movimento
 					};
-				return FIGURE[v] ? { tipo: 'figura' as const, svg: svgFigura(FIGURE[v]) } : null;
+				return FIGURE[v] ? { tipo: 'figura' as const, svg: svgFigura(FIGURE[v]), movimento } : null;
 			})
 			.filter((x) => x !== null)
 	);
+
+	/** Chi sfila col convoglio, e chi ha un movimento suo: fermo o di corsa. */
+	let camminatori = $derived(sfilata.filter((f) => f.movimento.tipo === 'cammina'));
+	let scena = $derived(sfilata.filter((f) => f.movimento.tipo !== 'cammina'));
+	/** Senza corteo passa il treno; con un corteo tutto fermo, nessun convoglio. */
+	let conConvoglio = $derived(sfilata.length === 0 || camminatori.length > 0);
+	/** Secondi dall'inizio del passaggio all'uscita dell'ultimo della scena. */
+	let durataScena = $derived(Math.max(0, ...scena.map((f) => fineInScena(f.movimento))));
 
 	/**
 	 * Altezza della linea: 40 px bastano al treno e alle figure; uno sprite
@@ -74,15 +85,32 @@
 		return attivo ? PAUSA_CARICO : pausa;
 	}
 
+	/**
+	 * Il passaggio finisce quando il convoglio è arrivato in fondo e la scena
+	 * è finita: si contano le due attese, e chi termina per ultimo chiude.
+	 */
+	let attese = 0;
+	let fineScena: ReturnType<typeof setTimeout> | undefined;
+
 	function parti() {
 		corsa += 1;
 		inViaggio = true;
 		clearTimeout(prossima);
-		prossima = setTimeout(arrivato, TRAVERSATA_MASSIMA);
+		clearTimeout(fineScena);
+		attese = (conConvoglio ? 1 : 0) + (durataScena > 0 ? 1 : 0);
+		if (durataScena > 0) fineScena = setTimeout(finitaUnaParte, durataScena * 1000 + 100);
+		prossima = setTimeout(arrivato, Math.max(TRAVERSATA_MASSIMA, durataScena * 1000 + 2_000));
+	}
+
+	function finitaUnaParte() {
+		attese -= 1;
+		if (attese <= 0) arrivato();
 	}
 
 	function arrivato() {
+		if (!inViaggio) return;
 		inViaggio = false;
+		clearTimeout(fineScena);
 		const fra = attesa();
 		if (fra === null) clearTimeout(prossima);
 		else programma(fra);
@@ -95,7 +123,10 @@
 		prossima = setTimeout(parti, fra);
 	}
 
-	$effect(() => () => clearTimeout(prossima));
+	$effect(() => () => {
+		clearTimeout(prossima);
+		clearTimeout(fineScena);
+	});
 
 	// La prima corsa arriva presto, poi si rispetta la pausa. Sotto carico il
 	// convoglio non aspetta: se è fermo riparte quasi subito. Cambiando la
@@ -112,15 +143,16 @@
 
 <div class="linea" aria-hidden="true" style:height="{altezzaLinea}px">
 	{#key corsa}
+		{#if conConvoglio}
 		<div
 			class="convoglio"
 			class:carico={attivo}
 			class:a-piedi={sfilata.length > 0}
-			onanimationend={(e) => e.target === e.currentTarget && arrivato()}
+			onanimationend={(e) => e.target === e.currentTarget && finitaUnaParte()}
 		>
 			{#if sfilata.length > 0}
 				<div class="sfilata">
-					{#each sfilata as f, i (i)}
+					{#each camminatori as f, i (i)}
 						<!-- Il ritardo sfasa i passi: non marciano tutti all'unisono. -->
 						<span
 							class="figura"
@@ -142,6 +174,27 @@
 				<TrenoSvg />
 			{/if}
 		</div>
+		{/if}
+		{#if inViaggio}
+			<!-- La scena: chi resta fermo in un punto e chi corre da solo fino
+			     in fondo, ognuno coi suoi tempi dall'inizio del passaggio. -->
+			{#each scena as f, i (i)}
+				<span
+					class="in-scena {f.movimento.tipo}"
+					style:--da={f.movimento.posizione}
+					style:animation-delay="{f.movimento.ritardo}s"
+					style:animation-duration="{f.movimento.durata}s"
+				>
+					{#if f.tipo === 'sprite'}
+						<span class="sprite" style={f.stile}></span>
+					{:else if f.tipo === 'immagine'}
+						<img src={f.src} alt="" draggable="false" />
+					{:else}
+						<span class="figura-ferma">{@html f.svg}</span>
+					{/if}
+				</span>
+			{/each}
+		{/if}
 	{/key}
 </div>
 
@@ -154,6 +207,59 @@
 		overflow: hidden;
 		pointer-events: none;
 		z-index: 2;
+		/* Le misure della scena si danno in larghezze del binario (cqw). */
+		container-type: inline-size;
+	}
+
+	/* Fuori dal suo tempo non si vede: l'animazione la mostra solo fra il
+	   ritardo e la fine della durata. */
+	.in-scena {
+		position: absolute;
+		bottom: 0;
+		left: 0;
+		display: flex;
+		align-items: flex-end;
+		padding-bottom: 2px;
+		visibility: hidden;
+		animation-timing-function: linear;
+		animation-iteration-count: 1;
+		animation-fill-mode: none;
+	}
+	.in-scena img {
+		height: 30px;
+		width: auto;
+	}
+	/* Fermo: nel punto scelto, senza uscire dai bordi. */
+	.in-scena.fermo {
+		left: calc(var(--da) * 1%);
+		transform: translateX(calc(var(--da) * -1%));
+		animation-name: in-scena;
+	}
+	/* Attraversa: dal punto scelto fino oltre il bordo destro. */
+	.in-scena.attraversa {
+		animation-name: attraversa;
+	}
+	@keyframes in-scena {
+		from,
+		to {
+			visibility: visible;
+		}
+	}
+	@keyframes attraversa {
+		from {
+			visibility: visible;
+			transform: translateX(calc(var(--da) * (100cqw - 100%) / 100));
+		}
+		to {
+			visibility: visible;
+			transform: translateX(calc(100cqw + 20px));
+		}
+	}
+	.figura-ferma :global(.passo-b) {
+		animation: passo 0.34s steps(1) infinite;
+	}
+	.figura-ferma :global(.passo-a) {
+		animation: passo 0.34s steps(1) infinite reverse;
 	}
 
 	/* Solo transform: il convoglio resta sul compositore e non ridisegna

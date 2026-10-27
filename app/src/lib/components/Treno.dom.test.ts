@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import Treno from './Treno.svelte';
+import { conMovimento } from '../movimento';
 
 vi.mock('@tauri-apps/api/core', () => ({ convertFileSrc: (p: string) => `asset://${p}` }));
 
@@ -66,5 +67,50 @@ describe('passaggi del treno', () => {
 		await rerender({ pausa: 2000 });
 		await vi.advanceTimersByTimeAsync(2100);
 		expect(convoglio(container)).not.toBe(primo);
+	});
+});
+
+describe('scena: chi resta fermo e chi attraversa', () => {
+	beforeEach(() => vi.useFakeTimers());
+	afterEach(() => {
+		cleanup();
+		vi.useRealTimers();
+	});
+
+	const fermo = conMovimento('img:C:\\lotta.gif', { tipo: 'fermo', posizione: 30, ritardo: 0, durata: 6 });
+	const onda = conMovimento('img:C:\\onda.gif', { tipo: 'attraversa', posizione: 0, ritardo: 1, durata: 3 });
+
+	it('senza nessuno che cammina non passa il convoglio, ma la scena sì', async () => {
+		const { container } = render(Treno, { pausa: 5000, corteo: [fermo, onda] });
+		await vi.advanceTimersByTimeAsync(1300);
+		expect(container.querySelector('.convoglio')).toBeNull();
+		const lotta = container.querySelector<HTMLElement>('.in-scena.fermo')!;
+		expect(lotta.style.getPropertyValue('--da')).toBe('30');
+		const corsa = container.querySelector<HTMLElement>('.in-scena.attraversa')!;
+		expect(corsa.style.animationDelay).toBe('1s');
+		expect(corsa.style.animationDuration).toBe('3s');
+	});
+
+	it('il passaggio finisce quando esce di scena l ultimo, poi conta la pausa', async () => {
+		const { container } = render(Treno, { pausa: 5000, corteo: [fermo, onda] });
+		await vi.advanceTimersByTimeAsync(1300);
+		expect(container.querySelector('.in-scena')).not.toBeNull();
+		// Il fermo resta 6 secondi: prima non si chiude.
+		await vi.advanceTimersByTimeAsync(5000);
+		expect(container.querySelector('.in-scena')).not.toBeNull();
+		await vi.advanceTimersByTimeAsync(1200);
+		expect(container.querySelector('.in-scena')).toBeNull();
+	});
+
+	it('con qualcuno che cammina, si aspetta anche il convoglio', async () => {
+		const { container } = render(Treno, { pausa: 5000, corteo: ['img:C:\\gatto.png', onda] });
+		await vi.advanceTimersByTimeAsync(1300);
+		const c = container.querySelector<HTMLElement>('.convoglio')!;
+		expect(c).not.toBeNull();
+		await vi.advanceTimersByTimeAsync(5000);
+		// La scena è finita, il convoglio no: si resta in viaggio.
+		expect(container.querySelector('.in-scena')).not.toBeNull();
+		await fireEvent.animationEnd(c);
+		expect(container.querySelector('.in-scena')).toBeNull();
 	});
 });
