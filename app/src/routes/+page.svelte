@@ -21,7 +21,7 @@
 	import BarraRecenti from '$lib/components/BarraRecenti.svelte';
 	import RichiestaLan from '$lib/components/RichiestaLan.svelte';
 	import NovitaFinestra from '$lib/components/Novita.svelte';
-	import { novitaDaMostrare, type Novita } from '$lib/novita';
+	import { NOVITA, novitaDaMostrare, type Novita } from '$lib/novita';
 	import FileList from '$lib/components/FileList.svelte';
 	import SearchBar from '$lib/components/SearchBar.svelte';
 	import ConfermaCestino from '$lib/components/ConfermaCestino.svelte';
@@ -1168,6 +1168,12 @@
 
 	$effect(() => {
 		if (!avviato || finestra !== 'main') return;
+		// Per provarla in sviluppo: `VITE_PROVA_NOVITA=1` la apre sempre, con
+		// le novità della versione più recente dell'elenco.
+		if (import.meta.env.DEV && import.meta.env.VITE_PROVA_NOVITA === '1') {
+			untrack(() => (novitaAperte = NOVITA.slice(0, 1)));
+			return;
+		}
 		untrack(() => {
 			tauriBackend
 				.appVersion()
