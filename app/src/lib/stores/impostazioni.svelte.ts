@@ -48,6 +48,10 @@ interface Valori {
 	 * `::pc`, `::ultima` (l'ultima cartella aperta) o il path di una cartella.
 	 */
 	paginaIniziale: string;
+	/** Le schede aperte alla chiusura si riaprono all'avvio. */
+	sessione: boolean;
+	/** Cartelle che si aprono sempre all'avvio, ognuna in una scheda. */
+	cartelleAvvio: string[];
 }
 
 const PREDEFINITE: Valori = {
@@ -67,7 +71,9 @@ const PREDEFINITE: Valori = {
 	pausaTreno: 30,
 	coloreAccento: '#8b5cf6',
 	temiPersonali: [],
-	paginaIniziale: 'C:\\'
+	paginaIniziale: 'C:\\',
+	sessione: false,
+	cartelleAvvio: []
 };
 
 /** Le viste delle versioni precedenti, tradotte nelle attuali. */
@@ -101,6 +107,8 @@ export class ImpostazioniStore {
 	coloreAccento = $state(PREDEFINITE.coloreAccento);
 	temiPersonali = $state<TemaPersonale[]>([]);
 	paginaIniziale = $state(PREDEFINITE.paginaIniziale);
+	sessione = $state(PREDEFINITE.sessione);
+	cartelleAvvio = $state<string[]>([]);
 
 	constructor(private archivio: Archivio | null = archivioPredefinito()) {
 		this.#leggi(archivio?.getItem(CHIAVE) ?? null);
@@ -135,6 +143,8 @@ export class ImpostazioniStore {
 			if (typeof v.coloreAccento === 'string') this.coloreAccento = v.coloreAccento;
 			if (Array.isArray(v.temiPersonali)) this.temiPersonali = v.temiPersonali;
 			if (typeof v.paginaIniziale === 'string' && v.paginaIniziale) this.paginaIniziale = v.paginaIniziale;
+			if (typeof v.sessione === 'boolean') this.sessione = v.sessione;
+			if (Array.isArray(v.cartelleAvvio)) this.cartelleAvvio = v.cartelleAvvio.filter((c) => typeof c === 'string');
 		} catch {
 			// Preferenze illeggibili: si parte da quelle predefinite.
 		}
@@ -198,7 +208,9 @@ export class ImpostazioniStore {
 			pausaTreno: this.pausaTreno,
 			coloreAccento: this.coloreAccento,
 			temiPersonali: this.temiPersonali,
-			paginaIniziale: this.paginaIniziale
+			paginaIniziale: this.paginaIniziale,
+			sessione: this.sessione,
+			cartelleAvvio: this.cartelleAvvio
 		};
 		try {
 			this.archivio?.setItem(CHIAVE, JSON.stringify(v));

@@ -69,30 +69,6 @@
 </script>
 
 <nav class="sidebar">
-	{#if accessoRapido.length > 0}
-		<div class="gruppo">
-			<div class="titolo">Accesso rapido</div>
-			{#each accessoRapido as p (p)}
-				<button
-					class="voce"
-					class:corrente={corrente(p)}
-					class:bersaglio={bersaglio === p}
-					data-cartella={p}
-					title={p}
-					onclick={() => vai(p)}
-					oncontextmenu={(e) => {
-						e.preventDefault();
-						onmenuaccesso?.(p, e);
-					}}
-				>
-					<span class="spillo" aria-hidden="true">📌</span>
-					{#if coloreDi?.(p)}<span class="pallino" style:background={coloreDi(p)}></span>{/if}
-					{nomeDi(p)}
-				</button>
-			{/each}
-		</div>
-	{/if}
-
 	<div class="gruppo">
 		<div class="titolo">Posizioni</div>
 		{#each posizioni as p (p.path)}
@@ -157,6 +133,26 @@
 			>
 				{#if coloreDi?.(f.path)}<span class="pallino" style:background={coloreDi(f.path)}></span>{/if}
 				{f.label}
+			</button>
+		{/each}
+		<!-- Le cartelle fissate dall'utente stanno accanto a quelle di Windows,
+		     nell'ordine scelto; il clic destro le riordina o le toglie. -->
+		{#each accessoRapido as p (p)}
+			<button
+				class="voce fissata"
+				class:corrente={corrente(p)}
+				class:bersaglio={bersaglio === p}
+				data-cartella={p}
+				title={p}
+				onclick={() => vai(p)}
+				oncontextmenu={(e) => {
+					e.preventDefault();
+					onmenuaccesso?.(p, e);
+				}}
+			>
+				<span class="spillo" aria-hidden="true">📌</span>
+				{#if coloreDi?.(p)}<span class="pallino" style:background={coloreDi(p)}></span>{/if}
+				{nomeDi(p)}
 			</button>
 		{/each}
 	</div>

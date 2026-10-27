@@ -1147,6 +1147,64 @@
 		}
 	});
 
+	/** Le schede aperte, per riprenderle al prossimo avvio. */
+	const CHIAVE_SESSIONE = 'space-train.sessione';
+
+	interface Sessione {
+		schede: string[];
+		attiva: number;
+	}
+
+	// Solo la finestra principale: le altre si chiudono e si riaprono a
+	// piacere, e sovrascriverebbero la sessione con le loro poche schede.
+	$effect(() => {
+		const schede = store.tabs.map((t) => t.path);
+		const attiva = store.tabs.findIndex((t) => t.id === store.activeId);
+		if (!avviato || finestra !== 'main' || schede.length === 0) return;
+		try {
+			localStorage.setItem(CHIAVE_SESSIONE, JSON.stringify({ schede, attiva } satisfies Sessione));
+		} catch {
+			// Archivio negato: la sessione non si riprenderà.
+		}
+	});
+
+	function sessioneSalvata(): Sessione | null {
+		try {
+			const s = JSON.parse(localStorage.getItem(CHIAVE_SESSIONE) ?? 'null') as Sessione | null;
+			return s && Array.isArray(s.schede) ? s : null;
+		} catch {
+			return null;
+		}
+	}
+
+	/**
+	 * Le schede con cui parte l'app quando Windows non chiede una cartella:
+	 * quelle della volta scorsa, se l'utente vuole riprenderle, più le
+	 * cartelle fissate per l'avvio. Quelle sparite nel frattempo si saltano;
+	 * se non resta niente, la pagina iniziale.
+	 */
+	async function schedeIniziali(): Promise<Sessione> {
+		const salvata = impostazioni.sessione ? sessioneSalvata() : null;
+		const candidate = [...(salvata?.schede ?? [])];
+		for (const c of impostazioni.cartelleAvvio) {
+			if (!candidate.some((p) => stessoPath(p, c))) candidate.push(c);
+		}
+		const esistono = await Promise.all(
+			candidate.map((p) =>
+				p.startsWith('::')
+					? Promise.resolve(p)
+					: tauriBackend
+							.resolvePath(p)
+							.then((d) => (d.seleziona === null ? d.cartella : null))
+							.catch(() => null)
+			)
+		);
+		const schede = esistono.filter((p): p is string => p !== null);
+		if (schede.length === 0) return { schede: [await paginaIniziale()], attiva: 0 };
+		const attiva = salvata ? Math.min(Math.max(salvata.attiva, 0), schede.length - 1) : 0;
+		return { schede, attiva };
+	}
+
 	/**
 	 * La cartella da aprire quando Windows non ne chiede una. Una pagina
 	 * iniziale sparita nel frattempo (disco staccato, cartella cancellata)
@@ -1183,7 +1241,16 @@
 				.catch(() => null)
 				.then(async (dest) => {
 					if (dest) await apriDestinazione(dest);
-					else await store.openTab(await paginaIniziale());
+					else {
+						const { schede, attiva } = await schedeIniziali();
+						// Tutte insieme: le schede entrano subito nell'ordine giusto,
+						// e i loro contenuti arrivano in parallelo.
+						const ids = await Promise.all(schede.map((p) => store.openTab(p)));
+						// Una cartella arrivata da Windows nel frattempo resta davanti.
+						if (store.activeId !== null && ids.includes(store.activeId)) {
+							store.setActive(ids[attiva] ?? ids[0]);
+						}
+					}
 					avviato = true;
 				});
 		});
@@ -1226,6 +1293,30 @@
 		if (store.activeId === null) return;
 		store.seleziona(store.activeId, e.path, vociVisibili, modificatori);
 	}
+
+	/**
+	 * Clic sul vuoto e rettangolo di selezione. Con Ctrl o Maiusc il
+	 * rettangolo si aggiunge a ciò che era già selezionato quando è partito.
+	 */
+	let selezionePrimaDelRettangolo: string[] = [];
+	const rettangolo = {
+		oninizio: () => {
+			selezionePrimaDelRettangolo = [...(store.activeTab?.selection ?? [])];
+		},
+		oncambia: (paths: string[], aggiungi: boolean) => {
+			if (store.activeId === null) return;
+			const scelte = aggiungi ? [...new Set([...selezionePrimaDelRettangolo, ...paths])] : paths;
+			// Nell'ordine della lista, come ogni altra selezione.
+			const dentro = new Set(scelte);
+			store.selezionaPercorsi(
+				store.activeId,
+				vociVisibili.filter((v) => dentro.has(v.path)).map((v) => v.path)
+			);
+		},
+		onvuoto: () => {
+			if (store.activeId !== null) store.pulisciSelezione(store.activeId);
+		}
+	};
 
 	function alternaPreferiti() {
 		const scelte = selezionate();
@@ -1323,6 +1414,12 @@
 		return tab && !eVirtuale(tab.path) ? tab.path : null;
 	}
 
+	/** La cartella del menu si apre già a ogni avvio. */
+	function eAllAvvio(scelte: Entry[]): boolean {
+		const cartella = cartellaDelMenu(scelte);
+		return cartella !== null && impostazioni.cartelleAvvio.some((c) => stessoPath(c, cartella));
+	}
+
 	/** La cartella del menu è già la pagina iniziale. */
 	function eIniziale(scelte: Entry[]): boolean {
 		const pagina = impostazioni.paginaIniziale;
@@ -1368,7 +1465,8 @@
 					store.activeTab !== undefined &&
 					stessoPath(statoLan.condivisa, store.activeTab.path),
 				fissata: accessoRapido.contiene(cartellaDelMenu(scelte) ?? ''),
-				iniziale: eIniziale(scelte)
+				iniziale: eIniziale(scelte),
+				allAvvio: eAllAvvio(scelte)
 			}),
 			x,
 			y
@@ -1392,7 +1490,8 @@
 				estensioni: impostazioni.estensioni,
 				nascosti: store.showHidden,
 				anteprima: impostazioni.anteprima,
-				iniziale: impostazioni.paginaIniziale
+				iniziale: impostazioni.paginaIniziale,
+				sessione: impostazioni.sessione
 			})
 		);
 	}
@@ -1557,7 +1656,7 @@
 					const cartella = cartellaDelMenu(scelte);
 					if (cartella) {
 						accessoRapido.fissa(cartella);
-						avvisa(`«${nomeDi(cartella)}» aggiunta ad Accesso rapido.`);
+						avvisa(`«${nomeDi(cartella)}» fissata nella barra laterale.`);
 					}
 					break;
 				}
@@ -1614,6 +1713,23 @@
 					if (cartella) await tauriBackend.openTerminal(cartella);
 					break;
 				}
+				case 'cartellaAvvio': {
+					const cartella = cartellaDelMenu(scelte);
+					if (!cartella) break;
+					if (eAllAvvio(scelte)) {
+						impostazioni.imposta(
+							'cartelleAvvio',
+							impostazioni.cartelleAvvio.filter((c) => !stessoPath(c, cartella))
+						);
+					} else {
+						impostazioni.imposta('cartelleAvvio', [...impostazioni.cartelleAvvio, cartella]);
+						avvisa(`«${nomeDi(cartella)}» si aprirà a ogni avvio, in una scheda sua.`);
+					}
+					break;
+				}
+				case 'sessione':
+					impostazioni.imposta('sessione', !impostazioni.sessione);
+					break;
 				case 'paginaIniziale': {
 					const cartella = cartellaDelMenu(scelte);
 					if (cartella) {
@@ -1949,6 +2065,7 @@
 						oncontextvuoto={menuSulVuoto}
 						oncolonne={(n) => (colonne = n)}
 						ontrascina={trascina}
+						{rettangolo}
 					/>
 				{:else if store.activeTab}
 					<FileList
@@ -1977,6 +2094,7 @@
 						onrename={confermaRinomina}
 						oncancelrename={() => (rinominando = null)}
 						ontrascina={trascina}
+						{rettangolo}
 					/>
 				{/if}
 

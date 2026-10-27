@@ -67,6 +67,19 @@ pub fn run() {
         .setup(|app| {
             use tauri::Manager;
             registra_scorciatoia(app.handle());
+            // Chi aveva scelto Space Train come predefinito lo ritrova anche
+            // dopo un aggiornamento: fuori dal thread della finestra, il
+            // registro può essere lento.
+            // Solo nelle build di release: in sviluppo il registro finirebbe
+            // a puntare all'eseguibile di prova.
+            #[cfg(not(debug_assertions))]
+            std::thread::spawn(|| {
+                if let (Ok(exe), Ok(classi)) = (std::env::current_exe(), registry::classi_utente()) {
+                    if let Ok(true) = registry::riallinea(&classi, &exe.to_string_lossy()) {
+                        registry::avvisa_shell();
+                    }
+                }
+            });
             // La rete locale parte con l'app: annunci e server restano in
             // ascolto finché l'utente non rende invisibile questo PC.
             let dati = app

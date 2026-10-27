@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { selezioneRettangolo, type OpzioniRettangolo } from '../rettangolo';
 	import type { Entry } from '../ipc';
 	import {
 		impaginaZone,
@@ -30,7 +31,8 @@
 		oncontext = undefined,
 		oncontextvuoto = undefined,
 		oncolonne = undefined,
-		ontrascina = undefined
+		ontrascina = undefined,
+		rettangolo = undefined
 	}: {
 		entries: Entry[];
 		/** Zone in cui è divisa la griglia. Vuoto = nessuna divisione. */
@@ -54,7 +56,11 @@
 		/** Quante celle stanno per riga: serve alle frecce su e giù. */
 		oncolonne?: (n: number) => void;
 		ontrascina?: (e: Entry) => void;
+		/** Clic sul vuoto e selezione col rettangolo. */
+		rettangolo?: OpzioniRettangolo;
 	} = $props();
+
+	const SENZA_RETTANGOLO: OpzioniRettangolo = { oncambia: () => {}, onvuoto: () => {} };
 
 	let altezzaCella = $derived(misura.altezza);
 
@@ -145,6 +151,7 @@
 		e.preventDefault();
 		oncontextvuoto?.(e);
 	}}
+	use:selezioneRettangolo={rettangolo ?? SENZA_RETTANGOLO}
 >
 	<div class="spaziatore" style:height="{impaginato.altezzaTotale}px">
 		{#each finestre as f, z (z)}
@@ -196,6 +203,8 @@
 		background-size: 96px 96px;
 		background-attachment: local;
 		padding: 8px;
+		/* Il rettangolo di selezione si posa dentro, e scorre col contenuto. */
+		position: relative;
 		scrollbar-gutter: stable;
 	}
 	.spaziatore {

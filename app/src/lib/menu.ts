@@ -26,6 +26,8 @@ export type AzioneMenu =
 	| 'mostraInEsplora'
 	| 'terminale'
 	| 'paginaIniziale'
+	| 'cartellaAvvio'
+	| 'sessione'
 	| `iniziale:${'pc' | 'c' | 'ultima' | 'attuale'}`
 	| 'nuovaCartella'
 	| 'preferito'
@@ -129,6 +131,8 @@ export interface ContestoMenu {
 	 * la voce per sceglierla non compare.
 	 */
 	iniziale?: boolean;
+	/** La cartella del menu si apre sempre all'avvio, in una scheda sua. */
+	allAvvio?: boolean;
 }
 
 /**
@@ -152,7 +156,8 @@ function vociSfondo({
 	ricerca,
 	condivisaQui = false,
 	fissata = false,
-	iniziale = false
+	iniziale = false,
+	allAvvio = false
 }: ContestoMenu): VoceMenu[] {
 	const voci: VoceMenu[] = [];
 	if (!ricerca) {
@@ -174,8 +179,8 @@ function vociSfondo({
 	if (!ricerca) {
 		voci.push(
 			fissata
-				? { azione: 'sgancia', etichetta: 'Rimuovi da Accesso rapido', stacca: true }
-				: { azione: 'fissa', etichetta: 'Aggiungi ad Accesso rapido', stacca: true }
+				? { azione: 'sgancia', etichetta: 'Togli dalla barra laterale', stacca: true }
+				: { azione: 'fissa', etichetta: 'Fissa nella barra laterale', stacca: true }
 		);
 		voci.push(
 			condivisaQui
@@ -183,6 +188,7 @@ function vociSfondo({
 				: { azione: 'condividi', etichetta: 'Condividi questa cartella in rete locale' }
 		);
 		if (!iniziale) voci.push({ azione: 'paginaIniziale', etichetta: 'Imposta come pagina iniziale' });
+		voci.push(voceAvvio(allAvvio));
 		voci.push({ azione: 'terminale', etichetta: 'Apri nel terminale', stacca: true });
 		voci.push({ azione: 'altreOpzioni', etichetta: 'Altre opzioni di Windows', stacca: true });
 		voci.push({ azione: 'proprieta', etichetta: 'Proprietà', scorciatoia: 'Alt+Invio' });
@@ -199,7 +205,8 @@ function vociElementi({
 	pari = [],
 	condivisa = null,
 	fissata = false,
-	iniziale = false
+	iniziale = false,
+	allAvvio = false
 }: ContestoMenu): VoceMenu[] {
 	const voci: VoceMenu[] = [];
 	const quante = selezione.length;
@@ -214,10 +221,11 @@ function vociElementi({
 			voci.push({ azione: 'apriNuovaFinestra', etichetta: 'Apri in una nuova finestra' });
 			voci.push(
 				fissata
-					? { azione: 'sgancia', etichetta: 'Rimuovi da Accesso rapido' }
-					: { azione: 'fissa', etichetta: 'Aggiungi ad Accesso rapido' }
+					? { azione: 'sgancia', etichetta: 'Togli dalla barra laterale' }
+					: { azione: 'fissa', etichetta: 'Fissa nella barra laterale' }
 			);
 			if (!iniziale) voci.push({ azione: 'paginaIniziale', etichetta: 'Imposta come pagina iniziale' });
+			voci.push(voceAvvio(allAvvio));
 			voci.push({ azione: 'terminale', etichetta: 'Apri nel terminale' });
 		} else {
 			voci.push({ azione: 'apriCon', etichetta: 'Apri con…' });
@@ -403,7 +411,7 @@ export function vociAccessoRapido(primo: boolean, ultimo: boolean): VoceMenu[] {
 	];
 	if (!primo) voci.push({ azione: 'suAccesso', etichetta: 'Sposta su', stacca: true });
 	if (!ultimo) voci.push({ azione: 'giuAccesso', etichetta: 'Sposta giù', stacca: primo });
-	voci.push({ azione: 'sgancia', etichetta: 'Rimuovi da Accesso rapido', stacca: true });
+	voci.push({ azione: 'sgancia', etichetta: 'Togli dalla barra laterale', stacca: true });
 	return voci;
 }
 
@@ -453,6 +461,8 @@ export interface StatoVista {
 	anteprima: boolean;
 	/** La pagina iniziale scelta: `::pc`, `::ultima` o il path di una cartella. */
 	iniziale?: string;
+	/** Le schede della volta scorsa si riaprono all'avvio. */
+	sessione?: boolean;
 }
 
 /** La pagina iniziale predefinita: il disco di sistema, come prima della scelta. */
@@ -461,7 +471,14 @@ export const INIZIALE_PREDEFINITA = 'C:\\';
 export const INIZIALE_ULTIMA = '::ultima';
 
 /** Le pagine iniziali fra cui scegliere nel menu «Visualizza». */
-export function vociIniziale(iniziale: string = INIZIALE_PREDEFINITA): VoceMenu[] {
+/** Fissare una cartella perché si apra a ogni avvio, o smettere. */
+function voceAvvio(allAvvio: boolean): VoceMenu {
+	return allAvvio
+		? { azione: 'cartellaAvvio', etichetta: 'Non aprire più all’avvio' }
+		: { azione: 'cartellaAvvio', etichetta: 'Apri sempre all’avvio' };
+}
+
+export function vociIniziale(iniziale: string = INIZIALE_PREDEFINITA, sessione = false): VoceMenu[] {
 	const scelte: Array<[AzioneMenu, string, string]> = [
 		['iniziale:pc', 'Questo PC', '::pc'],
 		['iniziale:c', 'Disco locale (C:)', INIZIALE_PREDEFINITA],
@@ -477,6 +494,7 @@ export function vociIniziale(iniziale: string = INIZIALE_PREDEFINITA): VoceMenu[
 		const nome = iniziale.replace(/\\+$/, '').split('\\').pop() || iniziale;
 		voci.push({ azione: 'iniziale:attuale', etichetta: nome, spunta: true, nomeAccessibile: iniziale });
 	}
+	voci.push({ azione: 'sessione', etichetta: 'Riprendi le schede della volta scorsa', spunta: sessione });
 	return voci.map((v, i) => (i === 0 ? { ...v, stacca: true, sezione: 'All’apertura' } : v));
 }
 
@@ -507,7 +525,7 @@ export function vociVista(s: StatoVista): VoceMenu[] {
 		},
 		{ azione: 'estensioni', etichetta: 'Estensioni dei nomi file', spunta: s.estensioni },
 		{ azione: 'nascosti', etichetta: 'Elementi nascosti', spunta: s.nascosti },
-		...vociIniziale(s.iniziale)
+		...vociIniziale(s.iniziale, s.sessione)
 	];
 }
 

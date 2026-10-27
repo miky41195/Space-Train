@@ -1,5 +1,17 @@
 <script lang="ts">
-	import { cella, latoFotogramma, passoFotogramma, RIQUADRI_MAX, type Riquadro, type Spritesheet } from '../spritesheet';
+	import {
+		agganciaRiquadro,
+		cella,
+		latoFotogramma,
+		passoFotogramma,
+		RIQUADRI_MAX,
+		type LatiTirati,
+		type Riquadro,
+		type Spritesheet
+	} from '../spritesheet';
+
+	/** Distanza a schermo, in pixel, entro cui un bordo si aggancia a un vicino. */
+	const AGGANCIO = 6;
 
 	let {
 		foglio,
@@ -138,9 +150,17 @@
 		const dx = px - gesto.px;
 		const dy = py - gesto.py;
 		const { x, y, w, h } = gesto.da;
+		// Coi fotogrammi a mano i bordi si agganciano a quelli dei vicini;
+		// Alt premuto lascia muovere libero, al pixel.
+		const indice = gesto.indice;
+		const aggancia = (r: Riquadro, lati?: LatiTirati) =>
+			indice === undefined || e.altKey
+				? r
+				: agganciaRiquadro(r, riquadri.filter((_, k) => k !== indice), AGGANCIO / zoom, lati);
 		if (gesto.modo === 'sposta') {
 			// Stessa misura, senza uscire dal foglio.
-			emetti(gesto.indice, Math.min(L - w, Math.max(0, x + dx)), Math.min(A - h, Math.max(0, y + dy)), w, h);
+			const r = aggancia({ x: Math.min(L - w, Math.max(0, x + dx)), y: Math.min(A - h, Math.max(0, y + dy)), w, h });
+			emetti(indice, Math.min(L - w, Math.max(0, r.x)), Math.min(A - h, Math.max(0, r.y)), w, h);
 			return;
 		}
 		// Ogni lato tirato si ferma al bordo del foglio e a un pixel dal lato opposto.
@@ -152,7 +172,8 @@
 		if (gesto.lati.e) destra = Math.max(sinistra + 1, Math.min(L, x + w + dx));
 		if (gesto.lati.n) alto = Math.min(basso - 1, Math.max(0, y + dy));
 		if (gesto.lati.s) basso = Math.max(alto + 1, Math.min(A, y + h + dy));
-		emetti(gesto.indice, sinistra, alto, destra - sinistra, basso - alto);
+		const r = aggancia({ x: sinistra, y: alto, w: destra - sinistra, h: basso - alto }, gesto.lati);
+		emetti(indice, Math.max(0, r.x), Math.max(0, r.y), Math.min(L - Math.max(0, r.x), r.w), Math.min(A - Math.max(0, r.y), r.h));
 	}
 
 	function rilascia() {

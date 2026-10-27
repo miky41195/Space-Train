@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { selezioneRettangolo, type OpzioniRettangolo } from '../rettangolo';
 	import type { Entry, SortKey, SortSpec } from '../ipc';
 	import Intestazioni from './Intestazioni.svelte';
 	import {
@@ -40,6 +41,7 @@
 		onrename = undefined,
 		oncancelrename = undefined,
 		ontrascina = undefined,
+		rettangolo = undefined,
 		oncolonne = undefined
 	}: {
 		entries: Entry[];
@@ -85,9 +87,13 @@
 		onrename?: (e: Entry, nuovoNome: string) => void;
 		oncancelrename?: () => void;
 		ontrascina?: (e: Entry) => void;
+		/** Clic sul vuoto e selezione col rettangolo. */
+		rettangolo?: OpzioniRettangolo;
 		/** Clic destro sulle intestazioni: scelta delle colonne. */
 		oncolonne?: (evento: MouseEvent) => void;
 	} = $props();
+
+	const SENZA_RETTANGOLO: OpzioniRettangolo = { oncambia: () => {}, onvuoto: () => {} };
 
 	let scrollTop = $state(0);
 	let viewportHeight = $state(600);
@@ -169,6 +175,7 @@
 			e.preventDefault();
 			oncontextvuoto?.(e);
 		}}
+		use:selezioneRettangolo={rettangolo ?? SENZA_RETTANGOLO}
 	>
 	<div class="spacer" style:height="{impaginato.altezzaTotale}px">
 		{#each finestre as f, z (z)}
@@ -230,6 +237,8 @@
 		background-size: 96px 96px;
 		background-attachment: local;
 		padding: 4px;
+		/* Il rettangolo di selezione si posa dentro, e scorre col contenuto. */
+		position: relative;
 		/* Il solco resta riservato anche con lista corta: senza, la comparsa
 		   della barra sposterebbe le righe scollegandole dalle intestazioni. */
 		scrollbar-gutter: stable;

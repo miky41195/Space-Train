@@ -83,3 +83,15 @@ body {
 	background: var(--text-dim);
 	background-clip: content-box;
 }
+
+/* Il rettangolo con cui si selezionano più voci trascinando sul vuoto. */
+.rettangolo-selezione {
+	position: absolute;
+	left: 0;
+	top: 0;
+	z-index: 5;
+	pointer-events: none;
+	border: 1px solid var(--accent);
+	background: color-mix(in srgb, var(--accent) 18%, transparent);
+	border-radius: 2px;
+}

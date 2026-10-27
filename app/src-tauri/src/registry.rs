@@ -24,6 +24,10 @@ const TIPI: [&str; 2] = ["Directory", "Drive"];
 /// I verbi del CLSID di Esplora: Win+E usa `open`, «Nuova finestra» della
 /// barra delle applicazioni usa `opennewwindow`. Vanno presi entrambi.
 const VERBI_ESPLORA: [&str; 2] = ["open", "opennewwindow"];
+/// I verbi che molti programmi chiedono per nome invece di usare quello
+/// predefinito: «Apri cartella» di un gioco su Steam, un download nel
+/// browser. Senza, quei programmi aprivano ancora Esplora.
+const VERBI_CARTELLA: [&str; 2] = ["open", "explore"];
 
 /// Com'erano le chiavi prima di diventare predefiniti.
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
@@ -85,6 +89,13 @@ pub fn applica(classi: &RegKey, exe: &str) -> Result<(), FsError> {
         cmd.set_value("", &comando(exe, true)).map_err(scrivi)?;
         // Il verbo predefinito è ciò che Windows esegue al doppio clic.
         shell.set_value("", &VERBO).map_err(scrivi)?;
+
+        for nome in VERBI_CARTELLA {
+            let (cmd, _) = shell.create_subkey(format!(r"{}\command", nome)).map_err(scrivi)?;
+            cmd.set_value("", &comando(exe, true)).map_err(scrivi)?;
+            // Vuoto ma presente, come per Win+E: copre quello di sistema.
+            cmd.set_value("DelegateExecute", &"").map_err(scrivi)?;
+        }
     }
 
     for verbo in VERBI_ESPLORA {
@@ -111,12 +122,14 @@ pub fn ripristina(classi: &RegKey, backup: &Backup) -> Result<(), FsError> {
                     let _ = shell.delete_value("");
                 }
             }
-            // Il metodo delle versioni precedenti scriveva qui: se ne è
-            // rimasto qualcosa di nostro, lo si toglie.
-            if let Ok(cmd) = shell.open_subkey(r"open\command") {
-                let v: String = cmd.get_value("").unwrap_or_default();
-                if v.to_lowercase().contains("space train") || v.to_lowercase().contains("app.exe") {
-                    let _ = shell.delete_subkey_all("open");
+            // I verbi per nome si tolgono solo se sono nostri: un altro
+            // programma potrebbe averne scritto uno suo.
+            for nome in VERBI_CARTELLA {
+                if let Ok(cmd) = shell.open_subkey(format!(r"{}\command", nome)) {
+                    let v: String = cmd.get_value("").unwrap_or_default();
+                    if v.to_lowercase().contains("space train") || v.to_lowercase().contains("app.exe") {
+                        let _ = shell.delete_subkey_all(nome);
+                    }
                 }
             }
         }
@@ -130,6 +143,23 @@ pub fn ripristina(classi: &RegKey, backup: &Backup) -> Result<(), FsError> {
         let _ = classi.delete_subkey_all(format!(r"CLSID\{}", CLSID_ESPLORA));
     }
     Ok(())
+}
+
+/// Se Space Train è già il predefinito, riscrive le chiavi con l'eseguibile
+/// di adesso. Dopo un aggiornamento o una reinstallazione il percorso può
+/// cambiare, e le versioni nuove possono aggiungere verbi: così chi aveva
+/// scelto Space Train lo ritrova senza rifarlo. Ritorna vero se ha scritto.
+pub fn riallinea(classi: &RegKey, exe: &str) -> Result<bool, FsError> {
+    let nostro = classi
+        .open_subkey_with_flags(r"Directory\shell", KEY_READ)
+        .and_then(|k| k.get_value::<String, _>(""))
+        .map(|v| v == VERBO)
+        .unwrap_or(false);
+    if !nostro {
+        return Ok(false);
+    }
+    applica(classi, exe)?;
+    Ok(true)
 }
 
 /// Vero se cartelle e dischi si aprono con questo `exe`.
@@ -236,6 +266,31 @@ mod tests {
             .unwrap();
         assert_eq!(clsid.get_value::<String, _>("DelegateExecute").unwrap(), "");
         assert!(!e_predefinito(&classi, r"C:\altro\programma.exe"));
+    }
+
+    #[test]
+    fn anche_i_verbi_chiesti_per_nome_aprono_space_train() {
+        let (_p, classi) = Prova::nuova("verbi");
+        applica(&classi, EXE).unwrap();
+        for verbo in ["open", "explore"] {
+            let cmd = classi.open_subkey(format!(r"Directory\shell\{}\command", verbo)).unwrap();
+            assert_eq!(cmd.get_value::<String, _>("").unwrap(), format!(r#""{}" "%1""#, EXE));
+            assert_eq!(cmd.get_value::<String, _>("DelegateExecute").unwrap(), "");
+        }
+        ripristina(&classi, &Backup::default()).unwrap();
+        assert!(classi.open_subkey(r"Directory\shell\open").is_err());
+        assert!(classi.open_subkey(r"Drive\shell\explore").is_err());
+    }
+
+    #[test]
+    fn riallinea_aggiorna_il_percorso_solo_se_era_gia_predefinito() {
+        let (_p, classi) = Prova::nuova("riallinea");
+        assert!(!riallinea(&classi, EXE).unwrap());
+        assert!(!e_predefinito(&classi, EXE));
+
+        applica(&classi, r"C:\vecchio\app.exe").unwrap();
+        assert!(riallinea(&classi, EXE).unwrap());
+        assert!(e_predefinito(&classi, EXE));
     }
 
     #[test]

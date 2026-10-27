@@ -1863,17 +1863,14 @@ describe('più finestre', () => {
 
 describe('accesso rapido', () => {
 	const barra = () => document.querySelector<HTMLElement>('.sidebar')!;
-	const fissate = () =>
-		[...barra().querySelectorAll('.gruppo')]
-			.find((g) => g.querySelector('.titolo')?.textContent === 'Accesso rapido')
-			?.querySelectorAll('.voce');
+	const fissate = () => barra().querySelectorAll('.voce.fissata');
 	// Il nome senza lo spillo che lo precede.
 	const nomiFissate = () => [...(fissate() ?? [])].map((v) => v.textContent?.replace('📌', '').trim());
 
-	it('una cartella si fissa dal suo menu e compare in cima alla barra laterale', async () => {
+	it('una cartella si fissa dal suo menu e compare accanto alle cartelle di Windows', async () => {
 		await monta();
-		expect(fissate()).toBeUndefined();
-		await voceMenu(riga('Dati'), 'Aggiungi ad Accesso rapido');
+		expect(fissate()).toHaveLength(0);
+		await voceMenu(riga('Dati'), 'Fissa nella barra laterale');
 		await waitFor(() => expect(nomiFissate()).toEqual(['Dati']));
 
 		// Un clic ci porta, ovunque ci si trovi.
@@ -1887,13 +1884,13 @@ describe('accesso rapido', () => {
 		await monta();
 		await entraIn('Dati');
 		await waitFor(() => expect(nomi()).toEqual(['interno.txt']));
-		await voceMenu(null, 'Aggiungi ad Accesso rapido');
+		await voceMenu(null, 'Fissa nella barra laterale');
 		await waitFor(() => expect(nomiFissate()).toEqual(['Dati']));
 	});
 
 	it('le cartelle fissate restano dopo un riavvio', async () => {
 		const { unmount } = await monta();
-		await voceMenu(riga('Dati'), 'Aggiungi ad Accesso rapido');
+		await voceMenu(riga('Dati'), 'Fissa nella barra laterale');
 		await waitFor(() => expect(nomiFissate()).toEqual(['Dati']));
 		unmount();
 		await monta();
@@ -1902,8 +1899,8 @@ describe('accesso rapido', () => {
 
 	it('dal menu della barra laterale si riordina e si rimuove', async () => {
 		await monta();
-		await voceMenu(riga('Dati'), 'Aggiungi ad Accesso rapido');
-		await voceMenu(riga('Vuota'), 'Aggiungi ad Accesso rapido');
+		await voceMenu(riga('Dati'), 'Fissa nella barra laterale');
+		await voceMenu(riga('Vuota'), 'Fissa nella barra laterale');
 		await waitFor(() => expect(nomiFissate()).toEqual(['Dati', 'Vuota']));
 
 		const menuSu = async (nome: string, voce: string) => {
@@ -1916,13 +1913,13 @@ describe('accesso rapido', () => {
 		await menuSu('Vuota', 'Sposta su');
 		await waitFor(() => expect(nomiFissate()).toEqual(['Vuota', 'Dati']));
 
-		await menuSu('Vuota', 'Rimuovi da Accesso rapido');
+		await menuSu('Vuota', 'Togli dalla barra laterale');
 		await waitFor(() => expect(nomiFissate()).toEqual(['Dati']));
 	});
 
 	it('una cartella fissata è una destinazione per il trascinamento', async () => {
 		await monta();
-		await voceMenu(riga('Dati'), 'Aggiungi ad Accesso rapido');
+		await voceMenu(riga('Dati'), 'Fissa nella barra laterale');
 		await waitFor(() => expect(nomiFissate()).toEqual(['Dati']));
 		const voce = within(barra()).getAllByRole('button', { name: /Dati/ })[0];
 		document.elementFromPoint = () => voce;
@@ -1932,7 +1929,7 @@ describe('accesso rapido', () => {
 
 	it('rinominata, la cartella resta fissata col nome nuovo', async () => {
 		await monta();
-		await voceMenu(riga('Vuota'), 'Aggiungi ad Accesso rapido');
+		await voceMenu(riga('Vuota'), 'Fissa nella barra laterale');
 		await fireEvent.click(riga('Vuota'));
 		tasto('F2');
 		const campo = await campoRinomina();
@@ -2348,5 +2345,57 @@ describe('spritesheet nei temi', () => {
 		} finally {
 			ripristina();
 		}
+	});
+});
+
+// ── Selezione col mouse, sessione, cartelle all'avvio ────────────────
+
+describe('selezione sul vuoto', () => {
+	const vuoto = () => document.querySelector<HTMLElement>('.viewport')!;
+
+	it('un clic sullo spazio vuoto toglie la selezione', async () => {
+		await monta();
+		await fireEvent.click(riga('alfa.txt'));
+		await waitFor(() => expect(selezionati()).toEqual(['alfa.txt']));
+		await fireEvent.mouseDown(vuoto(), { button: 0 });
+		await fireEvent.mouseUp(window);
+		await waitFor(() => expect(selezionati()).toEqual([]));
+	});
+
+	it('con Ctrl un clic sul vuoto lascia la selezione com era', async () => {
+		await monta();
+		await fireEvent.click(riga('alfa.txt'));
+		await fireEvent.mouseDown(vuoto(), { button: 0, ctrlKey: true });
+		await fireEvent.mouseUp(window);
+		expect(selezionati()).toEqual(['alfa.txt']);
+	});
+});
+
+describe('avvio con le schede', () => {
+	it('le cartelle fissate per l avvio si aprono ognuna in una scheda', async () => {
+		localStorage.setItem(
+			'space-train.impostazioni',
+			JSON.stringify({ cartelleAvvio: ['C:\\Dati', 'C:\\Vuota'] })
+		);
+		render(Pagina);
+		await waitFor(() => expect(schede()).toEqual(['Dati', 'Vuota']));
+	});
+
+	it('con la sessione attiva tornano le schede della volta scorsa, e quella che era davanti', async () => {
+		localStorage.setItem('space-train.impostazioni', JSON.stringify({ sessione: true }));
+		localStorage.setItem(
+			'space-train.sessione',
+			JSON.stringify({ schede: ['C:\\', 'C:\\Dati', 'C:\\non-esiste-piu'], attiva: 1 })
+		);
+		render(Pagina);
+		// La cartella sparita si salta.
+		await waitFor(() => expect(schede()).toEqual(['C:', 'Dati']));
+		await waitFor(() => expect(nomi()).toEqual(['interno.txt']));
+	});
+
+	it('senza sessione si riparte dalla pagina iniziale', async () => {
+		localStorage.setItem('space-train.sessione', JSON.stringify({ schede: ['C:\\Dati'], attiva: 0 }));
+		await monta();
+		expect(schede()).toEqual(['C:']);
 	});
 });

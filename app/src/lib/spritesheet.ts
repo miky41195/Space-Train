@@ -470,3 +470,57 @@ export function stile(s: Spritesheet, src: string, alto?: number): string {
 		`image-rendering:${s.nitido ? 'pixelated' : 'auto'}`
 	].join(';');
 }
+
+/** I lati che si stanno tirando in un riquadro. */
+export interface LatiTirati {
+	n: boolean;
+	s: boolean;
+	e: boolean;
+	o: boolean;
+}
+
+/** Lo scarto più piccolo, entro `soglia`, che porta un valore su uno dei bersagli. */
+function scartoMinimo(valori: number[], bersagli: number[], soglia: number): number {
+	let migliore = 0;
+	let distanza = soglia + 1;
+	for (const v of valori) {
+		for (const b of bersagli) {
+			const d = b - v;
+			if (Math.abs(d) <= soglia && Math.abs(d) < distanza) {
+				migliore = d;
+				distanza = Math.abs(d);
+			}
+		}
+	}
+	return distanza <= soglia ? migliore : 0;
+}
+
+/**
+ * Aggancia un fotogramma a mano ai bordi degli altri quando ci passa vicino,
+ * come le guide magnetiche dei programmi di disegno: messi in fila, i
+ * fotogrammi restano allineati al pixel.
+ *
+ * Spostando, il riquadro scorre intero perché un suo lato tocchi o
+ * allinei un lato vicino; tirando i lati, si aggancia solo il lato tirato.
+ * `soglia` è in pixel del foglio.
+ */
+export function agganciaRiquadro(r: Riquadro, altri: Riquadro[], soglia: number, lati?: LatiTirati): Riquadro {
+	const xs = altri.flatMap((a) => [a.x, a.x + a.w]);
+	const ys = altri.flatMap((a) => [a.y, a.y + a.h]);
+	if (!lati) {
+		const dx = scartoMinimo([r.x, r.x + r.w], xs, soglia);
+		const dy = scartoMinimo([r.y, r.y + r.h], ys, soglia);
+		return { x: r.x + dx, y: r.y + dy, w: r.w, h: r.h };
+	}
+	let sinistra = r.x;
+	let destra = r.x + r.w;
+	let alto = r.y;
+	let basso = r.y + r.h;
+	if (lati.o) sinistra += scartoMinimo([sinistra], xs, soglia);
+	if (lati.e) destra += scartoMinimo([destra], xs, soglia);
+	if (lati.n) alto += scartoMinimo([alto], ys, soglia);
+	if (lati.s) basso += scartoMinimo([basso], ys, soglia);
+	// L'aggancio non deve mai capovolgere o annullare il riquadro.
+	if (destra - sinistra < 1 || basso - alto < 1) return r;
+	return { x: sinistra, y: alto, w: destra - sinistra, h: basso - alto };
+}

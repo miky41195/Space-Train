@@ -48,7 +48,11 @@ jobs:
           projectPath: app
           tagName: ${{ github.ref_name }}
           releaseName: Space Train ${{ github.ref_name }}
-          releaseBody: Scarica e avvia l'installatore `.exe`. Le copie già installate si aggiornano da sole.
+          releaseBody: |
+            **New install:** download the file ending in `_x64-setup.exe` below and run it.
+            Copies already installed update themselves at the next start.
+
+            The `.sig` and `latest.json` files are used by the automatic updater: there is no need to download them.
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true

@@ -528,6 +528,9 @@
 															aggiornaSprite(i, 'riquadri', e.currentTarget.checked ? riquadriDellaGriglia(foglio) : undefined)} />
 													Fotogrammi a mano, anche di misure diverse (un colpo, un'onda di energia)
 												</label>
+												{#if foglio.riquadri}
+													<p class="aiuto-aggancio">Vicino a un altro fotogramma i bordi si agganciano: tieni Alt per muoverlo libero.</p>
+												{/if}
 												{#if !foglio.riquadri}
 												<label>
 													X
@@ -949,6 +952,12 @@
 		align-items: center;
 		gap: 6px;
 		color: var(--text);
+	}
+	.aiuto-aggancio {
+		flex-basis: 100%;
+		margin: 0;
+		color: var(--text-dim);
+		font-size: 11px;
 	}
 	.nota-a-mano {
 		margin: 0;

@@ -17,7 +17,8 @@ import {
 	griglia,
 	cella,
 	passoFotogramma,
-	riquadriDellaGriglia
+	riquadriDellaGriglia,
+	agganciaRiquadro
 } from './spritesheet';
 
 describe('spritesheet', () => {
@@ -219,5 +220,25 @@ describe('spritesheet', () => {
 		const fuori = normalizza({ ...s, riquadri: [{ x: 90, y: -4, w: 50, h: 99 }], ordine: [0, 1, 0] });
 		expect(fuori.riquadri).toEqual([{ x: 90, y: 0, w: 6, h: 32 }]);
 		expect(fuori.ordine).toEqual([0, 0]);
+	});
+});
+
+describe('aggancio dei fotogrammi a mano', () => {
+	const vicino = { x: 0, y: 0, w: 32, h: 32 };
+
+	it('spostato accanto a un altro, si attacca al suo bordo e si allinea in alto', () => {
+		// Lasciato a 3 px di distanza e 2 px più in basso.
+		expect(agganciaRiquadro({ x: 35, y: 2, w: 32, h: 32 }, [vicino], 4)).toEqual({ x: 32, y: 0, w: 32, h: 32 });
+	});
+
+	it('lontano resta dov è', () => {
+		expect(agganciaRiquadro({ x: 50, y: 10, w: 32, h: 32 }, [vicino], 4)).toEqual({ x: 50, y: 10, w: 32, h: 32 });
+	});
+
+	it('tirando un lato si aggancia solo quello', () => {
+		const r = agganciaRiquadro({ x: 35, y: 0, w: 20, h: 30 }, [vicino], 4, { n: false, s: true, e: false, o: true });
+		// Il lato sinistro va sul bordo destro dell'altro, quello basso sul suo fondo;
+		// il lato destro, non tirato, resta dov'era.
+		expect(r).toEqual({ x: 32, y: 0, w: 23, h: 32 });
 	});
 });

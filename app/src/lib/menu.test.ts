@@ -32,10 +32,18 @@ describe('vociMenu', () => {
 			'fissa',
 			'condividi',
 			'paginaIniziale',
+			'cartellaAvvio',
 			'terminale',
 			'altreOpzioni',
 			'proprieta'
 		]);
+	});
+
+	it('una cartella si fissa per l avvio e si toglie dallo stesso posto', () => {
+		const v = (allAvvio: boolean) =>
+			vociMenu({ selezione: [], appuntiPieni: false, allAvvio }).find((x) => x.azione === 'cartellaAvvio')?.etichetta;
+		expect(v(false)).toBe('Apri sempre all’avvio');
+		expect(v(true)).toBe('Non aprire più all’avvio');
 	});
 
 	it('la cartella che è già pagina iniziale non la offre di nuovo', () => {
