@@ -5,7 +5,7 @@ replace File Explorer as the default way to open folders, and it updates itself.
 
 ## Install
 
-1. Open the [Releases](https://github.com/miky41195/Star-Train/releases/latest) page.
+1. Open the [Releases](https://github.com/miky41195/Space-Train/releases/latest) page.
 2. Download `Space.Train_<version>_x64-setup.exe` and run it. No administrator
    rights are needed: it installs for the current user only.
 

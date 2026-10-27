@@ -57,7 +57,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQwMDMxQThBRUFGN0QxODQKUldTRTBmZnFpaG9EUUYzTG1oVkJRVTIzZDR1cUU2aC9kRHJ4OFdmYkZ0SEg4K2RuNjdjRTRpRngK",
       "endpoints": [
-        "https://github.com/miky41195/Star-Train/releases/latest/download/latest.json"
+        "https://github.com/miky41195/Space-Train/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"
