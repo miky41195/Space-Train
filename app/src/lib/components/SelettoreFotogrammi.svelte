@@ -67,8 +67,20 @@
 	let scelto = $state(0);
 	let sceltoValido = $derived(Math.min(scelto, Math.max(0, riquadri.length - 1)));
 
-	/** Manda il rettangolo toccato a chi lo salva: la zona, o un fotogramma a mano. */
-	function emetti(indice: number | undefined, x: number, y: number, w: number, h: number) {
+	/**
+	 * Manda il rettangolo toccato a chi lo salva: la zona, o un fotogramma a mano.
+	 *
+	 * Si arrotondano i bordi, non posizione e misura separate: tirando solo il
+	 * lato sinistro, arrotondare x e larghezza ciascuno per conto suo poteva
+	 * spostare di un pixel anche il lato destro, e i fotogrammi accostati non
+	 * combaciavano più.
+	 */
+	function emetti(indice: number | undefined, x0: number, y0: number, w0: number, h0: number) {
+		const x = Math.round(x0);
+		const y = Math.round(y0);
+		const w = Math.max(1, Math.round(x0 + w0) - x);
+		const h = Math.max(1, Math.round(y0 + h0) - y);
+		aggiornaGuide(indice, { x, y, w, h });
 		if (indice === undefined) {
 			onzona(x, y, w, h);
 			return;
@@ -76,6 +88,27 @@
 		const lista = [...riquadri];
 		lista[indice] = { x, y, w, h };
 		onriquadri?.(lista);
+	}
+
+	/**
+	 * Le linee guida: dove un bordo del fotogramma che si muove coincide con
+	 * quello di un altro, come nei programmi di disegno. Si vedono solo
+	 * durante il gesto.
+	 */
+	let guide = $state<{ x: number[]; y: number[] }>({ x: [], y: [] });
+
+	function aggiornaGuide(indice: number | undefined, r: Riquadro) {
+		if (indice === undefined) {
+			guide = { x: [], y: [] };
+			return;
+		}
+		const altri = riquadri.filter((_, k) => k !== indice);
+		const xs = new Set(altri.flatMap((a) => [a.x, a.x + a.w]));
+		const ys = new Set(altri.flatMap((a) => [a.y, a.y + a.h]));
+		guide = {
+			x: [r.x, r.x + r.w].filter((v) => xs.has(v)),
+			y: [r.y, r.y + r.h].filter((v) => ys.has(v))
+		};
 	}
 
 	function togliScelto() {
@@ -141,15 +174,6 @@
 		const { px, py } = punto(e);
 		const L = foglio.larghezza;
 		const A = foglio.altezza;
-		if (gesto.modo === 'nuova') {
-			const x = Math.max(0, Math.min(gesto.px, px));
-			const y = Math.max(0, Math.min(gesto.py, py));
-			emetti(gesto.indice, x, y, Math.min(L, Math.max(gesto.px, px)) - x, Math.min(A, Math.max(gesto.py, py)) - y);
-			return;
-		}
-		const dx = px - gesto.px;
-		const dy = py - gesto.py;
-		const { x, y, w, h } = gesto.da;
 		// Coi fotogrammi a mano i bordi si agganciano a quelli dei vicini;
 		// Alt premuto lascia muovere libero, al pixel.
 		const indice = gesto.indice;
@@ -157,6 +181,21 @@
 			indice === undefined || e.altKey
 				? r
 				: agganciaRiquadro(r, riquadri.filter((_, k) => k !== indice), AGGANCIO / zoom, lati);
+		if (gesto.modo === 'nuova') {
+			const x = Math.max(0, Math.min(gesto.px, px));
+			const y = Math.max(0, Math.min(gesto.py, py));
+			// Un fotogramma nuovo si aggancia da tutti i lati: anche il punto
+			// da cui si è partiti a disegnarlo.
+			const r = aggancia(
+				{ x, y, w: Math.min(L, Math.max(gesto.px, px)) - x, h: Math.min(A, Math.max(gesto.py, py)) - y },
+				{ n: true, s: true, e: true, o: true }
+			);
+			emetti(indice, r.x, r.y, Math.min(L - r.x, r.w), Math.min(A - r.y, r.h));
+			return;
+		}
+		const dx = px - gesto.px;
+		const dy = py - gesto.py;
+		const { x, y, w, h } = gesto.da;
 		if (gesto.modo === 'sposta') {
 			// Stessa misura, senza uscire dal foglio.
 			const r = aggancia({ x: Math.min(L - w, Math.max(0, x + dx)), y: Math.min(A - h, Math.max(0, y + dy)), w, h });
@@ -178,6 +217,7 @@
 
 	function rilascia() {
 		gesto = null;
+		guide = { x: [], y: [] };
 	}
 
 	function cambiaZoom(verso: 1 | -1) {
@@ -262,6 +302,12 @@
 						{/if}
 					</div>
 				{/each}
+				{#each guide.x as gx (`x${gx}`)}
+					<span class="guida verticale" style:left="{gx * zoom}px"></span>
+				{/each}
+				{#each guide.y as gy (`y${gy}`)}
+					<span class="guida orizzontale" style:top="{gy * zoom}px"></span>
+				{/each}
 			{:else}
 				<!-- La zona scelta, divisa nei suoi fotogrammi. -->
 				<div
@@ -298,6 +344,23 @@
 <style>
 	.selettore {
 		margin-top: 8px;
+	}
+	/* Le linee guida dell'aggancio, sopra tutto il foglio. */
+	.guida {
+		position: absolute;
+		pointer-events: none;
+		z-index: 3;
+		background: var(--signal);
+	}
+	.guida.verticale {
+		top: 0;
+		bottom: 0;
+		width: 1px;
+	}
+	.guida.orizzontale {
+		left: 0;
+		right: 0;
+		height: 1px;
 	}
 	.barra {
 		display: flex;

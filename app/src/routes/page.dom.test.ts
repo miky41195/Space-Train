@@ -1402,7 +1402,9 @@ describe('cartelle colorate', () => {
 
 describe('trascinamento', () => {
 	function trascinaDa(el: HTMLElement) {
-		fireEvent.mouseDown(el, { button: 0, clientX: 10, clientY: 10 });
+		// Il file si prende per il nome, come in Esplora: dal resto della
+		// riga parte il rettangolo di selezione.
+		fireEvent.mouseDown(el.querySelector('.name') ?? el, { button: 0, clientX: 10, clientY: 10 });
 		fireEvent.mouseMove(window, { buttons: 1, clientX: 40, clientY: 10 });
 	}
 
@@ -1420,6 +1422,15 @@ describe('trascinamento', () => {
 		await waitFor(() =>
 			expect(disco.shell[0]).toEqual({ cmd: 'start_drag', args: { paths: ['C:\\alfa.txt', 'C:\\beta.txt'] } })
 		);
+	});
+
+	it('dalla parte vuota della riga non si trascina il file: parte il rettangolo', async () => {
+		await monta();
+		const data = riga('alfa.txt').querySelector('.date')!;
+		fireEvent.mouseDown(data, { button: 0, clientX: 10, clientY: 10 });
+		fireEvent.mouseMove(window, { buttons: 1, clientX: 40, clientY: 60 });
+		fireEvent.mouseUp(window);
+		expect(disco.shell).toEqual([]);
 	});
 
 	it('un clic senza movimento non è un trascinamento', async () => {

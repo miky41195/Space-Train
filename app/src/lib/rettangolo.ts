@@ -38,7 +38,7 @@ export interface OpzioniRettangolo {
 
 /** Pixel oltre i quali la pressione diventa un rettangolo. */
 const SOGLIA = 5;
-/** Distanza dal bordo entro cui la lista scorre da sola. */
+/** Pixel di scorrimento massimi per fotogramma, col puntatore fuori dalla lista. */
 const BORDO = 24;
 
 export function selezioneRettangolo(nodo: HTMLElement, opzioni: OpzioniRettangolo) {
@@ -47,21 +47,39 @@ export function selezioneRettangolo(nodo: HTMLElement, opzioni: OpzioniRettangol
 	function giu(e: MouseEvent) {
 		if (e.button !== 0) return;
 		const bersaglio = e.target as HTMLElement | null;
-		// Sopra una voce comandano lei e il trascinamento dei file.
-		if (bersaglio?.closest('[data-voce], input, button')) return;
+		if (!bersaglio || bersaglio.closest('input, button')) return;
+		// Sopra una voce comandano lei e il trascinamento dei file. Le righe
+		// larghe della vista dettagli fanno eccezione: solo icona e nome
+		// prendono il file, dal resto della riga si disegna il rettangolo.
+		const voce = bersaglio.closest('[data-voce]');
+		if (voce && (!voce.hasAttribute('data-riga-larga') || bersaglio.closest('[data-presa]'))) return;
 		const fuori = nodo.getBoundingClientRect();
 		// Il clic sulla barra di scorrimento non è un clic sul vuoto.
 		if (e.clientX - fuori.left >= nodo.clientWidth || e.clientY - fuori.top >= nodo.clientHeight) return;
 
 		const aggiungi = e.ctrlKey || e.shiftKey;
+		// I limiti del contenuto si misurano prima di disegnare: il rettangolo
+		// sta dentro la viewport, e senza questi limiti la allungherebbe da sé,
+		// facendola scorrere all'infinito.
+		const limiteX = nodo.clientWidth;
+		const limiteY = Math.max(nodo.scrollHeight, nodo.clientHeight);
 		const contenuto = (cx: number, cy: number) => {
 			const r = nodo.getBoundingClientRect();
-			return { x: cx - r.left + nodo.scrollLeft, y: cy - r.top + nodo.scrollTop };
+			return {
+				x: Math.min(limiteX, Math.max(0, cx - r.left + nodo.scrollLeft)),
+				y: Math.min(limiteY, Math.max(0, cy - r.top + nodo.scrollTop))
+			};
 		};
 		const inizio = contenuto(e.clientX, e.clientY);
 		let ultimo = { x: e.clientX, y: e.clientY };
 		let riquadro: HTMLDivElement | null = null;
 		let giro = 0;
+		/**
+		 * Dove sta ogni voce vista durante il gesto, in coordinate del
+		 * contenuto. Le liste sono virtualizzate: una voce uscita dallo
+		 * schermo sparisce dalla pagina, ma resta dentro il rettangolo.
+		 */
+		const posizioni = new Map<string, Riquadro>();
 
 		// Niente selezione del testo mentre si trascina.
 		e.preventDefault();
@@ -76,26 +94,28 @@ export function selezioneRettangolo(nodo: HTMLElement, opzioni: OpzioniRettangol
 				riquadro.style.height = `${r.h}px`;
 			}
 			const base = nodo.getBoundingClientRect();
-			const dentro: string[] = [];
 			for (const el of nodo.querySelectorAll<HTMLElement>('[data-voce]')) {
 				const b = el.getBoundingClientRect();
-				const voce = {
+				posizioni.set(el.dataset.voce!, {
 					x: b.left - base.left + nodo.scrollLeft,
 					y: b.top - base.top + nodo.scrollTop,
 					w: b.width,
 					h: b.height
-				};
-				if (siToccano(r, voce)) dentro.push(el.dataset.voce!);
+				});
 			}
+			const dentro: string[] = [];
+			for (const [path, voce] of posizioni) if (siToccano(r, voce)) dentro.push(path);
 			o.oncambia(dentro, aggiungi);
 		}
 
-		// Vicino ai bordi la lista scorre, e il rettangolo la segue.
+		// Col puntatore oltre il bordo, sopra o sotto, la lista scorre e il
+		// rettangolo la segue. Dentro la lista non scorre: partire vicino al
+		// fondo non deve far scappare tutto verso il basso.
 		function scorri() {
 			const r = nodo.getBoundingClientRect();
 			let passo = 0;
-			if (ultimo.y < r.top + BORDO) passo = -Math.min(24, r.top + BORDO - ultimo.y);
-			else if (ultimo.y > r.bottom - BORDO) passo = Math.min(24, ultimo.y - (r.bottom - BORDO));
+			if (ultimo.y < r.top) passo = -Math.min(BORDO, r.top - ultimo.y);
+			else if (ultimo.y > r.bottom) passo = Math.min(BORDO, ultimo.y - r.bottom);
 			if (passo !== 0) {
 				nodo.scrollTop += passo;
 				aggiorna();
@@ -120,8 +140,17 @@ export function selezioneRettangolo(nodo: HTMLElement, opzioni: OpzioniRettangol
 			window.removeEventListener('mousemove', muovi);
 			window.removeEventListener('mouseup', su);
 			cancelAnimationFrame(giro);
-			if (riquadro) riquadro.remove();
-			else if (!aggiungi) o.onvuoto();
+			if (riquadro) {
+				riquadro.remove();
+				// Il clic che chiude il gesto cadrebbe su una riga e la
+				// selezionerebbe da sola, cancellando il rettangolo.
+				const ingoia = (c: MouseEvent) => {
+					c.stopPropagation();
+					c.preventDefault();
+				};
+				window.addEventListener('click', ingoia, { capture: true, once: true });
+				setTimeout(() => window.removeEventListener('click', ingoia, { capture: true }), 0);
+			} else if (!aggiungi && !voce) o.onvuoto();
 		}
 
 		window.addEventListener('mousemove', muovi);

@@ -164,7 +164,12 @@
 	data-category={entry.kind === 'dir' ? 'dir' : categoryFor(entry.name)}
 	data-cartella={entry.kind === 'dir' ? entry.path : undefined}
 	data-voce={entry.path}
-	onmousedown={(e) => ontrascina && seTrascina(e, () => ontrascina(entry))}
+	data-riga-larga
+	onmousedown={(e) => {
+		// Come in Esplora: si trascina il file prendendolo per l'icona o il
+		// nome; dal resto della riga parte il rettangolo di selezione.
+		if (ontrascina && (e.target as HTMLElement).closest('[data-presa]')) seTrascina(e, () => ontrascina(entry));
+	}}
 	ondblclick={() => onactivate(entry)}
 	onclick={(e) => onselect(entry, { ctrl: e.ctrlKey, shift: e.shiftKey })}
 	oncontextmenu={(e) => {
@@ -177,7 +182,7 @@
 		else if (e.key === ' ') onselect(entry, { ctrl: e.ctrlKey, shift: e.shiftKey });
 	}}
 >
-	<span class="icon">
+	<span class="icon" data-presa>
 		{#if colore && entry.kind === 'dir'}
 			<span class="cartella-colorata">{@html iconaCartella(colore)}</span>
 		{:else if immagine}
@@ -206,7 +211,7 @@
 		/>
 	{:else}
 		<span class="nome-blocco">
-			<span class="name" title={entry.name}
+			<span class="name" data-presa title={entry.name}
 				>{#each tratti as t, i (i)}{#if t.forte}<mark>{t.testo}</mark>{:else}{t.testo}{/if}{/each}</span
 			>
 			{#if cartella}<span class="cartella" title={cartella}>{cartella}</span>{/if}
