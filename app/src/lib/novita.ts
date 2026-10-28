@@ -14,6 +14,20 @@ export interface Novita {
 
 export const NOVITA: Novita[] = [
 	{
+		versione: '0.2.5',
+		voci: [
+			'L’editor dei temi si apre in una finestra sua: spostala dove vuoi e guarda il tema applicato nella finestra principale.',
+			'Editor dei temi: «Sfondo» cambia davvero il colore di fondo, e la dimensione del testo si sceglie in pixel; le righe dell’elenco si adattano.',
+			'Angoli della finestra puliti, senza il bordo squadrato di Windows.',
+			'Nella vista dettagli una riga si trascina da qualunque punto; il rettangolo di selezione parte dallo spazio vuoto.',
+			'Trascina una cartella nello spazio libero della barra delle schede per aprirla in una scheda nuova.',
+			'I file ricevuti da un altro PC passano dall’antivirus di Windows e vengono segnati come scaricati da internet; quelli bloccati si saltano e gli altri arrivano comunque.',
+			'Prima di accettare dei file in arrivo puoi scegliere in quale cartella salvarli.',
+			'I programmi in una cartella condivisa da un altro PC non si avviano direttamente dalla rete: scaricali prima.',
+			'Il tasto destro fuori dai campi di testo non mostra più il menu del browser.'
+		]
+	},
+	{
 		versione: '0.2.4',
 		voci: [
 			'Amici: scambia file e cartelle con altri PC ovunque siano, senza VPN né porte da aprire. Barra laterale → Aggiungi amici: dai il tuo codice (anche come QR) e incolla il loro.',
