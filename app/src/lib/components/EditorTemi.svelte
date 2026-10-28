@@ -4,6 +4,8 @@
 		TEMI,
 		CARATTERI,
 		FORME_BASE,
+		DIMENSIONE_MIN,
+		DIMENSIONE_MAX,
 		variabiliDa,
 		temaDa,
 		type Tema,
@@ -67,10 +69,14 @@
 		onchiudi: () => void;
 	} = $props();
 
-	/** I colori che l'editor fa scegliere, con il loro nome per l'utente. */
+	/**
+	 * I colori che l'editor fa scegliere, con il loro nome per l'utente.
+	 * «Sfondo» è `--hull`: è il colore di elenco, barra laterale e testata,
+	 * cioè quello che si vede. `--void` sta solo dietro e nei campi.
+	 */
 	const COLORI = [
-		['void', '--void', 'Sfondo'],
-		['hull', '--hull', 'Pannelli'],
+		['hull', '--hull', 'Sfondo'],
+		['void', '--void', 'Campi di testo e bordi'],
 		['text', '--text', 'Testo'],
 		['dim', '--text-dim', 'Testo secondario'],
 		['plasma', '--plasma', 'Evidenziazione'],
@@ -94,6 +100,7 @@
 	let raggioPiccolo = $state(FORME_BASE.raggioPiccolo);
 	let carattere = $state(FORME_BASE.carattere);
 	let carattereTitoli = $state(FORME_BASE.carattereTitoli);
+	let dimensione = $state(FORME_BASE.dimensione);
 	let corteoTipo = $state<'treno' | 'figure' | 'immagini'>('treno');
 	let figure = $state<string[]>([]);
 	let immagini = $state<string[]>([]);
@@ -123,6 +130,7 @@
 		raggioPiccolo = t.forme?.raggioPiccolo ?? FORME_BASE.raggioPiccolo;
 		carattere = t.forme?.carattere ?? FORME_BASE.carattere;
 		carattereTitoli = t.forme?.carattereTitoli ?? FORME_BASE.carattereTitoli;
+		dimensione = t.forme?.dimensione ?? FORME_BASE.dimensione;
 		const voci = t.corteo ?? [];
 		const lette = voci.map((v) => leggiMovimento(v));
 		const mie = lette.filter((l) => mia(l.voce));
@@ -169,7 +177,7 @@
 		chiaro,
 		gruppo: 'personale',
 		variabili: variabiliDa(tavolozza, chiaro),
-		forme: { raggio, raggioPiccolo, carattere, carattereTitoli },
+		forme: { raggio, raggioPiccolo, carattere, carattereTitoli, dimensione },
 		corteo:
 			corteoTipo === 'treno'
 				? undefined
@@ -436,6 +444,19 @@
 					<span>Arrotondamento righe e pulsanti</span>
 					<input type="range" min="0" max="20" bind:value={raggioPiccolo} aria-label="Arrotondamento righe" />
 					<output>{raggioPiccolo}px</output>
+				</label>
+				<label class="riga">
+					<span>Dimensione del testo</span>
+					<input type="range" min={DIMENSIONE_MIN} max={DIMENSIONE_MAX} bind:value={dimensione}
+						aria-label="Dimensione del testo" />
+					<input class="pixel" type="number" min={DIMENSIONE_MIN} max={DIMENSIONE_MAX} value={dimensione}
+						aria-label="Dimensione del testo in pixel"
+						onchange={(e) => {
+							const n = Math.round(Number(e.currentTarget.value));
+							dimensione = Number.isFinite(n) ? Math.min(DIMENSIONE_MAX, Math.max(DIMENSIONE_MIN, n)) : FORME_BASE.dimensione;
+							e.currentTarget.value = String(dimensione);
+						}} />
+					<span class="unita">px</span>
 				</label>
 				<label class="riga">
 					<span>Carattere del testo</span>
@@ -875,12 +896,12 @@
 		margin: 0;
 		flex: 1;
 		font-family: var(--font-display);
-		font-size: 17px;
+		font-size: calc(17px * var(--scala-testo, 1));
 	}
 	h3 {
 		margin: 0 0 8px;
 		font-family: var(--font-display);
-		font-size: 12px;
+		font-size: calc(12px * var(--scala-testo, 1));
 		letter-spacing: 0.06em;
 		text-transform: uppercase;
 		color: var(--text-dim);
@@ -923,6 +944,19 @@
 		flex: 1;
 		accent-color: var(--accent);
 	}
+	.riga input.pixel {
+		width: 56px;
+		height: 28px;
+		padding: 0 6px;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		background: var(--bg);
+		color: var(--text);
+		font: inherit;
+	}
+	.riga > span.unita {
+		width: auto;
+	}
 	output {
 		width: 40px;
 		text-align: right;
@@ -955,7 +989,7 @@
 	.nota {
 		margin: 6px 0;
 		color: var(--text-dim);
-		font-size: 12px;
+		font-size: calc(12px * var(--scala-testo, 1));
 	}
 	.figure {
 		display: grid;
@@ -984,7 +1018,7 @@
 		position: absolute;
 		top: 2px;
 		right: 4px;
-		font-size: 10px;
+		font-size: calc(10px * var(--scala-testo, 1));
 		font-weight: 700;
 		color: var(--accent);
 	}
@@ -1043,7 +1077,7 @@
 		align-items: center;
 		gap: 6px 14px;
 		margin: 6px 0;
-		font-size: 12px;
+		font-size: calc(12px * var(--scala-testo, 1));
 		color: var(--text-dim);
 	}
 	.movimento label {
@@ -1092,7 +1126,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
-		font-size: 11px;
+		font-size: calc(11px * var(--scala-testo, 1));
 		color: var(--text-dim);
 	}
 	.campi input[type='number'] {
@@ -1103,7 +1137,7 @@
 		background: var(--bg);
 		color: var(--text);
 		font: inherit;
-		font-size: 12px;
+		font-size: calc(12px * var(--scala-testo, 1));
 	}
 	.campi .campo-a-mano,
 	.nota-a-mano {
@@ -1119,11 +1153,11 @@
 		flex-basis: 100%;
 		margin: 0;
 		color: var(--text-dim);
-		font-size: 11px;
+		font-size: calc(11px * var(--scala-testo, 1));
 	}
 	.nota-a-mano {
 		margin: 0;
-		font-size: 11px;
+		font-size: calc(11px * var(--scala-testo, 1));
 		color: var(--text-dim);
 	}
 	.campi .campo-ordine {
@@ -1137,7 +1171,7 @@
 		background: var(--bg);
 		color: var(--text);
 		font: inherit;
-		font-size: 12px;
+		font-size: calc(12px * var(--scala-testo, 1));
 	}
 	.campo-binario {
 		grid-column: 1 / -1;
@@ -1149,7 +1183,7 @@
 		border-top: 1px solid var(--border);
 	}
 	.titolo-binario {
-		font-size: 11px;
+		font-size: calc(11px * var(--scala-testo, 1));
 		font-weight: 600;
 		color: var(--text);
 	}
@@ -1182,7 +1216,7 @@
 		background: transparent;
 		color: var(--text);
 		font: inherit;
-		font-size: 11px;
+		font-size: calc(11px * var(--scala-testo, 1));
 		cursor: default;
 	}
 	.preset button:disabled {
@@ -1192,7 +1226,7 @@
 		align-self: end;
 		padding-bottom: 5px;
 		white-space: nowrap;
-		font-size: 11px;
+		font-size: calc(11px * var(--scala-testo, 1));
 		color: var(--text-dim);
 		font-variant-numeric: tabular-nums;
 	}
@@ -1223,7 +1257,7 @@
 		width: 30px;
 		padding: 0;
 		border: none;
-		font-size: 18px;
+		font-size: calc(18px * var(--scala-testo, 1));
 	}
 	.primario {
 		border-color: var(--accent);
@@ -1244,7 +1278,7 @@
 		align-items: center;
 		gap: 6px 12px;
 		margin: 6px 0;
-		font-size: 12px;
+		font-size: calc(12px * var(--scala-testo, 1));
 		color: var(--text-dim);
 	}
 	.strumenti-sfondo label {
@@ -1264,7 +1298,7 @@
 		height: 26px;
 		padding: 0 10px;
 		white-space: nowrap;
-		font-size: 12px;
+		font-size: calc(12px * var(--scala-testo, 1));
 	}
 	.strumenti-sfondo button[aria-pressed='true'] {
 		border-color: var(--accent);

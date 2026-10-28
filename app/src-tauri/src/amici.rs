@@ -620,25 +620,30 @@ impl Amici {
         avanzamento: &mut dyn FnMut(u64, u64),
     ) -> Result<Vec<[String; 2]>, FsError> {
         let mut coppie = Vec::new();
+        let mut bloccati = Vec::new();
         let mut gia = 0u64;
         for sorgente in sorgenti {
             let (id, rel) = dividi(sorgente).ok_or(FsError::NotFound)?;
-            let (creati, totale) = self.con_flusso(&id, |s| {
+            let (arrivo, totale) = self.con_flusso(&id, |s| {
                 scrivi_json(s, &Richiesta::Scarica { path: rel }).map_err(errore_io)?;
                 let r = controlla(leggi_json(s).map_err(errore_io)?)?;
                 let totale: u64 = r.contenuto.iter().map(|v| v.dimensione).sum();
-                let creati = prendi_file(s, Path::new(dest), &r.contenuto, annulla, &mut |f| {
+                let arrivo = prendi_file(s, Path::new(dest), &r.contenuto, annulla, &mut |f| {
                     avanzamento(gia + f, gia + totale)
                 })
                 .map_err(errore_io)?;
-                Ok((creati, totale))
+                Ok((arrivo, totale))
             })?;
             gia += totale;
-            if let Some(c) = creati.first() {
+            bloccati.extend(arrivo.bloccati);
+            if let Some(c) = arrivo.creati.first() {
                 coppie.push([sorgente.clone(), paths::display(c)]);
             }
         }
-        Ok(coppie)
+        match crate::lan::avviso_bloccati(&bloccati) {
+            Some(message) => Err(FsError::Io { message }),
+            None => Ok(coppie),
+        }
     }
 
     /// Manda file a un amico. Aspetta che lui accetti, come in rete locale.

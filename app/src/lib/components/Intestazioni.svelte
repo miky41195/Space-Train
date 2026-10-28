@@ -90,7 +90,7 @@
 		background: transparent;
 		color: var(--text-dim);
 		font-family: var(--font-display);
-		font-size: 10px;
+		font-size: calc(10px * var(--scala-testo, 1));
 		font-weight: 600;
 		letter-spacing: 0.16em;
 		text-transform: uppercase;

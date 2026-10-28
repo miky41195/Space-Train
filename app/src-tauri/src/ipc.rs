@@ -449,12 +449,21 @@ pub fn scarica_remoto(
 
 /// Apre un file della cartella condivisa da un altro PC: lo scarica in una
 /// cartella temporanea e lo apre da lì.
+///
+/// I programmi no: scaricare dalla rete e avviare subito è proprio ciò che
+/// fanno i virus, e l'antivirus finirebbe per sospettare di Space Train.
+/// Si copiano sul PC e si aprono da lì, con i controlli di Windows.
 #[tauri::command]
 pub async fn lan_apri(
     lan: tauri::State<'_, Arc<Lan>>,
     amici: tauri::State<'_, Arc<Amici>>,
     path: String,
 ) -> Result<(), FsError> {
+    if crate::fs::provenienza::e_programma(&path) {
+        return Err(FsError::Io {
+            message: "È un programma: per sicurezza non si avvia direttamente da un altro PC. Copialo sul tuo PC e aprilo da lì.".into(),
+        });
+    }
     let lan = lan.inner().clone();
     let amici = amici.inner().clone();
     fuori_dalla_finestra(move || {

@@ -17,6 +17,11 @@ export interface Forme {
 	carattere: string;
 	/** Carattere di titoli, intestazioni ed etichette. */
 	carattereTitoli: string;
+	/**
+	 * Dimensione del testo normale, in pixel. Tutti gli altri testi (titoli,
+	 * note, etichette) crescono e calano nella stessa proporzione.
+	 */
+	dimensione: number;
 }
 
 export interface Tema {
@@ -46,8 +51,20 @@ export const FORME_BASE: Forme = {
 	carattere: "'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif",
 	// Uguale alla voce dell'elenco CARATTERI: l'editor la riconosce solo se
 	// la stringa coincide.
-	carattereTitoli: "'Bahnschrift', 'Segoe UI', sans-serif"
+	carattereTitoli: "'Bahnschrift', 'Segoe UI', sans-serif",
+	dimensione: 13
 };
+
+/** I limiti della dimensione del testo che si può scegliere, in pixel. */
+export const DIMENSIONE_MIN = 9;
+export const DIMENSIONE_MAX = 24;
+
+/** Quanto il testo del tema è più grande (o più piccolo) di quello di base. */
+export function scalaTesto(tema: Tema): number {
+	const d = tema.forme?.dimensione ?? FORME_BASE.dimensione;
+	const valida = Number.isFinite(d) ? Math.min(DIMENSIONE_MAX, Math.max(DIMENSIONE_MIN, d)) : FORME_BASE.dimensione;
+	return valida / FORME_BASE.dimensione;
+}
 
 /** Caratteri presenti in Windows tra cui scegliere nell'editor. */
 export const CARATTERI = [
@@ -281,6 +298,7 @@ export function variabiliPer(tema: Tema, accento: string): Record<string, string
 		'--radius-sm': `${forme.raggioPiccolo}px`,
 		'--font-ui': forme.carattere,
 		'--font-display': forme.carattereTitoli,
+		'--scala-testo': String(scalaTesto(tema)),
 		'--motivo': figura ? motivoFigura(figura, tema.chiaro ? 0.1 : 0.07) : 'none'
 	};
 }

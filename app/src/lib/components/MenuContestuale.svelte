@@ -183,7 +183,7 @@
 	kbd {
 		color: var(--text-dim);
 		font: inherit;
-		font-size: 11px;
+		font-size: calc(11px * var(--scala-testo, 1));
 	}
 
 	.spunta {
@@ -195,7 +195,7 @@
 	.sezione {
 		padding: 6px 10px 2px;
 		color: var(--text-dim);
-		font-size: 11px;
+		font-size: calc(11px * var(--scala-testo, 1));
 		letter-spacing: 0.04em;
 	}
 
@@ -206,7 +206,7 @@
 		display: block;
 		margin-bottom: 6px;
 		color: var(--text-dim);
-		font-size: 11px;
+		font-size: calc(11px * var(--scala-testo, 1));
 	}
 	.tavolozza {
 		display: flex;

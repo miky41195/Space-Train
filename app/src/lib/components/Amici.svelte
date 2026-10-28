@@ -187,12 +187,12 @@
 	h2 {
 		margin: 0 0 6px;
 		font-family: var(--font-display);
-		font-size: 17px;
+		font-size: calc(17px * var(--scala-testo, 1));
 		font-weight: 600;
 	}
 	h3 {
 		margin: 0 0 6px;
-		font-size: 12px;
+		font-size: calc(12px * var(--scala-testo, 1));
 		color: var(--text-dim);
 		font-weight: 600;
 		text-transform: uppercase;
@@ -204,7 +204,7 @@
 	.spiega,
 	.dim {
 		color: var(--text-dim);
-		font-size: 12px;
+		font-size: calc(12px * var(--scala-testo, 1));
 		line-height: 1.4;
 	}
 	.spiega {
@@ -216,7 +216,7 @@
 		border-radius: var(--radius-sm);
 		background: var(--bg);
 		font-family: ui-monospace, Consolas, monospace;
-		font-size: 12px;
+		font-size: calc(12px * var(--scala-testo, 1));
 		word-break: break-all;
 		user-select: all;
 	}
@@ -247,7 +247,7 @@
 		background: var(--bg);
 		color: var(--text);
 		font: inherit;
-		font-size: 12px;
+		font-size: calc(12px * var(--scala-testo, 1));
 		outline: none;
 	}
 	input:not([type]):focus {
@@ -290,7 +290,7 @@
 		display: flex;
 		align-items: center;
 		gap: 4px;
-		font-size: 12px;
+		font-size: calc(12px * var(--scala-testo, 1));
 		color: var(--text-dim);
 		white-space: nowrap;
 	}
@@ -307,7 +307,7 @@
 		background: transparent;
 		color: var(--text);
 		font: inherit;
-		font-size: 12px;
+		font-size: calc(12px * var(--scala-testo, 1));
 		cursor: default;
 		white-space: nowrap;
 	}

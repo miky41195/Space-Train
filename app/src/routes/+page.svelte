@@ -64,7 +64,7 @@
 	import { filterEntries } from '$lib/fuzzy';
 	import { impagina, type ModoGruppi } from '$lib/raggruppa';
 	import { misuraCella, zoom, LATO_MIN, LATO_MAX, type Vista } from '$lib/vista';
-	import { applicaTema, coloreAccento, temaDa, type IdAccento, type TemaPersonale } from '$lib/temi';
+	import { applicaTema, coloreAccento, scalaTesto, temaDa, type IdAccento, type TemaPersonale } from '$lib/temi';
 	import EditorTemi from '$lib/components/EditorTemi.svelte';
 	import { ColoriStore, type IdColore } from '$lib/stores/colori.svelte';
 	import { azioneTasto } from '$lib/scorciatoie';
@@ -133,6 +133,10 @@
 			const foglio = leggiSprite(v);
 			return foglio ? misuraBinario(foglio).altezza + 10 - 40 : 0;
 		}))
+	);
+	/** Col testo più grande le righe si alzano, perché non si taglino. */
+	let altezzaRiga = $derived(
+		Math.round((impostazioni.compatta ? 26 : 32) * Math.max(1, scalaTesto(anteprimaTema ?? temaCorrente)))
 	);
 	let editorAperto = $state(false);
 	let selettoreColore = $state<HTMLInputElement | null>(null);
@@ -780,13 +784,22 @@
 			ricezioneInCorso = r.id;
 			progresso = { transferred: r.fatti, total: r.totale };
 		});
-		void ascolta<{ id: number; da: string; cartella: string; quanti: number; errore: string | null; annullato?: boolean }>(
+		void ascolta<{
+			id: number;
+			da: string;
+			cartella: string;
+			quanti: number;
+			errore: string | null;
+			annullato?: boolean;
+			bloccati?: string | null;
+		}>(
 			'lan-ricevuto',
 			(r) => {
 				if (ricezioneInCorso === r.id) ricezioneInCorso = null;
 				if (opInCorso === null) progresso = null;
 				if (r.annullato) avvisa(`Ricezione da ${r.da} annullata.`);
 				else if (r.errore) erroreOp = `Ricezione da ${r.da} interrotta: ${r.errore}`;
+				else if (r.bloccati) erroreOp = `Ricezione da ${r.da}: ${r.bloccati}`;
 				else avvisa(`Ricevuti ${r.quanti === 1 ? '1 elemento' : `${r.quanti} elementi`} da ${r.da} in ${r.cartella}.`);
 				void store.aggiornaCartella(r.cartella);
 			}
@@ -2190,7 +2203,7 @@
 						nascondiEstensione={!impostazioni.estensioni}
 						cartellaDi={cartellaVoce}
 						coloreDi={coloreVoce}
-						altezzaRiga={impostazioni.compatta ? 26 : 32}
+						{altezzaRiga}
 						{bersaglio}
 						selection={insiemeSelezione}
 						matches={store.activeTab.query === '' || inRicerca ? undefined : evidenziazioni}
@@ -2480,7 +2493,7 @@
 		border: none;
 		background: transparent;
 		color: inherit;
-		font-size: 15px;
+		font-size: calc(15px * var(--scala-testo, 1));
 		cursor: default;
 	}
 	.errore {

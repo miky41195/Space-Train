@@ -68,7 +68,7 @@
 	h2 {
 		margin: 0 0 10px;
 		font-family: var(--font-display);
-		font-size: 17px;
+		font-size: calc(17px * var(--scala-testo, 1));
 		font-weight: 600;
 	}
 	p {

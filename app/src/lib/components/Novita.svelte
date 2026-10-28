@@ -64,12 +64,12 @@
 	h2 {
 		margin: 0 0 12px;
 		font-family: var(--font-display);
-		font-size: 17px;
+		font-size: calc(17px * var(--scala-testo, 1));
 		font-weight: 600;
 	}
 	h3 {
 		margin: 10px 0 4px;
-		font-size: 13px;
+		font-size: calc(13px * var(--scala-testo, 1));
 		color: var(--text-dim);
 		font-weight: 600;
 	}

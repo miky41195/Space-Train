@@ -4,24 +4,23 @@
  *
  * Si attacca alla finestra; `maniglia` è il selettore della parte da cui la
  * si prende. I pulsanti e i campi dentro la maniglia restano cliccabili.
- * La finestra non può uscire dallo schermo oltre la testata: deve sempre
- * restare un pezzo da cui riprenderla.
+ * La finestra resta tutta dentro quella dell'app: fuori sarebbe tagliata.
  */
 
-/** Quanto della testata deve restare a schermo, in pixel. */
-const MARGINE = 48;
-
-/** Lo spostamento consentito perché il rettangolo `r` resti raggiungibile. */
+/**
+ * Lo spostamento consentito perché il rettangolo `r` resti tutto dentro
+ * lo schermo. Se è più grande, resta attaccato in alto a sinistra.
+ */
 export function limitaSpostamento(
 	dx: number,
 	dy: number,
-	r: { left: number; top: number; width: number },
+	r: { left: number; top: number; width: number; height: number },
 	schermo: { width: number; height: number }
 ): { dx: number; dy: number } {
-	const minX = MARGINE - (r.left + r.width);
-	const maxX = schermo.width - MARGINE - r.left;
-	const minY = -r.top;
-	const maxY = schermo.height - MARGINE - r.top;
+	const minX = 0 - r.left;
+	const maxX = Math.max(minX, schermo.width - r.width - r.left);
+	const minY = 0 - r.top;
+	const maxY = Math.max(minY, schermo.height - r.height - r.top);
 	return { dx: Math.min(maxX, Math.max(minX, dx)), dy: Math.min(maxY, Math.max(minY, dy)) };
 }
 
@@ -41,7 +40,7 @@ export function spostabile(finestra: HTMLElement, maniglia = 'header') {
 		// Il rettangolo senza lo spostamento già fatto: i limiti si
 		// calcolano dalla posizione d'origine.
 		const b = finestra.getBoundingClientRect();
-		const origine = { left: b.left - x, top: b.top - y, width: b.width };
+		const origine = { left: b.left - x, top: b.top - y, width: b.width, height: b.height };
 		presa.setPointerCapture?.(e.pointerId);
 		finestra.classList.add('in-spostamento');
 
@@ -69,9 +68,34 @@ export function spostabile(finestra: HTMLElement, maniglia = 'header') {
 		presa.addEventListener('pointercancel', su);
 	}
 
+	/**
+	 * Se la finestra cresce (una sezione che si apre) o l'app si
+	 * rimpicciolisce, lo spostamento fatto potrebbe portarla fuori: si
+	 * riporta dentro.
+	 */
+	function riallinea() {
+		if (x === 0 && y === 0) return;
+		const b = finestra.getBoundingClientRect();
+		const d = limitaSpostamento(
+			x,
+			y,
+			{ left: b.left - x, top: b.top - y, width: b.width, height: b.height },
+			{ width: window.innerWidth, height: window.innerHeight }
+		);
+		if (d.dx === x && d.dy === y) return;
+		x = d.dx;
+		y = d.dy;
+		finestra.style.translate = `${x}px ${y}px`;
+	}
+
+	const osserva = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(riallinea);
+	osserva?.observe(finestra);
+	window.addEventListener('resize', riallinea);
 	finestra.addEventListener('pointerdown', giu);
 	return {
 		destroy() {
+			osserva?.disconnect();
+			window.removeEventListener('resize', riallinea);
 			finestra.removeEventListener('pointerdown', giu);
 		}
 	};

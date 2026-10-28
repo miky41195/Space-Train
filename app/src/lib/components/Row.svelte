@@ -237,7 +237,7 @@
 		border-radius: var(--radius-sm);
 		cursor: default;
 		color: var(--text);
-		font-size: 13px;
+		font-size: calc(13px * var(--scala-testo, 1));
 		user-select: none;
 	}
 	.row:hover {
@@ -269,7 +269,7 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		color: var(--text-dim);
-		font-size: 11px;
+		font-size: calc(11px * var(--scala-testo, 1));
 	}
 	.tipo {
 		overflow: hidden;

@@ -136,7 +136,7 @@
 		margin-top: -46px;
 		text-align: center;
 		font-family: var(--font-display);
-		font-size: 22px;
+		font-size: calc(22px * var(--scala-testo, 1));
 		font-weight: 600;
 		letter-spacing: 0.42em;
 		text-indent: 0.42em;

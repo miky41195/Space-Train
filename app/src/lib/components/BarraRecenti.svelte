@@ -82,7 +82,7 @@
 		border-radius: 6px;
 		background: transparent;
 		color: var(--text-dim);
-		font-size: 15px;
+		font-size: calc(15px * var(--scala-testo, 1));
 		cursor: default;
 	}
 	button:hover {

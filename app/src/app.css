@@ -51,7 +51,7 @@ body {
 	background: transparent;
 	color: var(--text);
 	font-family: var(--font-ui);
-	font-size: 13px;
+	font-size: calc(13px * var(--scala-testo, 1));
 }
 
 .app {

@@ -281,7 +281,7 @@
 		align-items: center;
 		gap: 6px;
 		padding: 2px 10px;
-		font-size: 12px;
+		font-size: calc(12px * var(--scala-testo, 1));
 		color: var(--text-dim);
 	}
 	.testo-indirizzo {
@@ -304,7 +304,7 @@
 	}
 	.richieste {
 		color: var(--accent);
-		font-size: 12px;
+		font-size: calc(12px * var(--scala-testo, 1));
 	}
 	.pallino-stato.acceso {
 		background: #22c55e;
@@ -323,7 +323,7 @@
 	}
 	.aggiungi-pc {
 		color: var(--text-dim);
-		font-size: 12px;
+		font-size: calc(12px * var(--scala-testo, 1));
 	}
 	.nuovo-indirizzo input {
 		width: 100%;
@@ -335,7 +335,7 @@
 		background: var(--bg);
 		color: var(--text);
 		font: inherit;
-		font-size: 12px;
+		font-size: calc(12px * var(--scala-testo, 1));
 		outline: none;
 	}
 	.gruppo + .gruppo {
@@ -344,7 +344,7 @@
 	.titolo {
 		padding: 0 12px 6px;
 		color: var(--text-dim);
-		font-size: 11px;
+		font-size: calc(11px * var(--scala-testo, 1));
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
 	}
@@ -405,7 +405,7 @@
 	.vuoto-lan {
 		padding: 0 12px 6px;
 		color: var(--text-dim);
-		font-size: 11px;
+		font-size: calc(11px * var(--scala-testo, 1));
 		line-height: 1.4;
 	}
 	.pc,
@@ -413,7 +413,7 @@
 		margin-right: 8px;
 	}
 	.spillo {
-		font-size: 11px;
+		font-size: calc(11px * var(--scala-testo, 1));
 	}
 	.pallino {
 		display: inline-block;
@@ -476,6 +476,6 @@
 	}
 	.libero {
 		color: var(--text-dim);
-		font-size: 11px;
+		font-size: calc(11px * var(--scala-testo, 1));
 	}
 </style>

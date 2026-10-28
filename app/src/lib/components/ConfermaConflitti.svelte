@@ -97,7 +97,7 @@
 	}
 	h2 {
 		margin: 0 0 10px;
-		font-size: 15px;
+		font-size: calc(15px * var(--scala-testo, 1));
 		font-weight: 600;
 	}
 	p {

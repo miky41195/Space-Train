@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TEMI, variabiliPer, trasparente, temaDa, coloreAccento, variabiliDa, CARATTERI, FORME_BASE } from './temi';
+import { TEMI, variabiliPer, trasparente, temaDa, coloreAccento, variabiliDa, CARATTERI, FORME_BASE, scalaTesto } from './temi';
 import { FIGURE, CORTEI, svgFigura, motivoFigura, misuraFigura } from './figure';
 
 describe('temi', () => {
@@ -119,5 +119,14 @@ describe('caratteri', () => {
 			expect(valori, `${t.id}: testo`).toContain(f.carattere);
 			expect(valori, `${t.id}: titoli`).toContain(f.carattereTitoli);
 		}
+	});
+
+	it('la dimensione del testo in pixel diventa una scala per tutti i testi', () => {
+		const t = TEMI[0];
+		expect(variabiliPer(t, '#8b5cf6')['--scala-testo']).toBe('1');
+		const grande = { ...t, forme: { dimensione: 26 } };
+		expect(scalaTesto(grande)).toBe(24 / 13);
+		expect(scalaTesto({ ...t, forme: { dimensione: 2 } })).toBe(9 / 13);
+		expect(scalaTesto({ ...t, forme: { dimensione: Number.NaN } })).toBe(1);
 	});
 });

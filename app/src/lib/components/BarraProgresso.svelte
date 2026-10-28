@@ -70,7 +70,7 @@
 	.etichetta {
 		white-space: nowrap;
 		font-family: var(--font-display);
-		font-size: 12px;
+		font-size: calc(12px * var(--scala-testo, 1));
 		letter-spacing: 0.1em;
 		text-transform: uppercase;
 		color: var(--text-dim);

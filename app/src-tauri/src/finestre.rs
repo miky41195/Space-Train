@@ -75,6 +75,7 @@ pub fn nuova(app: &tauri::AppHandle, path: Option<String>) -> Result<String, Str
         .position(x, y)
         .decorations(false)
         .transparent(true)
+        .shadow(false)
         .resizable(true)
         .initialization_script(&script)
         .build()

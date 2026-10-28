@@ -367,7 +367,7 @@
 		align-items: center;
 		gap: 8px;
 		margin-bottom: 6px;
-		font-size: 12px;
+		font-size: calc(12px * var(--scala-testo, 1));
 	}
 	/* Testi su una riga sola: se andassero a capo mentre si trascina, il
 	   foglio si sposterebbe sotto il mouse. */
@@ -481,7 +481,7 @@
 		border-radius: 3px;
 		background: var(--accent);
 		color: var(--bg);
-		font-size: 10px;
+		font-size: calc(10px * var(--scala-testo, 1));
 		font-weight: 600;
 		line-height: 14px;
 		pointer-events: none;

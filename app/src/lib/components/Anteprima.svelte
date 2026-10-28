@@ -164,7 +164,7 @@
 		width: 100%;
 		margin: 0;
 		font-family: 'Cascadia Mono', Consolas, monospace;
-		font-size: 11.5px;
+		font-size: calc(11.5px * var(--scala-testo, 1));
 		line-height: 1.5;
 		white-space: pre-wrap;
 		overflow-wrap: anywhere;
@@ -183,7 +183,7 @@
 		margin: 0;
 		padding: 12px 16px;
 		border-top: 1px solid var(--border);
-		font-size: 12px;
+		font-size: calc(12px * var(--scala-testo, 1));
 	}
 	dt {
 		color: var(--text-dim);

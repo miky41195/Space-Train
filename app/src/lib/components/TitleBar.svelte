@@ -132,7 +132,7 @@
 		flex-shrink: 0;
 		padding: 0 12px 0 4px;
 		font-family: var(--font-display);
-		font-size: 12px;
+		font-size: calc(12px * var(--scala-testo, 1));
 		font-weight: 600;
 		letter-spacing: 0.22em;
 		text-transform: uppercase;
@@ -192,7 +192,7 @@
 		border-radius: var(--radius-sm);
 		background: transparent;
 		color: var(--text-dim);
-		font-size: 16px;
+		font-size: calc(16px * var(--scala-testo, 1));
 		cursor: default;
 	}
 	.nuovo:hover {

@@ -115,6 +115,8 @@ pub struct Ricevuto {
     pub errore: Option<String>,
     /// Chi riceveva l'ha fermata: non è un errore da segnalare.
     pub annullato: bool,
+    /// Avviso sui file fermati dall'antivirus, se ce ne sono.
+    pub bloccati: Option<String>,
 }
 
 // ── Protocollo ───────────────────────────────────────────────────────
@@ -645,7 +647,9 @@ pub(crate) fn piano(sorgente: &Path) -> Vec<Voce> {
                     pila.push(PathBuf::from(paths::display(&f)));
                 }
             }
-        } else if meta.is_file() {
+        } else if meta.is_file() && leggibile(&p) {
+            // Un file che l'antivirus trattiene qui non si annuncia: non si
+            // potrebbe spedirlo, e il trasferimento si fermerebbe a metà.
             out.push(Voce { rel, dimensione: meta.len(), cartella: false });
         }
     }
@@ -690,8 +694,30 @@ pub(crate) fn manda_file(
     s.flush()
 }
 
-/// Legge i byte annunciati e li scrive sotto `dest`. Ritorna i path di
-/// primo livello creati, già con il nome libero scelto.
+/// Cosa è arrivato da un altro PC.
+#[derive(Debug, Default)]
+pub(crate) struct Arrivo {
+    /// I path di primo livello creati, già con il nome libero scelto.
+    pub(crate) creati: Vec<PathBuf>,
+    /// I file (path relativi come annunciati) che l'antivirus ha fermato.
+    pub(crate) bloccati: Vec<String>,
+}
+
+/// Il messaggio per chi ha scaricato file e se n'è visto fermare qualcuno.
+pub(crate) fn avviso_bloccati(bloccati: &[String]) -> Option<String> {
+    let primo = bloccati.first()?;
+    let nome = primo.rsplit('/').next().unwrap_or(primo);
+    Some(match bloccati.len() {
+        1 => format!("L'antivirus di Windows ha fermato «{}»: non è stato salvato. Il resto è arrivato.", nome),
+        n => format!("L'antivirus di Windows ha fermato {} file (fra cui «{}»): non sono stati salvati. Il resto è arrivato.", n, nome),
+    })
+}
+
+/// Legge i byte annunciati e li scrive sotto `dest`.
+///
+/// Ogni file arrivato passa dall'antivirus e viene segnato come venuto da
+/// internet (vedi `fs::provenienza`). Un file che l'antivirus ferma si salta
+/// leggendone comunque i byte, così quelli dopo arrivano lo stesso.
 ///
 /// Se si interrompe (annullato, rete caduta) toglie ciò che aveva iniziato
 /// a scrivere: un file a metà sembrerebbe buono e non lo è.
@@ -701,15 +727,17 @@ pub(crate) fn prendi_file(
     voci: &[Voce],
     annulla: &AtomicBool,
     avanzamento: &mut dyn FnMut(u64),
-) -> io::Result<Vec<PathBuf>> {
-    let mut creati = Vec::new();
-    let esito = prendi_file_in(s, dest, voci, annulla, avanzamento, &mut creati);
+) -> io::Result<Arrivo> {
+    let mut arrivo = Arrivo::default();
+    let esito = prendi_file_in(s, dest, voci, annulla, avanzamento, &mut arrivo);
     if esito.is_err() {
-        for c in &creati {
+        for c in &arrivo.creati {
             let _ = crate::fs::copy::rimuovi(c);
         }
     }
-    esito.map(|_| creati)
+    // Un file singolo fermato dall'antivirus non è stato creato davvero.
+    arrivo.creati.retain(|c| paths::extended(c).exists());
+    esito.map(|_| arrivo)
 }
 
 fn prendi_file_in(
@@ -718,8 +746,10 @@ fn prendi_file_in(
     voci: &[Voce],
     annulla: &AtomicBool,
     avanzamento: &mut dyn FnMut(u64),
-    creati: &mut Vec<PathBuf>,
+    esito: &mut Arrivo,
 ) -> io::Result<()> {
+    use crate::fs::provenienza::{e_virus, esamina, Esame};
+    let creati = &mut esito.creati;
     std::fs::create_dir_all(paths::extended(dest))?;
     // Ogni elemento di primo livello riceve un nome libero a destinazione;
     // tutto ciò che sta sotto segue il nome scelto.
@@ -749,7 +779,13 @@ fn prendi_file_in(
         if let Some(g) = arrivo.parent() {
             std::fs::create_dir_all(paths::extended(g))?;
         }
-        let mut out = std::fs::File::create(paths::extended(&arrivo))?;
+        // Senza file aperto i byte si leggono e si buttano: l'antivirus ha
+        // fermato questo, non quelli che vengono dopo nel flusso.
+        let mut out = match std::fs::File::create(paths::extended(&arrivo)) {
+            Ok(f) => Some(f),
+            Err(e) if e_virus(&e) => None,
+            Err(e) => return Err(e),
+        };
         let mut resto = v.dimensione;
         while resto > 0 {
             if annulla.load(Ordering::Relaxed) {
@@ -757,13 +793,35 @@ fn prendi_file_in(
             }
             let quanto = (resto as usize).min(buf.len());
             s.read_exact(&mut buf[..quanto])?;
-            out.write_all(&buf[..quanto])?;
+            if let Some(f) = out.as_mut() {
+                match f.write_all(&buf[..quanto]) {
+                    Ok(()) => {}
+                    Err(e) if e_virus(&e) => {
+                        out = None;
+                        let _ = std::fs::remove_file(paths::extended(&arrivo));
+                    }
+                    Err(e) => return Err(e),
+                }
+            }
             resto -= quanto as u64;
             fatti += quanto as u64;
             avanzamento(fatti);
         }
+        let scritto = out.take().is_some();
+        if !scritto || esamina(&arrivo) == Esame::Bloccato {
+            let _ = std::fs::remove_file(paths::extended(&arrivo));
+            esito.bloccati.push(v.rel.clone());
+        }
     }
     Ok(())
+}
+
+/// Il file si può leggere per spedirlo: l'antivirus non lo trattiene.
+fn leggibile(path: &Path) -> bool {
+    match std::fs::File::open(paths::extended(path)) {
+        Ok(_) => true,
+        Err(e) => !crate::fs::provenienza::e_virus(&e),
+    }
 }
 
 fn ricevi<S: Read + Write>(
@@ -824,9 +882,10 @@ fn ricevi<S: Read + Write>(
             id,
             da,
             cartella: paths::display(&dest),
-            quanti: esito.as_ref().map(|c| c.len()).unwrap_or(0),
+            quanti: esito.as_ref().map(|a| a.creati.len()).unwrap_or(0),
             errore: if annulla.load(Ordering::Relaxed) { None } else { esito.as_ref().err().map(|e| e.to_string()) },
             annullato: annulla.load(Ordering::Relaxed),
+            bloccati: esito.as_ref().ok().and_then(|a| avviso_bloccati(&a.bloccati)),
         },
     );
     if let Ok(mut m) = lan.ricezioni.lock() {
@@ -926,6 +985,7 @@ pub fn scarica(
     avanzamento: &mut dyn FnMut(u64, u64),
 ) -> Result<Vec<[String; 2]>, FsError> {
     let mut coppie = Vec::new();
+    let mut bloccati = Vec::new();
     let mut gia = 0u64;
     for sorgente in sorgenti {
         let (id, rel) = dividi(sorgente).ok_or(FsError::NotFound)?;
@@ -933,16 +993,20 @@ pub fn scarica(
         scrivi_json(&mut s, &Richiesta::Scarica { path: rel }).map_err(errore_io)?;
         let r = controlla(leggi_json(&mut s).map_err(errore_io)?)?;
         let totale: u64 = r.contenuto.iter().map(|v| v.dimensione).sum();
-        let creati = prendi_file(&mut s, Path::new(dest), &r.contenuto, annulla, &mut |f| {
+        let arrivo = prendi_file(&mut s, Path::new(dest), &r.contenuto, annulla, &mut |f| {
             avanzamento(gia + f, gia + totale)
         })
         .map_err(errore_io)?;
         gia += totale;
-        if let Some(c) = creati.first() {
+        bloccati.extend(arrivo.bloccati);
+        if let Some(c) = arrivo.creati.first() {
             coppie.push([sorgente.clone(), paths::display(c)]);
         }
     }
-    Ok(coppie)
+    match avviso_bloccati(&bloccati) {
+        Some(message) => Err(FsError::Io { message }),
+        None => Ok(coppie),
+    }
 }
 
 /// Invia file locali a un altro PC. Attende che l'altro accetti.
@@ -985,14 +1049,6 @@ pub fn invia(
         gia += parte;
     }
     Ok(())
-}
-
-/// Scarica un file remoto in una cartella temporanea e lo apre.
-pub fn apri(lan: &Lan, path: &str) -> Result<(), FsError> {
-    let temp = std::env::temp_dir().join("SpaceTrain-rete");
-    let coppie = scarica(lan, &[path.to_string()], &temp.to_string_lossy(), &AtomicBool::new(false), &mut |_, _| {})?;
-    let locale = coppie.first().map(|c| c[1].clone()).ok_or(FsError::NotFound)?;
-    crate::shell::open::open_default(&locale)
 }
 
 #[cfg(test)]
@@ -1048,14 +1104,14 @@ mod tests {
 
         let dest = d.path().join("arrivo");
         // «progetto» non esiste a destinazione: tiene il suo nome.
-        let creati = prendi_file(&mut flusso.as_slice(), &dest, &voci, &AtomicBool::new(false), &mut |_| {}).unwrap();
+        let creati = prendi_file(&mut flusso.as_slice(), &dest, &voci, &AtomicBool::new(false), &mut |_| {}).unwrap().creati;
         assert_eq!(creati, vec![dest.join("progetto")]);
         assert_eq!(fs::read_to_string(dest.join("progetto").join("a.txt")).unwrap(), "alfa");
         assert_eq!(fs::read(dest.join("progetto").join("sotto").join("b.bin")).unwrap().len(), 300_000);
         assert!(dest.join("progetto").join("vuota").is_dir());
 
         // Una seconda volta il nome è occupato: arriva numerato.
-        let creati = prendi_file(&mut flusso.as_slice(), &dest, &voci, &AtomicBool::new(false), &mut |_| {}).unwrap();
+        let creati = prendi_file(&mut flusso.as_slice(), &dest, &voci, &AtomicBool::new(false), &mut |_| {}).unwrap().creati;
         assert_eq!(creati, vec![dest.join("progetto (2)")]);
     }
 
@@ -1086,6 +1142,29 @@ mod tests {
         assert!(lan.annulla_ricezione(7));
         assert!(flag.load(Ordering::Relaxed));
         assert!(!lan.annulla_ricezione(8));
+    }
+
+    #[test]
+    fn i_file_ricevuti_risultano_da_internet() {
+        let d = tempdir().unwrap();
+        let src = d.path().join("doc.txt");
+        fs::write(&src, b"testo").unwrap();
+        let voci = piano(&src);
+        let mut flusso = Vec::new();
+        manda_file(&mut flusso, d.path(), &voci, &AtomicBool::new(false), &mut |_| {}).unwrap();
+        let dest = d.path().join("arrivo");
+        let arrivo = prendi_file(&mut flusso.as_slice(), &dest, &voci, &AtomicBool::new(false), &mut |_| {}).unwrap();
+        assert!(arrivo.bloccati.is_empty());
+        let mut ads = dest.join("doc.txt").into_os_string();
+        ads.push(":Zone.Identifier");
+        assert!(fs::read_to_string(ads).unwrap().contains("ZoneId=3"));
+    }
+
+    #[test]
+    fn l_avviso_dei_bloccati_nomina_il_file() {
+        assert_eq!(avviso_bloccati(&[]), None);
+        assert!(avviso_bloccati(&["cartella/virus.exe".into()]).unwrap().contains("«virus.exe»"));
+        assert!(avviso_bloccati(&["a.exe".into(), "b.exe".into()]).unwrap().contains("2 file"));
     }
 
     #[test]

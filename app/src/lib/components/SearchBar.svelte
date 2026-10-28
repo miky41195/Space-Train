@@ -99,7 +99,7 @@
 	}
 	.lente {
 		color: var(--text-dim);
-		font-size: 15px;
+		font-size: calc(15px * var(--scala-testo, 1));
 	}
 	input {
 		flex: 1;
@@ -129,7 +129,7 @@
 		border-radius: 6px;
 		background: transparent;
 		color: var(--text-dim);
-		font-size: 15px;
+		font-size: calc(15px * var(--scala-testo, 1));
 		cursor: default;
 	}
 	button:hover {
@@ -140,7 +140,7 @@
 		width: auto;
 		padding: 0 8px;
 		font: inherit;
-		font-size: 12px;
+		font-size: calc(12px * var(--scala-testo, 1));
 		border: 1px solid var(--border);
 	}
 	.opzione.accesa {

@@ -185,7 +185,7 @@
 		line-clamp: 2;
 		-webkit-box-orient: vertical;
 		overflow: hidden;
-		font-size: 12px;
+		font-size: calc(12px * var(--scala-testo, 1));
 		line-height: 1.35;
 		text-align: center;
 		overflow-wrap: anywhere;
@@ -193,7 +193,7 @@
 	.info,
 	.data {
 		color: var(--text-dim);
-		font-size: 11px;
+		font-size: calc(11px * var(--scala-testo, 1));
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -209,7 +209,7 @@
 		-webkit-line-clamp: 1;
 		line-clamp: 1;
 		text-align: left;
-		font-size: 13px;
+		font-size: calc(13px * var(--scala-testo, 1));
 	}
 	.cella.piena {
 		border-bottom: 1px solid var(--border);
