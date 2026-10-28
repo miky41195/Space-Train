@@ -50,6 +50,7 @@
 	import { leggiPixel, scriviPng } from '../pixel';
 
 	let {
+		finestra = false,
 		temaAttuale,
 		personali,
 		backend,
@@ -58,6 +59,11 @@
 		onelimina,
 		onchiudi
 	}: {
+		/**
+		 * In una finestra sua: la occupa tutta e si sposta come una finestra
+		 * di Windows, anche fuori dall'app. Senza, è un riquadro sopra l'app.
+		 */
+		finestra?: boolean;
 		/** Il tema in uso: se è uno dei tuoi si modifica, altrimenti si parte da lui. */
 		temaAttuale: Tema;
 		personali: readonly TemaPersonale[];
@@ -388,12 +394,19 @@
 	}
 
 	let tutti = $derived([...TEMI, ...personali]);
+
+	/** Il riquadro si sposta a mano solo dentro l'app: la finestra ci pensa Windows. */
+	function sposta(nodo: HTMLElement, attivo: boolean) {
+		return attivo ? spostabile(nodo) : undefined;
+	}
 </script>
 
-<div class="sfondo" role="presentation">
-	<div class="finestra" role="dialog" aria-modal="true" aria-label="Editor dei temi" use:spostabile>
-		<header title="Trascina per spostare l'editor e vedere il tema dietro">
-			<h2>{modifica ? 'Modifica tema' : 'Nuovo tema'}</h2>
+<div class="sfondo" class:intera={finestra} role="presentation">
+	<div class="finestra" class:intera={finestra} role="dialog" aria-modal="true" aria-label="Editor dei temi"
+		use:sposta={!finestra}>
+		<!-- In finestra la testata la sposta Windows: anche fuori dall'app. -->
+		<header title="Trascina per spostare l'editor e vedere il tema dietro" data-tauri-drag-region={finestra || undefined}>
+			<h2 data-tauri-drag-region={finestra || undefined}>{modifica ? 'Modifica tema' : 'Nuovo tema'}</h2>
 			<button class="chiudi" onclick={onchiudi} aria-label="Chiudi l'editor">×</button>
 		</header>
 
@@ -873,6 +886,21 @@
 		border: 1px solid var(--border);
 		border-radius: var(--radius);
 		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+	}
+	.sfondo.intera {
+		display: block;
+		background: transparent;
+	}
+	.finestra.intera {
+		width: 100%;
+		height: 100vh;
+		max-width: none;
+		max-height: none;
+		box-shadow: none;
+		overflow: hidden;
+	}
+	.finestra.intera .corpo {
+		flex: 1;
 	}
 	header,
 	footer {

@@ -139,6 +139,7 @@ pub fn run() {
             ipc::create_new_file,
             ipc::initial_path,
             ipc::new_window,
+            ipc::apri_editor_temi,
             ipc::save_theme_image,
             ipc::read_theme_image,
             ipc::lan_stato,

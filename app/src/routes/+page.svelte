@@ -66,6 +66,7 @@
 	import { misuraCella, zoom, LATO_MIN, LATO_MAX, type Vista } from '$lib/vista';
 	import { applicaTema, coloreAccento, scalaTesto, temaDa, type IdAccento, type TemaPersonale } from '$lib/temi';
 	import EditorTemi from '$lib/components/EditorTemi.svelte';
+	import { EVENTO_EDITOR, type MessaggioEditor } from '$lib/editor-finestra';
 	import { ColoriStore, type IdColore } from '$lib/stores/colori.svelte';
 	import { azioneTasto } from '$lib/scorciatoie';
 	import {
@@ -74,6 +75,7 @@
 		RETE,
 		RETE_LOCALE,
 		AMICI,
+		NUOVA_SCHEDA,
 		impostaNomiAmici,
 		cartellaDi,
 		eReteLocale,
@@ -138,7 +140,37 @@
 	let altezzaRiga = $derived(
 		Math.round((impostazioni.compatta ? 26 : 32) * Math.max(1, scalaTesto(anteprimaTema ?? temaCorrente)))
 	);
+	/** L'editor dentro la pagina: solo se non si è potuta aprire la sua finestra. */
 	let editorAperto = $state(false);
+
+	/**
+	 * L'editor dei temi in una finestra sua, che si sposta anche fuori
+	 * dall'app. Se non si apre (anteprima nel browser) resta dentro la pagina.
+	 */
+	async function apriEditor() {
+		try {
+			await tauriBackend.apriEditorTemi();
+		} catch {
+			editorAperto = true;
+		}
+	}
+
+	/** Cosa fa l'editor, dalla sua finestra o da dentro la pagina. */
+	function daEditor(m: MessaggioEditor) {
+		if (m.tipo === 'anteprima') {
+			anteprimaTema = m.tema;
+			return;
+		}
+		if (m.tipo === 'salva') {
+			impostazioni.salvaTema(m.tema);
+			impostazioni.imposta('tema', m.tema.id);
+			avvisa(`Tema «${m.tema.nome}» salvato.`);
+		} else if (m.tipo === 'elimina') {
+			impostazioni.eliminaTema(m.id);
+		}
+		anteprimaTema = null;
+		editorAperto = false;
+	}
 	let selettoreColore = $state<HTMLInputElement | null>(null);
 
 	$effect(() => {
@@ -769,6 +801,7 @@
 				.catch(() => {});
 
 		void ascolta<Pari[]>('lan-pari', (p) => (pariLan = p));
+		void ascolta<MessaggioEditor>(EVENTO_EDITOR, daEditor);
 		void ascolta<StatoAmici>('amici', (s) => {
 			statoAmici = s;
 			// La posizione «Amici» elenca gli amici confermati: si aggiorna con loro.
@@ -947,10 +980,26 @@
 		}
 	}
 
-	/** Cartella di destinazione per un punto della finestra, in pixel CSS. */
+	/**
+	 * Cartella di destinazione per un punto della finestra, in pixel CSS.
+	 * Lo spazio libero fra le schede vale `NUOVA_SCHEDA`.
+	 */
 	function cartellaSotto(x: number, y: number): string | null {
-		const el = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-cartella]');
-		return el?.dataset.cartella ?? null;
+		const sotto = document.elementFromPoint(x, y);
+		const el = sotto?.closest<HTMLElement>('[data-cartella]');
+		if (el) return el.dataset.cartella ?? null;
+		return sotto?.closest('[data-nuova-scheda]') ? NUOVA_SCHEDA : null;
+	}
+
+	/** Ogni elemento rilasciato fra le schede si apre in una scheda sua: un file, nella sua cartella. */
+	async function apriInSchede(paths: string[]) {
+		for (const p of paths) {
+			try {
+				await apriDestinazione(await tauriBackend.resolvePath(p));
+			} catch (e) {
+				erroreOp = descriviErrore(e);
+			}
+		}
 	}
 
 	/**
@@ -961,6 +1010,7 @@
 	async function rilascia(paths: string[], x: number, y: number) {
 		bersaglio = null;
 		const sopra = cartellaSotto(x, y);
+		if (sopra === NUOVA_SCHEDA) return apriInSchede(paths);
 		const dest = sopra ?? (modificabile ? (store.activeTab?.path ?? null) : null);
 		if (!dest || paths.length === 0) return;
 
@@ -1932,7 +1982,7 @@
 					impostazioni.imposta('compatta', !impostazioni.compatta);
 					break;
 				case 'editorTemi':
-					editorAperto = true;
+					void apriEditor();
 					break;
 				case 'animazioneAvvio':
 					impostazioni.imposta('animazioneAvvio', !impostazioni.animazioneAvvio);
@@ -2285,23 +2335,10 @@
 			temaAttuale={temaCorrente}
 			personali={impostazioni.temiPersonali}
 			backend={tauriBackend}
-			onanteprima={(t) => (anteprimaTema = t)}
-			onsalva={(t) => {
-				impostazioni.salvaTema(t);
-				impostazioni.imposta('tema', t.id);
-				anteprimaTema = null;
-				editorAperto = false;
-				avvisa(`Tema «${t.nome}» salvato.`);
-			}}
-			onelimina={(id) => {
-				impostazioni.eliminaTema(id);
-				anteprimaTema = null;
-				editorAperto = false;
-			}}
-			onchiudi={() => {
-				anteprimaTema = null;
-				editorAperto = false;
-			}}
+			onanteprima={(t) => daEditor({ tipo: 'anteprima', tema: t })}
+			onsalva={(t) => daEditor({ tipo: 'salva', tema: t })}
+			onelimina={(id) => daEditor({ tipo: 'elimina', id })}
+			onchiudi={() => daEditor({ tipo: 'chiudi' })}
 		/>
 	{/if}
 

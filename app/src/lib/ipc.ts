@@ -221,6 +221,8 @@ export interface Backend {
 	initialPath(): Promise<Destinazione | null>;
 	/** Apre un'altra finestra dell'app sulla cartella indicata. */
 	newWindow(path: string | null): Promise<string>;
+	/** Apre l'editor dei temi in una finestra sua, sopra questa. */
+	apriEditorTemi(): Promise<void>;
 	/** Salva un'immagine per i personaggi di un tema. Ritorna il percorso. */
 	saveThemeImage(nome: string, base64: string): Promise<string>;
 	/** Rilegge in base64 un'immagine salvata con `saveThemeImage`. */
@@ -318,6 +320,7 @@ export const tauriBackend: Backend = {
 	createNewFile: (parent, ext) => invoke('create_new_file', { parent, ext }),
 	initialPath: () => invoke('initial_path'),
 	newWindow: (path) => invoke('new_window', { path }),
+	apriEditorTemi: () => invoke('apri_editor_temi'),
 	saveThemeImage: (nome, base64) => invoke('save_theme_image', { nome, dati: base64 }),
 	readThemeImage: (path) => invoke('read_theme_image', { path }),
 	amiciStato: () => invoke('amici_stato'),

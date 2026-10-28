@@ -56,6 +56,12 @@ export class DiscoFinto {
 	datiImmaginiTema = new Map<string, string>();
 	/** Finestre aperte con «Apri in una nuova finestra», col loro percorso. */
 	finestre: Array<string | null> = [];
+	/**
+	 * Se l'editor dei temi si apre in una finestra sua. Spento, il comando
+	 * fallisce e la pagina lo apre dentro di sé: i test lo usano così.
+	 */
+	editorInFinestra = false;
+	aperturaEditor = 0;
 	/** La cartella con cui «Windows» avvia l'app, come `"%1"` nel registro. */
 	iniziale: { cartella: string; seleziona: string | null } | null = null;
 	/** Chiamate alla Shell di Windows, che il disco finto non sa eseguire. */
@@ -237,6 +243,10 @@ export class DiscoFinto {
 				return `C:\\DatiApp\\temi-immagini\\${args.nome as string}`;
 			case 'read_theme_image':
 				return this.datiImmaginiTema.get(args.path as string) ?? '';
+			case 'apri_editor_temi':
+				if (!this.editorInFinestra) throw new Error('finestre non disponibili');
+				this.aperturaEditor++;
+				return null;
 			case 'new_window':
 				this.finestre.push((args.path as string | null) ?? null);
 				return `finestra-${this.finestre.length + 1}`;

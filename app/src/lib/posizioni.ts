@@ -10,6 +10,11 @@ export const CESTINO = '::cestino';
 export const RETE_LOCALE = '::lan';
 /** Gli amici su Space Train, ovunque siano. */
 export const AMICI = '::amici';
+/**
+ * Non è una posizione: è lo spazio libero fra le schede, dove rilasciare
+ * una cartella la apre in una scheda nuova.
+ */
+export const NUOVA_SCHEDA = '::nuova-scheda';
 
 const NOMI_VIRTUALI: Record<string, string> = {
 	[QUESTO_PC]: 'Questo PC',

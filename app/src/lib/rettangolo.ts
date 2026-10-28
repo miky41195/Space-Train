@@ -48,11 +48,9 @@ export function selezioneRettangolo(nodo: HTMLElement, opzioni: OpzioniRettangol
 		if (e.button !== 0) return;
 		const bersaglio = e.target as HTMLElement | null;
 		if (!bersaglio || bersaglio.closest('input, button')) return;
-		// Sopra una voce comandano lei e il trascinamento dei file. Le righe
-		// larghe della vista dettagli fanno eccezione: solo icona e nome
-		// prendono il file, dal resto della riga si disegna il rettangolo.
-		const voce = bersaglio.closest('[data-voce]');
-		if (voce && (!voce.hasAttribute('data-riga-larga') || bersaglio.closest('[data-presa]'))) return;
+		// Sopra una voce comandano lei e il trascinamento dei file: il
+		// rettangolo parte solo dal vuoto.
+		if (bersaglio.closest('[data-voce]')) return;
 		const fuori = nodo.getBoundingClientRect();
 		// Il clic sulla barra di scorrimento non è un clic sul vuoto.
 		if (e.clientX - fuori.left >= nodo.clientWidth || e.clientY - fuori.top >= nodo.clientHeight) return;
@@ -150,7 +148,7 @@ export function selezioneRettangolo(nodo: HTMLElement, opzioni: OpzioniRettangol
 				};
 				window.addEventListener('click', ingoia, { capture: true, once: true });
 				setTimeout(() => window.removeEventListener('click', ingoia, { capture: true }), 0);
-			} else if (!aggiungi && !voce) o.onvuoto();
+			} else if (!aggiungi) o.onvuoto();
 		}
 
 		window.addEventListener('mousemove', muovi);

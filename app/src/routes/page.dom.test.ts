@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, cleanup, fireEvent, waitFor, screen, within } from '@testing-library/svelte';
 import { DiscoFinto } from '$lib/test-disco';
+import { TEMI, type TemaPersonale } from '$lib/temi';
 
 /**
  * Test d'integrazione della pagina intera: tutto ciò che sta fra i
@@ -1402,8 +1403,6 @@ describe('cartelle colorate', () => {
 
 describe('trascinamento', () => {
 	function trascinaDa(el: HTMLElement) {
-		// Il file si prende per il nome, come in Esplora: dal resto della
-		// riga parte il rettangolo di selezione.
 		fireEvent.mouseDown(el.querySelector('.name') ?? el, { button: 0, clientX: 10, clientY: 10 });
 		fireEvent.mouseMove(window, { buttons: 1, clientX: 40, clientY: 10 });
 	}
@@ -1424,13 +1423,28 @@ describe('trascinamento', () => {
 		);
 	});
 
-	it('dalla parte vuota della riga non si trascina il file: parte il rettangolo', async () => {
+	it('la riga si trascina da qualsiasi punto, non solo dal nome', async () => {
 		await monta();
 		const data = riga('alfa.txt').querySelector('.date')!;
 		fireEvent.mouseDown(data, { button: 0, clientX: 10, clientY: 10 });
 		fireEvent.mouseMove(window, { buttons: 1, clientX: 40, clientY: 60 });
-		fireEvent.mouseUp(window);
-		expect(disco.shell).toEqual([]);
+		await waitFor(() => expect(disco.shell[0]).toEqual({ cmd: 'start_drag', args: { paths: ['C:\\alfa.txt'] } }));
+		expect(document.querySelector('.rettangolo-selezione')).toBeNull();
+	});
+
+	it('una cartella rilasciata fra le schede si apre in una scheda nuova', async () => {
+		await monta();
+		rilascia(document.querySelector('[data-nuova-scheda]'), ['C:\\Dati']);
+		await waitFor(() => expect(schede()).toEqual(['C:', 'Dati']));
+		// Niente spostamenti: la cartella resta dov'era.
+		expect(disco.esiste('C:\\Dati\\interno.txt')).toBe(true);
+	});
+
+	it('rilasciata su una scheda invece ci finisce dentro', async () => {
+		await monta();
+		rilascia(document.querySelector('.tab'), ['C:\\Dati\\interno.txt']);
+		await waitFor(() => expect(disco.esiste('C:\\interno.txt')).toBe(true));
+		expect(schede()).toEqual(['C:']);
 	});
 
 	it('un clic senza movimento non è un trascinamento', async () => {
@@ -2020,6 +2034,51 @@ describe('evidenziazione personalizzata', () => {
 
 describe('editor dei temi', () => {
 	const variabile = (nome: string) => document.documentElement.style.getPropertyValue(nome);
+
+	describe('nella sua finestra', () => {
+		const mio: TemaPersonale = {
+			...TEMI[0],
+			id: 'personale-1',
+			nome: 'Fuori',
+			gruppo: 'personale',
+			forme: { raggio: 27 }
+		};
+		const dallEditor = (payload: unknown) => ascoltatori.get('editor-temi')?.({ payload });
+
+		async function apriInFinestra() {
+			disco.editorInFinestra = true;
+			await monta();
+			await fireEvent.click(screen.getByRole('button', { name: 'Aspetto' }));
+			const menu = await screen.findByRole('menu');
+			await fireEvent.click(within(menu).getByRole('menuitem', { name: 'Crea o modifica un tema…' }));
+			await waitFor(() => expect(disco.aperturaEditor).toBe(1));
+		}
+
+		it('si apre in una finestra a parte, non dentro l app', async () => {
+			await apriInFinestra();
+			expect(screen.queryByRole('dialog', { name: 'Editor dei temi' })).toBeNull();
+		});
+
+		it('l anteprima arriva dalla finestra, e chiudendola sparisce', async () => {
+			await apriInFinestra();
+			dallEditor({ tipo: 'anteprima', tema: mio });
+			await waitFor(() => expect(variabile('--radius')).toBe('27px'));
+			dallEditor({ tipo: 'chiudi' });
+			await waitFor(() => expect(variabile('--radius')).toBe('12px'));
+		});
+
+		it('salvato nella finestra, il tema diventa quello in uso', async () => {
+			await apriInFinestra();
+			dallEditor({ tipo: 'salva', tema: mio });
+			await waitFor(() => expect(variabile('--radius')).toBe('27px'));
+			// La chiusura che segue il salvataggio non lo toglie.
+			dallEditor({ tipo: 'chiudi' });
+			await fireEvent.click(screen.getByRole('button', { name: 'Aspetto' }));
+			const menu = await screen.findByRole('menu');
+			expect(within(menu).getByRole('menuitemcheckbox', { name: 'Fuori' }).getAttribute('aria-checked')).toBe('true');
+			expect(variabile('--radius')).toBe('27px');
+		});
+	});
 
 	async function apriEditor() {
 		await fireEvent.click(screen.getByRole('button', { name: 'Aspetto' }));

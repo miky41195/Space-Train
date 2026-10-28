@@ -89,6 +89,7 @@ export function backendFinto(over: Partial<Backend> = {}): Backend {
 		async newWindow() {
 			return 'finestra-2';
 		},
+		async apriEditorTemi() {},
 		async saveThemeImage(nome: string) {
 			return `C:\\Temi\\${nome}`;
 		},

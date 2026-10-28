@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { getCurrentWindow } from '@tauri-apps/api/window';
 	import type { TabsStore } from '../stores/tabs.svelte';
-	import { eVirtuale, nomePosizione } from '../posizioni';
+	import { NUOVA_SCHEDA, eVirtuale, nomePosizione } from '../posizioni';
 
 	let {
 		store,
@@ -34,7 +34,9 @@
 	<!-- Lo spazio libero fra le schede, dove passa il treno, sposta la
 	     finestra come la scritta: Tauri reagisce solo se il clic cade
 	     proprio su un elemento marcato, quindi le schede restano cliccabili. -->
-	<div class="tabs" data-tauri-drag-region>
+	<!-- Una cartella rilasciata nello spazio libero fra le schede si apre in
+	     una scheda nuova: `data-nuova-scheda` lo distingue da una scheda. -->
+	<div class="tabs" data-tauri-drag-region data-nuova-scheda class:bersaglio={bersaglio === NUOVA_SCHEDA}>
 		{#each store.tabs as tab (tab.id)}
 			<button
 				class="tab"
@@ -147,6 +149,10 @@
 		overflow-x: auto;
 		scrollbar-width: none;
 		flex: 1;
+	}
+	.tabs.bersaglio {
+		border-radius: var(--radius-sm);
+		box-shadow: inset 0 0 0 1px var(--current);
 	}
 	.tab {
 		display: flex;

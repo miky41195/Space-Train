@@ -587,6 +587,13 @@ pub async fn new_window(app: tauri::AppHandle, path: Option<String>) -> Result<S
     crate::finestre::nuova(&app, path).map_err(|message| FsError::Io { message })
 }
 
+/// Apre l'editor dei temi in una finestra sua, che si sposta anche fuori
+/// dall'app. Async per lo stesso motivo di `new_window`.
+#[tauri::command]
+pub async fn apri_editor_temi(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<(), FsError> {
+    crate::finestre::editor_temi(&app, &window).map_err(|message| FsError::Io { message })
+}
+
 /// Salva un'immagine scelta nell'editor dei temi nella cartella dati
 /// dell'app, così il tema continua a funzionare anche se l'originale
 /// viene spostato o cancellato. Ritorna il percorso salvato.
