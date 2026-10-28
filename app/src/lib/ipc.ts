@@ -215,6 +215,8 @@ export interface Backend {
 	showProperties(paths: string[]): Promise<void>;
 	openWith(path: string): Promise<void>;
 	runAsAdmin(path: string): Promise<void>;
+	/** Il selettore di cartelle di Windows; null se l'utente annulla. */
+	scegliCartella(titolo: string, iniziale: string | null): Promise<string | null>;
 	newFileTypes(): Promise<TipoNuovo[]>;
 	createNewFile(parent: string, ext: string): Promise<string>;
 	/** La cartella con cui Windows ha avviato l'app, se c'è. */
@@ -239,7 +241,8 @@ export interface Backend {
 	lanStato(): Promise<StatoLan>;
 	lanImposta(config: ConfigLan): Promise<StatoLan>;
 	lanPari(): Promise<Pari[]>;
-	lanRispondi(id: number, accetta: boolean): Promise<void>;
+	/** Accetta o rifiuta file in arrivo; accettando, `cartella` è dove salvarli (null: i ricevuti). */
+	lanRispondi(id: number, accetta: boolean, cartella?: string | null): Promise<void>;
 	lanApri(path: string): Promise<void>;
 	/** Ferma da questo lato una ricezione in corso. */
 	lanAnnullaRicezione(id: number): Promise<boolean>;
@@ -316,6 +319,7 @@ export const tauriBackend: Backend = {
 	showProperties: (paths) => invoke('show_properties', { paths }),
 	openWith: (path) => invoke('open_with', { path }),
 	runAsAdmin: (path) => invoke('run_as_admin', { path }),
+	scegliCartella: (titolo, iniziale) => invoke('scegli_cartella', { titolo, iniziale }),
 	newFileTypes: () => invoke('new_file_types'),
 	createNewFile: (parent, ext) => invoke('create_new_file', { parent, ext }),
 	initialPath: () => invoke('initial_path'),
@@ -332,7 +336,7 @@ export const tauriBackend: Backend = {
 	lanStato: () => invoke('lan_stato'),
 	lanImposta: (config) => invoke('lan_imposta', { config }),
 	lanPari: () => invoke('lan_pari'),
-	lanRispondi: (id, accetta) => invoke('lan_rispondi', { id, accetta }),
+	lanRispondi: (id, accetta, cartella = null) => invoke('lan_rispondi', { id, accetta, cartella }),
 	lanApri: (path) => invoke('lan_apri', { path }),
 	lanAnnullaRicezione: (id) => invoke('lan_annulla_ricezione', { id }),
 	lanPreparaTrascina: (paths) => invoke('lan_prepara_trascina', { paths }),

@@ -787,7 +787,7 @@ mod tests {
             if evento == "lan-richiesta" {
                 let id = dato["id"].as_u64().unwrap();
                 let lan = per_avvisi.clone();
-                std::thread::spawn(move || lan.rispondi(id, true));
+                std::thread::spawn(move || lan.rispondi(id, true, None));
             }
         });
         let amici = Amici::avvia(rt.handle().clone(), dir.clone(), lan, avvisi);

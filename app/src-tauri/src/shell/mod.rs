@@ -6,6 +6,8 @@ pub mod appunti;
 pub mod nativo;
 pub mod rete;
 pub mod nuovo;
+#[cfg(windows)]
+pub mod scegli;
 
 /// Ultimo tratto di un path: il nome della cartella o del file.
 pub fn nome_di(path: &str) -> String {

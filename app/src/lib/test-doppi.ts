@@ -77,6 +77,9 @@ export function backendFinto(over: Partial<Backend> = {}): Backend {
 		async showProperties() {},
 		async openWith() {},
 		async runAsAdmin() {},
+		async scegliCartella() {
+			return null;
+		},
 		async newFileTypes() {
 			return [{ ext: '.txt', nome: 'Documento di testo' }];
 		},

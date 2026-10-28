@@ -887,11 +887,11 @@
 		if (cartella) avvisa(`«${nomeDi(cartella)}» è condivisa in rete locale, in sola lettura.`);
 	}
 
-	function rispondiLan(accetta: boolean) {
+	function rispondiLan(accetta: boolean, dove: string | null) {
 		const r = richiesteLan[0];
 		if (!r) return;
 		richiesteLan = richiesteLan.slice(1);
-		void tauriBackend.lanRispondi(r.id, accetta);
+		void tauriBackend.lanRispondi(r.id, accetta, dove);
 	}
 
 	/**
@@ -2323,11 +2323,16 @@
 	{/if}
 
 	{#if richiesteLan[0] && statoLan}
-		<RichiestaLan
-			richiesta={richiesteLan[0]}
-			cartella={statoLan.cartellaRicevuti}
-			onrisposta={rispondiLan}
-		/>
+		<!-- Una richiesta nuova riparte dalla cartella dei ricevuti, non dalla
+		     scelta fatta per quella prima. -->
+		{#key richiesteLan[0].id}
+			<RichiestaLan
+				richiesta={richiesteLan[0]}
+				cartella={statoLan.cartellaRicevuti}
+				onscegli={(da) => tauriBackend.scegliCartella('Dove salvare i file in arrivo', da)}
+				onrisposta={rispondiLan}
+			/>
+		{/key}
 	{/if}
 
 	{#if editorAperto}

@@ -244,7 +244,8 @@ pub struct Lan {
     config: Mutex<Config>,
     file_config: PathBuf,
     pari: Mutex<HashMap<String, (Pari, Instant)>>,
-    richieste: Mutex<HashMap<u64, mpsc::Sender<bool>>>,
+    /// Chi aspetta il consenso: `None` è un rifiuto, altrimenti dove salvare.
+    richieste: Mutex<HashMap<u64, mpsc::Sender<Option<PathBuf>>>>,
     prossima: AtomicU64,
     /// Chi ci ha annunciato di persona, non in broadcast: gli si risponde
     /// allo stesso modo, così basta che uno solo dei due aggiunga l'altro.
@@ -389,10 +390,18 @@ impl Lan {
         }
     }
 
-    /// La risposta dell'utente a una richiesta d'invio.
-    pub fn rispondi(&self, id: u64, accetta: bool) {
+    /// La risposta dell'utente a una richiesta d'invio, con la cartella
+    /// scelta per salvare. Una cartella che non è un path assoluto su disco
+    /// (vuota, virtuale, relativa) vale come nessuna scelta.
+    pub fn rispondi(&self, id: u64, accetta: bool, cartella: Option<String>) {
         if let Some(tx) = self.richieste.lock().ok().and_then(|mut m| m.remove(&id)) {
-            let _ = tx.send(accetta);
+            let dest = accetta.then(|| {
+                cartella
+                    .map(PathBuf::from)
+                    .filter(|c| c.is_absolute())
+                    .unwrap_or_else(|| self.cartella_ricevuti())
+            });
+            let _ = tx.send(dest);
         }
     }
 }
@@ -853,16 +862,15 @@ fn ricevi<S: Read + Write>(
         RichiestaInvio { id, da: da.clone(), quanti: primi.len(), totale, nomi: primi.iter().take(8).cloned().collect() },
     );
 
-    let accetta = rx.recv_timeout(ATTESA_CONSENSO).unwrap_or(false);
+    let scelta = rx.recv_timeout(ATTESA_CONSENSO).ok().flatten();
     if let Ok(mut m) = lan.richieste.lock() {
         m.remove(&id);
     }
-    if !accetta {
+    let Some(dest) = scelta else {
         return scrivi_json(s, &Risposta::errore("Il destinatario ha rifiutato."));
-    }
+    };
     scrivi_json(s, &Risposta { ok: true, ..Default::default() })?;
 
-    let dest = lan.cartella_ricevuti();
     let mut ultimo = Instant::now();
     let annulla = Arc::new(AtomicBool::new(false));
     if let Ok(mut m) = lan.ricezioni.lock() {
@@ -1145,6 +1153,27 @@ mod tests {
     }
 
     #[test]
+    fn accettando_si_sceglie_dove_salvare() {
+        let dir = tempdir().unwrap();
+        let ricevuti = dir.path().join("ricevuti");
+        let config = Config { ricevuti: Some(ricevuti.to_string_lossy().into_owned()), ..Default::default() };
+        let lan = Lan::nuovo("A".into(), "A".into(), config, dir.path().join("lan.json"));
+        let risposta = |accetta: bool, cartella: Option<&str>| {
+            let (tx, rx) = mpsc::channel();
+            lan.richieste.lock().unwrap().insert(1, tx);
+            lan.rispondi(1, accetta, cartella.map(String::from));
+            rx.recv().unwrap()
+        };
+        let scelta = dir.path().join("eccezioni");
+        assert_eq!(risposta(true, Some(&scelta.to_string_lossy())), Some(scelta));
+        // Nessuna scelta, o una che non è un path su disco: la cartella dei ricevuti.
+        assert_eq!(risposta(true, None), Some(ricevuti.clone()));
+        assert_eq!(risposta(true, Some("::amici")), Some(ricevuti.clone()));
+        assert_eq!(risposta(true, Some("relativa")), Some(ricevuti));
+        assert_eq!(risposta(false, Some(r"C:\qualsiasi")), None);
+    }
+
+    #[test]
     fn i_file_ricevuti_risultano_da_internet() {
         let d = tempdir().unwrap();
         let src = d.path().join("doc.txt");
@@ -1221,7 +1250,7 @@ mod tests {
                 let id = dato["id"].as_u64().unwrap();
                 let lan = per_avvisi.clone();
                 // Risponde da un altro thread, come farebbe l'utente.
-                std::thread::spawn(move || lan.rispondi(id, accetta));
+                std::thread::spawn(move || lan.rispondi(id, accetta, None));
             }
         });
         let server = TcpListener::bind("127.0.0.1:0").unwrap();

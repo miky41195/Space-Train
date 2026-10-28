@@ -49,7 +49,9 @@ export class DiscoFinto {
 	amici: Amico[] = [];
 	/** Invii verso altri PC e risposte alle richieste ricevute. */
 	inviati: Array<{ peer: string; paths: string[] }> = [];
-	risposte: Array<{ id: number; accetta: boolean }> = [];
+	risposte: Array<{ id: number; accetta: boolean; cartella: string | null }> = [];
+	/** Cosa risponde il selettore di cartelle: null è «annullato». */
+	cartellaScelta: string | null = null;
 	/** Immagini salvate dall'editor dei temi. */
 	immaginiTema: string[] = [];
 	/** I loro byte in base64, per percorso salvato. */
@@ -284,7 +286,7 @@ export class DiscoFinto {
 			case 'lan_pari':
 				return this.pari;
 			case 'lan_rispondi':
-				this.risposte.push({ id: args.id as number, accetta: args.accetta as boolean });
+				this.risposte.push({ id: args.id as number, accetta: args.accetta as boolean, cartella: (args.cartella as string | null) ?? null });
 				return null;
 			case 'lan_prepara_trascina': {
 				const dest = 'C:\\Temp';
@@ -323,6 +325,8 @@ export class DiscoFinto {
 			case 'run_as_admin':
 				this.shell.push({ cmd, args });
 				return cmd === 'start_drag' ? 'nessuno' : cmd === 'show_shell_menu' ? false : null;
+			case 'scegli_cartella':
+				return this.cartellaScelta;
 			case 'plugin:app|version':
 				// Senza versione impostata l'app non sa quale è: niente novità.
 				if (this.versioneApp) return this.versioneApp;

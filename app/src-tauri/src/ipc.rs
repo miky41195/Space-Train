@@ -375,6 +375,16 @@ mod finestra {
         sul_thread_finestra(&window, move |h| nativo::apri_con(h, &path)).await
     }
 
+    /// Il selettore di cartelle di Windows. `None` se l'utente annulla.
+    #[tauri::command]
+    pub async fn scegli_cartella(
+        window: tauri::WebviewWindow,
+        titolo: String,
+        iniziale: Option<String>,
+    ) -> Result<Option<String>, FsError> {
+        sul_thread_finestra(&window, move |h| crate::shell::scegli::cartella(h, &titolo, iniziale.as_deref())).await
+    }
+
     #[tauri::command]
     pub async fn run_as_admin(window: tauri::WebviewWindow, path: String) -> Result<(), FsError> {
         sul_thread_finestra(&window, move |h| nativo::come_amministratore(h, &path)).await
@@ -416,10 +426,11 @@ pub fn lan_pari(lan: tauri::State<'_, Arc<Lan>>) -> Vec<crate::lan::Pari> {
     lan.pari()
 }
 
-/// Accetta o rifiuta file in arrivo da un altro PC.
+/// Accetta o rifiuta file in arrivo da un altro PC. Accettando si può
+/// scegliere dove salvarli; senza, vanno nella cartella dei ricevuti.
 #[tauri::command]
-pub fn lan_rispondi(lan: tauri::State<'_, Arc<Lan>>, id: u64, accetta: bool) {
-    lan.rispondi(id, accetta);
+pub fn lan_rispondi(lan: tauri::State<'_, Arc<Lan>>, id: u64, accetta: bool, cartella: Option<String>) {
+    lan.rispondi(id, accetta, cartella);
 }
 
 /// Ferma da questo lato una ricezione in corso da un altro PC.

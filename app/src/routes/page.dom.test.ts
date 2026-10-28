@@ -1789,8 +1789,24 @@ describe('rete locale', () => {
 		expect(document.activeElement?.textContent).toBe('Rifiuta');
 
 		await fireEvent.click(within(dialogo).getByRole('button', { name: 'Rifiuta' }));
-		await waitFor(() => expect(disco.risposte).toEqual([{ id: 7, accetta: false }]));
+		await waitFor(() => expect(disco.risposte).toEqual([{ id: 7, accetta: false, cartella: null }]));
 		expect(screen.queryByRole('dialog', { name: 'File in arrivo' })).toBeNull();
+	});
+
+	it('prima di accettare si sceglie dove salvarli', async () => {
+		await monta();
+		ascoltatori.get('lan-richiesta')?.({
+			payload: { id: 9, da: 'PC2', quanti: 1, totale: 10, nomi: ['setup.exe'] }
+		});
+		const dialogo = await screen.findByRole('dialog', { name: 'File in arrivo' });
+		disco.cartellaScelta = 'D:\\Eccezioni';
+		await fireEvent.click(within(dialogo).getByRole('button', { name: 'Cambia cartella…' }));
+		expect(await within(dialogo).findByText('D:\\Eccezioni')).toBeTruthy();
+		// Annullare il selettore lascia la scelta fatta.
+		disco.cartellaScelta = null;
+		await fireEvent.click(within(dialogo).getByRole('button', { name: 'Cambia cartella…' }));
+		await fireEvent.click(within(dialogo).getByRole('button', { name: 'Accetta' }));
+		await waitFor(() => expect(disco.risposte).toEqual([{ id: 9, accetta: true, cartella: 'D:\\Eccezioni' }]));
 	});
 
 	it('accettando arrivano e lo si viene a sapere', async () => {
@@ -1799,7 +1815,7 @@ describe('rete locale', () => {
 			payload: { id: 8, da: 'PC2', quanti: 1, totale: 10, nomi: ['foto.jpg'] }
 		});
 		await fireEvent.click(await screen.findByRole('button', { name: 'Accetta' }));
-		await waitFor(() => expect(disco.risposte).toEqual([{ id: 8, accetta: true }]));
+		await waitFor(() => expect(disco.risposte).toEqual([{ id: 8, accetta: true, cartella: null }]));
 
 		ascoltatori.get('lan-ricevuto')?.({
 			payload: { id: 8, da: 'PC2', cartella: 'C:\\Ricevuti', quanti: 1, errore: null }

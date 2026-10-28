@@ -5,13 +5,26 @@
 	let {
 		richiesta,
 		cartella,
+		onscegli,
 		onrisposta
 	}: {
 		richiesta: RichiestaInvio;
-		/** Dove arriveranno i file se l'utente accetta. */
+		/** Dove arriveranno i file se l'utente accetta senza scegliere. */
 		cartella: string;
-		onrisposta: (accetta: boolean) => void;
+		/** Apre il selettore di cartelle partendo da `da`; null se annullato. */
+		onscegli: (da: string) => Promise<string | null>;
+		/** `dove` è la cartella scelta, o null per quella predefinita. */
+		onrisposta: (accetta: boolean, dove: string | null) => void;
 	} = $props();
+
+	/** Dove salvare: si può cambiare prima di accettare. */
+	// svelte-ignore state_referenced_locally
+	let dove = $state(cartella);
+
+	async function cambia() {
+		const scelta = await onscegli(dove).catch(() => null);
+		if (scelta) dove = scelta;
+	}
 
 	let bottone = $state<HTMLButtonElement | null>(null);
 
@@ -38,10 +51,13 @@
 			{/each}
 			{#if altri > 0}<li class="resto">e altri {altri}…</li>{/if}
 		</ul>
-		<p class="nota">Se accetti arriveranno in <strong>{cartella}</strong>.</p>
+		<p class="nota">
+			Se accetti arriveranno in <strong>{dove}</strong>.
+			<button class="cambia" onclick={cambia}>Cambia cartella…</button>
+		</p>
 		<div class="azioni">
-			<button bind:this={bottone} onclick={() => onrisposta(false)}>Rifiuta</button>
-			<button class="primario" onclick={() => onrisposta(true)}>Accetta</button>
+			<button bind:this={bottone} onclick={() => onrisposta(false, null)}>Rifiuta</button>
+			<button class="primario" onclick={() => onrisposta(true, dove === cartella ? null : dove)}>Accetta</button>
 		</div>
 	</div>
 </div>
@@ -108,6 +124,12 @@
 	}
 	button:hover {
 		background: var(--row-hover);
+	}
+	.cambia {
+		height: 26px;
+		margin-left: 6px;
+		padding: 0 10px;
+		font-size: calc(12px * var(--scala-testo, 1));
 	}
 	.primario {
 		border-color: var(--accent);

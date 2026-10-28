@@ -135,6 +135,7 @@ pub fn run() {
             ipc::show_properties,
             ipc::open_with,
             ipc::run_as_admin,
+            ipc::scegli_cartella,
             ipc::new_file_types,
             ipc::create_new_file,
             ipc::initial_path,
