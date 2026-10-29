@@ -14,6 +14,18 @@ export interface Novita {
 
 export const NOVITA: Novita[] = [
 	{
+		versione: '0.2.6',
+		voci: [
+			'Tema Spazio rifinito: la corrente sul binario ha un nucleo di luce bianca, e dietro la testata scorre un cielo di stelle in pixel.',
+			'Le posizioni della barra laterale sono fermate sul binario: quella in cui ti trovi si accende, un PC o un amico raggiungibile ha la fermata verde.',
+			'Niente più vetro sfocato: testata, barra laterale, menu e finestre di conferma hanno superfici piene e più leggibili.',
+			'Icone disegnate al posto dei simboli di testo, e date, dimensioni e conteggi in caratteri da orario ferroviario.',
+			'Lo spazio libero dei dischi nella barra laterale si aggiorna anche quando lo cambiano altri programmi.',
+			'Più sicurezza con gli altri PC: un file con un nome strano non può più avviare comandi, si apre solo il file chiesto e mai un programma, e i file nascosti della cartella condivisa non si possono scaricare.',
+			'Il riquadro dei file in arrivo mostra il totale e i nomi reali di ciò che arriva.'
+		]
+	},
+	{
 		versione: '0.2.5',
 		voci: [
 			'L’editor dei temi si apre in una finestra sua: spostala dove vuoi e guarda il tema applicato nella finestra principale.',
