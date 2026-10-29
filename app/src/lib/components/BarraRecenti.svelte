@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { PERIODI_RECENTI } from '../raggruppa';
+	import Icona from './Icona.svelte';
 
 	let {
 		giorni,
@@ -43,7 +44,7 @@
 	/>
 	<span class="periodo">{periodo.nome}</span>
 	<span class="conta">{quanti === 0 ? 'nessun elemento' : quanti === 1 ? '1 elemento' : `${quanti} elementi`}</span>
-	<button onclick={onchiudi} aria-label="Nascondi i recenti" title="Nascondi i recenti">×</button>
+	<button onclick={onchiudi} aria-label="Nascondi i recenti" title="Nascondi i recenti"><Icona nome="chiudi" /></button>
 </div>
 
 <style>

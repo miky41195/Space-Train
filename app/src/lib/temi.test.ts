@@ -21,7 +21,7 @@ describe('temi', () => {
 	it('un accento scelto sostituisce quello del tema, anche nella tinta di selezione', () => {
 		const v = variabiliPer(temaDa('spazio'), coloreAccento(temaDa('spazio'), 'verde', '#000000'));
 		expect(v['--accent']).toBe('#22c55e');
-		expect(v['--accent-soft']).toBe('rgba(34, 197, 94, 0.2)');
+		expect(v['--accent-soft']).toBe('rgba(34, 197, 94, 0.26)');
 	});
 
 	it('l accento personalizzato usa il colore scelto dall utente', () => {

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Backend, Drive, KnownFolder, Pari, StatoAmici, StatoLan } from '../ipc';
 	import type { TabsStore } from '../stores/tabs.svelte';
+	import Icona from './Icona.svelte';
 	import { QUESTO_PC, RETE, CESTINO, RETE_LOCALE, AMICI, byte, stessoPath, nomeDi } from '../posizioni';
 
 	let {
@@ -50,8 +51,8 @@
 		backend.knownFolders().then((f) => (folders = f));
 	});
 
-	// Lo spazio libero cambia con ogni copia: si rilegge quando la pagina
-	// segnala un'operazione conclusa, non a intervalli.
+	// Lo spazio libero si rilegge ogni volta che la pagina lo chiede: dopo
+	// un'operazione, al ritorno in primo piano e una volta al minuto.
 	$effect(() => {
 		aggiornamento;
 		backend.drives().then((d) => (drives = d));
@@ -143,13 +144,14 @@
 				{/if}
 			</div>
 			{#each pari as p (p.id)}
+				<!-- Un PC trovato in rete risponde: la sua fermata è in linea. -->
 				<button
-					class="voce"
+					class="voce in-linea"
 					class:corrente={store.activeTab?.path.toLowerCase().startsWith(pathPari(p).toLowerCase())}
 					onclick={() => vai(pathPari(p))}
 					title={p.condivisa ? `${p.nome} — condivide «${p.condivisa}»` : `${p.nome} — nessuna cartella condivisa`}
 				>
-					<span class="pc" aria-hidden="true">🖥</span>{p.nome}
+					{p.nome}
 				</button>
 			{:else}
 				<div class="vuoto-lan">
@@ -162,7 +164,11 @@
 				<div class="indirizzo" title={raggiunto(i) ? 'Raggiunto' : 'In attesa di risposta: Space Train acceso e visibile anche dall’altra parte?'}>
 					<span class="pallino-stato" class:acceso={raggiunto(i)}></span>
 					<span class="testo-indirizzo">{i}</span>
-					<button class="togli" aria-label="Togli {i}" onclick={() => togliIndirizzo(i)}>×</button>
+					<button class="togli" aria-label="Togli {i}" onclick={() => togliIndirizzo(i)}
+						><svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"
+							><path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.5" /></svg
+						></button
+					>
 				</div>
 			{/each}
 			{#if aggiungendo}
@@ -178,7 +184,7 @@
 					/>
 				</form>
 			{:else}
-				<button class="voce aggiungi-pc" onclick={() => (aggiungendo = true)}>+ Aggiungi PC per indirizzo</button>
+				<button class="voce aggiungi-pc" onclick={() => (aggiungendo = true)}>Aggiungi PC per indirizzo</button>
 			{/if}
 		</div>
 	{/if}
@@ -187,13 +193,15 @@
 		<div class="gruppo">
 			<div class="titolo">Amici</div>
 			{#each confermati as a (a.id)}
+				<!-- In linea o no lo dice il colore del nodo della fermata. -->
 				<button
 					class="voce"
+					class:in-linea={a.inLinea}
 					class:corrente={dentro(AMICI + '\\' + a.id)}
 					onclick={() => vai(AMICI + '\\' + a.id)}
 					title={a.inLinea ? `${a.nome} — in linea` : `${a.nome} — non in linea`}
 				>
-					<span class="pallino-stato amico" class:acceso={a.inLinea}></span>{a.nome}
+					{a.nome}
 				</button>
 			{/each}
 			{#if inAttesa > 0}
@@ -202,7 +210,7 @@
 				</button>
 			{/if}
 			<button class="voce aggiungi-pc" onclick={onapriamici}>
-				{confermati.length === 0 ? '+ Aggiungi amici' : 'Gestisci amici'}
+				{confermati.length === 0 ? 'Aggiungi amici' : 'Gestisci amici'}
 			</button>
 		</div>
 	{/if}
@@ -236,7 +244,7 @@
 					onmenuaccesso?.(p, e);
 				}}
 			>
-				<span class="spillo" aria-hidden="true">📌</span>
+				<span class="spillo" aria-hidden="true"><Icona nome="spillo" lato={11} /></span>
 				{#if coloreDi?.(p)}<span class="pallino" style:background={coloreDi(p)}></span>{/if}
 				{nomeDi(p)}
 			</button>
@@ -269,18 +277,17 @@
 
 <style>
 	.sidebar {
-		width: 200px;
+		width: 212px;
 		flex-shrink: 0;
-		padding: 12px 8px;
+		padding: 12px 8px 12px 30px;
 		background: var(--surface-glass);
-		backdrop-filter: blur(24px) saturate(160%);
 		overflow-y: auto;
 	}
 	.indirizzo {
 		display: flex;
 		align-items: center;
 		gap: 6px;
-		padding: 2px 10px;
+		padding: 2px 0;
 		font-size: calc(12px * var(--scala-testo, 1));
 		color: var(--text-dim);
 	}
@@ -297,17 +304,21 @@
 		background: var(--text-dim);
 		opacity: 0.5;
 	}
-	.pallino-stato.amico {
-		display: inline-block;
-		margin-right: 8px;
-		vertical-align: middle;
+	/* Le azioni non sono fermate: il binario ci passa accanto senza nodo. */
+	.voce.richieste,
+	.voce.aggiungi-pc {
+		background-image: none;
 	}
 	.richieste {
 		color: var(--accent);
 		font-size: calc(12px * var(--scala-testo, 1));
 	}
+	/* Un PC o un amico raggiungibile adesso. */
+	.voce.in-linea {
+		--nodo: var(--in-linea);
+	}
 	.pallino-stato.acceso {
-		background: #22c55e;
+		background: var(--in-linea);
 		opacity: 1;
 	}
 	.togli {
@@ -321,9 +332,14 @@
 	.togli:hover {
 		color: var(--text);
 	}
-	.aggiungi-pc {
+	/* Le azioni si distinguono dalle fermate per il tono: più piccole e
+	   spente, e si accendono solo al passaggio. */
+	.voce.aggiungi-pc {
 		color: var(--text-dim);
 		font-size: calc(12px * var(--scala-testo, 1));
+	}
+	.voce.aggiungi-pc:hover {
+		color: var(--text);
 	}
 	.nuovo-indirizzo input {
 		width: 100%;
@@ -342,20 +358,38 @@
 		margin-top: 16px;
 	}
 	.titolo {
-		padding: 0 12px 6px;
+		padding: 0 0 6px;
 		color: var(--text-dim);
+		font-family: var(--font-display);
 		font-size: calc(11px * var(--scala-testo, 1));
+		font-weight: 600;
 		text-transform: uppercase;
-		letter-spacing: 0.06em;
+		letter-spacing: 0.12em;
 	}
+	/* Ogni posizione è una fermata sul binario verticale, che corre sotto la
+	   barra a 13 px dal bordo (vedi `.luoghi` in +page.svelte): il nodo
+	   tondo, con ghiera e centro, sta sopra i due fili. Disegnato come
+	   sfondo, così il colore al passaggio del mouse non lo copre. */
 	.voce {
 		display: block;
-		width: 100%;
+		width: calc(100% + 22px);
+		margin-left: -22px;
 		min-height: 30px;
-		padding: 0 12px;
+		padding: 0 12px 0 22px;
 		border: none;
 		border-radius: var(--radius-sm);
-		background: transparent;
+		--nodo: var(--rail-metal);
+		--nodo-dentro: var(--surface);
+		background-color: transparent;
+		background-image: radial-gradient(
+			circle,
+			var(--nodo-dentro) 0 2.2px,
+			var(--nodo) 2.7px 3.6px,
+			transparent 4.1px
+		);
+		background-size: 9px 9px;
+		background-position: 3px 50%;
+		background-repeat: no-repeat;
 		color: var(--text);
 		font: inherit;
 		text-align: left;
@@ -365,7 +399,7 @@
 		white-space: nowrap;
 	}
 	.voce:hover {
-		background: var(--row-hover);
+		background-color: var(--row-hover);
 	}
 	.riga-titolo {
 		display: flex;
@@ -403,17 +437,16 @@
 	}
 	.stato-lan,
 	.vuoto-lan {
-		padding: 0 12px 6px;
+		padding: 0 0 6px;
 		color: var(--text-dim);
 		font-size: calc(11px * var(--scala-testo, 1));
 		line-height: 1.4;
 	}
-	.pc,
 	.spillo {
+		display: inline-flex;
+		vertical-align: -1px;
 		margin-right: 8px;
-	}
-	.spillo {
-		font-size: calc(11px * var(--scala-testo, 1));
+		color: var(--text-dim);
 	}
 	.pallino {
 		display: inline-block;
@@ -424,26 +457,16 @@
 		vertical-align: middle;
 	}
 	.voce.bersaglio {
-		background: color-mix(in srgb, var(--current) 14%, transparent);
+		--nodo: var(--current);
+		background-color: color-mix(in srgb, var(--current) 14%, transparent);
 		box-shadow: inset 0 0 0 1px var(--current);
 	}
-	/* La stazione in cui ti trovi: un contatto acceso sul binario. */
+	/* La fermata in cui ti trovi: il nodo si accende. */
 	.voce.corrente {
-		position: relative;
-		background: var(--accent-soft);
+		--nodo: var(--current);
+		--nodo-dentro: var(--current);
+		background-color: var(--accent-soft);
 		color: var(--text);
-	}
-	.voce.corrente::before {
-		content: '';
-		position: absolute;
-		left: 0;
-		top: 50%;
-		width: 3px;
-		height: 14px;
-		transform: translateY(-50%);
-		border-radius: 2px;
-		background: var(--current);
-		box-shadow: 0 0 8px var(--current);
 	}
 
 	/* Il disco mostra quanto è pieno: la barra diventa rossa oltre il 90%. */
@@ -476,6 +499,8 @@
 	}
 	.libero {
 		color: var(--text-dim);
+		font-family: var(--font-display);
+		font-variant-numeric: tabular-nums;
 		font-size: calc(11px * var(--scala-testo, 1));
 	}
 </style>

@@ -83,8 +83,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		background: rgba(0, 0, 0, 0.5);
-		backdrop-filter: blur(3px);
+		background: color-mix(in srgb, var(--bg) 72%, transparent);
 		z-index: 10;
 	}
 	.finestra {

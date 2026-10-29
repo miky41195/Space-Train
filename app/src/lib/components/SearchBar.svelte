@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Icona from './Icona.svelte';
 	let {
 		query,
 		risultati,
@@ -83,7 +84,7 @@
 			title="Cerca il testo anche dentro i file">Contenuto</button
 		>
 	{/if}
-	<button onclick={onclose} aria-label="Chiudi la ricerca">×</button>
+	<button onclick={onclose} aria-label="Chiudi la ricerca"><Icona nome="chiudi" /></button>
 </div>
 
 <style>

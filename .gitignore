@@ -16,3 +16,10 @@ app/src-tauri/gen/schemas/
 # Local notes, not published
 docs/
 registry/
+
+# Lavoro di impeccable (catture e appunti locali)
+.impeccable/
+
+# Appunti di lavoro locali (documenti del progetto, impeccable)
+/PRODUCT.md
+/DESIGN.md

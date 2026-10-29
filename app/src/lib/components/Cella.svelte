@@ -130,7 +130,6 @@
 	}
 	.cella.selected {
 		background: var(--accent-soft);
-		box-shadow: inset 0 0 0 1px var(--accent);
 	}
 	.cella.tagliato {
 		opacity: 0.45;
@@ -193,6 +192,8 @@
 	.info,
 	.data {
 		color: var(--text-dim);
+		font-family: var(--font-display);
+		font-variant-numeric: tabular-nums;
 		font-size: calc(11px * var(--scala-testo, 1));
 		white-space: nowrap;
 		overflow: hidden;

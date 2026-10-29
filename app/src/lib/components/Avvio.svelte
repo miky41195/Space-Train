@@ -95,17 +95,27 @@
 		inset-block: 0;
 		left: 0;
 		width: 30%;
+		/* La stessa corrente del binario: coda di plasma e nucleo bianco. */
 		background: linear-gradient(
 			90deg,
 			transparent,
-			var(--plasma) 40%,
-			var(--current) 50%,
-			var(--plasma) 60%,
+			color-mix(in srgb, var(--plasma) 70%, transparent) 45%,
+			var(--current) 88%,
 			transparent
 		);
-		box-shadow: 0 0 10px var(--current);
 		transform: translateX(-100%);
 		animation: scarica 0.65s cubic-bezier(0.4, 0, 0.2, 1) 0.1s;
+	}
+	.corrente::after {
+		content: '';
+		position: absolute;
+		inset-block: 0;
+		right: 6%;
+		width: 6px;
+		background: #fff;
+		box-shadow:
+			0 0 3px #fff,
+			0 0 10px 2px var(--current);
 	}
 
 	@keyframes scarica {

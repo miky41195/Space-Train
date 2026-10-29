@@ -247,7 +247,6 @@
 	}
 	.row.selected {
 		background: var(--accent-soft);
-		box-shadow: inset 0 0 0 1px var(--accent);
 	}
 	/* Cartella su cui si sta per rilasciare: il binario si accende. */
 	.row.bersaglio {
@@ -317,9 +316,11 @@
 		color: var(--accent);
 		font-weight: 600;
 	}
+	/* Numeri in DIN, come le cifre di un orario ferroviario. */
 	.size,
 	.date {
 		color: var(--text-dim);
+		font-family: var(--font-display);
 		font-variant-numeric: tabular-nums;
 		text-align: right;
 	}

@@ -49,7 +49,16 @@
 			linear-gradient(var(--rail-metal), var(--rail-metal)) 3px 0 / 1px 100% no-repeat;
 	}
 
-	/* Solo transform e opacity: restano sul compositore, non ridisegnano. */
+	/* L'alone del nucleo deve uscire dai cinque pixel del binario: il clip
+	   resta, ma con un margine. */
+	.binario {
+		overflow: clip;
+		overflow-clip-margin: 8px;
+	}
+
+	/* Solo transform e opacity: restano sul compositore, non ridisegnano.
+	   La corrente ha un verso: una coda di plasma che si spegne dietro e un
+	   nucleo bianco davanti, l'unica cosa dell'app che fa luce. */
 	.corrente {
 		position: absolute;
 		top: 0;
@@ -60,13 +69,23 @@
 		background: linear-gradient(
 			90deg,
 			transparent,
-			var(--plasma) 35%,
-			var(--current) 50%,
-			var(--plasma) 65%,
+			color-mix(in srgb, var(--plasma) 70%, transparent) 45%,
+			var(--current) 88%,
 			transparent
 		);
-		box-shadow: 0 0 6px var(--current);
 		animation: scorre 9s linear infinite;
+	}
+	.corrente::after {
+		content: '';
+		position: absolute;
+		top: 0;
+		right: 6%;
+		width: 6px;
+		height: 100%;
+		background: #fff;
+		box-shadow:
+			0 0 3px #fff,
+			0 0 10px 2px var(--current);
 	}
 
 	.verticale .corrente {
@@ -75,12 +94,18 @@
 		background: linear-gradient(
 			180deg,
 			transparent,
-			var(--plasma) 35%,
-			var(--current) 50%,
-			var(--plasma) 65%,
+			color-mix(in srgb, var(--plasma) 70%, transparent) 45%,
+			var(--current) 88%,
 			transparent
 		);
 		animation-name: scorre-verticale;
+	}
+	.verticale .corrente::after {
+		top: auto;
+		right: 0;
+		bottom: 6%;
+		width: 100%;
+		height: 6px;
 	}
 
 	.attivo .corrente {
@@ -118,7 +143,9 @@
 			transform: none;
 			width: 100%;
 			opacity: 0.18;
-			box-shadow: none;
+		}
+		.corrente::after {
+			display: none;
 		}
 		.verticale .corrente {
 			height: 100%;

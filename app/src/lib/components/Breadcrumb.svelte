@@ -74,15 +74,15 @@
 		class="nav"
 		disabled={!store.activeTab || store.activeTab.historyIndex === 0}
 		onclick={() => id !== null && store.goBack(id)}
-		aria-label="Indietro">←</button
+		aria-label="Indietro"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.5" /></svg></button
 	>
 	<button
 		class="nav"
 		disabled={!store.activeTab || store.activeTab.historyIndex >= store.activeTab.history.length - 1}
 		onclick={() => id !== null && store.goForward(id)}
-		aria-label="Avanti">→</button
+		aria-label="Avanti"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.5" /></svg></button
 	>
-	<button class="nav" onclick={() => id !== null && store.goUp(id)} aria-label="Su">↑</button>
+	<button class="nav" onclick={() => id !== null && store.goUp(id)} aria-label="Su"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.5" /></svg></button>
 
 	<!-- Mappa della linea: ogni cartella è una stazione, l'ultima è dove ti
 	     trovi. Il tracciato che le unisce è lo stesso percorso che hai fatto
@@ -156,6 +156,9 @@
 		flex-shrink: 0;
 	}
 	.nav {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
 		width: 28px;
 		height: 28px;
 		border: none;
@@ -246,13 +249,13 @@
 		background: var(--rail-metal);
 	}
 
+	/* Nodi tondi, come le fermate della barra laterale. */
 	.nodo {
 		width: 6px;
 		height: 6px;
 		flex-shrink: 0;
 		border-radius: 50%;
 		background: var(--rail-metal);
-		box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4);
 	}
 
 	.stazione:hover {
@@ -273,6 +276,12 @@
 		width: 8px;
 		height: 8px;
 		background: var(--current);
-		box-shadow: 0 0 8px var(--current);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--current) 20%, transparent);
+	}
+	/* L'ultimo tratto, quello che arriva dove sei, porta la corrente. */
+	.capolinea.stazione::before {
+		height: 2px;
+		margin-top: -0.5px;
+		background: linear-gradient(90deg, var(--plasma), var(--current));
 	}
 </style>

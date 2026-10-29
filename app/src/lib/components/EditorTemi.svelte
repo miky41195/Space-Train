@@ -48,6 +48,7 @@
 	} from '../movimento';
 	import { coloreSfondo, colorePixel, daEsadecimale, esadecimale, togliSfondo } from '../trasparenza';
 	import { leggiPixel, scriviPng } from '../pixel';
+	import Icona from './Icona.svelte';
 
 	let {
 		finestra = false,
@@ -407,7 +408,7 @@
 		<!-- In finestra la testata la sposta Windows: anche fuori dall'app. -->
 		<header title="Trascina per spostare l'editor e vedere il tema dietro" data-tauri-drag-region={finestra || undefined}>
 			<h2 data-tauri-drag-region={finestra || undefined}>{modifica ? 'Modifica tema' : 'Nuovo tema'}</h2>
-			<button class="chiudi" onclick={onchiudi} aria-label="Chiudi l'editor">×</button>
+			<button class="chiudi" onclick={onchiudi} aria-label="Chiudi l'editor"><Icona nome="chiudi" /></button>
 		</header>
 
 		<div class="corpo">
@@ -553,7 +554,7 @@
 											immagini = immagini.filter((_, j) => j !== i);
 											movimenti = movimenti.filter((_, j) => j !== i);
 										}}
-										aria-label="Togli {nome}">×</button
+										aria-label="Togli {nome}"><Icona nome="chiudi" /></button
 									>
 								</div>
 								<div class="strumenti-sfondo">

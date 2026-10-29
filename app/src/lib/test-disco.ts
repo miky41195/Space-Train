@@ -35,6 +35,8 @@ export class DiscoFinto {
 	/** Path originali di ciò che è stato cestinato, in ordine. */
 	cestino: string[] = [];
 	aperti: string[] = [];
+	/** Byte liberi su C:, che un test può cambiare come farebbe un altro programma. */
+	liberoC = 40;
 	/** Gli appunti di Windows. */
 	appunti: ContenutoAppunti | null = null;
 	/** Tasti premuti al momento di un rilascio. */
@@ -117,7 +119,7 @@ export class DiscoFinto {
 				return genitore(path);
 			}
 			case 'drives':
-				return [{ label: 'Disco locale (C:)', path: 'C:\\', libero: 40, totale: 100, tipo: 'fisso' }];
+				return [{ label: 'Disco locale (C:)', path: 'C:\\', libero: this.liberoC, totale: 100, tipo: 'fisso' }];
 			case 'known_folders':
 				return [];
 			case 'open_entry':

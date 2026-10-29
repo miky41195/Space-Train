@@ -192,11 +192,12 @@
 	}
 	h3 {
 		margin: 0 0 6px;
-		font-size: calc(12px * var(--scala-testo, 1));
+		font-family: var(--font-display);
+		font-size: calc(11px * var(--scala-testo, 1));
 		color: var(--text-dim);
 		font-weight: 600;
 		text-transform: uppercase;
-		letter-spacing: 0.06em;
+		letter-spacing: 0.12em;
 	}
 	section {
 		margin-top: 16px;

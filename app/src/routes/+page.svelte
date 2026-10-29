@@ -30,6 +30,7 @@
 	import ConfermaConflitti from '$lib/components/ConfermaConflitti.svelte';
 	import BarraProgresso from '$lib/components/BarraProgresso.svelte';
 	import Rail from '$lib/components/Rail.svelte';
+	import Icona from '$lib/components/Icona.svelte';
 	import Treno from '$lib/components/Treno.svelte';
 	import { decodifica as leggiSprite, misuraBinario } from '$lib/spritesheet';
 	import Anteprima from '$lib/components/Anteprima.svelte';
@@ -389,8 +390,19 @@
 		return messaggioErrore(err ?? null) || 'Operazione non riuscita.';
 	}
 
-	/** Lo spazio sui dischi va riletto dopo ogni operazione che lo cambia. */
+	/**
+	 * Lo spazio sui dischi va riletto dopo ogni operazione che lo cambia.
+	 * Lo cambiano anche gli altri programmi (download, aggiornamenti): per
+	 * quelli si rilegge quando la finestra torna in primo piano e una volta
+	 * al minuto mentre è visibile.
+	 */
 	let aggiornamentoDischi = $state(0);
+	$effect(() => {
+		const giro = setInterval(() => {
+			if (document.visibilityState === 'visible') aggiornamentoDischi++;
+		}, 60_000);
+		return () => clearInterval(giro);
+	});
 
 	async function ricarica() {
 		if (store.activeId !== null) await store.aggiorna(store.activeId);
@@ -2074,6 +2086,7 @@
 </script>
 
 <svelte:window
+	onfocus={() => aggiornamentoDischi++}
 	onmousedown={tastiLaterali}
 	onauxclick={(e) => historyActionFor(e.button) !== null && e.preventDefault()}
 	onkeydown={tastiera}
@@ -2099,6 +2112,9 @@
 	</div>
 
 	<div class="corpo">
+		<!-- Le posizioni sono fermate: il binario verticale corre sopra la
+		     barra laterale e ne attraversa i nodi. -->
+		<div class="luoghi">
 		<Sidebar
 			{store}
 			backend={tauriBackend}
@@ -2117,6 +2133,7 @@
 			onmenuaccesso={apriMenuAccesso}
 		/>
 		<Rail orientamento="verticale" attivo={sottoCarico} />
+		</div>
 		<main>
 			<Breadcrumb
 				{store}
@@ -2186,7 +2203,7 @@
 				<div class="errore">
 					{erroreOp}
 					<button class="chiudi-errore" onclick={() => (erroreOp = null)} aria-label="Chiudi"
-						>×</button
+						><Icona nome="chiudi" /></button
 					>
 				</div>
 			{/if}
@@ -2433,10 +2450,13 @@
 <style>
 	/* Contiene il binario e fa da riferimento al convoglio, che sborda
 	   verso l'alto sopra la testata. */
+	/* Lo stesso cielo della testata continua fin sul binario; la tessera è
+	   spostata perché le due strisce non si ripetano una sotto l'altra. */
 	.linea-principale {
 		position: relative;
 		flex-shrink: 0;
 		z-index: 3;
+		background: var(--stelle, none) 210px 0 / 480px 40px repeat, var(--bg);
 	}
 	/* Il binario è decorazione: il clic passa al contenitore, che sposta
 	   la finestra. */
@@ -2448,11 +2468,32 @@
 		flex: 1;
 		min-height: 0;
 	}
+	/* Il fondo sta qui e non sulla barra: così il binario passa fra i due e
+	   i nodi delle fermate gli stanno sopra, come stazioni sulla linea. */
+	.luoghi {
+		position: relative;
+		display: flex;
+		flex-shrink: 0;
+		background: var(--surface-glass);
+	}
+	.luoghi > :global(.binario) {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		left: 13px;
+		pointer-events: none;
+	}
+	.luoghi > :global(.sidebar) {
+		position: relative;
+		z-index: 1;
+		background: transparent;
+	}
 	main {
 		display: flex;
 		flex-direction: column;
 		flex: 1;
 		min-width: 0;
+		border-left: 1px solid var(--border);
 	}
 	/* Lista e anteprima affiancate: la lista prende tutto lo spazio libero. */
 	.contenuto {
@@ -2471,7 +2512,6 @@
 		height: 34px;
 		padding: 0 12px;
 		background: var(--surface-glass);
-		backdrop-filter: blur(24px) saturate(160%);
 		border-top: 1px solid var(--border);
 		flex-shrink: 0;
 	}
@@ -2520,6 +2560,7 @@
 	.stato {
 		margin-left: auto;
 		color: var(--text-dim);
+		font-family: var(--font-display);
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
 	}

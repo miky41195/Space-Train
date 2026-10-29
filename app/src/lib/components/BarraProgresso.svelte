@@ -99,9 +99,12 @@
 		width: 3px;
 		height: 12px;
 		transform: translateY(-50%);
-		border-radius: 2px;
-		background: var(--current);
-		box-shadow: 0 0 10px var(--current);
+		border-radius: 1px;
+		/* Lo stesso nucleo bianco della corrente sul binario. */
+		background: #fff;
+		box-shadow:
+			0 0 3px #fff,
+			0 0 10px 2px var(--current);
 	}
 	.numeri {
 		color: var(--text-dim);

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { posizionaMenu, type AzioneMenu, type VoceMenu } from '../menu';
+	import Icona from './Icona.svelte';
 
 	let {
 		voci,
@@ -120,7 +121,7 @@
 		>
 			<span
 				>{#if v.spunta !== undefined}<span class="spunta" aria-hidden="true"
-						>{v.spunta ? '✓' : ''}</span
+						>{#if v.spunta}<Icona nome="spunta" />{/if}</span
 					>{/if}{v.etichetta}</span
 			>
 			{#if v.scorciatoia}<kbd>{v.scorciatoia}</kbd>{/if}
@@ -144,8 +145,7 @@
 		z-index: 21;
 		min-width: 200px;
 		padding: 4px;
-		background: var(--hull-glass);
-		backdrop-filter: blur(24px) saturate(160%);
+		background: var(--hull);
 		border: 1px solid var(--border);
 		border-radius: var(--radius-sm);
 		box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
@@ -187,7 +187,8 @@
 	}
 
 	.spunta {
-		display: inline-block;
+		display: inline-flex;
+		vertical-align: -1px;
 		width: 18px;
 		color: var(--current);
 	}

@@ -50,8 +50,7 @@
 <div class="comandi" role="toolbar" aria-label="Comandi">
 	<button class="comando nuovo" onclick={onnuovo} disabled={!modificabile} aria-haspopup="menu">
 		<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
-			<circle cx="8" cy="8" r="7" fill="var(--accent)" />
-			<path d="M8 4.5v7M4.5 8h7" stroke="#fff" stroke-width="1.5" />
+			<path d="M8 2.5v11M2.5 8h11" stroke="var(--accent)" stroke-width="1.8" />
 		</svg>
 		Nuovo
 		<svg class="freccia" viewBox="0 0 8 8" width="8" height="8" aria-hidden="true">

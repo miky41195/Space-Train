@@ -113,6 +113,28 @@ export function variabiliDa(t: Tavolozza, chiaro: boolean): Record<string, strin
 	};
 }
 
+/**
+ * Il cielo dietro la testata, dove passa il convoglio: stelle di un pixel o
+ * due, in una tessera che si ripete in larghezza. Solo nei temi scuri: su un
+ * fondo chiaro diventerebbero sporco.
+ */
+export function stelle(testo: string, corrente: string, segnale: string): string {
+	const punti: [number, number, number, string][] = [
+		[18, 9, 2, 'a'], [61, 27, 1, 'b'], [104, 5, 2, 'c'], [139, 19, 1, 'b'],
+		[177, 31, 2, 'a'], [214, 11, 1, 'a'], [252, 24, 2, 'b'], [293, 6, 1, 'd'],
+		[331, 33, 1, 'a'], [368, 14, 2, 'b'], [402, 28, 1, 'a'], [447, 8, 2, 'a']
+	];
+	const tinta = { a: [testo, 0.55], b: [testo, 0.25], c: [corrente, 0.8], d: [segnale, 0.7] } as const;
+	const rect = punti
+		.map(([x, y, l, k]) => {
+			const [colore, alfa] = tinta[k as keyof typeof tinta];
+			return `<rect x='${x}' y='${y}' width='${l}' height='${l}' fill='${colore}' fill-opacity='${alfa}'/>`;
+		})
+		.join('');
+	const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='480' height='40' shape-rendering='crispEdges'>${rect}</svg>`;
+	return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
+
 const colori = (id: string, nome: string, chiaro: boolean, t: Tavolozza): Tema => ({
 	id,
 	nome,
@@ -293,13 +315,22 @@ export function variabiliPer(tema: Tema, accento: string): Record<string, string
 		'--accent': accento,
 		// Su fondo chiaro la tinta della selezione deve essere più decisa
 		// per staccarsi dal bianco.
-		'--accent-soft': trasparente(accento, tema.chiaro ? 0.16 : 0.2),
+		'--accent-soft': trasparente(accento, tema.chiaro ? 0.18 : 0.26),
 		'--radius': `${forme.raggio}px`,
 		'--radius-sm': `${forme.raggioPiccolo}px`,
 		'--font-ui': forme.carattere,
 		'--font-display': forme.carattereTitoli,
 		'--scala-testo': String(scalaTesto(tema)),
-		'--motivo': figura ? motivoFigura(figura, tema.chiaro ? 0.1 : 0.07) : 'none'
+		'--motivo': figura ? motivoFigura(figura, tema.chiaro ? 0.1 : 0.07) : 'none',
+		// Calcolate qui e non salvate col tema: valgono anche per i temi
+		// personali fatti prima che il cielo esistesse.
+		'--stelle': tema.chiaro
+			? 'none'
+			: stelle(
+					tema.variabili['--text'] ?? '#e9e6f0',
+					tema.variabili['--current'] ?? '#7cf5ff',
+					tema.variabili['--signal'] ?? '#ffb454'
+				)
 	};
 }
 

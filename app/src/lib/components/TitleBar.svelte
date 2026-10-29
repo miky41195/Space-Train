@@ -59,7 +59,8 @@
 						e.stopPropagation();
 						store.closeTab(tab.id);
 					}}
-					onkeydown={(e) => e.key === 'Enter' && store.closeTab(tab.id)}>×</span
+					onkeydown={(e) => e.key === 'Enter' && store.closeTab(tab.id)}
+					><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.5" /></svg></span
 				>
 			</button>
 		{/each}
@@ -67,7 +68,7 @@
 			class="nuovo"
 			onclick={() => store.openTab(store.activeTab?.path ?? 'C:\\')}
 			title="Nuova scheda (Ctrl+T)"
-			aria-label="Nuova scheda">+</button
+			aria-label="Nuova scheda"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.5" /></svg></button
 		>
 	</div>
 
@@ -99,10 +100,8 @@
 
 <style>
 	/* Tre strati, perché il convoglio passi fra lo sfondo e il contenuto:
-	   lo sfondo vetrato sta in un ::before sotto il convoglio (z 3, nella
-	   linea principale), marchio, schede e lampade sopra (z 4). Il
-	   backdrop-filter non può stare sulla barra stessa: creerebbe un
-	   contesto di sovrapposizione e chiuderebbe tutto sotto il convoglio. */
+	   il cielo sta in un ::before sotto il convoglio (z 3, nella linea
+	   principale), marchio, schede e lampade sopra (z 4). */
 	.titlebar {
 		position: relative;
 		display: flex;
@@ -113,13 +112,13 @@
 		border-bottom: 1px solid var(--border);
 		flex-shrink: 0;
 	}
-	/* Superficie statica: qui il blur non costa niente sullo scroll. */
+	/* Il pezzo di cielo che il convoglio attraversa: fondo dello spazio e
+	   stelle in pixel (solo nei temi scuri, vedi `stelle` in temi.ts). */
 	.titlebar::before {
 		content: '';
 		position: absolute;
 		inset: 0;
-		background: var(--surface-glass);
-		backdrop-filter: blur(24px) saturate(160%);
+		background: var(--stelle, none) 0 0 / 480px 40px repeat-x, var(--bg);
 		pointer-events: none;
 	}
 	.marchio,
@@ -144,7 +143,8 @@
 
 	.tabs {
 		display: flex;
-		align-items: center;
+		align-items: flex-end;
+		align-self: stretch;
 		gap: 4px;
 		overflow-x: auto;
 		scrollbar-width: none;
@@ -154,15 +154,17 @@
 		border-radius: var(--radius-sm);
 		box-shadow: inset 0 0 0 1px var(--current);
 	}
+	/* Le schede poggiano sul bordo inferiore della testata: arrotondate solo
+	   in alto, come una porta sulla fiancata. */
 	.tab {
 		display: flex;
 		align-items: center;
 		gap: 8px;
 		max-width: 180px;
-		height: 28px;
+		height: 32px;
 		padding: 0 8px 0 12px;
 		border: none;
-		border-radius: var(--radius-sm);
+		border-radius: var(--radius-sm) var(--radius-sm) 0 0;
 		background: transparent;
 		color: var(--text-dim);
 		font: inherit;
@@ -175,23 +177,29 @@
 	.tab.bersaglio {
 		box-shadow: inset 0 0 0 1px var(--current);
 	}
+	/* La scheda aperta è un pezzo della fiancata: stessa superficie del
+	   contenuto, niente cornice. */
 	.tab.active {
-		background: var(--accent-soft);
+		background: var(--surface);
 		color: var(--text);
-		box-shadow: inset 0 0 0 1px var(--accent);
 	}
 	.label {
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
-	.chiudi {
+	.tab .chiudi {
+		display: inline-flex;
 		opacity: 0.5;
 		padding: 0 2px;
 	}
-	.chiudi:hover {
+	.tab .chiudi:hover {
 		opacity: 1;
 	}
 	.nuovo {
+		align-self: center;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
 		width: 28px;
 		height: 28px;
 		border: none;
@@ -206,8 +214,9 @@
 		color: var(--text);
 	}
 	/* Tre lampade di segnalazione. La forma è quella del semaforo Mac —
-	   pastiglie tonde a sinistra — ma il trattamento è ferroviario:
-	   ghiera scura, nucleo acceso, riflesso in alto a sinistra. */
+	   pastiglie tonde — ma il trattamento è ferroviario: ghiera scura,
+	   nucleo acceso, riflesso in alto a sinistra. Non fanno alone: l'unica
+	   luce che si spande nella finestra è la corrente. */
 	.lampade {
 		display: flex;
 		gap: 8px;
@@ -269,11 +278,10 @@
 		color: rgba(0, 0, 0, 0.62);
 	}
 
+	/* Al passaggio la ghiera si accende del colore della lampada. */
 	.lampada:hover,
 	.lampada:focus-visible {
-		box-shadow:
-			0 0 0 1px var(--alone),
-			0 0 10px var(--alone);
+		box-shadow: 0 0 0 2px color-mix(in srgb, var(--alone) 45%, transparent);
 	}
 
 	.lampada:active {

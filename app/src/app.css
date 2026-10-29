@@ -25,6 +25,8 @@
 	--scroll: rgba(255, 255, 255, 0.12);
 	/* Testo degli avvisi d'errore, leggibile sul fondo del tema. */
 	--errore-testo: #ffb4ab;
+	/* Un PC o un amico raggiungibile adesso. */
+	--in-linea: #22c55e;
 	--radius: 12px;
 	--radius-sm: 8px;
 

@@ -1015,6 +1015,15 @@ describe('Questo PC e Cestino', () => {
 		expect(await screen.findByText('40 B liberi')).toBeTruthy();
 	});
 
+	it('lo spazio libero si rilegge quando la finestra torna in primo piano', async () => {
+		await monta();
+		expect(await screen.findByText('40 B liberi')).toBeTruthy();
+		// Un altro programma ha riempito il disco mentre la finestra era dietro.
+		disco.liberoC = 25;
+		await fireEvent.focus(window);
+		expect(await screen.findByText('25 B liberi')).toBeTruthy();
+	});
+
 	it('sopra la radice del disco c è Questo PC, con i dischi e il loro spazio', async () => {
 		await monta();
 		await fireEvent.click(screen.getByRole('button', { name: 'Su' }));
@@ -2549,7 +2558,7 @@ describe('PC aggiunti per indirizzo', () => {
 
 	it('si aggiunge un indirizzo dalla barra laterale, e chi lo aggiunge diventa visibile', async () => {
 		await monta();
-		await fireEvent.click(await within(barra()).findByRole('button', { name: '+ Aggiungi PC per indirizzo' }));
+		await fireEvent.click(await within(barra()).findByRole('button', { name: 'Aggiungi PC per indirizzo' }));
 		const campo = within(barra()).getByRole('textbox', { name: 'Indirizzo del PC da aggiungere' }) as HTMLInputElement;
 		await fireEvent.input(campo, { target: { value: '100.64.0.2' } });
 		await fireEvent.submit(campo.closest('form')!);
@@ -2585,7 +2594,7 @@ describe('amici', () => {
 
 	it('dal pannello si vede il proprio codice e si chiede un amicizia', async () => {
 		await monta();
-		await fireEvent.click(await screen.findByRole('button', { name: '+ Aggiungi amici' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Aggiungi amici' }));
 		const pannello = await screen.findByRole('dialog', { name: 'Amici' });
 		// Il codice si legge a gruppi di quattro.
 		expect(within(pannello).getByText(/^codi-ce-d/)).toBeTruthy();

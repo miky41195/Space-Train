@@ -76,13 +76,43 @@
 	.elenco {
 		overflow: auto;
 	}
+	/* Le novità sono fermate di una linea: due fili e un nodo tondo per
+	   voce, come le posizioni della barra laterale. */
 	ul {
+		position: relative;
 		margin: 0;
-		padding-left: 18px;
+		padding-left: 22px;
+		list-style: none;
 		line-height: 1.5;
 	}
+	ul::before {
+		content: '';
+		position: absolute;
+		top: 4px;
+		bottom: 4px;
+		left: 6px;
+		width: 5px;
+		background:
+			linear-gradient(var(--rail-metal), var(--rail-metal)) 1px 0 / 1px 100% no-repeat,
+			linear-gradient(var(--rail-metal), var(--rail-metal)) 3px 0 / 1px 100% no-repeat;
+	}
+	li {
+		position: relative;
+	}
+	li::before {
+		content: '';
+		position: absolute;
+		left: -18px;
+		top: calc(0.75em - 4px);
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+		box-sizing: border-box;
+		border: 1.5px solid var(--rail-metal);
+		background: var(--surface);
+	}
 	li + li {
-		margin-top: 4px;
+		margin-top: 6px;
 	}
 	.azioni {
 		display: flex;
