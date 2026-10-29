@@ -112,7 +112,7 @@ pub fn entry_from_dir_entry(de: &DirEntry) -> Option<Entry> {
 }
 
 #[cfg(windows)]
-fn is_hidden(meta: &std::fs::Metadata) -> bool {
+pub(crate) fn is_hidden(meta: &std::fs::Metadata) -> bool {
     use std::os::windows::fs::MetadataExt;
     const FILE_ATTRIBUTE_HIDDEN: u32 = 0x2;
     const FILE_ATTRIBUTE_SYSTEM: u32 = 0x4;
@@ -121,7 +121,7 @@ fn is_hidden(meta: &std::fs::Metadata) -> bool {
 }
 
 #[cfg(not(windows))]
-fn is_hidden(_meta: &std::fs::Metadata) -> bool {
+pub(crate) fn is_hidden(_meta: &std::fs::Metadata) -> bool {
     false
 }
 

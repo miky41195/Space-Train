@@ -45,6 +45,8 @@ pub const PREFISSO_INVIO: &str = "@";
 /// Ogni quanto si controlla chi è in linea, e si riprovano i messaggi
 /// d'amicizia che non sono ancora arrivati.
 const GIRO: Duration = Duration::from_secs(20);
+/// Quante richieste di altri PC si servono insieme (vedi `ascolta`).
+const MASSIMO_FLUSSI: usize = 16;
 /// Un amico sentito più di così fa è considerato fuori linea.
 const IN_LINEA: Duration = Duration::from_secs(50);
 const ATTESA_CONNESSIONE: Duration = Duration::from_secs(15);
@@ -300,16 +302,25 @@ impl Amici {
     // ── Chi ci contatta ───────────────────────────────────────────────
 
     async fn ascolta(self: Arc<Self>, endpoint: Endpoint) {
+        // Ogni flusso occupa un thread del pool bloccante, lo stesso dei
+        // comandi dell'interfaccia: chiunque conosca il codice poteva aprirne
+        // a centinaia e bloccare l'app. Oltre il tetto il flusso si chiude.
+        let posti = Arc::new(tokio::sync::Semaphore::new(MASSIMO_FLUSSI));
         while let Some(arrivo) = endpoint.accept().await {
             let a = self.clone();
+            let posti = posti.clone();
             tokio::spawn(async move {
                 let Ok(conn) = arrivo.await else { return };
                 let chi = codice_di(&conn.remote_id());
                 while let Ok((send, recv)) = conn.accept_bi().await {
+                    let Ok(posto) = posti.clone().try_acquire_owned() else {
+                        continue;
+                    };
                     let a = a.clone();
                     let chi = chi.clone();
                     let rt = a.rt.clone();
                     tokio::task::spawn_blocking(move || {
+                        let _posto = posto;
                         let mut s = Flusso::nuovo(&rt, send, recv);
                         if let Ok(r) = leggi_json::<Richiesta>(&mut s) {
                             let _ = a.servi(&chi, r, &mut s);
@@ -627,14 +638,15 @@ impl Amici {
             let (arrivo, totale) = self.con_flusso(&id, |s| {
                 scrivi_json(s, &Richiesta::Scarica { path: rel }).map_err(errore_io)?;
                 let r = controlla(leggi_json(s).map_err(errore_io)?)?;
-                let totale: u64 = r.contenuto.iter().map(|v| v.dimensione).sum();
+                // Le misure le manda l'altro PC: la somma non deve traboccare.
+                let totale = crate::lan::riepilogo(&r.contenuto).1;
                 let arrivo = prendi_file(s, Path::new(dest), &r.contenuto, annulla, &mut |f| {
-                    avanzamento(gia + f, gia + totale)
+                    avanzamento(gia.saturating_add(f), gia.saturating_add(totale))
                 })
                 .map_err(errore_io)?;
                 Ok((arrivo, totale))
             })?;
-            gia += totale;
+            gia = gia.saturating_add(totale);
             bloccati.extend(arrivo.bloccati);
             if let Some(c) = arrivo.creati.first() {
                 coppie.push([sorgente.clone(), paths::display(c)]);
@@ -688,8 +700,13 @@ impl Amici {
 
 /// Un nome ricevuto da fuori, ripulito: niente caratteri di controllo né
 /// lunghezze esagerate. Vuoto, resta quello di prima.
-fn nome_sicuro(nome: &str, riserva: &str) -> String {
-    let pulito: String = nome.chars().filter(|c| !c.is_control()).take(40).collect();
+pub(crate) fn nome_sicuro(nome: &str, riserva: &str) -> String {
+    // Fuori anche i segni invisibili che girano il verso del testo
+    // (U+202E e simili): con quelli «gpj.exe» si legge «exe.jpg».
+    let invisibile = |c: &char| {
+        matches!(*c, '\u{200b}'..='\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}' | '\u{061c}' | '\u{feff}')
+    };
+    let pulito: String = nome.chars().filter(|c| !c.is_control() && !invisibile(c)).take(40).collect();
     let pulito = pulito.trim();
     if pulito.is_empty() {
         riserva.to_string()
@@ -765,6 +782,7 @@ mod tests {
         assert_eq!(nome_sicuro("  Anna\n\u{7}  ", "x"), "Anna");
         assert_eq!(nome_sicuro("   ", "prima"), "prima");
         assert_eq!(nome_sicuro(&"a".repeat(100), "x").len(), 40);
+        assert_eq!(nome_sicuro("Anna\u{202e}gpj.exe", "x"), "Annagpj.exe");
     }
 
     #[test]

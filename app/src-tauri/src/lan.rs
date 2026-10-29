@@ -42,6 +42,8 @@ pub const PORTA_DATI: u16 = 47821;
 const OGNI: Duration = Duration::from_secs(3);
 /// Un PC che non si annuncia da così tanto si considera spento.
 const SCADENZA: Duration = Duration::from_secs(12);
+/// Quanti PC si ricordano insieme: una casa o un ufficio ne hanno molti meno.
+const MASSIMO_PARI: usize = 64;
 /// Quanto aspetta chi invia che l'altro accetti o rifiuti.
 const ATTESA_CONSENSO: Duration = Duration::from_secs(120);
 const MASSIMO_INTESTAZIONE: usize = 16 * 1024 * 1024;
@@ -202,9 +204,30 @@ pub(crate) fn leggi_json<T: for<'de> Deserialize<'de>>(s: &mut impl Read) -> io:
     if n > MASSIMO_INTESTAZIONE {
         return Err(io::Error::new(io::ErrorKind::InvalidData, "intestazione troppo grande"));
     }
-    let mut dati = vec![0u8; n];
-    s.read_exact(&mut dati)?;
+    // La lunghezza la dichiara l'altro capo: il buffer cresce con i byte che
+    // arrivano davvero, invece di riservarne 16 MiB su quattro byte di
+    // promessa (bastavano poche connessioni per esaurire la memoria).
+    let mut dati = Vec::with_capacity(n.min(64 * 1024));
+    s.take(n as u64).read_to_end(&mut dati)?;
+    if dati.len() != n {
+        return Err(io::ErrorKind::UnexpectedEof.into());
+    }
     serde_json::from_slice(&dati).map_err(io::Error::other)
+}
+
+/// Un nome che Windows non tratta come un file qualunque: i dispositivi
+/// (`CON`, `NUL`, `COM1`…, anche con un'estensione) e i nomi che finiscono
+/// con un punto o uno spazio.
+fn riservato(parte: &str) -> bool {
+    if parte.ends_with(['.', ' ']) {
+        return true;
+    }
+    let base = parte.split('.').next().unwrap_or(parte).trim_end().to_ascii_uppercase();
+    matches!(base.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || ((base.starts_with("COM") || base.starts_with("LPT"))
+            && base.len() == 4
+            && base.as_bytes()[3].is_ascii_digit()
+            && base.as_bytes()[3] != b'0')
 }
 
 /// Un path relativo arrivato dalla rete, solo se non può uscire dalla
@@ -212,7 +235,7 @@ pub(crate) fn leggi_json<T: for<'de> Deserialize<'de>>(s: &mut impl Read) -> io:
 fn rel_sicuro(rel: &str) -> Option<PathBuf> {
     let mut out = PathBuf::new();
     for parte in rel.split(['/', '\\']).filter(|p| !p.is_empty()) {
-        if parte == "." || parte == ".." || parte.contains(':') {
+        if parte == "." || parte == ".." || parte.contains(':') || riservato(parte) {
             return None;
         }
         let p = Path::new(parte);
@@ -230,6 +253,31 @@ fn dentro(radice: &Path, rel: &str) -> Option<PathBuf> {
     let base = std::fs::canonicalize(paths::extended(radice)).ok()?;
     let reale = std::fs::canonicalize(paths::extended(&unito)).ok()?;
     reale.starts_with(&base).then_some(unito)
+}
+
+/// Nascosto o di sistema: fuori da ciò che si condivide.
+fn nascosto(p: &Path) -> bool {
+    std::fs::symlink_metadata(paths::extended(p)).is_ok_and(|m| crate::fs::entry::is_hidden(&m))
+}
+
+/// Come `dentro`, ma per ciò che si dà agli altri PC: nessun tratto del
+/// path sotto la cartella condivisa può essere nascosto. L'elenco già non li
+/// mostrava; senza questo controllo chi conosceva il path li scaricava.
+fn condiviso(radice: &Path, rel: &str) -> Option<PathBuf> {
+    let p = dentro(radice, rel)?;
+    let mut tratto = radice.to_path_buf();
+    for parte in rel_sicuro(rel)?.components() {
+        tratto.push(parte);
+        if nascosto(&tratto) {
+            return None;
+        }
+    }
+    Some(p)
+}
+
+/// Il piano di ciò che si scarica dalla cartella condivisa, senza i nascosti.
+fn piano_condiviso(sorgente: &Path) -> Vec<Voce> {
+    piano_con(sorgente, true)
 }
 
 pub(crate) fn errore_io(e: io::Error) -> FsError {
@@ -340,6 +388,25 @@ impl Lan {
         }
         if let Ok(d) = serde_json::to_vec_pretty(&f) {
             let _ = std::fs::write(&self.file_config, d);
+        }
+    }
+
+    /// Un PC appena annunciato. Il primo indirizzo da cui si è fatto sentire
+    /// resta il suo finché non tace: chiunque in rete poteva annunciarsi con
+    /// l'id di un altro e prendersi le sue cartelle e i file mandati a lui.
+    /// Le voci scadute si tolgono, e la lista ha un tetto.
+    fn registra(&self, p: Pari) {
+        let Ok(mut m) = self.pari.lock() else { return };
+        m.retain(|_, (_, visto)| visto.elapsed() < SCADENZA);
+        match m.get(&p.id) {
+            Some((noto, _)) if noto.ip != p.ip => {}
+            Some(_) => {
+                m.insert(p.id.clone(), (p, Instant::now()));
+            }
+            None if m.len() < MASSIMO_PARI => {
+                m.insert(p.id.clone(), (p, Instant::now()));
+            }
+            None => {}
         }
     }
 
@@ -463,18 +530,18 @@ fn avvia_scoperta(avvisi: Avvisi, lan: Arc<Lan>) {
                             // un annuncio arrivato dalla VPN non tornerebbe
                             // indietro col broadcast.
                             if let Ok(mut r) = lan.ritorni.lock() {
-                                r.insert(da.ip(), Instant::now());
+                                r.retain(|_, visto| visto.elapsed() < SCADENZA);
+                                if r.len() < MASSIMO_PARI || r.contains_key(&da.ip()) {
+                                    r.insert(da.ip(), Instant::now());
+                                }
                             }
-                            let p = Pari {
-                                id: a.id.clone(),
+                            lan.registra(Pari {
+                                id: a.id,
                                 nome: a.nome,
                                 ip: da.ip().to_string(),
                                 porta: a.porta,
                                 condivisa: a.condivisa,
-                            };
-                            if let Ok(mut m) = lan.pari.lock() {
-                                m.insert(a.id, (p, Instant::now()));
-                            }
+                            });
                         }
                     }
                 }
@@ -533,14 +600,42 @@ fn destinazioni_dirette(lan: &Lan, c: &Config) -> Vec<SocketAddr> {
 
 // ── Server ───────────────────────────────────────────────────────────
 
+/// Quante connessioni si servono insieme. Ognuna ha il suo thread: senza un
+/// tetto, chiunque in rete poteva aprirne migliaia e fermare il PC.
+const MASSIMO_CONNESSIONI: usize = 32;
+
+/// Un posto fra le connessioni servite; lo libera chi lo lascia cadere.
+struct Posto(Arc<std::sync::atomic::AtomicUsize>);
+
+impl Posto {
+    fn prendi(occupati: &Arc<std::sync::atomic::AtomicUsize>) -> Option<Posto> {
+        occupati
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |n| (n < MASSIMO_CONNESSIONI).then_some(n + 1))
+            .ok()
+            .map(|_| Posto(occupati.clone()))
+    }
+}
+
+impl Drop for Posto {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
 fn avvia_server(avvisi: Avvisi, lan: Arc<Lan>, server: TcpListener) {
     std::thread::Builder::new()
         .name("lan-server".into())
         .spawn(move || {
+            let occupati = Arc::new(std::sync::atomic::AtomicUsize::new(0));
             for conn in server.incoming().flatten() {
+                // Pieno: la connessione si chiude subito, chi la apriva riproverà.
+                let Some(posto) = Posto::prendi(&occupati) else {
+                    continue;
+                };
                 let avvisi = avvisi.clone();
                 let lan = lan.clone();
                 std::thread::spawn(move || {
+                    let _posto = posto;
                     let _ = servi(avvisi, lan, conn);
                 });
             }
@@ -549,11 +644,13 @@ fn avvia_server(avvisi: Avvisi, lan: Arc<Lan>, server: TcpListener) {
 }
 
 fn servi(avvisi: Avvisi, lan: Arc<Lan>, mut s: TcpStream) -> io::Result<()> {
-    let _ = s.set_read_timeout(Some(Duration::from_secs(60)));
+    let visibile = lan.config().visibile;
+    // Da invisibile si aspetta poco: basta leggere la richiesta per dire di no.
+    let _ = s.set_read_timeout(Some(Duration::from_secs(if visibile { 60 } else { 5 })));
     let richiesta: Richiesta = leggi_json(&mut s)?;
 
     // Un PC non visibile non risponde a nessuno: invisibile davvero.
-    if !lan.config().visibile {
+    if !visibile {
         return scrivi_json(&mut s, &Risposta::errore("Questo PC non è visibile in rete locale."));
     }
     let esito = match richiesta {
@@ -593,7 +690,7 @@ pub(crate) fn servi_richiesta<S: Read + Write>(
             let Some(radice) = condivisa else {
                 return scrivi_json(s, &Risposta::errore("Questo PC non condivide nessuna cartella."));
             };
-            let Some(cartella) = dentro(&radice, &path) else {
+            let Some(cartella) = condiviso(&radice, &path) else {
                 return scrivi_json(s, &Risposta::errore("Cartella non trovata."));
             };
             let voci = elenca_locale(&cartella);
@@ -603,10 +700,10 @@ pub(crate) fn servi_richiesta<S: Read + Write>(
             let Some(radice) = condivisa else {
                 return scrivi_json(s, &Risposta::errore("Questo PC non condivide nessuna cartella."));
             };
-            let Some(sorgente) = dentro(&radice, &path) else {
+            let Some(sorgente) = condiviso(&radice, &path) else {
                 return scrivi_json(s, &Risposta::errore("Elemento non trovato."));
             };
-            let contenuto = piano(&sorgente);
+            let contenuto = piano_condiviso(&sorgente);
             scrivi_json(s, &Risposta { ok: true, contenuto: contenuto.clone(), ..Default::default() })?;
             let base = sorgente.parent().unwrap_or(&sorgente).to_path_buf();
             manda_file(s, &base, &contenuto, &AtomicBool::new(false), &mut |_| {})
@@ -638,11 +735,18 @@ fn elenca_locale(cartella: &Path) -> Vec<VoceRemota> {
 /// Tutto ciò che va spedito per `sorgente`: lei stessa e, se è una
 /// cartella, il suo contenuto. I path partono dal nome di `sorgente`.
 pub(crate) fn piano(sorgente: &Path) -> Vec<Voce> {
+    piano_con(sorgente, false)
+}
+
+fn piano_con(sorgente: &Path, salta_nascosti: bool) -> Vec<Voce> {
     let base = sorgente.parent().unwrap_or(sorgente);
     let mut out = Vec::new();
     let mut pila = vec![sorgente.to_path_buf()];
     while let Some(p) = pila.pop() {
         let Ok(meta) = std::fs::symlink_metadata(paths::extended(&p)) else { continue };
+        if salta_nascosti && crate::fs::entry::is_hidden(&meta) {
+            continue;
+        }
         let rel = p
             .strip_prefix(base)
             .map(|r| r.to_string_lossy().replace('\\', "/"))
@@ -695,9 +799,10 @@ pub(crate) fn manda_file(
         }
         // Un file accorciato nel frattempo: si completa con zeri per non
         // sfasare tutti quelli che seguono.
+        // Gli zeri si generano mentre si scrivono: un file da 4 GB svuotato
+        // durante l'invio non chiede 4 GB di memoria.
         if mandati < v.dimensione {
-            let zeri = vec![0u8; (v.dimensione - mandati) as usize];
-            s.write_all(&zeri)?;
+            io::copy(&mut io::repeat(0).take(v.dimensione - mandati), s)?;
         }
     }
     s.flush()
@@ -833,29 +938,53 @@ fn leggibile(path: &Path) -> bool {
     }
 }
 
+/// Quante richieste di invio possono aspettare insieme una risposta.
+const MASSIMO_IN_ATTESA: usize = 8;
+
+/// I nomi di primo livello (in ordine, senza doppioni) e i byte totali di
+/// ciò che un invio annuncia, contati da chi riceve.
+pub(crate) fn riepilogo(voci: &[Voce]) -> (Vec<String>, u64) {
+    let mut primi: Vec<String> = Vec::new();
+    for v in voci {
+        let primo = rel_sicuro(&v.rel)
+            .and_then(|r| r.components().next().map(|c| c.as_os_str().to_string_lossy().into_owned()));
+        if let Some(p) = primo.filter(|p| !primi.contains(p)) {
+            primi.push(p);
+        }
+    }
+    let totale = voci.iter().filter(|v| !v.cartella).fold(0u64, |t, v| t.saturating_add(v.dimensione));
+    (primi, totale)
+}
+
 fn ricevi<S: Read + Write>(
     avvisi: Avvisi,
     lan: Arc<Lan>,
     s: &mut S,
     da: String,
     voci: Vec<Voce>,
-    totale: u64,
+    // Quello che chi invia dichiara: non lo si usa, vedi `riepilogo`.
+    _dichiarato: u64,
 ) -> io::Result<()> {
     // Tutti i path vengono controllati prima di chiedere il consenso.
     if voci.iter().any(|v| rel_sicuro(&v.rel).is_none_or(|r| r.as_os_str().is_empty())) {
         return scrivi_json(s, &Risposta::errore("Richiesta non valida."));
     }
 
+    // Il nome e il totale li decide chi invia: nel riquadro del consenso va
+    // ciò che arriva davvero, e un nome senza caratteri che lo travestano.
+    let (primi, totale) = riepilogo(&voci);
+    let da = crate::amici::nome_sicuro(&da, "PC sconosciuto");
+
     let id = lan.prossima.fetch_add(1, Ordering::Relaxed);
     let (tx, rx) = mpsc::channel();
-    if let Ok(mut m) = lan.richieste.lock() {
-        m.insert(id, tx);
+    // Ogni richiesta in attesa tiene un thread per due minuti: non se ne
+    // accumulano più di qualcuna.
+    let accolta = lan.richieste.lock().is_ok_and(|mut m| {
+        (m.len() < MASSIMO_IN_ATTESA).then(|| m.insert(id, tx)).is_some()
+    });
+    if !accolta {
+        return scrivi_json(s, &Risposta::errore("Il destinatario ha già troppe richieste in attesa."));
     }
-    let primi: Vec<String> = voci
-        .iter()
-        .filter(|v| !v.rel.contains('/'))
-        .map(|v| v.rel.clone())
-        .collect();
     avvisa(
         &avvisi,
         "lan-richiesta",
@@ -1000,12 +1129,12 @@ pub fn scarica(
         let mut s = connetti(lan, &id)?;
         scrivi_json(&mut s, &Richiesta::Scarica { path: rel }).map_err(errore_io)?;
         let r = controlla(leggi_json(&mut s).map_err(errore_io)?)?;
-        let totale: u64 = r.contenuto.iter().map(|v| v.dimensione).sum();
+        let totale = riepilogo(&r.contenuto).1;
         let arrivo = prendi_file(&mut s, Path::new(dest), &r.contenuto, annulla, &mut |f| {
-            avanzamento(gia + f, gia + totale)
+            avanzamento(gia.saturating_add(f), gia.saturating_add(totale))
         })
         .map_err(errore_io)?;
-        gia += totale;
+        gia = gia.saturating_add(totale);
         bloccati.extend(arrivo.bloccati);
         if let Some(c) = arrivo.creati.first() {
             coppie.push([sorgente.clone(), paths::display(c)]);
@@ -1066,6 +1195,43 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
+    fn un_intestazione_che_promette_tanto_e_manda_poco_e_un_errore() {
+        // 16 MiB annunciati, dieci byte mandati: errore, senza aspettare
+        // né tenere da parte i 16 MiB.
+        let mut flusso = (16u32 * 1024 * 1024).to_be_bytes().to_vec();
+        flusso.extend_from_slice(b"0123456789");
+        let esito: io::Result<Risposta> = leggi_json(&mut flusso.as_slice());
+        assert_eq!(esito.unwrap_err().kind(), io::ErrorKind::UnexpectedEof);
+    }
+
+    #[test]
+    fn il_riquadro_del_consenso_conta_cio_che_arriva_davvero() {
+        let voce = |rel: &str, dimensione: u64, cartella: bool| Voce { rel: rel.into(), dimensione, cartella };
+        // Chi invia dichiara «1 KB» e una sola cartella, ma annuncia di più:
+        // anche voci con la barra rovescia, che prima non si contavano.
+        let voci = vec![
+            voce("foto", 0, true),
+            voce("foto/a.jpg", 3_000_000, false),
+            voce("nascosto\\b.bin", 5_000_000_000, false),
+            voce("nota.txt", 10, false),
+        ];
+        let (primi, totale) = riepilogo(&voci);
+        assert_eq!(primi, vec!["foto", "nascosto", "nota.txt"]);
+        assert_eq!(totale, 5_003_000_010);
+        // Una somma che trabocca resta il massimo, senza panico.
+        assert_eq!(riepilogo(&[voce("a", u64::MAX, false), voce("b", 5, false)]).1, u64::MAX);
+    }
+
+    #[test]
+    fn le_connessioni_contemporanee_hanno_un_tetto() {
+        let contatore = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let posti: Vec<_> = (0..MASSIMO_CONNESSIONI).map(|_| Posto::prendi(&contatore).unwrap()).collect();
+        assert!(Posto::prendi(&contatore).is_none());
+        drop(posti);
+        assert!(Posto::prendi(&contatore).is_some());
+    }
+
+    #[test]
     fn i_path_dalla_rete_non_escono_dalla_cartella() {
         assert_eq!(rel_sicuro("a/b.txt"), Some(PathBuf::from("a").join("b.txt")));
         assert_eq!(rel_sicuro(""), Some(PathBuf::new()));
@@ -1073,6 +1239,13 @@ mod tests {
         assert_eq!(rel_sicuro("a/../../x"), None);
         assert_eq!(rel_sicuro("C:/Windows"), None);
         assert_eq!(rel_sicuro("a\\..\\x"), None);
+        // Nomi che Windows riserva, e punti o spazi finali: col prefisso
+        // \\?\ si creerebbero davvero, ed Esplora non riuscirebbe a toglierli.
+        for cattivo in ["CON", "a/nul", "COM1.txt", "lpt9.log", "aux.", "x/nota.txt.", "spazio "] {
+            assert_eq!(rel_sicuro(cattivo), None, "{cattivo}");
+        }
+        assert!(rel_sicuro("console.txt").is_some());
+        assert!(rel_sicuro("COM10.txt").is_some());
     }
 
     #[test]
@@ -1085,6 +1258,29 @@ mod tests {
         assert!(dentro(&radice, "sotto").is_some());
         assert!(dentro(&radice, "").is_some());
         assert!(dentro(&radice, "../fuori.txt").is_none());
+    }
+
+    /// Nell'elenco i nascosti non c'erano, ma chi ne conosceva il path li
+    /// scaricava lo stesso (per esempio la chiave degli Amici in AppData).
+    #[cfg(windows)]
+    #[test]
+    fn i_nascosti_della_cartella_condivisa_non_si_scaricano() {
+        let d = tempdir().unwrap();
+        let radice = d.path().join("condivisa");
+        let segreta = radice.join("AppData");
+        fs::create_dir_all(&segreta).unwrap();
+        fs::write(segreta.join("amici.key"), b"chiave").unwrap();
+        fs::write(radice.join("foto.jpg"), b"x").unwrap();
+        let nascondi = std::process::Command::new("attrib").arg("+h").arg(&segreta).status().unwrap();
+        assert!(nascondi.success());
+
+        assert!(condiviso(&radice, "AppData/amici.key").is_none());
+        assert!(condiviso(&radice, "AppData").is_none());
+        assert!(condiviso(&radice, "foto.jpg").is_some());
+        // Scaricando tutta la cartella, il nascosto resta fuori.
+        let voci: Vec<String> = piano_condiviso(&radice).into_iter().map(|v| v.rel).collect();
+        assert!(voci.iter().any(|r| r.ends_with("foto.jpg")));
+        assert!(!voci.iter().any(|r| r.contains("AppData")));
     }
 
     #[test]
@@ -1263,6 +1459,21 @@ mod tests {
     fn presenta(chi: &Lan, altro: &Lan, porta: u16) {
         let p = Pari { id: altro.id.clone(), nome: altro.nome.clone(), ip: "127.0.0.1".into(), porta, condivisa: None };
         chi.pari.lock().unwrap().insert(altro.id.clone(), (p, Instant::now()));
+    }
+
+    #[test]
+    fn un_annuncio_non_ruba_l_identita_di_un_pc_gia_visto() {
+        let (lan, _) = pc_di_prova("IO", Config::default(), true);
+        let pari = |ip: &str| Pari { id: "SALOTTO".into(), nome: "Salotto".into(), ip: ip.into(), porta: 47821, condivisa: None };
+        lan.registra(pari("192.168.1.10"));
+        // Un altro PC si spaccia per «SALOTTO»: resta quello vero.
+        lan.registra(pari("192.168.1.66"));
+        assert_eq!(lan.pari()[0].ip, "192.168.1.10");
+        // Annunci con id sempre nuovi non fanno crescere la lista senza fine.
+        for i in 0..500 {
+            lan.registra(Pari { id: format!("finto{i}"), ..pari("10.0.0.1") });
+        }
+        assert!(lan.pari().len() <= MASSIMO_PARI);
     }
 
     #[test]

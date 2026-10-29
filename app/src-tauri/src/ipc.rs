@@ -482,12 +482,15 @@ pub async fn lan_apri(
         let coppie = scarica_remoto(
             &lan,
             &amici,
-            &[path],
+            std::slice::from_ref(&path),
             &temp.to_string_lossy(),
             &std::sync::atomic::AtomicBool::new(false),
             &mut |_, _| {},
         )?;
-        let locale = coppie.first().map(|c| c[1].clone()).ok_or(FsError::NotFound)?;
+        let locale = crate::fs::provenienza::file_da_aprire(&path, &coppie)?;
+        if !std::path::Path::new(&locale).is_file() {
+            return Err(FsError::NotFound);
+        }
         open::open_default(&locale)
     })
     .await
