@@ -147,7 +147,10 @@
 		padding: 4px;
 		background: var(--hull);
 		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
+		/* Un menu è alto: a pillola diventerebbe una capsula. */
+		border-radius: min(var(--radius-sm), 14px);
+		clip-path: var(--forma-sm, none);
+		mask: var(--maschera-sm, none);
 		box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
 	}
 
@@ -160,7 +163,7 @@
 		height: 28px;
 		padding: 0 10px;
 		border: none;
-		border-radius: 6px;
+		border-radius: min(var(--radius-sm), 6px);
 		background: transparent;
 		color: var(--text);
 		font: inherit;

@@ -59,6 +59,8 @@
 		color: var(--text);
 		border: 1px solid var(--border);
 		border-radius: var(--radius);
+		clip-path: var(--forma, none);
+		mask: var(--maschera, none);
 		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
 	}
 	h2 {
@@ -124,6 +126,8 @@
 		padding: 0 16px;
 		border: 1px solid var(--accent);
 		border-radius: var(--radius-sm);
+		clip-path: var(--forma-sm, none);
+		mask: var(--maschera-sm, none);
 		background: var(--accent);
 		color: #fff;
 		font: inherit;

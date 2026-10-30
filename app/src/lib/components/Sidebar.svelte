@@ -348,6 +348,8 @@
 		padding: 0 8px;
 		border: 1px solid var(--accent);
 		border-radius: var(--radius-sm);
+		clip-path: var(--forma-sm, none);
+		mask: var(--maschera-sm, none);
 		background: var(--bg);
 		color: var(--text);
 		font: inherit;
@@ -378,6 +380,8 @@
 		padding: 0 12px 0 22px;
 		border: none;
 		border-radius: var(--radius-sm);
+		clip-path: var(--forma-sm, none);
+		mask: var(--maschera-sm, none);
 		--nodo: var(--rail-metal);
 		--nodo-dentro: var(--surface);
 		background-color: transparent;

@@ -117,6 +117,8 @@
 		padding: 0 16px;
 		border: 1px solid var(--border);
 		border-radius: var(--radius-sm);
+		clip-path: var(--forma-sm, none);
+		mask: var(--maschera-sm, none);
 		background: transparent;
 		color: var(--text);
 		font: inherit;

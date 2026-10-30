@@ -61,15 +61,18 @@ body {
 	flex-direction: column;
 	height: 100vh;
 	background: var(--bg);
-	border: 1px solid var(--border);
+	border: var(--cornice, 1px solid var(--border));
 	border-radius: var(--radius);
+	clip-path: var(--forma, none);
+	mask: var(--maschera, none);
 	overflow: hidden;
 }
 
-/* Il focus da tastiera deve restare visibile ovunque. */
+/* Il focus da tastiera deve restare visibile ovunque. Con gli angoli
+   ritagliati il contorno va dentro, o il ritaglio lo nasconde. */
 :focus-visible {
 	outline: 2px solid var(--current);
-	outline-offset: 2px;
+	outline-offset: var(--fuoco-scarto, 2px);
 }
 
 ::-webkit-scrollbar {

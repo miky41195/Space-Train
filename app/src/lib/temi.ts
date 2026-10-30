@@ -27,6 +27,50 @@ export interface Forme {
 	 * pixel sulla stessa base del testo. Assente = segue `dimensione`.
 	 */
 	dimensioneTitoli?: number;
+	/** Come finiscono gli angoli; il raggio diventa la misura del taglio. */
+	angolo: Angolo;
+	/** Il profilo delle schede nella testata. */
+	scheda: Scheda;
+	/** Il disegno nel cielo della testata e della linea principale. */
+	cielo: Cielo;
+	/** Il bordo della finestra. */
+	cornice: Cornice;
+}
+
+export type Angolo = 'tondo' | 'smusso' | 'tacca' | 'pillola';
+export type Scheda = 'tetto' | 'trapezio' | 'arco' | 'pillola';
+export type Cielo = 'stelle' | 'griglia' | 'bolle' | 'curve' | 'ventagli' | 'nessuno';
+export type Cornice = 'filo' | 'doppia';
+
+/** Le scelte di forma con il nome che l'editor mostra. */
+export const ANGOLI: readonly { valore: Angolo; nome: string }[] = [
+	{ valore: 'tondo', nome: 'Arrotondati' },
+	{ valore: 'smusso', nome: 'Smussati' },
+	{ valore: 'tacca', nome: 'A tacca' },
+	{ valore: 'pillola', nome: 'A pillola' }
+];
+export const SCHEDE: readonly { valore: Scheda; nome: string }[] = [
+	{ valore: 'tetto', nome: 'A tetto' },
+	{ valore: 'trapezio', nome: 'A trapezio' },
+	{ valore: 'arco', nome: 'Ad arco' },
+	{ valore: 'pillola', nome: 'A pillola' }
+];
+export const CIELI: readonly { valore: Cielo; nome: string }[] = [
+	{ valore: 'stelle', nome: 'Stelle (solo temi scuri)' },
+	{ valore: 'griglia', nome: 'Griglia' },
+	{ valore: 'bolle', nome: 'Bolle' },
+	{ valore: 'curve', nome: 'Curve di livello' },
+	{ valore: 'ventagli', nome: 'Ventagli' },
+	{ valore: 'nessuno', nome: 'Nessuno' }
+];
+export const CORNICI: readonly { valore: Cornice; nome: string }[] = [
+	{ valore: 'filo', nome: 'Filo sottile' },
+	{ valore: 'doppia', nome: 'Doppio filo' }
+];
+
+/** Il valore se è una delle scelte ammesse, altrimenti quello di base. */
+function scelta<T extends string>(valore: unknown, ammessi: readonly { valore: T }[], base: T): T {
+	return ammessi.some((a) => a.valore === valore) ? (valore as T) : base;
 }
 
 export interface Tema {
@@ -57,7 +101,11 @@ export const FORME_BASE: Forme = {
 	// Uguale alla voce dell'elenco CARATTERI: l'editor la riconosce solo se
 	// la stringa coincide.
 	carattereTitoli: "'Bahnschrift', 'Segoe UI', sans-serif",
-	dimensione: 13
+	dimensione: 13,
+	angolo: 'tondo',
+	scheda: 'tetto',
+	cielo: 'stelle',
+	cornice: 'filo'
 };
 
 /** I limiti della dimensione del testo che si può scegliere, in pixel. */
@@ -227,6 +275,22 @@ export const TEMI: Tema[] = [
 	}),
 
 	// ── Mondi: colori, forme, sfondo e personaggi ──
+	mondo('cianografia', 'Cianografia', false, {
+		void: '#0a2744', hull: '#0e3257', rail: '#4f80b2', current: '#b8f0ff',
+		plasma: '#5db8ff', signal: '#ffd36b', text: '#eaf4ff', dim: '#9cb9d9'
+	}, { raggio: 12, raggioPiccolo: 5, carattereTitoli: car('Cascadia'), angolo: 'smusso', scheda: 'trapezio', cielo: 'griglia' }, 'compasso'),
+	mondo('abisso', 'Abisso', false, {
+		void: '#02121b', hull: '#06202d', rail: '#144a5c', current: '#52ffd6',
+		plasma: '#2fb4ff', signal: '#ff8ade', text: '#dcf6f3', dim: '#7fa8ab'
+	}, { raggio: 22, raggioPiccolo: 15, carattere: car('Candara'), carattereTitoli: car('Candara'), angolo: 'pillola', scheda: 'pillola', cielo: 'bolle' }, 'medusa'),
+	mondo('atlante', 'Atlante', true, {
+		void: '#e3ece6', hull: '#f7faf6', rail: '#9fb5ab', current: '#0f6a8c',
+		plasma: '#c27a1a', signal: '#b4432f', text: '#17283a', dim: '#5a6c78'
+	}, { raggio: 14, raggioPiccolo: 6, carattereTitoli: car('Georgia'), angolo: 'tacca', cielo: 'curve' }, 'mongolfiera'),
+	mondo('orient', 'Orient Express', false, {
+		void: '#0c1512', hull: '#13201b', rail: '#6b5c34', current: '#f6dc96',
+		plasma: '#cfa24a', signal: '#8fd1b8', text: '#f1ead8', dim: '#a99f86'
+	}, { raggio: 10, raggioPiccolo: 4, carattereTitoli: car('Bahnschrift'), angolo: 'smusso', scheda: 'arco', cielo: 'ventagli', cornice: 'doppia' }, 'locoOro'),
 	mondo('anime', 'Anime', false, {
 		void: '#12101f', hull: '#1c1830', rail: '#3d3566', current: '#5ee7ff',
 		plasma: '#ff5fa2', signal: '#ffd166', text: '#f5f0ff', dim: '#a59bc4'
@@ -330,23 +394,126 @@ export function variabiliPer(tema: Tema, accento: string): Record<string, string
 		// Su fondo chiaro la tinta della selezione deve essere più decisa
 		// per staccarsi dal bianco.
 		'--accent-soft': trasparente(accento, tema.chiaro ? 0.18 : 0.26),
-		'--radius': `${forme.raggio}px`,
-		'--radius-sm': `${forme.raggioPiccolo}px`,
 		'--font-ui': forme.carattere,
 		'--font-display': forme.carattereTitoli,
 		'--scala-testo': String(scalaTesto(tema)),
 		'--scala-titoli': String(scalaTitoli(tema)),
 		'--motivo': figura ? motivoFigura(figura, tema.chiaro ? 0.1 : 0.07) : 'none',
+		...variabiliForme(forme),
 		// Calcolate qui e non salvate col tema: valgono anche per i temi
 		// personali fatti prima che il cielo esistesse.
-		'--stelle': tema.chiaro
-			? 'none'
-			: stelle(
-					tema.variabili['--text'] ?? '#e9e6f0',
-					tema.variabili['--current'] ?? '#7cf5ff',
-					tema.variabili['--signal'] ?? '#ffb454'
-				)
+		...variabiliCielo(scelta(forme.cielo, CIELI, 'stelle'), tema)
 	};
+}
+
+const px = (n: number) => `${n}px`;
+
+/** Taglia i quattro angoli a 45°. */
+function poligonoSmusso(n: number): string {
+	const c = px(n);
+	return `polygon(${c} 0, calc(100% - ${c}) 0, 100% ${c}, 100% calc(100% - ${c}), calc(100% - ${c}) 100%, ${c} 100%, 0 calc(100% - ${c}), 0 ${c})`;
+}
+
+/** Scava gli angoli verso l'interno, come i cartigli delle mappe. */
+function mascheraTacca(n: number, soloSopra = false): string {
+	const angolo = (x: string, y: string) =>
+		`radial-gradient(circle at ${x} ${y}, #0000 ${px(n)}, #000 ${px(n + 0.5)}) ${x} ${y} / 51% ${soloSopra ? '100%' : '51%'} no-repeat`;
+	const sopra = [angolo('0', '0'), angolo('100%', '0')];
+	return (soloSopra ? sopra : [...sopra, angolo('0', '100%'), angolo('100%', '100%')]).join(', ');
+}
+
+/**
+ * Le variabili delle forme. Con angoli smussati o a tacca il raggio non
+ * arrotonda più: diventa la misura del taglio, e il bordo resta squadrato
+ * sotto il ritaglio. Il focus va dentro l'elemento, che il ritaglio
+ * altrimenti nasconderebbe.
+ */
+export function variabiliForme(forme: Forme): Record<string, string> {
+	const angolo = scelta(forme.angolo, ANGOLI, 'tondo');
+	const scheda = scelta(forme.scheda, SCHEDE, 'tetto');
+	const r = Math.max(0, forme.raggio);
+	const rs = Math.max(0, forme.raggioPiccolo);
+	const ritaglia = angolo === 'smusso' || angolo === 'tacca';
+	const v: Record<string, string> = {
+		'--radius': ritaglia ? '0px' : px(r),
+		'--radius-sm': ritaglia ? '0px' : angolo === 'pillola' ? '999px' : px(rs),
+		'--forma': angolo === 'smusso' ? poligonoSmusso(r) : 'none',
+		'--forma-sm': angolo === 'smusso' ? poligonoSmusso(rs) : 'none',
+		'--maschera': angolo === 'tacca' ? mascheraTacca(r) : 'none',
+		'--maschera-sm': angolo === 'tacca' ? mascheraTacca(rs) : 'none',
+		'--fuoco-scarto': ritaglia ? '-2px' : '2px',
+		'--cornice': scelta(forme.cornice, CORNICI, 'filo') === 'doppia' ? '3px double var(--rail-metal)' : '1px solid var(--border)'
+	};
+	// La scheda a tetto segue gli angoli; le altre hanno un profilo loro.
+	const tetto = Math.min(rs, 12);
+	const schede: Record<Scheda, [raggio: string, forma: string, maschera: string]> = {
+		tetto:
+			angolo === 'smusso'
+				? ['0', `polygon(${px(rs)} 0, calc(100% - ${px(rs)}) 0, 100% ${px(rs)}, 100% 100%, 0 100%, 0 ${px(rs)})`, 'none']
+				: angolo === 'tacca'
+					? ['0', 'none', mascheraTacca(rs, true)]
+					: [`${px(tetto)} ${px(tetto)} 0 0`, 'none', 'none'],
+		trapezio: ['0', 'polygon(10px 0, calc(100% - 10px) 0, 100% 100%, 0 100%)', 'none'],
+		arco: ['16px 16px 0 0 / 14px 14px 0 0', 'none', 'none'],
+		pillola: ['999px', 'none', 'none']
+	};
+	const [raggio, forma, maschera] = schede[scheda];
+	v['--scheda-raggio'] = raggio;
+	v['--scheda-forma'] = forma;
+	v['--scheda-maschera'] = maschera;
+	// La pillola si stacca dal bordo; il trapezio ha bisogno di spazio ai lati.
+	v['--scheda-altezza'] = scheda === 'pillola' ? '26px' : '32px';
+	v['--scheda-stacco'] = scheda === 'pillola' ? '4px' : '0px';
+	v['--scheda-margini'] = scheda === 'trapezio' ? '0 16px 0 20px' : scheda === 'arco' ? '0 12px 0 16px' : '0 8px 0 12px';
+	return v;
+}
+
+/** Un SVG come immagine di sfondo. */
+const svgUrl = (l: number, a: number, corpo: string) =>
+	`url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='${l}' height='${a}'>${corpo}</svg>`)}")`;
+
+/**
+ * Il cielo della testata e della linea principale e la misura della sua
+ * tessera. Le stelle restano solo per i temi scuri: su un fondo chiaro
+ * diventerebbero sporco. Gli altri cieli sono disegnati per entrambi.
+ */
+export function variabiliCielo(cielo: Cielo, tema: Tema): Record<string, string> {
+	const testo = tema.variabili['--text'] ?? '#e9e6f0';
+	const corrente = tema.variabili['--current'] ?? '#7cf5ff';
+	const plasma = tema.variabili['--plasma'] ?? '#8b5cf6';
+	const segnale = tema.variabili['--signal'] ?? '#ffb454';
+	const tinta = tema.chiaro ? 0.16 : 0.1;
+	const v = (immagine: string, misura: string) => ({ '--stelle': immagine, '--cielo-misura': misura });
+	switch (cielo) {
+		case 'stelle':
+			return v(tema.chiaro ? 'none' : stelle(testo, corrente, segnale), '480px 40px');
+		case 'griglia':
+			return v(svgUrl(16, 16, `<path d='M0 .5H16M.5 0V16' stroke='${corrente}' stroke-opacity='${tinta}'/>`), '16px 16px');
+		case 'bolle': {
+			const bolle: [number, number, number, string, number][] = [
+				[29, 28, 1.5, corrente, 0.5], [65, 12, 3, corrente, 0.22], [110, 25, 1.5, segnale, 0.4],
+				[151, 9, 2.5, plasma, 0.3], [194, 23, 4, corrente, 0.2], [223, 11, 1.2, testo, 0.35]
+			];
+			const corpo = bolle.map(([x, y, r, c, o]) => `<circle cx='${x}' cy='${y}' r='${r}' fill='${c}' fill-opacity='${o}'/>`).join('');
+			return v(svgUrl(240, 40, corpo), '240px 40px');
+		}
+		case 'curve':
+			return v(
+				svgUrl(
+					300,
+					40,
+					`<g fill='none' stroke='${corrente}' stroke-opacity='${tema.chiaro ? 0.14 : 0.12}'><path d='M-10 30C40 10 80 38 130 22S220 6 310 26'/><path d='M-10 36C40 18 85 44 135 30S225 14 310 33'/><path d='M-10 22C35 2 78 30 125 14S215-2 310 18'/><ellipse cx='200' cy='20' rx='22' ry='8'/><ellipse cx='200' cy='20' rx='12' ry='4'/></g>`
+				),
+				'300px 40px'
+			);
+		case 'ventagli':
+			return v(
+				svgUrl(34, 20, `<path d='M11 20a6 6 0 0 1 12 0M6 20a11 11 0 0 1 22 0M1 20a16 16 0 0 1 32 0' fill='none' stroke='${plasma}' stroke-opacity='0.3'/>`),
+				'34px 20px'
+			);
+		case 'nessuno':
+			return v('none', '480px 40px');
+	}
 }
 
 /** Applica tema e accento al documento. */

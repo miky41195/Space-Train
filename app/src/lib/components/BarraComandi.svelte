@@ -211,6 +211,8 @@
 	button {
 		border: none;
 		border-radius: var(--radius-sm);
+		clip-path: var(--forma-sm, none);
+		mask: var(--maschera-sm, none);
 		background: transparent;
 		color: var(--text);
 		font: inherit;

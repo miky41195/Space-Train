@@ -163,6 +163,8 @@
 		height: 28px;
 		border: none;
 		border-radius: var(--radius-sm);
+		clip-path: var(--forma-sm, none);
+		mask: var(--maschera-sm, none);
 		background: transparent;
 		color: var(--text-dim);
 		cursor: default;
@@ -190,6 +192,8 @@
 		padding: 0 10px;
 		border: 1px solid var(--accent);
 		border-radius: var(--radius-sm);
+		clip-path: var(--forma-sm, none);
+		mask: var(--maschera-sm, none);
 		background: var(--bg);
 		color: var(--text);
 		font: inherit;
@@ -204,6 +208,8 @@
 		padding: 0 10px;
 		border: 1px solid var(--border);
 		border-radius: var(--radius-sm);
+		clip-path: var(--forma-sm, none);
+		mask: var(--maschera-sm, none);
 		background: var(--bg);
 		color: var(--text-dim);
 		font: inherit;

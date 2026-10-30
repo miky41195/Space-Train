@@ -182,6 +182,8 @@
 		color: var(--text);
 		border: 1px solid var(--border);
 		border-radius: var(--radius);
+		clip-path: var(--forma, none);
+		mask: var(--maschera, none);
 		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
 	}
 	h2 {
@@ -214,7 +216,10 @@
 	.codice {
 		padding: 8px 10px;
 		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
+		/* Il codice va su due righe: a pillola diventerebbe un ovale. */
+		border-radius: min(var(--radius-sm), 12px);
+		clip-path: var(--forma-sm, none);
+		mask: var(--maschera-sm, none);
 		background: var(--bg);
 		font-family: ui-monospace, Consolas, monospace;
 		font-size: calc(12px * var(--scala-testo, 1));
@@ -231,7 +236,8 @@
 		width: 200px;
 		margin-top: 10px;
 		padding: 8px;
-		border-radius: var(--radius-sm);
+		/* Niente ritagli: il QR deve restare leggibile fino agli angoli. */
+		border-radius: min(var(--radius-sm), 8px);
 		background: #fff;
 	}
 	.qr :global(svg) {
@@ -245,6 +251,8 @@
 		padding: 0 8px;
 		border: 1px solid var(--border);
 		border-radius: var(--radius-sm);
+		clip-path: var(--forma-sm, none);
+		mask: var(--maschera-sm, none);
 		background: var(--bg);
 		color: var(--text);
 		font: inherit;
@@ -305,6 +313,8 @@
 		padding: 0 12px;
 		border: 1px solid var(--border);
 		border-radius: var(--radius-sm);
+		clip-path: var(--forma-sm, none);
+		mask: var(--maschera-sm, none);
 		background: transparent;
 		color: var(--text);
 		font: inherit;

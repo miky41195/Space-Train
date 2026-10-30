@@ -122,6 +122,8 @@
 		gap: 6px;
 		padding: 8px 6px;
 		border-radius: var(--radius-sm);
+		clip-path: var(--forma-sm, none);
+		mask: var(--maschera-sm, none);
 		cursor: default;
 		user-select: none;
 	}

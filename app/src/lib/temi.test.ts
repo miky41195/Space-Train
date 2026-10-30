@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TEMI, variabiliPer, trasparente, temaDa, coloreAccento, variabiliDa, CARATTERI, FORME_BASE, scalaTesto, scalaTitoli } from './temi';
+import { TEMI, variabiliPer, trasparente, temaDa, coloreAccento, variabiliDa, CARATTERI, FORME_BASE, scalaTesto, scalaTitoli, variabiliForme, variabiliCielo, type Forme } from './temi';
 import { FIGURE, CORTEI, svgFigura, motivoFigura, misuraFigura } from './figure';
 
 describe('temi', () => {
@@ -138,5 +138,54 @@ describe('caratteri', () => {
 		expect(scalaTitoli(diversi)).toBe(18 / 13);
 		expect(scalaTesto(diversi)).toBe(1);
 		expect(scalaTitoli({ ...t, forme: { dimensioneTitoli: 40 } })).toBe(24 / 13);
+	});
+});
+
+describe('forme', () => {
+	const spazio = TEMI[0];
+
+	it('un tema senza forme nuove resta com era: raggi, nessun ritaglio, schede a tetto', () => {
+		const v = variabiliPer(spazio, '#8b5cf6');
+		expect(v['--radius']).toBe('12px');
+		expect(v['--radius-sm']).toBe('8px');
+		expect(v['--forma']).toBe('none');
+		expect(v['--maschera-sm']).toBe('none');
+		expect(v['--scheda-raggio']).toBe('8px 8px 0 0');
+		expect(v['--cornice']).toBe('1px solid var(--border)');
+		expect(v['--fuoco-scarto']).toBe('2px');
+	});
+
+	it('con gli angoli smussati il raggio diventa la misura del taglio', () => {
+		const v = variabiliForme({ ...FORME_BASE, angolo: 'smusso', raggioPiccolo: 5 });
+		expect(v['--radius-sm']).toBe('0px');
+		expect(v['--forma-sm']).toContain('polygon(5px 0');
+		expect(v['--fuoco-scarto']).toBe('-2px');
+	});
+
+	it('a pillola i controlli diventano capsule', () => {
+		expect(variabiliForme({ ...FORME_BASE, angolo: 'pillola' })['--radius-sm']).toBe('999px');
+	});
+
+	it('un valore sconosciuto in un tema salvato torna a quello di base', () => {
+		const strano = { ...FORME_BASE, angolo: 'esploso', scheda: '"><script>' } as unknown as Forme;
+		const v = variabiliForme(strano);
+		expect(v['--forma']).toBe('none');
+		expect(v['--scheda-forma']).toBe('none');
+	});
+
+	it('le stelle solo al buio; gli altri cieli anche sui temi chiari', () => {
+		const chiaro = TEMI.find((t) => t.chiaro)!;
+		expect(variabiliCielo('stelle', chiaro)['--stelle']).toBe('none');
+		expect(variabiliCielo('curve', chiaro)['--stelle']).toContain('data:image/svg+xml');
+		expect(variabiliCielo('griglia', spazio)['--cielo-misura']).toBe('16px 16px');
+		expect(variabiliCielo('nessuno', spazio)['--stelle']).toBe('none');
+	});
+
+	it('i mondi nuovi hanno corteo e motivo fatti di figure esistenti', () => {
+		for (const id of ['cianografia', 'abisso', 'atlante', 'orient']) {
+			const t = TEMI.find((x) => x.id === id)!;
+			expect(t, id).toBeDefined();
+			for (const f of [...(t.corteo ?? []), t.motivo!]) expect(FIGURE[f], `${id}: ${f}`).toBeDefined();
+		}
 	});
 });

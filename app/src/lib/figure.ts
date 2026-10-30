@@ -512,6 +512,130 @@ export const FIGURE: Record<string, Figura> = {
 		'.....n.....'
 	]),
 
+	// ── Cianografia: strumenti da disegno tecnico ──
+	trenoFilo: F('Treno in fil di ferro', { w: '#e6f6ff', d: '#5db8ff', y: '#ffd36b' }, [
+		'.ww...........',
+		'.ww...wwwwwww.',
+		'wwwwwww.....w.',
+		'w.....w.dd..wy',
+		'w.....w.dd..w.',
+		'wwwwwwwwwwwwww',
+		'.w..w.....w..w',
+		'.d..d.....d..d'
+	]),
+	compasso: F('Compasso', { w: '#e6f6ff', d: '#5db8ff', y: '#ffd36b' }, [
+		'....d....',
+		'...ddd...',
+		'....w....',
+		'...w.w...',
+		'...w.w...',
+		'..w...w..',
+		'..w...w..',
+		'.w.....w.',
+		'.d.....y.'
+	]),
+	squadra: F('Squadra', { w: '#e6f6ff', d: '#5db8ff' }, [
+		'w.........',
+		'ww........',
+		'w.w.......',
+		'w..w......',
+		'w.d.w.....',
+		'w.dd.w....',
+		'w.....w...',
+		'wwwwwwww..',
+		'.d.d.d.d..'
+	]),
+
+	// ── Abisso: creature del fondale ──
+	medusa: F('Medusa', { b: '#52ffd6', l: '#c9fff1', p: '#ff8ade' }, [
+		'...bbbbb...',
+		'..bbllbbb..',
+		'.bbllbbbbb.',
+		'.bbbbbbbbb.',
+		'.pbpbpbpbp.',
+		'.p.b.p.b.p.',
+		'.b.p.b.p.b.',
+		'.p...p...p.'
+	]),
+	pesceLanterna: F('Pesce lanterna', { b: '#2fb4ff', n: '#0e5f86', y: '#fff3a0', k: '#02121b', w: '#dcf6f3' }, [
+		'...........yy.',
+		'.....nnnn.y...',
+		'n..nbbbbbn....',
+		'nn.bbbbbkbb...',
+		'nnbbbbbbbbbw..',
+		'nn.bbbbbbwbw..',
+		'n..nbbbbbbn...',
+		'.....nnnn.....'
+	]),
+	cavalluccio: F('Cavalluccio marino', { s: '#ff8ade', d: '#c2589e', k: '#02121b' }, [
+		'....ssss..',
+		'...sskss..',
+		'...ssssss.',
+		'....ss....',
+		'...sss....',
+		'..dsss....',
+		'..dss.....',
+		'...ss.....',
+		'....ss.s..',
+		'.....sss..'
+	]),
+
+	// ── Atlante: viaggi su carta ──
+	aeroplanino: F('Aeroplanino di carta', { w: '#ffffff', g: '#9fb5ab', k: '#17283a' }, [
+		'k.............',
+		'wwk...........',
+		'.wwwwk........',
+		'..wwwwwwwk....',
+		'...wwwwwwwwwwk',
+		'..ggggggggk...',
+		'.ggggk........',
+		'ggk...........'
+	]),
+	mongolfiera: F('Mongolfiera', { o: '#c27a1a', b: '#0f6a8c', w: '#f7faf6', r: '#17283a', k: '#7a4a1e' }, [
+		'...oooo...',
+		'..obwbwo..',
+		'.obwbwbwo.',
+		'.obwbwbwo.',
+		'..obwbwo..',
+		'...obwo...',
+		'...r..r...',
+		'...kkkk...',
+		'...kkkk...'
+	]),
+	faro: F('Faro', { y: '#ffd36b', k: '#17283a', w: '#f7faf6', r: '#b4432f' }, [
+		'..yyy..',
+		'.kkkkk.',
+		'..www..',
+		'..rrr..',
+		'..www..',
+		'.rrrrr.',
+		'.wwwww.',
+		'.rrrrr.',
+		'kkkkkkk'
+	]),
+
+	// ── Orient Express: il treno di lusso ──
+	locoOro: F('Locomotiva a vapore', { v: '#2e6a50', g: '#cfa24a', d: '#f6dc96', f: '#cfc8b4', k: '#0c1512' }, [
+		'......fff.........',
+		'........fff.......',
+		'..........gg......',
+		'vvvv......vv......',
+		'vdgv.vvvvvvvvvv...',
+		'vvvvvgggggggggvv..',
+		'vvvvvvvvvvvvvvvvg.',
+		'vvvvvvvvvvvvvvvvgg',
+		'.gg..gg....gg.....'
+	]),
+	carrozzaOro: F('Carrozza letto', { b: '#7a4a22', g: '#cfa24a', d: '#f6dc96', k: '#0c1512' }, [
+		'.gggggggggggggggg.',
+		'gbbbbbbbbbbbbbbbbg',
+		'gbddbbddbbddbbddbg',
+		'gbddbbddbbddbbddbg',
+		'gbbbbbbbbbbbbbbbbg',
+		'gggggggggggggggggg',
+		'..gg..gg....gg..gg'
+	]),
+
 	// ── Treno (per l'editor: il convoglio originale si sceglie a parte) ──
 	vagone: F('Vagoncino', { p: '#8b5cf6', c: '#7cf5ff', k: '#1e1b4b', g: '#4b5563' }, [
 		'pppppppppppp',
@@ -523,6 +647,11 @@ export const FIGURE: Record<string, Figura> = {
 
 /** I personaggi di ogni mondo, nell'ordine in cui sfilano. */
 export const CORTEI: Record<string, string[]> = {
+	// Chi apre la fila è l'ultimo: il corteo avanza verso destra.
+	cianografia: ['compasso', 'squadra', 'compasso', 'trenoFilo'],
+	abisso: ['medusa', 'cavalluccio', 'medusa', 'pesceLanterna'],
+	atlante: ['mongolfiera', 'faro', 'mongolfiera', 'aeroplanino'],
+	orient: ['carrozzaOro', 'carrozzaOro', 'carrozzaOro', 'locoOro'],
 	anime: ['ragazzaRosa', 'ragazzoPunte', 'maghetta', 'ninja'],
 	pokemon: ['scintilla', 'fiammello', 'goccino', 'germoglio'],
 	gatti: ['gattoArancio', 'gattoNero', 'gattoBianco', 'gattoGrigio'],

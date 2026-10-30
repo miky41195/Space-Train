@@ -234,6 +234,8 @@
 		padding: 0 12px;
 		gap: 8px;
 		border-radius: var(--radius-sm);
+		clip-path: var(--forma-sm, none);
+		mask: var(--maschera-sm, none);
 		cursor: default;
 		color: var(--text);
 		font-size: calc(13px * var(--scala-testo, 1));

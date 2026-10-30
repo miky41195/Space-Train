@@ -113,12 +113,12 @@
 		flex-shrink: 0;
 	}
 	/* Il pezzo di cielo che il convoglio attraversa: fondo dello spazio e
-	   stelle in pixel (solo nei temi scuri, vedi `stelle` in temi.ts). */
+	   il disegno del tema (stelle, griglia, bolle…: `variabiliCielo`). */
 	.titlebar::before {
 		content: '';
 		position: absolute;
 		inset: 0;
-		background: var(--stelle, none) 0 0 / 480px 40px repeat-x, var(--bg);
+		background: var(--stelle, none) 0 0 / var(--cielo-misura, 480px 40px) repeat, var(--bg);
 		pointer-events: none;
 	}
 	.marchio,
@@ -152,19 +152,24 @@
 	}
 	.tabs.bersaglio {
 		border-radius: var(--radius-sm);
+		clip-path: var(--forma-sm, none);
+		mask: var(--maschera-sm, none);
 		box-shadow: inset 0 0 0 1px var(--current);
 	}
-	/* Le schede poggiano sul bordo inferiore della testata: arrotondate solo
-	   in alto, come una porta sulla fiancata. */
+	/* Le schede poggiano sul bordo inferiore della testata; il profilo
+	   (tetto, trapezio, arco, pillola) viene dal tema: `variabiliForme`. */
 	.tab {
 		display: flex;
 		align-items: center;
 		gap: 8px;
 		max-width: 180px;
-		height: 32px;
-		padding: 0 8px 0 12px;
+		height: var(--scheda-altezza, 32px);
+		margin-bottom: var(--scheda-stacco, 0px);
+		padding: var(--scheda-margini, 0 8px 0 12px);
 		border: none;
-		border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+		border-radius: var(--scheda-raggio, var(--radius-sm) var(--radius-sm) 0 0);
+		clip-path: var(--scheda-forma, none);
+		mask: var(--scheda-maschera, none);
 		background: transparent;
 		color: var(--text-dim);
 		font: inherit;
@@ -204,6 +209,8 @@
 		height: 28px;
 		border: none;
 		border-radius: var(--radius-sm);
+		clip-path: var(--forma-sm, none);
+		mask: var(--maschera-sm, none);
 		background: transparent;
 		color: var(--text-dim);
 		font-size: calc(16px * var(--scala-testo, 1));

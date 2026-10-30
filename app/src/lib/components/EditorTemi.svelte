@@ -6,10 +6,18 @@
 		FORME_BASE,
 		DIMENSIONE_MIN,
 		DIMENSIONE_MAX,
+		ANGOLI,
+		SCHEDE,
+		CIELI,
+		CORNICI,
 		variabiliDa,
 		temaDa,
 		type Tema,
-		type TemaPersonale
+		type TemaPersonale,
+		type Angolo,
+		type Scheda,
+		type Cielo,
+		type Cornice
 	} from '../temi';
 	import { FIGURE, svgFigura } from '../figure';
 	import { convertFileSrc } from '@tauri-apps/api/core';
@@ -109,6 +117,10 @@
 	let carattereTitoli = $state(FORME_BASE.carattereTitoli);
 	let dimensione = $state(FORME_BASE.dimensione);
 	let dimensioneTitoli = $state(FORME_BASE.dimensione);
+	let angolo = $state<Angolo>(FORME_BASE.angolo);
+	let scheda = $state<Scheda>(FORME_BASE.scheda);
+	let cielo = $state<Cielo>(FORME_BASE.cielo);
+	let cornice = $state<Cornice>(FORME_BASE.cornice);
 	let corteoTipo = $state<'treno' | 'figure' | 'immagini'>('treno');
 	let figure = $state<string[]>([]);
 	let immagini = $state<string[]>([]);
@@ -146,6 +158,10 @@
 		carattereTitoli = t.forme?.carattereTitoli ?? FORME_BASE.carattereTitoli;
 		dimensione = t.forme?.dimensione ?? FORME_BASE.dimensione;
 		dimensioneTitoli = t.forme?.dimensioneTitoli ?? dimensione;
+		angolo = t.forme?.angolo ?? FORME_BASE.angolo;
+		scheda = t.forme?.scheda ?? FORME_BASE.scheda;
+		cielo = t.forme?.cielo ?? FORME_BASE.cielo;
+		cornice = t.forme?.cornice ?? FORME_BASE.cornice;
 		const voci = t.corteo ?? [];
 		const lette = voci.map((v) => leggiMovimento(v));
 		const mie = lette.filter((l) => mia(l.voce));
@@ -192,7 +208,7 @@
 		chiaro,
 		gruppo: 'personale',
 		variabili: variabiliDa(tavolozza, chiaro),
-		forme: { raggio, raggioPiccolo, carattere, carattereTitoli, dimensione, dimensioneTitoli },
+		forme: { raggio, raggioPiccolo, carattere, carattereTitoli, dimensione, dimensioneTitoli, angolo, scheda, cielo, cornice },
 		corteo:
 			corteoTipo === 'treno'
 				? undefined
@@ -469,6 +485,38 @@
 					<span>Arrotondamento righe e pulsanti</span>
 					<input type="range" min="0" max="20" bind:value={raggioPiccolo} aria-label="Arrotondamento righe" />
 					<output>{raggioPiccolo}px</output>
+				</label>
+				<label class="riga">
+					<span>Angoli</span>
+					<select bind:value={angolo} aria-label="Angoli">
+						{#each ANGOLI as a (a.valore)}
+							<option value={a.valore}>{a.nome}</option>
+						{/each}
+					</select>
+				</label>
+				<label class="riga">
+					<span>Schede</span>
+					<select bind:value={scheda} aria-label="Schede">
+						{#each SCHEDE as s (s.valore)}
+							<option value={s.valore}>{s.nome}</option>
+						{/each}
+					</select>
+				</label>
+				<label class="riga">
+					<span>Cielo</span>
+					<select bind:value={cielo} aria-label="Cielo">
+						{#each CIELI as c (c.valore)}
+							<option value={c.valore}>{c.nome}</option>
+						{/each}
+					</select>
+				</label>
+				<label class="riga">
+					<span>Cornice della finestra</span>
+					<select bind:value={cornice} aria-label="Cornice della finestra">
+						{#each CORNICI as c (c.valore)}
+							<option value={c.valore}>{c.nome}</option>
+						{/each}
+					</select>
 				</label>
 				<label class="riga">
 					<span>Dimensione del testo</span>

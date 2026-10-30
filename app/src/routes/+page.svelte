@@ -2456,7 +2456,7 @@
 		position: relative;
 		flex-shrink: 0;
 		z-index: 3;
-		background: var(--stelle, none) 210px 0 / 480px 40px repeat, var(--bg);
+		background: var(--stelle, none) 210px 0 / var(--cielo-misura, 480px 40px) repeat, var(--bg);
 	}
 	/* Il binario è decorazione: il clic passa al contenitore, che sposta
 	   la finestra. */
