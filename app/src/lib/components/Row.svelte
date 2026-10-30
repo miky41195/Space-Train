@@ -316,11 +316,11 @@
 		color: var(--accent);
 		font-weight: 600;
 	}
-	/* Numeri in DIN, come le cifre di un orario ferroviario. */
+	/* Testo secondario: carattere del corpo, non quello dei titoli (che il
+	   tema può cambiare). Cifre tabellari perché le colonne restino in fila. */
 	.size,
 	.date {
 		color: var(--text-dim);
-		font-family: var(--font-display);
 		font-variant-numeric: tabular-nums;
 		text-align: right;
 	}

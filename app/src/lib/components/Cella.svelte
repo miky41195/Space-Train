@@ -192,7 +192,6 @@
 	.info,
 	.data {
 		color: var(--text-dim);
-		font-family: var(--font-display);
 		font-variant-numeric: tabular-nums;
 		font-size: calc(11px * var(--scala-testo, 1));
 		white-space: nowrap;

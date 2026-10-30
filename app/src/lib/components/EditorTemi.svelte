@@ -439,10 +439,13 @@
 				<h3>Colori</h3>
 				<div class="colori">
 					{#each COLORI as [k, , etichetta] (k)}
-						<label class="colore">
+						<!-- Non una label: occuperebbe tutta la colonna e un clic
+						     ovunque nella riga aprirebbe il selettore. Si apre solo
+						     dal quadratino. -->
+						<div class="colore">
 							<input type="color" bind:value={tavolozza[k]} aria-label={etichetta} />
-							<span>{etichetta}</span>
-						</label>
+							<span aria-hidden="true">{etichetta}</span>
+						</div>
 					{/each}
 				</div>
 			</section>
