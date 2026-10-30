@@ -18,10 +18,15 @@ export interface Forme {
 	/** Carattere di titoli, intestazioni ed etichette. */
 	carattereTitoli: string;
 	/**
-	 * Dimensione del testo normale, in pixel. Tutti gli altri testi (titoli,
-	 * note, etichette) crescono e calano nella stessa proporzione.
+	 * Dimensione del testo normale, in pixel. Note ed etichette crescono e
+	 * calano nella stessa proporzione.
 	 */
 	dimensione: number;
+	/**
+	 * Dimensione dei titoli (tutto ciò che usa il carattere dei titoli), in
+	 * pixel sulla stessa base del testo. Assente = segue `dimensione`.
+	 */
+	dimensioneTitoli?: number;
 }
 
 export interface Tema {
@@ -61,7 +66,16 @@ export const DIMENSIONE_MAX = 24;
 
 /** Quanto il testo del tema è più grande (o più piccolo) di quello di base. */
 export function scalaTesto(tema: Tema): number {
-	const d = tema.forme?.dimensione ?? FORME_BASE.dimensione;
+	return scala(tema.forme?.dimensione ?? FORME_BASE.dimensione);
+}
+
+/** Come `scalaTesto`, per i titoli; senza una dimensione propria seguono il testo. */
+export function scalaTitoli(tema: Tema): number {
+	const d = tema.forme?.dimensioneTitoli;
+	return d === undefined ? scalaTesto(tema) : scala(d);
+}
+
+function scala(d: number): number {
 	const valida = Number.isFinite(d) ? Math.min(DIMENSIONE_MAX, Math.max(DIMENSIONE_MIN, d)) : FORME_BASE.dimensione;
 	return valida / FORME_BASE.dimensione;
 }
@@ -321,6 +335,7 @@ export function variabiliPer(tema: Tema, accento: string): Record<string, string
 		'--font-ui': forme.carattere,
 		'--font-display': forme.carattereTitoli,
 		'--scala-testo': String(scalaTesto(tema)),
+		'--scala-titoli': String(scalaTitoli(tema)),
 		'--motivo': figura ? motivoFigura(figura, tema.chiaro ? 0.1 : 0.07) : 'none',
 		// Calcolate qui e non salvate col tema: valgono anche per i temi
 		// personali fatti prima che il cielo esistesse.

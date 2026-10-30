@@ -2560,7 +2560,6 @@
 	.stato {
 		margin-left: auto;
 		color: var(--text-dim);
-		font-family: var(--font-display);
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
 	}

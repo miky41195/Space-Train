@@ -108,6 +108,7 @@
 	let carattere = $state(FORME_BASE.carattere);
 	let carattereTitoli = $state(FORME_BASE.carattereTitoli);
 	let dimensione = $state(FORME_BASE.dimensione);
+	let dimensioneTitoli = $state(FORME_BASE.dimensione);
 	let corteoTipo = $state<'treno' | 'figure' | 'immagini'>('treno');
 	let figure = $state<string[]>([]);
 	let immagini = $state<string[]>([]);
@@ -127,6 +128,12 @@
 	let contagocce = $state<number | null>(null);
 	let esitoSfondo = $state<string | null>(null);
 
+	/** Il numero scritto nel campo, arrotondato e riportato nei limiti. */
+	function pixelValidi(scritto: string): number {
+		const n = Math.round(Number(scritto));
+		return Number.isFinite(n) ? Math.min(DIMENSIONE_MAX, Math.max(DIMENSIONE_MIN, n)) : FORME_BASE.dimensione;
+	}
+
 	/** Copia nell'editor tutto ciò che definisce `t`: colori, forme, corteo. */
 	function parti(t: Tema) {
 		chiaro = t.chiaro;
@@ -138,6 +145,7 @@
 		carattere = t.forme?.carattere ?? FORME_BASE.carattere;
 		carattereTitoli = t.forme?.carattereTitoli ?? FORME_BASE.carattereTitoli;
 		dimensione = t.forme?.dimensione ?? FORME_BASE.dimensione;
+		dimensioneTitoli = t.forme?.dimensioneTitoli ?? dimensione;
 		const voci = t.corteo ?? [];
 		const lette = voci.map((v) => leggiMovimento(v));
 		const mie = lette.filter((l) => mia(l.voce));
@@ -184,7 +192,7 @@
 		chiaro,
 		gruppo: 'personale',
 		variabili: variabiliDa(tavolozza, chiaro),
-		forme: { raggio, raggioPiccolo, carattere, carattereTitoli, dimensione },
+		forme: { raggio, raggioPiccolo, carattere, carattereTitoli, dimensione, dimensioneTitoli },
 		corteo:
 			corteoTipo === 'treno'
 				? undefined
@@ -469,8 +477,7 @@
 					<input class="pixel" type="number" min={DIMENSIONE_MIN} max={DIMENSIONE_MAX} value={dimensione}
 						aria-label="Dimensione del testo in pixel"
 						onchange={(e) => {
-							const n = Math.round(Number(e.currentTarget.value));
-							dimensione = Number.isFinite(n) ? Math.min(DIMENSIONE_MAX, Math.max(DIMENSIONE_MIN, n)) : FORME_BASE.dimensione;
+							dimensione = pixelValidi(e.currentTarget.value);
 							e.currentTarget.value = String(dimensione);
 						}} />
 					<span class="unita">px</span>
@@ -490,6 +497,18 @@
 							<option value={c.valore}>{c.nome}</option>
 						{/each}
 					</select>
+				</label>
+				<label class="riga">
+					<span>Dimensione dei titoli</span>
+					<input type="range" min={DIMENSIONE_MIN} max={DIMENSIONE_MAX} bind:value={dimensioneTitoli}
+						aria-label="Dimensione dei titoli" />
+					<input class="pixel" type="number" min={DIMENSIONE_MIN} max={DIMENSIONE_MAX} value={dimensioneTitoli}
+						aria-label="Dimensione dei titoli in pixel"
+						onchange={(e) => {
+							dimensioneTitoli = pixelValidi(e.currentTarget.value);
+							e.currentTarget.value = String(dimensioneTitoli);
+						}} />
+					<span class="unita">px</span>
 				</label>
 			</section>
 
@@ -928,12 +947,12 @@
 		margin: 0;
 		flex: 1;
 		font-family: var(--font-display);
-		font-size: calc(17px * var(--scala-testo, 1));
+		font-size: calc(17px * var(--scala-titoli, var(--scala-testo, 1)));
 	}
 	h3 {
 		margin: 0 0 8px;
 		font-family: var(--font-display);
-		font-size: calc(12px * var(--scala-testo, 1));
+		font-size: calc(12px * var(--scala-titoli, var(--scala-testo, 1)));
 		letter-spacing: 0.06em;
 		text-transform: uppercase;
 		color: var(--text-dim);

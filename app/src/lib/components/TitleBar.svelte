@@ -133,7 +133,7 @@
 		flex-shrink: 0;
 		padding: 0 12px 0 4px;
 		font-family: var(--font-display);
-		font-size: calc(12px * var(--scala-testo, 1));
+		font-size: calc(12px * var(--scala-titoli, var(--scala-testo, 1)));
 		font-weight: 600;
 		letter-spacing: 0.22em;
 		text-transform: uppercase;

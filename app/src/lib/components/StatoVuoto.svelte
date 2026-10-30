@@ -97,7 +97,7 @@
 	h2 {
 		margin: 12px 0 0;
 		font-family: var(--font-display);
-		font-size: calc(15px * var(--scala-testo, 1));
+		font-size: calc(15px * var(--scala-titoli, var(--scala-testo, 1)));
 		font-weight: 600;
 		letter-spacing: 0.14em;
 		text-transform: uppercase;

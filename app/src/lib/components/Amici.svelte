@@ -187,13 +187,13 @@
 	h2 {
 		margin: 0 0 6px;
 		font-family: var(--font-display);
-		font-size: calc(17px * var(--scala-testo, 1));
+		font-size: calc(17px * var(--scala-titoli, var(--scala-testo, 1)));
 		font-weight: 600;
 	}
 	h3 {
 		margin: 0 0 6px;
 		font-family: var(--font-display);
-		font-size: calc(11px * var(--scala-testo, 1));
+		font-size: calc(11px * var(--scala-titoli, var(--scala-testo, 1)));
 		color: var(--text-dim);
 		font-weight: 600;
 		text-transform: uppercase;

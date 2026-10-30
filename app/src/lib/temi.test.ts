@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TEMI, variabiliPer, trasparente, temaDa, coloreAccento, variabiliDa, CARATTERI, FORME_BASE, scalaTesto } from './temi';
+import { TEMI, variabiliPer, trasparente, temaDa, coloreAccento, variabiliDa, CARATTERI, FORME_BASE, scalaTesto, scalaTitoli } from './temi';
 import { FIGURE, CORTEI, svgFigura, motivoFigura, misuraFigura } from './figure';
 
 describe('temi', () => {
@@ -128,5 +128,15 @@ describe('caratteri', () => {
 		expect(scalaTesto(grande)).toBe(24 / 13);
 		expect(scalaTesto({ ...t, forme: { dimensione: 2 } })).toBe(9 / 13);
 		expect(scalaTesto({ ...t, forme: { dimensione: Number.NaN } })).toBe(1);
+	});
+
+	it('i titoli hanno una scala propria, che senza valore segue il testo', () => {
+		const t = TEMI[0];
+		expect(variabiliPer(t, '#8b5cf6')['--scala-titoli']).toBe('1');
+		expect(scalaTitoli({ ...t, forme: { dimensione: 26 } })).toBe(24 / 13);
+		const diversi = { ...t, forme: { dimensione: 13, dimensioneTitoli: 18 } };
+		expect(scalaTitoli(diversi)).toBe(18 / 13);
+		expect(scalaTesto(diversi)).toBe(1);
+		expect(scalaTitoli({ ...t, forme: { dimensioneTitoli: 40 } })).toBe(24 / 13);
 	});
 });

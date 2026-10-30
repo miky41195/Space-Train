@@ -56,7 +56,7 @@
 		gap: 10px;
 		padding: 0 12px;
 		font-family: var(--font-display);
-		font-size: calc(11px * var(--scala-testo, 1));
+		font-size: calc(11px * var(--scala-titoli, var(--scala-testo, 1)));
 		letter-spacing: 0.12em;
 		text-transform: uppercase;
 		color: var(--text-dim);
