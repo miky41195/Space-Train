@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TEMI, variabiliPer, trasparente, temaDa, coloreAccento, variabiliDa, CARATTERI, FORME_BASE, scalaTesto, scalaTitoli, variabiliForme, variabiliCielo, type Forme } from './temi';
+import { TEMI, variabiliPer, trasparente, temaDa, coloreAccento, variabiliDa, CARATTERI, FORME_BASE, scalaTesto, scalaTitoli, variabiliForme, variabiliCielo, categoriaDi, CATEGORIE, type Forme } from './temi';
 import { FIGURE, CORTEI, svgFigura, motivoFigura, misuraFigura } from './figure';
 
 describe('temi', () => {
@@ -187,5 +187,21 @@ describe('forme', () => {
 			expect(t, id).toBeDefined();
 			for (const f of [...(t.corteo ?? []), t.motivo!]) expect(FIGURE[f], `${id}: ${f}`).toBeDefined();
 		}
+	});
+});
+
+describe('categorie', () => {
+	it('ogni tema incluso cade in una categoria, e quelle della galleria contano giusto', () => {
+		const conta = (c: string) => TEMI.filter((t) => categoriaDi(t) === c).length;
+		expect(conta('scuri')).toBe(9);
+		expect(conta('chiari')).toBe(3);
+		expect(conta('stagioni')).toBe(4);
+		expect(conta('feste')).toBe(6);
+		expect(conta('mondi')).toBe(8);
+		expect(TEMI.every((t) => CATEGORIE.some((c) => c.id === categoriaDi(t)))).toBe(true);
+	});
+
+	it('i temi personali stanno fra i tuoi', () => {
+		expect(categoriaDi({ ...TEMI[0], id: 'mio', gruppo: 'personale' })).toBe('tuoi');
 	});
 });

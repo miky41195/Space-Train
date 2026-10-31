@@ -43,6 +43,8 @@
 	import { AnnullaStore } from '$lib/stores/annulla.svelte';
 	import type { Politica, Progresso, SortKey } from '$lib/ipc';
 	import MenuContestuale from '$lib/components/MenuContestuale.svelte';
+	import GalleriaTemi from '$lib/components/GalleriaTemi.svelte';
+	import FinestraImpostazioni from '$lib/components/FinestraImpostazioni.svelte';
 	import StatoVuoto from '$lib/components/StatoVuoto.svelte';
 	import FileGrid from '$lib/components/FileGrid.svelte';
 	import Avvio from '$lib/components/Avvio.svelte';
@@ -51,7 +53,6 @@
 		vociMenu,
 		vociVista,
 		vociOrdina,
-		vociAspetto,
 		vociNuovo,
 		vociAccessoRapido,
 		vociColonne,
@@ -264,6 +265,45 @@
 		return impagina(filtrate, prefs, impostazioni.raggruppa, Date.now(), recentiDal);
 	});
 	let vociVisibili = $derived(impaginato.voci);
+
+	// ── Dimensione delle cartelle ──
+	// Si pesa una cartella alla volta, in sottofondo. Cambiando cartella parte
+	// un turno nuovo: il backend ferma i calcoli del turno vecchio.
+	let dimensioni = $state<Record<string, number | 'calcolo'>>({});
+	let turnoPesi = 0;
+	let cartellaPesata: string | undefined;
+
+	function nuovoTurnoPesi() {
+		turnoPesi++;
+		dimensioni = {};
+		void tauriBackend.turnoDimensioni(turnoPesi).catch(() => {});
+	}
+
+	async function pesa(cartelle: string[], turno = turnoPesi) {
+		for (const c of cartelle) {
+			if (turno !== turnoPesi) return;
+			if (dimensioni[c] !== undefined) continue;
+			dimensioni[c] = 'calcolo';
+			const n = await tauriBackend.dimensioneCartella(c, turno).catch(() => null);
+			if (turno !== turnoPesi) return;
+			if (n === null) delete dimensioni[c];
+			else dimensioni[c] = n;
+		}
+	}
+
+	$effect(() => {
+		const modo = impostazioni.dimensioneCartelle;
+		const percorso = store.activeTab?.path;
+		const cartelle =
+			posizione === 'normale' ? vociVisibili.filter((e) => e.kind === 'dir').map((e) => e.path) : [];
+		untrack(() => {
+			if (percorso !== cartellaPesata || (modo === 'mai' && Object.keys(dimensioni).length > 0)) {
+				cartellaPesata = percorso;
+				nuovoTurnoPesi();
+			}
+			if (modo === 'aperta') void pesa(cartelle.filter((c) => dimensioni[c] === undefined));
+		});
+	});
 	let evidenziazioni = $derived(new Map(risultati.map((r) => [r.item.path, r.positions])));
 
 	let selezione = $derived(store.activeTab?.selection ?? []);
@@ -494,7 +534,11 @@
 		if (scelte.length === 0) return;
 		// Nel Cestino «elimina» non può che essere definitivo.
 		if (posizione === 'cestino') daEliminare = { voci: scelte, tipo: 'cestino' };
-		else if (posizione === 'normale') daCestinare = scelte;
+		else if (posizione === 'normale') {
+			// Senza conferma, se l'utente l'ha spenta: il cestino resta un ripensamento possibile.
+			if (impostazioni.confermaCestino) daCestinare = scelte;
+			else void cestina(scelte);
+		}
 	}
 
 	function chiediEliminaDefinitivo() {
@@ -1700,18 +1744,27 @@
 		sottoIlPulsante(evento, vociNuovo(tipiNuovo));
 	}
 
+	/** La galleria dei temi, aperta sotto il pulsante Aspetto. */
+	let galleria = $state<{ x: number; y: number } | null>(null);
+
 	function apriMenuAspetto(evento: MouseEvent) {
-		sottoIlPulsante(
-			evento,
-			vociAspetto({
-				tema: impostazioni.tema,
-				accento: impostazioni.accento,
-				coloreAccento: impostazioni.coloreAccento,
-				animazioneAvvio: impostazioni.animazioneAvvio,
-				pausaTreno: impostazioni.pausaTreno,
-				personali: impostazioni.temiPersonali
-			})
-		);
+		const r = (evento.currentTarget as HTMLElement).getBoundingClientRect();
+		galleria = { x: Math.max(8, window.innerWidth - r.right), y: r.bottom + 4 };
+	}
+
+	/** La galleria aperta da dentro le impostazioni: sotto il pulsante Aspetto. */
+	function galleriaDalleImpostazioni() {
+		impostazioniAperte = false;
+		const r = document.querySelector('[aria-label="Aspetto"]')?.getBoundingClientRect();
+		galleria = r ? { x: Math.max(8, window.innerWidth - r.right), y: r.bottom + 4 } : { x: 12, y: 84 };
+	}
+
+	let impostazioniAperte = $state(false);
+
+	/** Dalla galleria: un tema o un colore si provano restando lì, l'editor la chiude. */
+	function daGalleria(azione: AzioneMenu) {
+		if (azione === 'editorTemi') galleria = null;
+		void eseguiAzione(azione);
 	}
 
 	/** Colore comune delle cartelle selezionate, o `null` se diverso o assente. */
@@ -2106,7 +2159,7 @@
 {/if}
 
 <div class="app">
-	<TitleBar {store} {bersaglio} onnovita={riapriNovita} />
+	<TitleBar {store} {bersaglio} onnovita={riapriNovita} onimpostazioni={() => (impostazioniAperte = true)} />
 
 	<!-- La linea principale: corre per tutta la larghezza sotto la testata.
 	     Si accende quando il sistema muove davvero qualcosa, e ogni tanto
@@ -2263,6 +2316,7 @@
 						cutPaths={appunti.mode === 'cut' ? appunti.paths : undefined}
 						{icone}
 						onactivate={apri}
+						unClic={impostazioni.unClic}
 						onselect={seleziona}
 						oncontext={menuSuVoce}
 						oncontextvuoto={menuSulVuoto}
@@ -2273,6 +2327,10 @@
 				{:else if store.activeTab}
 					<FileList
 						entries={vociVisibili}
+						{dimensioni}
+						oncalcola={impostazioni.dimensioneCartelle === 'richiesta' && posizione === 'normale'
+							? (e: Entry) => void pesa([e.path])
+							: undefined}
 						zone={impaginato.zone}
 						chiave={chiaveContenuto}
 						colonne={impostazioni.colonne}
@@ -2291,6 +2349,7 @@
 						onsort={ordinaPer}
 						oncolonne={apriMenuColonne}
 						onactivate={apri}
+						unClic={impostazioni.unClic}
 						onselect={seleziona}
 						oncontext={menuSuVoce}
 						oncontextvuoto={menuSulVuoto}
@@ -2307,6 +2366,44 @@
 			</div>
 		</main>
 	</div>
+
+	{#if impostazioniAperte}
+		<FinestraImpostazioni
+			{impostazioni}
+			mostraNascosti={store.showHidden}
+			onnascosti={() => void store.setShowHidden(!store.showHidden)}
+			{predefinito}
+			onpredefinito={() => void (predefinito ? ripristinaEsplora() : impostaPredefinito())}
+			versione={versioneAttuale}
+			cartellaRicevuti={statoLan?.cartellaRicevuti ?? ''}
+			ricevutiScelta={statoLan?.ricevuti != null}
+			onricevuti={(cartella) => void impostaLan({ ricevuti: cartella })}
+			onscegliCartella={(titolo, da) => tauriBackend.scegliCartella(titolo, da)}
+			onnovita={() => {
+				impostazioniAperte = false;
+				riapriNovita();
+			}}
+			ongalleria={galleriaDalleImpostazioni}
+			oneditor={() => {
+				impostazioniAperte = false;
+				void apriEditor();
+			}}
+			onchiudi={() => (impostazioniAperte = false)}
+		/>
+	{/if}
+
+	{#if galleria}
+		<GalleriaTemi
+			tema={impostazioni.tema}
+			personali={impostazioni.temiPersonali}
+			accento={impostazioni.accento}
+			coloreAccento={impostazioni.coloreAccento}
+			x={galleria.x}
+			y={galleria.y}
+			onscegli={daGalleria}
+			onchiudi={() => (galleria = null)}
+		/>
+	{/if}
 
 	{#if menu}
 		<MenuContestuale

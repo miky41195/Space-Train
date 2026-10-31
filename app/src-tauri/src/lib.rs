@@ -102,6 +102,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             ipc::list_dir,
             ipc::open_entry,
+            ipc::dimensione_cartella,
+            ipc::turno_dimensioni,
             ipc::navigate,
             ipc::drives,
             ipc::known_folders,

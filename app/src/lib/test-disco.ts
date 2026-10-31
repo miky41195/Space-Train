@@ -103,6 +103,10 @@ export class DiscoFinto {
 	/** Le ricezioni fermate da questo lato. */
 	ricezioniAnnullate: number[] = [];
 
+	/** Quanto pesa ogni cartella quando la si calcola, e quali sono state pesate. */
+	pesoCartelle = 2048;
+	pesate: string[] = [];
+
 	/** La versione che l'app dice di avere; vuota = sconosciuta. */
 	versioneApp = '';
 
@@ -329,6 +333,11 @@ export class DiscoFinto {
 				return cmd === 'start_drag' ? 'nessuno' : cmd === 'show_shell_menu' ? false : null;
 			case 'scegli_cartella':
 				return this.cartellaScelta;
+			case 'dimensione_cartella':
+				this.pesate.push(args.path as string);
+				return this.pesoCartelle;
+			case 'turno_dimensioni':
+				return;
 			case 'plugin:app|version':
 				// Senza versione impostata l'app non sa quale è: niente novità.
 				if (this.versioneApp) return this.versioneApp;

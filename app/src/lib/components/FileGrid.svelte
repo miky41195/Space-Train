@@ -27,6 +27,7 @@
 		cutPaths = undefined,
 		icone = undefined,
 		onactivate,
+		unClic = false,
 		onselect,
 		oncontext = undefined,
 		oncontextvuoto = undefined,
@@ -50,6 +51,8 @@
 		cutPaths?: string[];
 		icone?: IconeStore;
 		onactivate: (e: Entry) => void;
+		/** Apre con un clic, come l'opzione di Esplora; il doppio clic non serve più. */
+		unClic?: boolean;
 		onselect: (e: Entry, modificatori: { ctrl?: boolean; shift?: boolean }) => void;
 		oncontext?: (e: Entry, evento: MouseEvent) => void;
 		oncontextvuoto?: (evento: MouseEvent) => void;
@@ -183,6 +186,7 @@
 					bersaglio={entry.path === bersaglio}
 					{ontrascina}
 					{onactivate}
+					{unClic}
 					{onselect}
 					{oncontext}
 				/>

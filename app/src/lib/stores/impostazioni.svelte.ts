@@ -52,7 +52,17 @@ interface Valori {
 	sessione: boolean;
 	/** Cartelle che si aprono sempre all'avvio, ognuna in una scheda. */
 	cartelleAvvio: string[];
+	/** Quando calcolare la dimensione delle cartelle nell'elenco. */
+	dimensioneCartelle: DimensioneCartelle;
+	/** Chiedere conferma prima di spostare nel cestino. */
+	confermaCestino: boolean;
+	/** Aprire con un clic invece che con il doppio clic, come l'opzione di Esplora. */
+	unClic: boolean;
 }
+
+/** `mai`: come Esplora; `aperta`: in sottofondo per la cartella aperta; `richiesta`: solo quando la si chiede. */
+export type DimensioneCartelle = 'mai' | 'aperta' | 'richiesta';
+const DIMENSIONI_CARTELLE: readonly DimensioneCartelle[] = ['mai', 'aperta', 'richiesta'];
 
 const PREDEFINITE: Valori = {
 	vista: 'dettagli',
@@ -73,7 +83,10 @@ const PREDEFINITE: Valori = {
 	temiPersonali: [],
 	paginaIniziale: 'C:\\',
 	sessione: false,
-	cartelleAvvio: []
+	cartelleAvvio: [],
+	dimensioneCartelle: 'mai',
+	confermaCestino: true,
+	unClic: false
 };
 
 /** Le viste delle versioni precedenti, tradotte nelle attuali. */
@@ -109,6 +122,9 @@ export class ImpostazioniStore {
 	paginaIniziale = $state(PREDEFINITE.paginaIniziale);
 	sessione = $state(PREDEFINITE.sessione);
 	cartelleAvvio = $state<string[]>([]);
+	dimensioneCartelle = $state<DimensioneCartelle>(PREDEFINITE.dimensioneCartelle);
+	confermaCestino = $state(PREDEFINITE.confermaCestino);
+	unClic = $state(PREDEFINITE.unClic);
 
 	constructor(private archivio: Archivio | null = archivioPredefinito()) {
 		this.#leggi(archivio?.getItem(CHIAVE) ?? null);
@@ -145,6 +161,9 @@ export class ImpostazioniStore {
 			if (typeof v.paginaIniziale === 'string' && v.paginaIniziale) this.paginaIniziale = v.paginaIniziale;
 			if (typeof v.sessione === 'boolean') this.sessione = v.sessione;
 			if (Array.isArray(v.cartelleAvvio)) this.cartelleAvvio = v.cartelleAvvio.filter((c) => typeof c === 'string');
+			if (DIMENSIONI_CARTELLE.includes(v.dimensioneCartelle as DimensioneCartelle)) this.dimensioneCartelle = v.dimensioneCartelle!;
+			if (typeof v.confermaCestino === 'boolean') this.confermaCestino = v.confermaCestino;
+			if (typeof v.unClic === 'boolean') this.unClic = v.unClic;
 		} catch {
 			// Preferenze illeggibili: si parte da quelle predefinite.
 		}
@@ -210,7 +229,10 @@ export class ImpostazioniStore {
 			temiPersonali: this.temiPersonali,
 			paginaIniziale: this.paginaIniziale,
 			sessione: this.sessione,
-			cartelleAvvio: this.cartelleAvvio
+			cartelleAvvio: this.cartelleAvvio,
+			dimensioneCartelle: this.dimensioneCartelle,
+			confermaCestino: this.confermaCestino,
+			unClic: this.unClic
 		};
 		try {
 			this.archivio?.setItem(CHIAVE, JSON.stringify(v));

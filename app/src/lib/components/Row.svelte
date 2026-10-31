@@ -20,7 +20,10 @@
 		colore = undefined,
 		altezza = 32,
 		bersaglio = false,
+		peso = undefined,
+		oncalcola = undefined,
 		onactivate,
+		unClic = false,
 		onselect,
 		oncontext = undefined,
 		onrename = undefined,
@@ -48,7 +51,13 @@
 		altezza?: number;
 		/** Un trascinamento sta passando sopra questa cartella. */
 		bersaglio?: boolean;
+		/** Dimensione calcolata di una cartella, o `calcolo` mentre la si legge. */
+		peso?: number | 'calcolo';
+		/** Presente quando la dimensione delle cartelle si calcola a richiesta. */
+		oncalcola?: (e: Entry) => void;
 		onactivate: (e: Entry) => void;
+		/** Apre con un clic, come l'opzione di Esplora; il doppio clic non serve più. */
+		unClic?: boolean;
 		onselect: (e: Entry, modificatori: { ctrl?: boolean; shift?: boolean }) => void;
 		oncontext?: (e: Entry, evento: MouseEvent) => void;
 		onrename?: (e: Entry, nuovoNome: string) => void;
@@ -169,8 +178,12 @@
 		// lì si seleziona il testo.
 		if (ontrascina && !(e.target as HTMLElement).closest('input')) seTrascina(e, () => ontrascina(entry));
 	}}
-	ondblclick={() => onactivate(entry)}
-	onclick={(e) => onselect(entry, { ctrl: e.ctrlKey, shift: e.shiftKey })}
+	ondblclick={() => !unClic && onactivate(entry)}
+	onclick={(e) => {
+		onselect(entry, { ctrl: e.ctrlKey, shift: e.shiftKey });
+		// Con Ctrl o Maiusc si sta selezionando, non aprendo.
+		if (unClic && !e.ctrlKey && !e.shiftKey) onactivate(entry);
+	}}
 	oncontextmenu={(e) => {
 		e.preventDefault();
 		e.stopPropagation();
@@ -222,7 +235,26 @@
 		</span>
 	{/if}
 	{#if colonne.tipo}<span class="tipo">{descriviTipo(entry)}</span>{/if}
-	{#if colonne.dimensione}<span class="size">{dimensione(entry)}</span>{/if}
+	{#if colonne.dimensione}
+		<span class="size">
+			{#if entry.kind === 'dir' && entry.libero === undefined && peso === 'calcolo'}
+				<span class="calcolo" role="img" aria-label="Calcolo della dimensione"></span>
+			{:else if entry.kind === 'dir' && entry.libero === undefined && typeof peso === 'number'}
+				{byte(peso)}
+			{:else if entry.kind === 'dir' && entry.libero === undefined && oncalcola}
+				<button
+					class="calcola"
+					onclick={(e) => {
+						e.stopPropagation();
+						oncalcola(entry);
+					}}
+					ondblclick={(e) => e.stopPropagation()}>Calcola</button
+				>
+			{:else}
+				{dimensione(entry)}
+			{/if}
+		</span>
+	{/if}
 	{#if colonne.data}<span class="date">{data(entry)}</span>{/if}
 </div>
 
@@ -325,6 +357,38 @@
 		color: var(--text-dim);
 		font-variant-numeric: tabular-nums;
 		text-align: right;
+	}
+	/* La cartella si sta pesando: un tratto di binario con la corrente che passa. */
+	.calcolo {
+		display: inline-block;
+		width: 30px;
+		height: 3px;
+		border-radius: 2px;
+		vertical-align: middle;
+		background: linear-gradient(90deg, var(--rail-metal), var(--current), var(--rail-metal)) 0 0 / 200% 100%;
+	}
+	@media (prefers-reduced-motion: no-preference) {
+		.calcolo {
+			animation: pesa 1.4s linear infinite;
+		}
+	}
+	@keyframes pesa {
+		to {
+			background-position: -200% 0;
+		}
+	}
+	.calcola {
+		padding: 0;
+		border: none;
+		background: none;
+		color: var(--current);
+		font: inherit;
+		text-decoration: underline;
+		text-underline-offset: 2px;
+		cursor: default;
+	}
+	.calcola:hover {
+		color: var(--text);
 	}
 	.icon {
 		display: flex;

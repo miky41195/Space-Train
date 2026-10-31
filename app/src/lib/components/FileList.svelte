@@ -35,6 +35,9 @@
 		sort = undefined,
 		onsort = undefined,
 		onactivate,
+		unClic = false,
+		dimensioni = {},
+		oncalcola = undefined,
 		onselect,
 		oncontext = undefined,
 		oncontextvuoto = undefined,
@@ -80,6 +83,11 @@
 		sort?: SortSpec;
 		onsort?: (chiave: SortKey) => void;
 		onactivate: (e: Entry) => void;
+		/** Apre con un clic, come l'opzione di Esplora; il doppio clic non serve più. */
+		unClic?: boolean;
+		/** Dimensioni delle cartelle già calcolate (o in calcolo), per path. */
+		dimensioni?: Record<string, number | 'calcolo'>;
+		oncalcola?: (e: Entry) => void;
 		onselect: (e: Entry, modificatori: { ctrl?: boolean; shift?: boolean }) => void;
 		oncontext?: (e: Entry, evento: MouseEvent) => void;
 		/** Clic destro sullo spazio vuoto della lista. */
@@ -204,6 +212,9 @@
 					bersaglio={entry.path === bersaglio}
 					{ontrascina}
 					{onactivate}
+					{unClic}
+					peso={dimensioni[entry.path]}
+					{oncalcola}
 					{onselect}
 					{oncontext}
 					{onrename}

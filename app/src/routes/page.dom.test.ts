@@ -175,6 +175,37 @@ async function dalMenu(pulsante: string, etichetta: string | RegExp, ruolo = 'me
 }
 
 const vista = (etichetta: string | RegExp) => dalMenu('Visualizza', etichetta);
+
+/** Apre la galleria dei temi dal pulsante «Aspetto». */
+async function galleria() {
+	if (!screen.queryByRole('dialog', { name: 'Temi' })) await fireEvent.click(screen.getByRole('button', { name: 'Aspetto' }));
+	return screen.findByRole('dialog', { name: 'Temi' });
+}
+
+/** Il pulsante di un tema nella galleria, cercandolo in tutte le categorie. */
+async function temaInGalleria(nome: string) {
+	const g = await galleria();
+	for (const scheda of within(g).getAllByRole('tab')) {
+		await fireEvent.click(scheda);
+		const tema = within(g).queryByRole('button', { name: nome });
+		if (tema) return tema;
+	}
+	throw new Error(`Tema non trovato nella galleria: ${nome}`);
+}
+
+/** Sceglie un tema o un colore d'evidenziazione dalla galleria. */
+async function dallaGalleria(nome: string) {
+	const g = await galleria();
+	const colore = within(g).queryByRole('button', { name: nome });
+	await fireEvent.click(colore && colore.classList.contains('campione') ? colore : await temaInGalleria(nome));
+}
+
+/** Apre l'editor dei temi dalla galleria. */
+async function creaTema() {
+	const g = await galleria();
+	await fireEvent.click(within(g).getByRole('button', { name: 'Crea o modifica un tema…' }));
+}
+
 const ordina = (etichetta: string | RegExp) => dalMenu('Ordina', etichetta);
 
 /** Nome e ordine delle celle in una vista a icone. */
@@ -1323,20 +1354,20 @@ describe('temi e colori', () => {
 	it('si sceglie un tema e il documento cambia colori', async () => {
 		await monta();
 		expect(variabile('--hull')).toBe('#171420');
-		await dalMenu('Aspetto', 'Chiaro');
+		await dallaGalleria('Chiaro');
 		await waitFor(() => expect(variabile('--hull')).toBe('#ffffff'));
 		expect(document.documentElement.dataset.tema).toBe('chiaro');
 	});
 
 	it('il colore d accento sostituisce quello del tema', async () => {
 		await monta();
-		await dalMenu('Aspetto', 'Verde', 'menuitemradio');
+		await dallaGalleria('Verde');
 		await waitFor(() => expect(variabile('--accent')).toBe('#22c55e'));
 	});
 
 	it('tema e accento restano dopo un riavvio', async () => {
 		const { unmount } = await monta();
-		await dalMenu('Aspetto', 'Oceano');
+		await dallaGalleria('Oceano');
 		await waitFor(() => expect(variabile('--hull')).toBe('#0d1e2c'));
 		unmount();
 		document.documentElement.removeAttribute('style');
@@ -1616,7 +1647,7 @@ describe('finestra', () => {
 
 	it('il tema rosa si applica', async () => {
 		await monta();
-		await dalMenu('Aspetto', 'Sakura');
+		await dallaGalleria('Sakura');
 		await waitFor(() => expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#f472b6'));
 	});
 });
@@ -2025,7 +2056,7 @@ describe('temi mondo', () => {
 
 	it('un tema mondo cambia forme, carattere e chi sfila sul binario', async () => {
 		await monta();
-		await dalMenu('Aspetto', 'Kawaii');
+		await dallaGalleria('Kawaii');
 		await waitFor(() => expect(variabile('--radius')).toBe('24px'));
 		expect(variabile('--font-display')).toContain('Comic Sans');
 		expect(variabile('--motivo')).toContain('data:image/svg+xml');
@@ -2034,7 +2065,7 @@ describe('temi mondo', () => {
 
 	it('nel tema Gatti al posto del treno sfilano i gatti', async () => {
 		await monta();
-		await dalMenu('Aspetto', 'Gatti');
+		await dallaGalleria('Gatti');
 		// La prima partenza avviene poco dopo l'avvio.
 		await waitFor(() => expect(document.querySelectorAll('.sfilata .figura').length).toBe(4), { timeout: 3000 });
 		expect(document.querySelector('.sfilata')?.innerHTML).toContain('#f59e0b');
@@ -2042,7 +2073,7 @@ describe('temi mondo', () => {
 
 	it('nei temi solo colore resta il treno', async () => {
 		await monta();
-		await dalMenu('Aspetto', 'Oceano');
+		await dallaGalleria('Oceano');
 		await waitFor(() => expect(document.querySelector('.convoglio')).not.toBeNull(), { timeout: 3000 });
 		expect(document.querySelector('.sfilata')).toBeNull();
 	});
@@ -2073,9 +2104,7 @@ describe('editor dei temi', () => {
 		async function apriInFinestra() {
 			disco.editorInFinestra = true;
 			await monta();
-			await fireEvent.click(screen.getByRole('button', { name: 'Aspetto' }));
-			const menu = await screen.findByRole('menu');
-			await fireEvent.click(within(menu).getByRole('menuitem', { name: 'Crea o modifica un tema…' }));
+			await creaTema();
 			await waitFor(() => expect(disco.aperturaEditor).toBe(1));
 		}
 
@@ -2098,17 +2127,14 @@ describe('editor dei temi', () => {
 			await waitFor(() => expect(variabile('--radius')).toBe('27px'));
 			// La chiusura che segue il salvataggio non lo toglie.
 			dallEditor({ tipo: 'chiudi' });
-			await fireEvent.click(screen.getByRole('button', { name: 'Aspetto' }));
-			const menu = await screen.findByRole('menu');
-			expect(within(menu).getByRole('menuitemcheckbox', { name: 'Fuori' }).getAttribute('aria-checked')).toBe('true');
+			const voce = await temaInGalleria('Fuori');
+			expect(voce.getAttribute('aria-pressed')).toBe('true');
 			expect(variabile('--radius')).toBe('27px');
 		});
 	});
 
 	async function apriEditor() {
-		await fireEvent.click(screen.getByRole('button', { name: 'Aspetto' }));
-		const menu = await screen.findByRole('menu');
-		await fireEvent.click(within(menu).getByRole('menuitem', { name: 'Crea o modifica un tema…' }));
+		await creaTema();
 		return screen.findByRole('dialog', { name: 'Editor dei temi' });
 	}
 
@@ -2138,10 +2164,8 @@ describe('editor dei temi', () => {
 		unmount();
 
 		await monta();
-		await fireEvent.click(screen.getByRole('button', { name: 'Aspetto' }));
-		const menu = await screen.findByRole('menu');
-		const voce = within(menu).getByRole('menuitemcheckbox', { name: 'Il mio mondo' });
-		expect(voce.getAttribute('aria-checked')).toBe('true');
+		const voce = await temaInGalleria('Il mio mondo');
+		expect(voce.getAttribute('aria-pressed')).toBe('true');
 	});
 
 	it('un tema proprio si riapre in modifica e si può eliminare', async () => {
@@ -2195,9 +2219,7 @@ describe('spritesheet nei temi', () => {
 	}
 
 	async function editorConFile(nome: string) {
-		await fireEvent.click(screen.getByRole('button', { name: 'Aspetto' }));
-		const menu = await screen.findByRole('menu');
-		await fireEvent.click(within(menu).getByRole('menuitem', { name: 'Crea o modifica un tema…' }));
+		await creaTema();
 		const editor = await screen.findByRole('dialog', { name: 'Editor dei temi' });
 		await fireEvent.click(within(editor).getByLabelText('Le mie immagini'));
 		const file = new File([new Uint8Array([137, 80, 78, 71])], nome, { type: 'image/png' });
@@ -2651,5 +2673,68 @@ describe('amici', () => {
 		expect(disco.amici).toHaveLength(1);
 		await fireEvent.click(within(pannello).getByRole('button', { name: 'Conferma' }));
 		await waitFor(() => expect(disco.amici).toHaveLength(0));
+	});
+});
+
+// ── Impostazioni ─────────────────────────────────────────────────────
+
+describe('impostazioni', () => {
+	async function apriImpostazioni(sezione?: string) {
+		await fireEvent.click(screen.getByRole('button', { name: 'Impostazioni' }));
+		const f = await screen.findByRole('dialog', { name: 'Impostazioni' });
+		if (sezione) await fireEvent.click(within(f).getByRole('button', { name: sezione }));
+		return f;
+	}
+
+	it('l ingranaggio apre le sezioni ed Esc chiude', async () => {
+		await monta();
+		const f = await apriImpostazioni('Aspetto');
+		expect(within(f).getByRole('switch', { name: 'Animazione all’avvio' })).toBeTruthy();
+		tasto('Escape');
+		await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Impostazioni' })).toBeNull());
+	});
+
+	it('senza conferma Canc cestina subito', async () => {
+		await monta();
+		const f = await apriImpostazioni('File e cartelle');
+		await fireEvent.click(within(f).getByRole('switch', { name: 'Chiedi conferma prima di spostare nel cestino' }));
+		await fireEvent.click(within(f).getByRole('button', { name: 'Chiudi le impostazioni' }));
+
+		await fireEvent.click(riga('alfa.txt'));
+		tasto('Delete');
+		await waitFor(() => expect(disco.cestino).toEqual(['C:\\alfa.txt']));
+		expect(screen.queryByRole('dialog', { name: 'Conferma eliminazione' })).toBeNull();
+	});
+
+	it('con un clic una cartella si apre subito', async () => {
+		await monta();
+		const f = await apriImpostazioni('File e cartelle');
+		await fireEvent.click(within(f).getByRole('switch', { name: 'Apri con un clic' }));
+		await fireEvent.click(within(f).getByRole('button', { name: 'Chiudi le impostazioni' }));
+
+		await fireEvent.click(riga('Dati'));
+		await waitFor(() => expect(nomi()).not.toContain('alfa.txt'));
+	});
+
+	it('la dimensione delle cartelle si calcola per la cartella aperta', async () => {
+		await monta();
+		expect(riga('Dati').querySelector('.size')?.textContent?.trim()).toBe('—');
+		const f = await apriImpostazioni('File e cartelle');
+		await fireEvent.change(within(f).getByLabelText(/Dimensione delle cartelle/), { target: { value: 'aperta' } });
+		await fireEvent.click(within(f).getByRole('button', { name: 'Chiudi le impostazioni' }));
+
+		await waitFor(() => expect(riga('Dati').querySelector('.size')?.textContent?.trim()).toBe('2 KB'));
+		expect(disco.pesate).toContain('C:\\Dati');
+	});
+
+	it('a richiesta la cartella si pesa solo col suo Calcola', async () => {
+		await monta();
+		const f = await apriImpostazioni('File e cartelle');
+		await fireEvent.change(within(f).getByLabelText(/Dimensione delle cartelle/), { target: { value: 'richiesta' } });
+		await fireEvent.click(within(f).getByRole('button', { name: 'Chiudi le impostazioni' }));
+
+		expect(disco.pesate).toEqual([]);
+		await fireEvent.click(within(riga('Dati')).getByRole('button', { name: 'Calcola' }));
+		await waitFor(() => expect(riga('Dati').querySelector('.size')?.textContent?.trim()).toBe('2 KB'));
 	});
 });

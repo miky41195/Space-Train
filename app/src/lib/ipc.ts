@@ -182,6 +182,10 @@ export interface EsitoMenu {
 export interface Backend {
 	listDir(path: string, sort: SortSpec, showHidden: boolean): Promise<Listing>;
 	openEntry(path: string): Promise<void>;
+	/** Byte di tutto l'albero di una cartella; null se un turno più nuovo l'ha fermato. */
+	dimensioneCartella(path: string, turno: number): Promise<number | null>;
+	/** Comincia un turno di calcoli delle dimensioni e ferma il precedente. */
+	turnoDimensioni(turno: number): Promise<void>;
 	navigate(path: string, direction: 'up'): Promise<string>;
 	drives(): Promise<Drive[]>;
 	knownFolders(): Promise<KnownFolder[]>;
@@ -284,6 +288,8 @@ function canale<T>(su: (m: T) => void): Channel<T> {
 export const tauriBackend: Backend = {
 	listDir: (path, sort, showHidden) => invoke('list_dir', { path, sort, showHidden }),
 	openEntry: (path) => invoke('open_entry', { path }),
+	dimensioneCartella: (path, turno) => invoke('dimensione_cartella', { path, turno }),
+	turnoDimensioni: (turno) => invoke('turno_dimensioni', { turno }),
 	navigate: (path, direction) => invoke('navigate', { path, direction }),
 	drives: () => invoke('drives'),
 	knownFolders: () => invoke('known_folders'),

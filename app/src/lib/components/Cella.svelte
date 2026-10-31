@@ -17,6 +17,7 @@
 		nascondiEstensione = false,
 		bersaglio = false,
 		onactivate,
+		unClic = false,
 		onselect,
 		oncontext = undefined,
 		ontrascina = undefined
@@ -32,6 +33,8 @@
 		nascondiEstensione?: boolean;
 		bersaglio?: boolean;
 		onactivate: (e: Entry) => void;
+		/** Apre con un clic, come l'opzione di Esplora; il doppio clic non serve più. */
+		unClic?: boolean;
 		onselect: (e: Entry, modificatori: { ctrl?: boolean; shift?: boolean }) => void;
 		oncontext?: (e: Entry, evento: MouseEvent) => void;
 		ontrascina?: (e: Entry) => void;
@@ -77,8 +80,12 @@
 	data-voce={entry.path}
 	title={entry.name}
 	onmousedown={(e) => ontrascina && seTrascina(e, () => ontrascina(entry))}
-	ondblclick={() => onactivate(entry)}
-	onclick={(e) => onselect(entry, { ctrl: e.ctrlKey, shift: e.shiftKey })}
+	ondblclick={() => !unClic && onactivate(entry)}
+	onclick={(e) => {
+		onselect(entry, { ctrl: e.ctrlKey, shift: e.shiftKey });
+		// Con Ctrl o Maiusc si sta selezionando, non aprendo.
+		if (unClic && !e.ctrlKey && !e.shiftKey) onactivate(entry);
+	}}
 	oncontextmenu={(e) => {
 		e.preventDefault();
 		e.stopPropagation();

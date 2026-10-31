@@ -12,6 +12,10 @@ export function backendFinto(over: Partial<Backend> = {}): Backend {
 			return { path, entries: [] };
 		},
 		async openEntry() {},
+		async dimensioneCartella() {
+			return 0;
+		},
+		async turnoDimensioni() {},
 		async navigate(path: string) {
 			return path;
 		},

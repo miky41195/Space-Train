@@ -2,6 +2,7 @@ pub mod archivi;
 pub mod cerca;
 pub mod cestino;
 pub mod copy;
+pub mod dimensione;
 pub mod entry;
 pub mod error;
 pub mod listing;

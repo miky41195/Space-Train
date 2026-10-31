@@ -3,7 +3,6 @@ import {
 	vociMenu,
 	vociVista,
 	vociOrdina,
-	vociAspetto,
 	vociNuovo,
 	vociAccessoRapido,
 	posizionaMenu
@@ -277,40 +276,6 @@ describe('vociOrdina', () => {
 			'gruppi:tipo'
 		]);
 		expect(v.find((x) => x.sezione)?.sezione).toBe('Raggruppa per');
-	});
-});
-
-describe('vociAspetto', () => {
-	it('offre i temi e una tavolozza di accenti con quello attivo', () => {
-		const v = vociAspetto({ tema: 'chiaro', accento: 'verde' });
-		expect(v.find((x) => x.spunta)?.azione).toBe('tema:chiaro');
-		const tavolozza = v.find((x) => x.tavolozza)?.tavolozza ?? [];
-		expect(tavolozza.find((c) => c.attivo)?.azione).toBe('accento:verde');
-	});
-
-	it('divide colori, mondi e temi propri in sezioni', () => {
-		const mio = { id: 'personale-1', nome: 'Il mio', chiaro: false, gruppo: 'personale' as const, variabili: {} };
-		const sezioni = vociAspetto({ tema: 'spazio', accento: 'tema', personali: [mio] })
-			.map((x) => x.sezione)
-			.filter(Boolean);
-		expect(sezioni).toEqual(['Colori', 'Mondi: forme e personaggi', 'I tuoi temi', 'Passaggi del treno e dei personaggi']);
-	});
-
-	it('la pausa fra i passaggi: una sola scelta spuntata, 30 secondi se non detto', () => {
-		const spuntate = (pausaTreno?: number) =>
-			vociAspetto({ tema: 'spazio', accento: 'tema', pausaTreno })
-				.filter((x) => x.azione.startsWith('pausa:') && x.spunta)
-				.map((x) => x.etichetta);
-		expect(spuntate()).toEqual(['Ogni 30 secondi']);
-		expect(spuntate(300)).toEqual(['Ogni 5 minuti']);
-		expect(spuntate(-1)).toEqual(['Solo durante i trasferimenti']);
-	});
-
-	it('il campione personalizzato mostra il colore scelto e porta all editor', () => {
-		const v = vociAspetto({ tema: 'spazio', accento: 'personalizzato', coloreAccento: '#123456' });
-		const p = v.find((x) => x.tavolozza)?.tavolozza?.find((c) => c.personalizzato);
-		expect(p).toMatchObject({ colore: '#123456', attivo: true });
-		expect(v.map((x) => x.azione)).toContain('editorTemi');
 	});
 });
 

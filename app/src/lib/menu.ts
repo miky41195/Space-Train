@@ -2,7 +2,7 @@ import type { Entry, SortKey, SortSpec } from './ipc';
 import { eEseguibile, eZip } from './posizioni';
 import type { ModoGruppi } from './raggruppa';
 import { TAGLIE, type Vista } from './vista';
-import { TEMI, ACCENTI, type IdAccento, type Tema } from './temi';
+import type { IdAccento } from './temi';
 import { COLORI_CARTELLA, type IdColore } from './stores/colori.svelte';
 
 export type AzioneMenu =
@@ -538,17 +538,6 @@ export function vociColonne(c: StatoVista['colonne']): VoceMenu[] {
 	];
 }
 
-export interface StatoAspetto {
-	tema: string;
-	accento: IdAccento;
-	/** Il colore personalizzato, mostrato nel suo campione. */
-	coloreAccento?: string;
-	animazioneAvvio?: boolean;
-	/** Secondi fra un passaggio del treno e il successivo; -1 mai. */
-	pausaTreno?: number;
-	personali?: readonly Tema[];
-}
-
 /** Le pause fra un passaggio e l'altro che si possono scegliere, in secondi. */
 export const PAUSE_TRENO: ReadonlyArray<[number, string]> = [
 	[0, 'Di continuo'],
@@ -560,49 +549,6 @@ export const PAUSE_TRENO: ReadonlyArray<[number, string]> = [
 	[600, 'Ogni 10 minuti'],
 	[-1, 'Solo durante i trasferimenti']
 ];
-
-/** Il menu «Aspetto»: temi di colore, mondi, temi propri, accento, editor. */
-export function vociAspetto(s: StatoAspetto): VoceMenu[] {
-	const voce = (t: Tema, i: number, sezione: string): VoceMenu => ({
-		azione: `tema:${t.id}` as AzioneMenu,
-		etichetta: t.nome,
-		spunta: s.tema === t.id,
-		sezione: i === 0 ? sezione : undefined,
-		stacca: i === 0
-	});
-	return [
-		...TEMI.filter((t) => t.gruppo === 'colori').map((t, i) => voce(t, i, 'Colori')),
-		...TEMI.filter((t) => t.gruppo === 'mondo').map((t, i) => voce(t, i, 'Mondi: forme e personaggi')),
-		...(s.personali ?? []).map((t, i) => voce(t, i, 'I tuoi temi')),
-		{
-			azione: 'accento',
-			etichetta: 'Colore d’evidenziazione',
-			stacca: true,
-			tavolozza: ACCENTI.map((a) => ({
-				azione: `accento:${a.id}` as AzioneMenu,
-				nome: a.nome,
-				colore: a.id === 'personalizzato' ? (s.coloreAccento ?? null) : a.colore,
-				attivo: s.accento === a.id,
-				personalizzato: a.id === 'personalizzato'
-			}))
-		},
-		{ azione: 'editorTemi', etichetta: 'Crea o modifica un tema…', stacca: true },
-		{
-			azione: 'animazioneAvvio',
-			etichetta: 'Animazione all’avvio',
-			spunta: s.animazioneAvvio ?? false
-		},
-		...PAUSE_TRENO.map(
-			([secondi, etichetta], i): VoceMenu => ({
-				azione: `pausa:${secondi}` as AzioneMenu,
-				etichetta,
-				spunta: (s.pausaTreno ?? 30) === secondi,
-				sezione: i === 0 ? 'Passaggi del treno e dei personaggi' : undefined,
-				stacca: i === 0
-			})
-		)
-	];
-}
 
 /**
  * Posizione del menu perché resti dentro la finestra.

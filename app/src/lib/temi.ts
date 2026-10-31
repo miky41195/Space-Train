@@ -91,6 +91,28 @@ export interface Tema {
 	motivo?: string;
 }
 
+/** Le categorie della galleria dei temi, nell'ordine in cui compaiono. */
+export const CATEGORIE = [
+	{ id: 'scuri', nome: 'Scuri' },
+	{ id: 'chiari', nome: 'Chiari' },
+	{ id: 'mondi', nome: 'Mondi' },
+	{ id: 'stagioni', nome: 'Stagioni' },
+	{ id: 'feste', nome: 'Feste' },
+	{ id: 'tuoi', nome: 'I tuoi temi' }
+] as const;
+export type IdCategoria = (typeof CATEGORIE)[number]['id'];
+
+const STAGIONI = new Set(['primavera', 'estate', 'autunno', 'inverno']);
+const FESTE = new Set(['natale', 'capodanno', 'sanvalentino', 'carnevale', 'pasqua', 'halloween']);
+
+export function categoriaDi(tema: Tema): IdCategoria {
+	if (tema.gruppo === 'personale') return 'tuoi';
+	if (tema.gruppo === 'colori') return tema.chiaro ? 'chiari' : 'scuri';
+	if (STAGIONI.has(tema.id)) return 'stagioni';
+	if (FESTE.has(tema.id)) return 'feste';
+	return 'mondi';
+}
+
 /** Il tema personale come lo salva l'editor. */
 export type TemaPersonale = Tema & { gruppo: 'personale' };
 

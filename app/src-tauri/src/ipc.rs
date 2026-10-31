@@ -77,6 +77,20 @@ pub fn elenca(path: String, sort: SortSpec, show_hidden: bool) -> Result<Listing
     }
 }
 
+/// La dimensione di una cartella locale, sommando tutto il suo albero.
+/// `None` se nel frattempo è partito un altro turno (l'elenco ha cambiato
+/// cartella): il risultato non servirebbe più.
+#[tauri::command]
+pub async fn dimensione_cartella(path: String, turno: u64) -> Result<Option<u64>, FsError> {
+    fuori_dalla_finestra(move || Ok(crate::fs::dimensione::dimensione(std::path::Path::new(&path), turno))).await
+}
+
+/// Comincia un turno di calcoli e ferma quelli del turno precedente.
+#[tauri::command]
+pub fn turno_dimensioni(turno: u64) {
+    crate::fs::dimensione::nuovo_turno(turno);
+}
+
 #[tauri::command]
 pub fn open_entry(path: String) -> Result<(), FsError> {
     open::open_default(&path)
