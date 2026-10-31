@@ -5,11 +5,16 @@
 
 	let {
 		store,
-		bersaglio = null
+		bersaglio = null,
+		onnovita = undefined,
+		onimpostazioni = undefined
 	}: {
 		store: TabsStore;
 		/** Cartella sopra cui passa un trascinamento. */
 		bersaglio?: string | null;
+		/** Riapre le novità della versione installata. */
+		onnovita?: () => void;
+		onimpostazioni?: () => void;
 	} = $props();
 
 	const win = getCurrentWindow();
@@ -71,6 +76,39 @@
 			aria-label="Nuova scheda"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.5" /></svg></button
 		>
 	</div>
+
+	{#if onnovita || onimpostazioni}
+		<!-- Strumenti della finestra, prima delle lampade e staccati da un filo:
+		     sono pulsanti, non segnali. -->
+		<div class="strumenti">
+			{#if onnovita}
+				<button class="strumento" onclick={onnovita} title="Novità di questa versione" aria-label="Novità di questa versione">
+					<svg viewBox="0 0 16 16" aria-hidden="true"
+						><path d="M2 6.5v3h2.2L10 13V3L4.2 6.5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" /><path
+							d="M12.3 5.6a3.3 3.3 0 0 1 0 4.8M4.6 9.6l.9 4"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.4"
+							stroke-linecap="round"
+						/></svg
+					>
+				</button>
+			{/if}
+			{#if onimpostazioni}
+				<button class="strumento" onclick={onimpostazioni} title="Impostazioni" aria-label="Impostazioni">
+					<svg viewBox="0 0 16 16" aria-hidden="true"
+						><circle cx="8" cy="8" r="2.6" fill="none" stroke="currentColor" stroke-width="1.4" /><path
+							d="M6.8 1.5h2.4l.4 1.8 1.2.7 1.8-.6 1.2 2.1-1.4 1.2v1.4l1.4 1.2-1.2 2.1-1.8-.6-1.2.7-.4 1.8H6.8l-.4-1.8-1.2-.7-1.8.6-1.2-2.1 1.4-1.2V7.3L2.2 6.1l1.2-2.1 1.8.6 1.2-.7z"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.4"
+							stroke-linejoin="round"
+						/></svg
+					>
+				</button>
+			{/if}
+		</div>
+	{/if}
 
 	<!-- A destra, come su Windows: chiudi resta l'ultimo, nell'angolo che
 	     la mano cerca. Cambia la posizione, non il trattamento. -->
@@ -229,6 +267,41 @@
 		gap: 8px;
 		padding: 0 14px 0 12px;
 		flex-shrink: 0;
+	}
+
+	.strumenti {
+		position: relative;
+		z-index: 4;
+		display: flex;
+		align-items: center;
+		gap: 2px;
+		padding-right: 10px;
+		border-right: 1px solid var(--border);
+		height: 16px;
+		flex-shrink: 0;
+	}
+	.strumento {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		padding: 0;
+		border: none;
+		border-radius: var(--radius-sm);
+		clip-path: var(--forma-sm, none);
+		mask: var(--maschera-sm, none);
+		background: transparent;
+		color: var(--text-dim);
+		cursor: default;
+	}
+	.strumento svg {
+		width: 16px;
+		height: 16px;
+	}
+	.strumento:hover {
+		background: var(--row-hover);
+		color: var(--text);
 	}
 
 	.lampada {

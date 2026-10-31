@@ -62,4 +62,20 @@ describe('TitleBar', () => {
 		await monta();
 		expect(screen.getByText('uno')).toBeTruthy();
 	});
+
+	it('megafono e ingranaggio compaiono solo se qualcuno li ascolta', async () => {
+		await monta();
+		expect(screen.queryByLabelText('Novità di questa versione')).toBeNull();
+		cleanup();
+
+		const store = new TabsStore(backendFinto());
+		await store.openTab('C:\\uno');
+		const onnovita = vi.fn();
+		const onimpostazioni = vi.fn();
+		render(TitleBar, { props: { store, onnovita, onimpostazioni } });
+		screen.getByLabelText('Novità di questa versione').click();
+		screen.getByLabelText('Impostazioni').click();
+		expect(onnovita).toHaveBeenCalledTimes(1);
+		expect(onimpostazioni).toHaveBeenCalledTimes(1);
+	});
 });

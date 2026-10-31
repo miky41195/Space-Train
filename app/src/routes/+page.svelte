@@ -1288,9 +1288,18 @@
 	 */
 	const CHIAVE_VERSIONE = 'space-train.versione-vista';
 	let novitaAperte = $state<Novita[]>([]);
-	let versioneAttuale = '';
+	let versioneAttuale = $state('');
+
+	/** Il megafono: le novità della versione installata, le altre a richiesta. */
+	let novitaDalMegafono = $state(false);
+	function riapriNovita() {
+		const i = Math.max(0, NOVITA.findIndex((n) => n.versione === versioneAttuale));
+		novitaDalMegafono = true;
+		novitaAperte = [NOVITA[i]];
+	}
 
 	function chiudiNovita() {
+		novitaDalMegafono = false;
 		novitaAperte = [];
 		try {
 			localStorage.setItem(CHIAVE_VERSIONE, versioneAttuale);
@@ -2097,7 +2106,7 @@
 {/if}
 
 <div class="app">
-	<TitleBar {store} {bersaglio} />
+	<TitleBar {store} {bersaglio} onnovita={riapriNovita} />
 
 	<!-- La linea principale: corre per tutta la larghezza sotto la testata.
 	     Si accende quando il sistema muove davvero qualcosa, e ogni tanto
@@ -2336,7 +2345,12 @@
 	{/if}
 
 	{#if novitaAperte.length > 0}
-		<NovitaFinestra novita={novitaAperte} onchiudi={chiudiNovita} />
+		<NovitaFinestra
+			novita={novitaAperte}
+			onchiudi={chiudiNovita}
+			installata={novitaDalMegafono ? versioneAttuale || NOVITA[0].versione : undefined}
+			precedenti={novitaDalMegafono ? NOVITA.filter((n) => n.versione !== novitaAperte[0]?.versione) : []}
+		/>
 	{/if}
 
 	{#if richiesteLan[0] && statoLan}

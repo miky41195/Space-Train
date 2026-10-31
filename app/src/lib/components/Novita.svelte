@@ -3,14 +3,22 @@
 
 	let {
 		novita,
-		onchiudi
+		onchiudi,
+		installata = undefined,
+		precedenti = []
 	}: {
 		/** Le versioni da raccontare, dalla più recente. */
 		novita: Novita[];
 		onchiudi: () => void;
+		/** La versione in uso, quando la finestra si riapre dal megafono. */
+		installata?: string;
+		/** Le versioni più vecchie, mostrate solo a richiesta. */
+		precedenti?: Novita[];
 	} = $props();
 
 	let bottone = $state<HTMLButtonElement | null>(null);
+	let tutte = $state(false);
+	let mostrate = $derived(tutte ? [...novita, ...precedenti] : novita);
 
 	$effect(() => {
 		bottone?.focus();
@@ -19,10 +27,11 @@
 
 <div class="sfondo" role="presentation" onclick={(e) => e.target === e.currentTarget && onchiudi()}>
 	<div class="finestra" role="dialog" aria-modal="true" aria-label="Novità di Space Train">
-		<h2>Novità di Space Train {novita[0]?.versione}</h2>
+		{#if installata}<span class="installata">Versione installata {installata}</span>{/if}
+		<h2>{installata ? 'Novità' : `Novità di Space Train ${novita[0]?.versione ?? ''}`}</h2>
 		<div class="elenco">
-			{#each novita as n (n.versione)}
-				{#if novita.length > 1}<h3>Versione {n.versione}</h3>{/if}
+			{#each mostrate as n (n.versione)}
+				{#if mostrate.length > 1}<h3>Versione {n.versione}</h3>{/if}
 				<ul>
 					{#each n.voci as v, i (i)}
 						<li>{v}</li>
@@ -31,6 +40,9 @@
 			{/each}
 		</div>
 		<div class="azioni">
+			{#if precedenti.length > 0 && !tutte}
+				<button class="link" onclick={() => (tutte = true)}>Versioni precedenti</button>
+			{/if}
 			<button class="primario" bind:this={bottone} onclick={onchiudi}>Ho capito</button>
 		</div>
 	</div>
@@ -116,12 +128,39 @@
 	li + li {
 		margin-top: 6px;
 	}
+	.installata {
+		margin-bottom: 2px;
+		color: var(--text-dim);
+		font-family: var(--font-display);
+		font-size: calc(11px * var(--scala-titoli, var(--scala-testo, 1)));
+		font-variant-numeric: tabular-nums;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+	}
 	.azioni {
 		display: flex;
+		align-items: center;
 		justify-content: flex-end;
+		gap: 12px;
 		margin-top: 16px;
 	}
-	button {
+	.azioni .link {
+		margin-right: auto;
+		height: auto;
+		padding: 0;
+		border: none;
+		background: none;
+		color: var(--text-dim);
+		text-decoration: underline;
+		text-underline-offset: 2px;
+		clip-path: none;
+		mask: none;
+	}
+	.azioni .link:hover {
+		color: var(--text);
+		filter: none;
+	}
+	.primario {
 		height: 32px;
 		padding: 0 16px;
 		border: 1px solid var(--accent);
@@ -133,7 +172,7 @@
 		font: inherit;
 		cursor: default;
 	}
-	button:hover {
+	.primario:hover {
 		filter: brightness(1.1);
 	}
 </style>
