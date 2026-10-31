@@ -143,7 +143,12 @@
 		overflow-y: auto;
 		position: fixed;
 		z-index: 21;
+		/* Largo quanto la voce più lunga anche vicino al bordo destro: senza,
+		   il menu si stringe allo spazio rimasto e le voci vanno a capo dentro
+		   righe alte 28px. `posizionaMenu` lo sposta poi a sinistra. */
+		width: max-content;
 		min-width: 200px;
+		max-width: calc(100vw - 16px);
 		padding: 4px;
 		background: var(--hull);
 		border: 1px solid var(--border);
@@ -168,6 +173,7 @@
 		color: var(--text);
 		font: inherit;
 		text-align: left;
+		white-space: nowrap;
 		cursor: default;
 	}
 
