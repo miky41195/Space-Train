@@ -14,6 +14,19 @@ export interface Novita {
 
 export const NOVITA: Novita[] = [
 	{
+		versione: '0.3.0',
+		voci: [
+			'Quattro mondi nuovi con forme tutte loro: Cianografia, Abisso, Atlante e Orient Express, ognuno con i suoi personaggi sul binario.',
+			'Nell’editor dei temi si scelgono anche gli angoli (arrotondati, smussati, a tacca, a pillola), la forma delle schede, il disegno del cielo e la cornice della finestra.',
+			'I titoli hanno una dimensione propria, separata da quella del testo.',
+			'I temi si scelgono da una galleria divisa per categorie, con un’anteprima dei colori di ciascuno.',
+			'Tutte le impostazioni sono raccolte in una finestra sola, dall’ingranaggio in alto a destra.',
+			'Impostazioni nuove: dimensione delle cartelle (per la cartella aperta o su richiesta), apertura con un clic, conferma prima del cestino disattivabile, cartella predefinita per i file ricevuti.',
+			'Dimensioni e date dei file usano il carattere del testo invece di quello dei titoli.',
+			'I menu aperti vicino al bordo della finestra non mandano più a capo le voci.'
+		]
+	},
+	{
 		versione: '0.2.6',
 		voci: [
 			'Tema Spazio rifinito: la corrente sul binario ha un nucleo di luce bianca, e dietro la testata scorre un cielo di stelle in pixel.',
