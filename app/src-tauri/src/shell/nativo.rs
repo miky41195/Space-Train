@@ -480,6 +480,16 @@ mod win {
 mod tests {
     use super::*;
 
+    #[cfg(not(windows))]
+    #[test]
+    fn showing_a_linux_file_opens_its_folder() {
+        let d = destinazione_di("/home/anna/nota.txt");
+        assert_eq!(d.cartella, "/home/anna");
+        assert_eq!(d.seleziona.as_deref(), Some("/home/anna/nota.txt"));
+        assert_eq!(destinazione_di("/").cartella, "/");
+    }
+
+    #[cfg(windows)]
     #[test]
     fn apri_percorso_porta_alla_cartella_con_la_voce_selezionata() {
         let d = destinazione_di(r"C:\Dati\nota.txt");
