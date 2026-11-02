@@ -23,3 +23,6 @@ registry/
 # Appunti di lavoro locali (documenti del progetto, impeccable)
 /PRODUCT.md
 /DESIGN.md
+
+# Screenshots of the Linux end-to-end run
+app/e2e/shots/
