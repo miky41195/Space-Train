@@ -9,7 +9,8 @@ import {
 	eZip,
 	eEseguibile,
 	stessoPath,
-	byte
+	byte,
+	dentroDi
 } from './posizioni';
 
 describe('briciole', () => {
@@ -81,5 +82,44 @@ describe('rete locale', () => {
 			{ nome: 'Foto', path: '::lan\\PC2-ab12\\Foto' }
 		]);
 		expect(nomePosizione('::lan')).toBe('Rete locale');
+	});
+});
+
+describe('Linux paths', () => {
+	it('breadcrumbs start at This PC, then the file system root', () => {
+		expect(briciole('/home/anna/Foto')).toEqual([
+			{ nome: 'Questo PC', path: '::pc' },
+			{ nome: 'File system', path: '/' },
+			{ nome: 'home', path: '/home' },
+			{ nome: 'anna', path: '/home/anna' },
+			{ nome: 'Foto', path: '/home/anna/Foto' }
+		]);
+		expect(nomePosizione('/')).toBe('File system');
+	});
+
+	it('name and parent folder', () => {
+		expect(nomeDi('/home/anna/nota.txt')).toBe('nota.txt');
+		expect(cartellaDi('/home/anna/nota.txt')).toBe('/home/anna');
+		expect(cartellaDi('/home')).toBe('/');
+	});
+
+	it('case matters on Linux', () => {
+		expect(stessoPath('/home/Anna', '/home/anna')).toBe(false);
+		expect(stessoPath('/home/anna/', '/home/anna')).toBe(true);
+		expect(stessoPath('/', '/')).toBe(true);
+	});
+
+	it('a USB stick is a different volume from the system disk', () => {
+		expect(stessoVolume('/home/anna/a.txt', '/tmp')).toBe(true);
+		expect(stessoVolume('/home/anna/a.txt', '/media/anna/USB/x')).toBe(false);
+		expect(stessoVolume('/media/anna/USB/a', '/media/anna/USB/b/c')).toBe(true);
+		expect(stessoVolume('/run/media/anna/USB/a', '/home')).toBe(false);
+	});
+
+	it('inside a folder', () => {
+		expect(dentroDi('/home/anna/Foto', '/home/anna')).toBe(true);
+		expect(dentroDi('/home/annalisa', '/home/anna')).toBe(false);
+		expect(dentroDi('/etc', '/')).toBe(true);
+		expect(dentroDi('C:\\Users\\X', 'c:\\users')).toBe(true);
 	});
 });

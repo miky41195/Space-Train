@@ -102,6 +102,14 @@ pub fn esamina(path: &Path) -> Esame {
 ///
 /// Attachment Services lo scrive già; lo si riscrive per avere sempre la
 /// stessa zona, anche dove il servizio non c'è o non ha potuto farlo.
+/// Only NTFS has alternate streams: elsewhere `file:Zone.Identifier` would
+/// be a stray new file next to the real one, so nothing is written.
+#[cfg(not(windows))]
+pub fn segna_internet(_path: &Path) -> io::Result<()> {
+    Ok(())
+}
+
+#[cfg(windows)]
 pub fn segna_internet(path: &Path) -> io::Result<()> {
     let mut ads = paths::extended(path).into_os_string();
     ads.push(":Zone.Identifier");
@@ -173,6 +181,7 @@ mod tests {
         assert!(file_da_aprire(chiesto, &[]).is_err());
     }
 
+    #[cfg(windows)]
     #[test]
     fn un_file_ricevuto_resta_e_risulta_da_internet() {
         let d = tempdir().unwrap();

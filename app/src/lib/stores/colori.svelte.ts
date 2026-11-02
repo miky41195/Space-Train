@@ -71,7 +71,7 @@ export class ColoriStore {
 		let cambiato = false;
 		const copia: Record<string, IdColore> = {};
 		for (const [k, v] of Object.entries(this.#mappa)) {
-			if (k === vecchio || k.startsWith(vecchio + '\\')) {
+			if (k === vecchio || k.startsWith(vecchio + (vecchio.startsWith('/') ? '/' : '\\'))) {
 				copia[nuovo + k.slice(vecchio.length)] = v;
 				cambiato = true;
 			} else {

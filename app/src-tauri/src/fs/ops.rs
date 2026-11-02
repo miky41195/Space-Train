@@ -126,13 +126,15 @@ pub fn resolve_input(input: &str) -> Result<Destinazione, FsError> {
 
     let mut espanso = espandi_variabili(pulito);
     if espanso == "~" || espanso.starts_with("~\\") || espanso.starts_with("~/") {
-        if let Ok(casa) = std::env::var("USERPROFILE") {
+        if let Some(casa) = paths::casa() {
             espanso = format!("{}{}", casa, &espanso[1..]);
         }
     }
-    let espanso = espanso.replace('/', "\\");
+    // On Windows both slashes work but the app shows backslashes; elsewhere
+    // the backslash is an ordinary character in names and stays as typed.
+    let espanso = if cfg!(windows) { espanso.replace('/', "\\") } else { espanso };
     // «C:» da solo è la radice del disco, non la cartella corrente del disco.
-    let espanso = if espanso.len() == 2 && espanso.ends_with(':') {
+    let espanso = if cfg!(windows) && espanso.len() == 2 && espanso.ends_with(':') {
         format!("{}\\", espanso)
     } else {
         espanso

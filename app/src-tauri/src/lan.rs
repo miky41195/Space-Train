@@ -441,7 +441,7 @@ impl Lan {
             .ricevuti
             .map(PathBuf::from)
             .unwrap_or_else(|| {
-                let casa = std::env::var("USERPROFILE").unwrap_or_else(|_| ".".into());
+                let casa = crate::fs::paths::casa().unwrap_or_else(|| ".".into());
                 Path::new(&casa).join("Downloads").join("Space Train")
             })
     }
@@ -1369,6 +1369,7 @@ mod tests {
         assert_eq!(risposta(false, Some(r"C:\qualsiasi")), None);
     }
 
+    #[cfg(windows)]
     #[test]
     fn i_file_ricevuti_risultano_da_internet() {
         let d = tempdir().unwrap();

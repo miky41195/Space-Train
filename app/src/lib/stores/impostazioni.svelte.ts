@@ -4,6 +4,7 @@ import type { IdAccento, TemaPersonale } from '../temi';
 import { limita, type Vista } from '../vista';
 import type { Archivio } from './preferiti.svelte';
 import { alCambioDi } from './sincronizza';
+import { RADICE_SISTEMA } from '../sistema';
 
 const CHIAVE = 'space-train.impostazioni';
 
@@ -81,7 +82,7 @@ const PREDEFINITE: Valori = {
 	pausaTreno: 30,
 	coloreAccento: '#8b5cf6',
 	temiPersonali: [],
-	paginaIniziale: 'C:\\',
+	paginaIniziale: RADICE_SISTEMA,
 	sessione: false,
 	cartelleAvvio: [],
 	dimensioneCartelle: 'mai',

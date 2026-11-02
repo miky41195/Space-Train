@@ -52,10 +52,55 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: Space Train ${{ github.ref_name }}
           releaseBody: |
-            **New install:** download the file ending in `_x64-setup.exe` below and run it.
-            Copies already installed update themselves at the next start.
+            **New install on Windows:** download the file ending in `_x64-setup.exe` below and run it.
+            **On Linux:** the `.AppImage` runs on any distribution (and updates itself); `.deb` is for Debian/Ubuntu, `.rpm` for Fedora/openSUSE.
+            Copies already installed update themselves at the next start (AppImage on Linux).
 
             The `.sig` and `latest.json` files are used by the automatic updater: there is no need to download them.
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true
+
+  linux:
+    # After Windows, not beside it: both jobs add their entry to the same
+    # `latest.json`, and two writers at once would lose one of them.
+    needs: windows
+    if: github.actor == github.repository_owner
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: System libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri -> target
+
+      - name: Dipendenze
+        working-directory: app
+        run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+        with:
+          projectPath: app
+          args: --bundles deb,rpm,appimage
+          tagName: ${{ github.ref_name }}
+          releaseName: Space Train ${{ github.ref_name }}
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true

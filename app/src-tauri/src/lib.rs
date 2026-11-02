@@ -5,6 +5,7 @@ pub mod fs;
 pub mod ipc;
 pub mod lan;
 pub mod osserva;
+#[cfg(windows)]
 pub mod registry;
 pub mod shell;
 pub mod transfer;
@@ -68,12 +69,16 @@ pub fn run() {
         .setup(|app| {
             use tauri::Manager;
             registra_scorciatoia(app.handle());
+            // Without the Windows Shell the folder picker comes from the
+            // desktop (GTK or the portal), through the dialog plugin.
+            #[cfg(not(windows))]
+            app.handle().plugin(tauri_plugin_dialog::init())?;
             // Chi aveva scelto Space Train come predefinito lo ritrova anche
             // dopo un aggiornamento: fuori dal thread della finestra, il
             // registro può essere lento.
             // Solo nelle build di release: in sviluppo il registro finirebbe
             // a puntare all'eseguibile di prova.
-            #[cfg(not(debug_assertions))]
+            #[cfg(all(windows, not(debug_assertions)))]
             std::thread::spawn(|| {
                 if let (Ok(exe), Ok(classi)) = (std::env::current_exe(), registry::classi_utente()) {
                     if let Ok(true) = registry::riallinea(&classi, &exe.to_string_lossy()) {

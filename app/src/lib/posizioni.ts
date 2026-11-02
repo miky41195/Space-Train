@@ -85,6 +85,19 @@ export function briciole(path: string): Briciola[] {
 		return out;
 	}
 
+	if (ePosix(path)) {
+		const out: Briciola[] = [
+			{ nome: NOMI_VIRTUALI[QUESTO_PC], path: QUESTO_PC },
+			{ nome: 'File system', path: '/' }
+		];
+		let corrente = '';
+		for (const p of path.split('/').filter(Boolean)) {
+			corrente = `${corrente}/${p}`;
+			out.push({ nome: p, path: corrente });
+		}
+		return out;
+	}
+
 	const parti = path.split(/[\\/]/).filter(Boolean);
 	if (parti.length === 0) return [{ nome: path, path }];
 
@@ -109,8 +122,34 @@ export function nomeDi(path: string): string {
 	return i === -1 ? path : path.slice(i).replace(/[\\/]+$/, '');
 }
 
+/**
+ * A Linux/Unix path: starts at `/`. Virtual places (`::…`) and Windows
+ * paths (`C:\…`, `\\server\…`) never do.
+ */
+export function ePosix(path: string): boolean {
+	return path.startsWith('/');
+}
+
+/** The separator used inside `path`. */
+export function separatore(path: string): '/' | '\\' {
+	return ePosix(path) ? '/' : '\\';
+}
+
+/** `figlio` is `cartella` itself or somewhere inside it. */
+export function dentroDi(figlio: string, cartella: string): boolean {
+	const posix = ePosix(cartella);
+	const norm = (p: string) => (posix ? p : p.toLowerCase());
+	const c = norm(cartella).replace(/[\\/]+$/, '');
+	const f = norm(figlio);
+	return f === c || f.startsWith(c + separatore(cartella)) || (c === '' && posix);
+}
+
 /** La cartella che contiene `path`, solo per mostrarla. */
 export function cartellaDi(path: string): string {
+	if (ePosix(path)) {
+		const i = path.replace(/\/+$/, '').lastIndexOf('/');
+		return i <= 0 ? '/' : path.slice(0, i);
+	}
 	const i = path.lastIndexOf('\\');
 	if (i <= 0) return path;
 	const g = path.slice(0, i);
@@ -124,6 +163,13 @@ export function cartellaDi(path: string): string {
 export function volume(path: string): string {
 	if (path.startsWith('\\\\')) {
 		return path.split('\\').slice(0, 4).join('\\').toLowerCase();
+	}
+	if (ePosix(path)) {
+		// Removable disks and mounted shares live under these folders; the
+		// rest is taken as the system disk.
+		const parti = path.split('/').filter(Boolean);
+		const prof = parti[0] === 'media' ? 3 : parti[0] === 'run' && parti[1] === 'media' ? 4 : parti[0] === 'mnt' ? 2 : 0;
+		return prof > 0 && parti.length >= prof ? '/' + parti.slice(0, prof).join('/') : '/';
 	}
 	return path.slice(0, 2).toLowerCase();
 }
@@ -154,8 +200,15 @@ export function eEseguibile(nome: string): boolean {
 	return ESEGUIBILI.has(estensione(nome));
 }
 
-/** Due path indicano lo stesso elemento: Windows ignora le maiuscole. */
+/**
+ * Due path indicano lo stesso elemento: Windows ignora le maiuscole,
+ * Linux no.
+ */
 export function stessoPath(a: string, b: string): boolean {
+	if (ePosix(a) || ePosix(b)) {
+		const pulito = (p: string) => p.replace(/(.)\/+$/, '$1');
+		return pulito(a) === pulito(b);
+	}
 	return a.replace(/\\+$/, '').toLowerCase() === b.replace(/\\+$/, '').toLowerCase();
 }
 

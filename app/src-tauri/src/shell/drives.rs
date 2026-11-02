@@ -114,15 +114,95 @@ fn nome_volume(path: &str) -> Option<String> {
     Some(String::from_utf16_lossy(&nome[..fine]))
 }
 
+/// The root plus every volume the user would think of as a disk: what is
+/// mounted under `/media`, `/run/media` and `/mnt`, and network shares.
+/// System mounts (`/proc`, `/sys`, snaps, `/boot`…) stay out.
 #[cfg(not(windows))]
 pub fn list_drives() -> Vec<Drive> {
-    vec![Drive {
-        label: "/".into(),
-        path: "/".into(),
-        libero: None,
-        totale: None,
-        tipo: "fisso".into(),
-    }]
+    let testo = std::fs::read_to_string("/proc/self/mounts").unwrap_or_default();
+    let mut visti = std::collections::HashSet::new();
+    let mut dischi: Vec<Drive> = std::iter::once(("/".to_string(), String::new()))
+        .chain(montaggi_utente(&testo))
+        .filter(|(path, _)| visti.insert(path.clone()))
+        .map(|(path, fs)| {
+            let tipo = if matches!(fs.as_str(), "nfs" | "nfs4" | "cifs" | "smb3" | "fuse.sshfs") {
+                "rete"
+            } else if path.starts_with("/media/") || path.starts_with("/run/media/") {
+                "rimovibile"
+            } else {
+                "fisso"
+            };
+            let (libero, totale) = spazio(&path);
+            let label = if path == "/" {
+                "File system".to_string()
+            } else {
+                crate::shell::nome_di(&path)
+            };
+            Drive { label, path, libero, totale, tipo: tipo.into() }
+        })
+        .collect();
+    // The root first, the rest in name order.
+    dischi[1..].sort_by(|a, b| a.label.to_lowercase().cmp(&b.label.to_lowercase()));
+    dischi
+}
+
+/// `(mount point, filesystem)` of the user-facing mounts in `/proc/mounts`.
+#[cfg(not(windows))]
+fn montaggi_utente(testo: &str) -> Vec<(String, String)> {
+    testo
+        .lines()
+        .filter_map(|riga| {
+            let mut campi = riga.split_whitespace();
+            let _sorgente = campi.next()?;
+            let punto = decodifica_mount(campi.next()?);
+            let fs = campi.next()?.to_string();
+            let di_rete = matches!(fs.as_str(), "nfs" | "nfs4" | "cifs" | "smb3" | "fuse.sshfs");
+            let dell_utente = ["/media/", "/run/media/", "/mnt/"]
+                .iter()
+                .any(|r| punto.starts_with(r));
+            (dell_utente || di_rete).then_some((punto, fs))
+        })
+        .collect()
+}
+
+/// `/proc/mounts` writes spaces and tabs in octal: `\040`, `\011`.
+#[cfg(not(windows))]
+fn decodifica_mount(s: &str) -> String {
+    let mut out = String::new();
+    let mut resto = s;
+    while let Some(i) = resto.find('\\') {
+        out.push_str(&resto[..i]);
+        let codice = resto.get(i + 1..i + 4).and_then(|c| u8::from_str_radix(c, 8).ok());
+        match codice {
+            Some(b) => {
+                out.push(b as char);
+                resto = &resto[i + 4..];
+            }
+            None => {
+                out.push('\\');
+                resto = &resto[i + 1..];
+            }
+        }
+    }
+    out.push_str(resto);
+    out
+}
+
+/// Free and total bytes for the user, from `statvfs`.
+#[cfg(not(windows))]
+fn spazio(path: &str) -> (Option<u64>, Option<u64>) {
+    let Ok(c) = std::ffi::CString::new(path) else {
+        return (None, None);
+    };
+    let mut s: libc::statvfs = unsafe { std::mem::zeroed() };
+    if unsafe { libc::statvfs(c.as_ptr(), &mut s) } != 0 {
+        return (None, None);
+    }
+    let blocco = s.f_frsize as u64;
+    (
+        Some(s.f_bavail as u64 * blocco),
+        Some(s.f_blocks as u64 * blocco),
+    )
 }
 
 /// I volumi come voci di «Questo PC»: cartelle che si aprono sul disco.
@@ -149,6 +229,31 @@ pub fn come_voci() -> Vec<crate::fs::entry::Entry> {
 mod tests {
     use super::*;
 
+    #[cfg(not(windows))]
+    #[test]
+    fn root_comes_first_with_space() {
+        let d = list_drives();
+        assert_eq!(d[0].path, "/");
+        assert!(d[0].totale.unwrap() > 0);
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn keeps_only_user_mounts_and_decodes_spaces() {
+        let testo = "proc /proc proc rw 0 0\n\
+                     /dev/sdb1 /media/anna/Chiavetta\\040USB vfat rw 0 0\n\
+                     //nas/foto /home/anna/nas cifs rw 0 0\n\
+                     /dev/sda1 /boot ext4 rw 0 0\n";
+        assert_eq!(
+            montaggi_utente(testo),
+            vec![
+                ("/media/anna/Chiavetta USB".to_string(), "vfat".to_string()),
+                ("/home/anna/nas".to_string(), "cifs".to_string()),
+            ]
+        );
+    }
+
+    #[cfg(windows)]
     #[test]
     fn trova_almeno_un_volume() {
         let d = list_drives();
@@ -156,6 +261,7 @@ mod tests {
         assert!(d.iter().any(|x| x.path.starts_with("C:")));
     }
 
+    #[cfg(windows)]
     #[test]
     fn il_disco_di_sistema_ha_spazio_e_nome() {
         let c = list_drives().into_iter().find(|d| d.path == "C:\\").unwrap();

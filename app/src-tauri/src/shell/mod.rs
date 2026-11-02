@@ -1,4 +1,8 @@
 pub mod drives;
+#[cfg(windows)]
+pub mod icons;
+#[cfg(not(windows))]
+#[path = "icons_altri.rs"]
 pub mod icons;
 pub mod known;
 pub mod open;

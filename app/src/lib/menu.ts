@@ -1,5 +1,6 @@
 import type { Entry, SortKey, SortSpec } from './ipc';
-import { eEseguibile, eZip } from './posizioni';
+import { eEseguibile, eZip, nomeDi } from './posizioni';
+import { RADICE_SISTEMA, SOLO_WINDOWS, SU_LINUX } from './sistema';
 import type { ModoGruppi } from './raggruppa';
 import { TAGLIE, type Vista } from './vista';
 import type { IdAccento } from './temi';
@@ -142,7 +143,12 @@ export interface ContestoMenu {
  * disabilitate: un menu di cinque voci tutte attive si legge più in fretta
  * di uno da nove di cui quattro grigie.
  */
-export function vociMenu(c: ContestoMenu): VoceMenu[] {
+export function vociMenu(c: ContestoMenu, linux = SU_LINUX): VoceMenu[] {
+	const voci = vociPerPosizione(c);
+	return linux ? voci.filter((v) => !SOLO_WINDOWS.has(v.azione)) : voci;
+}
+
+function vociPerPosizione(c: ContestoMenu): VoceMenu[] {
 	const posizione = c.posizione ?? 'normale';
 	if (posizione === 'cestino') return vociCestino(c);
 	if (posizione === 'pc' || posizione === 'rete') return vociVirtuali(c, posizione);
@@ -466,7 +472,7 @@ export interface StatoVista {
 }
 
 /** La pagina iniziale predefinita: il disco di sistema, come prima della scelta. */
-export const INIZIALE_PREDEFINITA = 'C:\\';
+export const INIZIALE_PREDEFINITA = RADICE_SISTEMA;
 /** Pagina iniziale speciale: riprende l'ultima cartella aperta. */
 export const INIZIALE_ULTIMA = '::ultima';
 
@@ -481,7 +487,7 @@ function voceAvvio(allAvvio: boolean): VoceMenu {
 export function vociIniziale(iniziale: string = INIZIALE_PREDEFINITA, sessione = false): VoceMenu[] {
 	const scelte: Array<[AzioneMenu, string, string]> = [
 		['iniziale:pc', 'Questo PC', '::pc'],
-		['iniziale:c', 'Disco locale (C:)', INIZIALE_PREDEFINITA],
+		['iniziale:c', SU_LINUX ? 'File system (/)' : 'Disco locale (C:)', INIZIALE_PREDEFINITA],
 		['iniziale:ultima', 'Ultima cartella aperta', INIZIALE_ULTIMA]
 	];
 	const voci: VoceMenu[] = scelte.map(([azione, etichetta, valore]) => ({
@@ -491,7 +497,7 @@ export function vociIniziale(iniziale: string = INIZIALE_PREDEFINITA, sessione =
 	}));
 	// Una cartella scelta col menu contestuale compare col suo nome.
 	if (!scelte.some(([, , v]) => v.toLowerCase() === iniziale.toLowerCase())) {
-		const nome = iniziale.replace(/\\+$/, '').split('\\').pop() || iniziale;
+		const nome = nomeDi(iniziale) || iniziale;
 		voci.push({ azione: 'iniziale:attuale', etichetta: nome, spunta: true, nomeAccessibile: iniziale });
 	}
 	voci.push({ azione: 'sessione', etichetta: 'Riprendi le schede della volta scorsa', spunta: sessione });

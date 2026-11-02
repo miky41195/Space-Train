@@ -24,6 +24,20 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri-plugin-global-shortcut = "2.3.2"
 trash = "5.2.6"
+notify = "8"
+tauri-plugin-single-instance = "2"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+png = "0.18.1"
+base64 = "0.23.1"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+tokio-util = { version = "0.7", features = ["io-util"] }
+tokio = { version = "1", features = ["rt", "io-util", "time", "sync", "macros"] }
+iroh = "1.4"
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+data-encoding = "2"
+
+[target.'cfg(windows)'.dependencies]
 windows = { version = "0.62.2", features = [
     "Win32_UI_Shell",
     "Win32_UI_Shell_Common",
@@ -42,19 +56,11 @@ windows = { version = "0.62.2", features = [
     "Win32_Storage_FileSystem",
 ] }
 windows-core = "0.62"
-notify = "8"
 winreg = "0.55"
-tauri-plugin-single-instance = "2"
-zip = { version = "2", default-features = false, features = ["deflate"] }
-png = "0.18.1"
-base64 = "0.23.1"
-tauri-plugin-updater = "2"
-tauri-plugin-process = "2"
-tokio-util = { version = "0.7", features = ["io-util"] }
-tokio = { version = "1", features = ["rt", "io-util", "time", "sync", "macros"] }
-iroh = "1.4"
-qrcode = { version = "0.14", default-features = false, features = ["svg"] }
-data-encoding = "2"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+tauri-plugin-dialog = "2"
 
 [dev-dependencies]
 tempfile = "3"

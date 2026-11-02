@@ -42,18 +42,42 @@ pub fn open_default(path: &str) -> Result<(), FsError> {
     Ok(())
 }
 
+/// Opens with the desktop's default application through `xdg-open`. The
+/// path is one argument, never a shell line: no name can become a command.
 #[cfg(not(windows))]
-pub fn open_default(_path: &str) -> Result<(), FsError> {
-    Err(FsError::NotFound)
+pub fn open_default(path: &str) -> Result<(), FsError> {
+    if !std::path::Path::new(path).exists() {
+        return Err(FsError::NotFound);
+    }
+    lancia(Command::new("xdg-open").arg(path))
+}
+
+/// Starts a helper program and reaps it in the background, so it does not
+/// linger as a zombie process until the app quits.
+#[cfg(not(windows))]
+fn lancia(comando: &mut Command) -> Result<(), FsError> {
+    let mut figlio = comando.spawn().map_err(|e| from_io(&e))?;
+    std::thread::spawn(move || {
+        let _ = figlio.wait();
+    });
+    Ok(())
 }
 
 /// Apre Esplora risorse selezionando il path indicato.
+#[cfg(windows)]
 pub fn reveal(path: &str) -> Result<(), FsError> {
     Command::new("explorer")
         .arg(format!("/select,{}", path))
         .spawn()
         .map(|_| ())
         .map_err(|e| from_io(&e))
+}
+
+/// Opens the folder that contains `path` in the desktop's file manager.
+#[cfg(not(windows))]
+pub fn reveal(path: &str) -> Result<(), FsError> {
+    let cartella = crate::fs::paths::parent_of(path).unwrap_or_else(|| path.to_string());
+    lancia(Command::new("xdg-open").arg(cartella))
 }
 
 /// Apre un terminale nella cartella `cartella`.
@@ -67,11 +91,11 @@ pub fn terminale(cartella: &str) -> Result<(), FsError> {
     if !dir.is_dir() {
         return Err(FsError::NotADirectory);
     }
-    if Command::new("wt.exe").args(["-d", "."]).current_dir(dir).spawn().is_ok() {
-        return Ok(());
-    }
     #[cfg(windows)]
     {
+        if Command::new("wt.exe").args(["-d", "."]).current_dir(dir).spawn().is_ok() {
+            return Ok(());
+        }
         use std::os::windows::process::CommandExt;
         /// La console nuova: l'app non ne ha una da prestare.
         const CREATE_NEW_CONSOLE: u32 = 0x0000_0010;
@@ -84,7 +108,30 @@ pub fn terminale(cartella: &str) -> Result<(), FsError> {
             .map_err(|e| from_io(&e))
     }
     #[cfg(not(windows))]
-    Err(FsError::NotFound)
+    {
+        // The desktop's own terminal first, then the common ones.
+        let candidati = [
+            "x-terminal-emulator",
+            "gnome-terminal",
+            "konsole",
+            "xfce4-terminal",
+            "kgx",
+            "ptyxis",
+            "tilix",
+            "kitty",
+            "alacritty",
+            "foot",
+            "xterm",
+        ];
+        for t in candidati {
+            if lancia(Command::new(t).current_dir(dir)).is_ok() {
+                return Ok(());
+            }
+        }
+        Err(FsError::Io {
+            message: "Nessun terminale trovato.".to_string(),
+        })
+    }
 }
 
 #[cfg(all(test, windows))]

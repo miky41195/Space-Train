@@ -2,7 +2,8 @@
 	import type { Backend, Drive, KnownFolder, Pari, StatoAmici, StatoLan } from '../ipc';
 	import type { TabsStore } from '../stores/tabs.svelte';
 	import Icona from './Icona.svelte';
-	import { QUESTO_PC, RETE, CESTINO, RETE_LOCALE, AMICI, byte, stessoPath, nomeDi } from '../posizioni';
+	import { QUESTO_PC, RETE, CESTINO, RETE_LOCALE, AMICI, byte, stessoPath, nomeDi, dentroDi } from '../posizioni';
+	import { SU_LINUX } from '../sistema';
 
 	let {
 		store,
@@ -92,17 +93,18 @@
 	let inAttesa = $derived(amici?.amici.filter((a) => a.stato === 'ricevuta').length ?? 0);
 
 	function dentro(path: string): boolean {
-		const t = store.activeTab?.path.toLowerCase();
-		return !!t && (t === path.toLowerCase() || t.startsWith(path.toLowerCase() + '\\'));
+		const t = store.activeTab?.path;
+		return !!t && dentroDi(t, path);
 	}
 
 	function corrente(path: string): boolean {
 		return store.activeTab ? stessoPath(store.activeTab.path, path) : false;
 	}
 
+	// «Rete» lists Windows network shares: there is nothing to show elsewhere.
 	const posizioni = [
 		{ path: QUESTO_PC, label: 'Questo PC' },
-		{ path: RETE, label: 'Rete' },
+		...(SU_LINUX ? [] : [{ path: RETE, label: 'Rete' }]),
 		{ path: CESTINO, label: 'Cestino' }
 	];
 </script>

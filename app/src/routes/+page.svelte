@@ -87,6 +87,7 @@
 		stessoPath,
 		stessoVolume
 	} from '$lib/posizioni';
+	import { RADICE_SISTEMA, SU_LINUX } from '$lib/sistema';
 
 	const impostazioni = new ImpostazioniStore();
 	// Come Esplora, ogni cartella ricorda come l'utente l'ha ordinata.
@@ -1049,6 +1050,8 @@
 	 */
 	async function trascina(voce: Entry) {
 		if (posizione === 'cestino' || posizione === 'rete' || posizione === 'pc') return;
+		// Dragging to other apps goes through the Windows Shell.
+		if (SU_LINUX) return;
 		// L'elenco dei PC in rete locale: trascinarne uno vorrebbe dire
 		// scaricare tutta la sua cartella condivisa.
 		if (posizione === 'lan' && store.activeTab?.path === RETE_LOCALE) return;
@@ -1304,7 +1307,7 @@
 				indirizzoInModifica = true;
 				return;
 			case 'nuovaScheda':
-				await store.openTab(store.activeTab?.path ?? 'C:\\');
+				await store.openTab(store.activeTab?.path ?? RADICE_SISTEMA);
 				return;
 			case 'nuovaFinestra':
 				return nuovaFinestra(store.activeTab?.path ?? null);
@@ -1321,7 +1324,7 @@
 			case 'su':
 				return store.goUp(id);
 			case 'proprieta':
-				return proprieta();
+				return SU_LINUX ? undefined : proprieta();
 			case 'anteprima':
 				return impostazioni.imposta('anteprima', !impostazioni.anteprima);
 		}
@@ -1503,7 +1506,7 @@
 		untrack(() => {
 			if (finestra !== 'main') {
 				const apri = (window as unknown as { __SPACE_TRAIN_APRI?: string | null }).__SPACE_TRAIN_APRI;
-				void store.openTab(apri ?? 'C:\\').then(() => (avviato = true));
+				void store.openTab(apri ?? RADICE_SISTEMA).then(() => (avviato = true));
 				return;
 			}
 			tauriBackend

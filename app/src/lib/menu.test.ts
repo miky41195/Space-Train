@@ -73,6 +73,14 @@ describe('vociMenu', () => {
 		expect(a).not.toContain('estrai');
 	});
 
+	it('on Linux leaves out what only the Windows Shell can do', () => {
+		const a = vociMenu({ selezione: voci(1), appuntiPieni: false }, true).map((v) => v.azione);
+		for (const solo of ['apriCon', 'altreOpzioni', 'proprieta', 'mostraInEsplora']) {
+			expect(a).not.toContain(solo);
+		}
+		expect(a).toEqual(expect.arrayContaining(['apri', 'comprimi', 'cestina']));
+	});
+
 	it('su una cartella offre di aprirla in una nuova scheda', () => {
 		const cartella = [{ ...voci(1)[0], name: 'Foto', kind: 'dir' as const }];
 		const a = azioni({ selezione: cartella, appuntiPieni: false });

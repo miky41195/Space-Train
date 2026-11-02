@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { ImpostazioniStore, DimensioneCartelle } from '../stores/impostazioni.svelte';
 	import { PAUSE_TRENO, INIZIALE_PREDEFINITA, INIZIALE_ULTIMA } from '../menu';
+	import { SU_LINUX } from '../sistema';
 
 	let {
 		impostazioni,
@@ -50,7 +51,7 @@
 
 	const INIZIALI = [
 		{ valore: '::pc', nome: 'Questo PC' },
-		{ valore: INIZIALE_PREDEFINITA, nome: 'Disco C:' },
+		{ valore: INIZIALE_PREDEFINITA, nome: SU_LINUX ? 'File system (/)' : 'Disco C:' },
 		{ valore: INIZIALE_ULTIMA, nome: 'L’ultima cartella aperta' }
 	];
 	const DIMENSIONI: { valore: DimensioneCartelle; nome: string }[] = [
@@ -116,14 +117,16 @@
 						impostazioni.imposta('sessione', !impostazioni.sessione)
 					)}
 				</div>
-				<div class="voce">
-					<span class="testo"
-						>Apri le cartelle con Space Train<small
-							>{predefinito ? 'Ora le cartelle si aprono qui invece che in Esplora risorse.' : 'Ora le cartelle si aprono in Esplora risorse.'}</small
-						></span
-					>
-					<button class="pulsante" onclick={onpredefinito}>{predefinito ? 'Ripristina Esplora risorse' : 'Imposta come predefinito'}</button>
-				</div>
+				{#if !SU_LINUX}
+					<div class="voce">
+						<span class="testo"
+							>Apri le cartelle con Space Train<small
+								>{predefinito ? 'Ora le cartelle si aprono qui invece che in Esplora risorse.' : 'Ora le cartelle si aprono in Esplora risorse.'}</small
+							></span
+						>
+						<button class="pulsante" onclick={onpredefinito}>{predefinito ? 'Ripristina Esplora risorse' : 'Imposta come predefinito'}</button>
+					</div>
+				{/if}
 			{:else if sezione === 'file'}
 				<h3>File e cartelle</h3>
 				<label class="voce">

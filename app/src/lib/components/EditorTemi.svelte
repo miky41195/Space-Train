@@ -20,6 +20,7 @@
 		type Cornice
 	} from '../temi';
 	import { FIGURE, svgFigura } from '../figure';
+	import { nomeDi } from '../posizioni';
 	import { convertFileSrc } from '@tauri-apps/api/core';
 	import {
 		codifica,
@@ -341,7 +342,7 @@
 				return;
 			}
 			const tolti = togliSfondo(img, { colore, tolleranza: o.tolleranza, soloBordi: o.soloBordi });
-			const base = (sorgente.split('\\').pop() ?? 'immagine').replace(/\.[^.]+$/, '');
+			const base = (nomeDi(sorgente) || 'immagine').replace(/\.[^.]+$/, '');
 			const nuovo = await backend.saveThemeImage(`${base}-trasparente.png`, await scriviPng(img));
 			originali = { ...originali, [nuovo]: sorgente };
 			immagini[i] = conImmagine(immagini[i], nuovo);
@@ -606,7 +607,7 @@
 							{@const foglio = decodifica(voce)}
 							{@const o = sfondoDi(i)}
 							{@const m = movimenti[i] ?? CAMMINA}
-							{@const nome = percorsoDi(voce).split('\\').pop() ?? ''}
+							{@const nome = nomeDi(percorsoDi(voce))}
 							<li>
 								<div class="testa">
 									<span class="nome-file">{nome}</span>

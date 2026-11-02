@@ -189,6 +189,39 @@ pub async fn move_to_trash(paths: Vec<String>) -> Result<(), FsError> {
     fuori_dalla_finestra(move || ops::move_to_trash(&paths)).await
 }
 
+#[cfg(windows)]
+pub use predefinito::*;
+
+/// «Set as default file manager» lives in the Windows registry: elsewhere
+/// the frontend hides it, and the app never claims to be the default.
+#[cfg(not(windows))]
+mod predefinito {
+    use super::*;
+
+    #[tauri::command]
+    pub async fn set_as_default() -> Result<String, FsError> {
+        Err(FsError::Io {
+            message: "Funzione disponibile solo su Windows.".to_string(),
+        })
+    }
+
+    #[tauri::command]
+    pub async fn restore_windows_explorer() -> Result<(), FsError> {
+        Ok(())
+    }
+
+    #[tauri::command]
+    pub async fn is_default() -> Result<bool, FsError> {
+        Ok(false)
+    }
+}
+
+#[cfg(not(windows))]
+pub use predefinito::*;
+
+#[cfg(windows)]
+mod predefinito {
+use super::*;
 use crate::registry;
 
 fn exe_path() -> Result<String, FsError> {
@@ -241,6 +274,7 @@ pub async fn restore_windows_explorer(app: tauri::AppHandle) -> Result<(), FsErr
 pub async fn is_default() -> Result<bool, FsError> {
     let exe = exe_path()?;
     fuori_dalla_finestra(move || Ok(registry::e_predefinito(&registry::classi_utente()?, &exe))).await
+}
 }
 
 /// Elimina senza Cestino. La conferma esplicita sta nel frontend.
@@ -406,6 +440,76 @@ mod finestra {
 }
 
 #[cfg(windows)]
+pub use finestra::*;
+
+/// Elsewhere there is no Windows Shell: the frontend hides what needs it
+/// (system menu, Properties, Open with, run as admin, drag to other apps).
+/// These answer anyway, so a stray call fails cleanly instead of hanging.
+#[cfg(not(windows))]
+mod finestra {
+    use super::*;
+    use crate::shell::nativo;
+
+    fn non_disponibile() -> FsError {
+        FsError::Io {
+            message: "Funzione disponibile solo su Windows.".to_string(),
+        }
+    }
+
+    #[tauri::command]
+    pub async fn start_drag(_paths: Vec<String>) -> Result<String, FsError> {
+        Err(non_disponibile())
+    }
+
+    #[tauri::command]
+    pub async fn show_shell_menu(
+        _paths: Vec<String>,
+        _folder: String,
+        _x: f64,
+        _y: f64,
+    ) -> Result<nativo::EsitoMenu, FsError> {
+        Err(non_disponibile())
+    }
+
+    #[tauri::command]
+    pub async fn show_properties(_paths: Vec<String>) -> Result<(), FsError> {
+        Err(non_disponibile())
+    }
+
+    #[tauri::command]
+    pub async fn open_with(_path: String) -> Result<(), FsError> {
+        Err(non_disponibile())
+    }
+
+    /// The desktop's folder picker. `None` if the user cancels.
+    #[tauri::command]
+    pub async fn scegli_cartella(
+        window: tauri::WebviewWindow,
+        titolo: String,
+        iniziale: Option<String>,
+    ) -> Result<Option<String>, FsError> {
+        use tauri_plugin_dialog::DialogExt;
+        let mut dialogo = window.dialog().file().set_title(titolo).set_parent(&window);
+        if let Some(i) = iniziale.filter(|i| std::path::Path::new(i).is_dir()) {
+            dialogo = dialogo.set_directory(i);
+        }
+        let (invia, ricevi) = tokio::sync::oneshot::channel();
+        dialogo.pick_folder(move |scelta| {
+            let _ = invia.send(scelta);
+        });
+        let scelta = ricevi.await.ok().flatten();
+        Ok(scelta
+            .and_then(|s| s.into_path().ok())
+            .map(|p| p.to_string_lossy().into_owned()))
+    }
+
+    #[tauri::command]
+    pub async fn run_as_admin(_path: String) -> Result<(), FsError> {
+        Err(non_disponibile())
+    }
+}
+
+#[cfg(not(windows))]
 pub use finestra::*;
 
 /// I tipi di file del menu «Nuovo», come li offre Windows.

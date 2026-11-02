@@ -2,6 +2,7 @@
 	import { getCurrentWindow } from '@tauri-apps/api/window';
 	import type { TabsStore } from '../stores/tabs.svelte';
 	import { NUOVA_SCHEDA, eVirtuale, nomePosizione } from '../posizioni';
+	import { RADICE_SISTEMA } from '../sistema';
 
 	let {
 		store,
@@ -71,7 +72,7 @@
 		{/each}
 		<button
 			class="nuovo"
-			onclick={() => store.openTab(store.activeTab?.path ?? 'C:\\')}
+			onclick={() => store.openTab(store.activeTab?.path ?? RADICE_SISTEMA)}
 			title="Nuova scheda (Ctrl+T)"
 			aria-label="Nuova scheda"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.5" /></svg></button
 		>
