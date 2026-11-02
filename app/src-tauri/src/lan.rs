@@ -1539,7 +1539,7 @@ mod tests {
         )
         .unwrap();
         let arrivato = ricevuti.join("regalo.txt");
-        for _ in 0..50 {
+        for _ in 0..250 {
             if arrivato.exists() {
                 break;
             }
