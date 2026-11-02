@@ -14,6 +14,13 @@ export interface Novita {
 
 export const NOVITA: Novita[] = [
 	{
+		versione: '0.4.0',
+		voci: [
+			'Anche l’eliminazione ha la sua barra di avanzamento: spostare nel cestino, eliminare definitivamente e svuotare il cestino mostrano quanti elementi mancano, e si possono annullare a metà.',
+			'Space Train arriva su Linux: dischi e chiavette montati, cartelle personali, cestino del sistema e apertura dei file con il programma predefinito.'
+		]
+	},
+	{
 		versione: '0.3.0',
 		voci: [
 			'Quattro mondi nuovi con forme tutte loro: Cianografia, Abisso, Atlante e Orient Express, ognuno con i suoi personaggi sul binario.',
