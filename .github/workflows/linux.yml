@@ -49,6 +49,6 @@ jobs:
         run: |
           set -o pipefail
           cargo test --lib 2>&1 | tee test.log || {
-            grep -E '^error(\[|:)|^---- .* stdout ----|panicked at|^test .* FAILED' test.log | head -40 | sed 's/^/::error::/'
+            grep -E -A4 '^error(\[|:)|panicked at' test.log | head -60 | sed 's/^/::error::/'
             exit 1
           }
