@@ -10,7 +10,14 @@ pub mod registry;
 pub mod shell;
 pub mod transfer;
 
-/// Registra `Ctrl+Alt+E` per riportare la finestra in primo piano.
+/// System-wide hotkey that brings the window back to the front.
+///
+/// Not `Ctrl+Alt+E`: on Windows AltGr is Ctrl+Alt, so that hotkey swallowed
+/// AltGr+E (é, €) everywhere and popped the app up instead of typing.
+/// A combination with the Win key never produces a character.
+const SCORCIATOIA: &str = "super+shift+e";
+
+/// Registra [`SCORCIATOIA`] per riportare la finestra in primo piano.
 ///
 /// Un fallimento non è fatale e non deve esserlo: la scorciatoia è già
 /// occupata se un'altra copia dell'app è in esecuzione o se un altro
@@ -19,7 +26,7 @@ pub mod transfer;
 fn registra_scorciatoia(app: &tauri::AppHandle) {
     use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
-    let esito = app.global_shortcut().on_shortcut("ctrl+alt+e", |app, _, event| {
+    let esito = app.global_shortcut().on_shortcut(SCORCIATOIA, |app, _, event| {
         if event.state() != ShortcutState::Pressed {
             return;
         }
@@ -172,4 +179,17 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("errore durante l'avvio dell'applicazione");
+}
+
+#[cfg(test)]
+mod tests {
+    use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut};
+
+    #[test]
+    fn the_hotkey_uses_win_not_altgr() {
+        let s: Shortcut = super::SCORCIATOIA.parse().unwrap();
+        assert_eq!(s, Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyE));
+        // AltGr is Ctrl+Alt on Windows: a hotkey on it eats typed characters.
+        assert!(!s.mods.contains(Modifiers::CONTROL | Modifiers::ALT));
+    }
 }
