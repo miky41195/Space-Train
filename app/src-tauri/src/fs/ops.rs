@@ -332,6 +332,7 @@ mod tests {
         assert_eq!(file.seleziona, Some(f.to_string_lossy().into_owned()));
     }
 
+    #[cfg(windows)]
     #[test]
     fn la_barra_espande_le_variabili_e_capisce_le_posizioni_speciali() {
         std::env::set_var("SPACE_TRAIN_PROVA", r"C:\");

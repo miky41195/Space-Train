@@ -43,7 +43,8 @@ pub fn interpreta(argomenti: &[String]) -> Option<Richiesta> {
             "/select" => seleziona = true,
             "/e" | "/n" | "/root" | "/separate" => {}
             _ if p.eq_ignore_ascii_case(CLSID_QUESTO_PC) => return Some(Richiesta::QuestoPc),
-            _ if p.starts_with('/') || p.starts_with('-') => {}
+            // Elsewhere a leading `/` is a path, not an Explorer option.
+            _ if (cfg!(windows) && p.starts_with('/')) || p.starts_with('-') => {}
             _ => {
                 // Un path può contenere virgole: tutto ciò che segue la prima
                 // parte non-opzione appartiene al path.
@@ -103,6 +104,15 @@ mod tests {
             Some(Richiesta::Percorso(r"C:\Dati".into()))
         );
         assert_eq!(interpreta(&a(&[CLSID_QUESTO_PC])), Some(Richiesta::QuestoPc));
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn a_linux_path_is_a_path() {
+        assert_eq!(
+            interpreta(&a(&["/home/anna/Foto"])),
+            Some(Richiesta::Percorso("/home/anna/Foto".into()))
+        );
     }
 
     #[test]

@@ -45,4 +45,10 @@ jobs:
 
       - name: Rust tests
         working-directory: app/src-tauri
-        run: cargo test --lib
+        # Failures also become annotations, readable on the run page.
+        run: |
+          set -o pipefail
+          cargo test --lib 2>&1 | tee test.log || {
+            grep -E '^error(\[|:)|^---- .* stdout ----|panicked at|^test .* FAILED' test.log | head -40 | sed 's/^/::error::/'
+            exit 1
+          }

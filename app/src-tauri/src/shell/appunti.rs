@@ -186,6 +186,7 @@ mod tests {
     use super::*;
 
     /// Un solo test tocca gli appunti veri: in parallelo si pesterebbero.
+    #[cfg(windows)]
     #[test]
     fn copia_e_taglio_fanno_il_giro_degli_appunti() {
         let paths = vec![r"C:\Windows\notepad.exe".to_string(), r"C:\file con spazi.txt".to_string()];
