@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Progresso } from '../ipc';
+	import type { ModoBarra } from '../progresso';
 
 	let {
 		progresso,
@@ -7,7 +8,7 @@
 		oncancel
 	}: {
 		progresso: Progresso;
-		modo: 'copy' | 'move' | 'comprimi' | 'estrai' | 'invio' | 'ricezione';
+		modo: ModoBarra;
 		oncancel: () => void;
 	} = $props();
 
@@ -23,8 +24,17 @@
 		comprimi: 'Compressione',
 		estrai: 'Estrazione',
 		invio: 'Invio in rete locale',
-		ricezione: 'Ricezione dalla rete locale'
+		ricezione: 'Ricezione dalla rete locale',
+		cestino: 'Spostamento nel Cestino',
+		elimina: 'Eliminazione'
 	} as const;
+
+	/** Deletions count items: bytes would say nothing about how long is left. */
+	let aElementi = $derived(modo === 'cestino' || modo === 'elimina');
+
+	function elementi(n: number): string {
+		return n === 1 ? '1 elemento' : `${n} elementi`;
+	}
 
 	function byte(n: number): string {
 		if (n < 1024) return `${n} B`;
@@ -50,7 +60,11 @@
 	</div>
 
 	<span class="numeri">
-		{byte(progresso.transferred)} di {byte(progresso.total)} · {percentuale}%
+		{#if aElementi}
+			{progresso.transferred} di {elementi(progresso.total)} · {percentuale}%
+		{:else}
+			{byte(progresso.transferred)} di {byte(progresso.total)} · {percentuale}%
+		{/if}
 	</span>
 
 	<button onclick={oncancel}>Annulla</button>

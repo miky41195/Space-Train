@@ -23,7 +23,7 @@ fn errore(e: trash::Error) -> FsError {
     FsError::Io { message }
 }
 
-fn path_di(item: &TrashItem) -> String {
+pub(crate) fn path_di(item: &TrashItem) -> String {
     format!("{}\\{}", RADICE, item.id.to_string_lossy())
 }
 
@@ -73,6 +73,21 @@ fn scegli(paths: &[String]) -> Result<Vec<TrashItem>, FsError> {
         .into_iter()
         .filter(|v| ids.contains(&v.id))
         .collect())
+}
+
+/// The selected items, or every item when `paths` is `None`.
+pub(crate) fn voci(paths: Option<&[String]>) -> Result<Vec<TrashItem>, FsError> {
+    match paths {
+        Some(p) => scegli(p),
+        None => trash::os_limited::list().map_err(errore),
+    }
+}
+
+pub(crate) fn elimina_voci(voci: Vec<TrashItem>) -> Result<(), FsError> {
+    if voci.is_empty() {
+        return Ok(());
+    }
+    trash::os_limited::purge_all(voci).map_err(errore)
 }
 
 pub fn ripristina(paths: &[String]) -> Result<(), FsError> {

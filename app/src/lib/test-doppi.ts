@@ -52,6 +52,9 @@ export function backendFinto(over: Partial<Backend> = {}): Backend {
 		async trashRestore() {},
 		async trashPurge() {},
 		async trashEmpty() {},
+		async deleteItems({ paths }) {
+			return paths;
+		},
 		async trashRestoreOriginals() {},
 		async textPreview() {
 			return null;

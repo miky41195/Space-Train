@@ -29,6 +29,7 @@
 	import ConfermaCestino from '$lib/components/ConfermaCestino.svelte';
 	import ConfermaConflitti from '$lib/components/ConfermaConflitti.svelte';
 	import BarraProgresso from '$lib/components/BarraProgresso.svelte';
+	import type { ModoBarra } from '$lib/progresso';
 	import Rail from '$lib/components/Rail.svelte';
 	import Icona from '$lib/components/Icona.svelte';
 	import Treno from '$lib/components/Treno.svelte';
@@ -41,7 +42,7 @@
 	import { AccessoRapidoStore } from '$lib/stores/accessoRapido.svelte';
 	import { ImpostazioniStore, type Colonne } from '$lib/stores/impostazioni.svelte';
 	import { AnnullaStore } from '$lib/stores/annulla.svelte';
-	import type { Politica, Progresso, SortKey } from '$lib/ipc';
+	import type { ModoElimina, Politica, Progresso, SortKey } from '$lib/ipc';
 	import MenuContestuale from '$lib/components/MenuContestuale.svelte';
 	import GalleriaTemi from '$lib/components/GalleriaTemi.svelte';
 	import FinestraImpostazioni from '$lib/components/FinestraImpostazioni.svelte';
@@ -548,15 +549,46 @@
 		else if (posizione === 'normale') daEliminare = { voci: scelte, tipo: 'disco' };
 	}
 
+	/**
+	 * Deletes with the same progress bar as transfers, counted in items.
+	 * With a transfer already on the bar, the deletion runs without showing
+	 * it. Returns the paths actually removed: the user can stop halfway.
+	 */
+	async function eliminaConBarra(mode: ModoElimina, paths: string[]): Promise<string[]> {
+		const opId = prossimoOpId++;
+		const mostra = opInCorso === null;
+		if (mostra) {
+			modoInCorso = mode === 'cestino' ? 'cestino' : 'elimina';
+			opInCorso = opId;
+			progresso = { transferred: 0, total: 0 };
+		}
+		try {
+			return await tauriBackend.deleteItems({
+				opId,
+				mode,
+				paths,
+				onProgress: (p) => {
+					if (mostra) progresso = p;
+				}
+			});
+		} finally {
+			if (mostra) {
+				opInCorso = null;
+				progresso = null;
+			}
+		}
+	}
+
 	async function cestina(voci = daCestinare) {
 		daCestinare = [];
 		erroreOp = null;
 		try {
-			await tauriBackend.moveToTrash(voci.map((v) => v.path));
-			annulla.registra({ tipo: 'cestino', originali: voci.map((v) => v.path) });
+			const fatti = await eliminaConBarra('cestino', voci.map((v) => v.path));
+			if (fatti.length > 0) annulla.registra({ tipo: 'cestino', originali: fatti });
 			await ricarica();
 		} catch (e) {
 			erroreOp = descriviErrore(e);
+			await ricarica();
 		}
 	}
 
@@ -567,12 +599,13 @@
 		erroreOp = null;
 		try {
 			const paths = richiesta.voci.map((v) => v.path);
-			if (richiesta.tipo === 'disco') await tauriBackend.deletePermanently(paths);
-			else if (richiesta.tipo === 'cestino') await tauriBackend.trashPurge(paths);
-			else await tauriBackend.trashEmpty();
+			const modo: ModoElimina =
+				richiesta.tipo === 'disco' ? 'disco' : richiesta.tipo === 'cestino' ? 'dalCestino' : 'svuota';
+			await eliminaConBarra(modo, modo === 'svuota' ? [] : paths);
 			await ricarica();
 		} catch (e) {
 			erroreOp = descriviErrore(e);
+			await ricarica();
 		}
 	}
 
@@ -605,7 +638,7 @@
 	// ── Appunti e trasferimenti ──────────────────────────────────────
 
 	let progresso = $state<Progresso | null>(null);
-	let modoInCorso = $state<'copy' | 'move' | 'comprimi' | 'estrai' | 'invio' | 'ricezione'>('copy');
+	let modoInCorso = $state<ModoBarra>('copy');
 	let opInCorso = $state<number | null>(null);
 	/** Trasferimento in attesa che l'utente risolva i conflitti di nome. */
 	let inSospeso = $state<{ sources: string[]; dest: string; mode: 'copy' | 'move' } | null>(null);

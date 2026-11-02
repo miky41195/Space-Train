@@ -151,15 +151,15 @@ pub async fn search(
 }
 
 /// Esegue un lavoro lungo su archivi con barra d'avanzamento e annullamento.
-async fn con_avanzamento(
+async fn con_avanzamento<T: Send + 'static>(
     state: &Operazioni,
     op_id: u64,
     totale: impl FnOnce() -> u64 + Send + 'static,
     on_progress: Channel<Progresso>,
-    lavoro: impl FnOnce(&AtomicBool, &mut dyn FnMut(u64)) -> Result<String, FsError>
+    lavoro: impl FnOnce(&AtomicBool, &mut dyn FnMut(u64)) -> Result<T, FsError>
         + Send
         + 'static,
-) -> Result<String, FsError> {
+) -> Result<T, FsError> {
     let annulla = state.registra(op_id);
     let esito = tauri::async_runtime::spawn_blocking(move || {
         let total = totale();
@@ -217,6 +217,53 @@ pub async fn extract(
         move || crate::fs::archivi::peso_archivio(&per_peso),
         on_progress,
         move |annulla, avanza| crate::fs::archivi::estrai(&archive, annulla, avanza),
+    )
+    .await
+}
+
+/// What a deletion with progress removes.
+#[derive(serde::Deserialize, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+pub enum ModoElimina {
+    /// To the Trash: recoverable.
+    Cestino,
+    /// From disk, skipping the Trash.
+    Disco,
+    /// Selected items already in the Trash, for good.
+    DalCestino,
+    /// Everything in the Trash.
+    Svuota,
+}
+
+/// Deletes with a progress bar counted in items. Can be cancelled between
+/// items: returns the paths actually removed, so the frontend undoes only
+/// those. The user's confirmation happens in the frontend, before this.
+#[tauri::command]
+pub async fn delete_items(
+    state: tauri::State<'_, Operazioni>,
+    op_id: u64,
+    mode: ModoElimina,
+    paths: Vec<String>,
+    on_progress: Channel<Progresso>,
+) -> Result<Vec<String>, FsError> {
+    use crate::fs::elimina;
+    let per_conto = paths.clone();
+    con_avanzamento(
+        &state,
+        op_id,
+        move || match mode {
+            ModoElimina::Cestino => per_conto.len() as u64,
+            ModoElimina::Disco => elimina::conta_tutti(&per_conto),
+            ModoElimina::DalCestino => elimina::conta_nel_cestino(Some(&per_conto)),
+            ModoElimina::Svuota => elimina::conta_nel_cestino(None),
+        },
+        on_progress,
+        move |annulla, avanza| match mode {
+            ModoElimina::Cestino => elimina::cestina(&paths, annulla, avanza),
+            ModoElimina::Disco => elimina::elimina_disco(&paths, annulla, avanza),
+            ModoElimina::DalCestino => elimina::elimina_dal_cestino(Some(&paths), annulla, avanza),
+            ModoElimina::Svuota => elimina::elimina_dal_cestino(None, annulla, avanza),
+        },
     )
     .await
 }

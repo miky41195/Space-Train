@@ -573,7 +573,7 @@ describe('operazioni sui file', () => {
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Sposta nel Cestino' }));
 		await waitFor(() => expect(disco.cestino).toEqual(['C:\\alfa.txt']));
-		expect(nomi()).not.toContain('alfa.txt');
+		await waitFor(() => expect(nomi()).not.toContain('alfa.txt'));
 	});
 
 	it('annullare la conferma non cestina nulla', async () => {
@@ -1109,6 +1109,22 @@ describe('eliminazione definitiva', () => {
 
 		await waitFor(() => expect(disco.esiste('C:\\alfa.txt')).toBe(false));
 		expect(disco.cestino).toEqual([]);
+	});
+
+	it('shows the progress bar, counted in items, while deleting', async () => {
+		let sblocca = () => {};
+		disco.bloccaEliminazione = new Promise((r) => (sblocca = r));
+		await monta();
+		await fireEvent.click(riga('alfa.txt'));
+		tasto('Delete', { shift: true });
+		await fireEvent.click(await screen.findByRole('button', { name: 'Elimina definitivamente' }));
+
+		expect(await screen.findByText('Eliminazione in corso…')).toBeTruthy();
+		expect(screen.getByText(/0 di 1 elemento/)).toBeTruthy();
+
+		sblocca();
+		await waitFor(() => expect(screen.queryByText('Eliminazione in corso…')).toBeNull());
+		expect(disco.esiste('C:\\alfa.txt')).toBe(false);
 	});
 });
 

@@ -277,7 +277,20 @@ export interface Backend {
 		onProgress: (p: Progresso) => void;
 	}): Promise<string>;
 	extract(opts: { opId: number; archive: string; onProgress: (p: Progresso) => void }): Promise<string>;
+	/**
+	 * Deletes with progress counted in items. Cancellable between items:
+	 * resolves with the paths actually removed.
+	 */
+	deleteItems(opts: {
+		opId: number;
+		mode: ModoElimina;
+		paths: string[];
+		onProgress: (p: Progresso) => void;
+	}): Promise<string[]>;
 }
+
+/** To the Trash, from disk, selected items out of the Trash, or all of it. */
+export type ModoElimina = 'cestino' | 'disco' | 'dalCestino' | 'svuota';
 
 function canale<T>(su: (m: T) => void): Channel<T> {
 	const c = new Channel<T>();
@@ -355,5 +368,7 @@ export const tauriBackend: Backend = {
 	compress: ({ opId, sources, dest, onProgress }) =>
 		invoke('compress', { opId, sources, dest, onProgress: canale(onProgress) }),
 	extract: ({ opId, archive, onProgress }) =>
-		invoke('extract', { opId, archive, onProgress: canale(onProgress) })
+		invoke('extract', { opId, archive, onProgress: canale(onProgress) }),
+	deleteItems: ({ opId, mode, paths, onProgress }) =>
+		invoke('delete_items', { opId, mode, paths, onProgress: canale(onProgress) })
 };

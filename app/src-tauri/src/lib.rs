@@ -163,6 +163,7 @@ pub fn run() {
             transfer::search,
             transfer::compress,
             transfer::extract,
+            transfer::delete_items,
         ])
         .run(tauri::generate_context!())
         .expect("errore durante l'avvio dell'applicazione");

@@ -35,6 +35,8 @@ export class DiscoFinto {
 	/** Path originali di ciò che è stato cestinato, in ordine. */
 	cestino: string[] = [];
 	aperti: string[] = [];
+	/** While set, `delete_items` waits for it: lets a test see the bar. */
+	bloccaEliminazione: Promise<void> | null = null;
 	/** Byte liberi su C:, che un test può cambiare come farebbe un altro programma. */
 	liberoC = 40;
 	/** Gli appunti di Windows. */
@@ -181,6 +183,18 @@ export class DiscoFinto {
 			case 'trash_empty':
 				this.#nelCestino = [];
 				return null;
+			case 'delete_items': {
+				const mode = args.mode as 'cestino' | 'disco' | 'dalCestino' | 'svuota';
+				const paths = args.paths as string[];
+				const canale = args.onProgress as Canale<{ transferred: number; total: number }>;
+				const totale = mode === 'svuota' ? this.#nelCestino.length : paths.length;
+				canale.onmessage?.({ transferred: 0, total: totale });
+				if (this.bloccaEliminazione) await this.bloccaEliminazione;
+				const comando = { cestino: 'move_to_trash', disco: 'delete_permanently', dalCestino: 'trash_purge', svuota: 'trash_empty' }[mode];
+				await this.invoke(comando, { paths });
+				canale.onmessage?.({ transferred: totale, total: totale });
+				return paths;
+			}
 			case 'scan_conflicts':
 				return (args.sources as string[])
 					.map(nome)
