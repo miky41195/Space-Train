@@ -1538,14 +1538,18 @@ mod tests {
             &mut |_, _| {},
         )
         .unwrap();
+        // The receiver creates the file before writing it: wait for the
+        // content, not just the name.
         let arrivato = ricevuti.join("regalo.txt");
+        let mut letto = String::new();
         for _ in 0..250 {
-            if arrivato.exists() {
+            letto = fs::read_to_string(&arrivato).unwrap_or_default();
+            if letto == "per te" {
                 break;
             }
             std::thread::sleep(Duration::from_millis(20));
         }
-        assert_eq!(fs::read_to_string(arrivato).unwrap(), "per te");
+        assert_eq!(letto, "per te");
     }
 
     #[test]

@@ -19,7 +19,7 @@ const shots = path.resolve('e2e/shots');
 const home = os.homedir();
 const folder = path.join(home, 'st-e2e');
 const trashFiles = path.join(process.env.XDG_DATA_HOME || path.join(home, '.local/share'), 'Trash/files');
-const ELEMENT = 'element-6066-11e4-a23d-4ec7b6e5f6';
+const ELEMENT = 'element-6066-11e4-a23d-4ec7b6e5f66';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -65,7 +65,9 @@ const names = () => run(`return [...document.querySelectorAll('.row .name, .cell
 
 async function click(what, script, ...args) {
 	const el = await until(what, () => run(script, ...args));
-	await wd('POST', `/session/${session}/element/${el[ELEMENT]}/click`, {});
+	const id = el[ELEMENT] ?? Object.values(el)[0];
+	if (!id) throw new Error(`${what}: no element reference in ${JSON.stringify(el)}`);
+	await wd('POST', `/session/${session}/element/${id}/click`, {});
 }
 
 const clickRow = (name) =>
