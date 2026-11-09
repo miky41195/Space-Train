@@ -70,6 +70,10 @@ export interface Esito {
 	coppie: Array<[string, string]>;
 }
 
+export type DuplicateEvent =
+	| { kind: 'progress'; done: number; total: number }
+	| { kind: 'group'; size: number; entries: Entry[] };
+
 export interface CriteriRicerca {
 	testo: string;
 	contenuto: boolean;
@@ -270,6 +274,12 @@ export interface Backend {
 		criteri: CriteriRicerca;
 		onResults: (lotto: Entry[]) => void;
 	}): Promise<number>;
+	findDuplicates(opts: {
+		opId: number;
+		root: string;
+		hidden: boolean;
+		onEvent: (e: DuplicateEvent) => void;
+	}): Promise<number>;
 	compress(opts: {
 		opId: number;
 		sources: string[];
@@ -365,6 +375,8 @@ export const tauriBackend: Backend = {
 		invoke('lan_scarica', { opId, sources, dest, onProgress: canale(onProgress) }),
 	search: ({ opId, root, criteri, onResults }) =>
 		invoke('search', { opId, root, criteri, onResults: canale(onResults) }),
+	findDuplicates: ({ opId, root, hidden, onEvent }) =>
+		invoke('find_duplicates', { opId, root, hidden, onEvent: canale(onEvent) }),
 	compress: ({ opId, sources, dest, onProgress }) =>
 		invoke('compress', { opId, sources, dest, onProgress: canale(onProgress) }),
 	extract: ({ opId, archive, onProgress }) =>

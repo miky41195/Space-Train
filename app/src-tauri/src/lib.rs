@@ -173,6 +173,7 @@ pub fn run() {
             transfer::lan_invia,
             transfer::lan_scarica,
             transfer::search,
+            transfer::find_duplicates,
             transfer::compress,
             transfer::extract,
             transfer::delete_items,

@@ -67,7 +67,7 @@
 	} from '$lib/menu';
 	import { historyActionFor } from '$lib/mouse';
 	import { filterEntries } from '$lib/fuzzy';
-	import { impagina, type ModoGruppi } from '$lib/raggruppa';
+	import { impagina, duplicateZones, type ModoGruppi } from '$lib/raggruppa';
 	import { misuraCella, zoom, LATO_MIN, LATO_MAX, type Vista } from '$lib/vista';
 	import { applicaTema, coloreAccento, scalaTesto, temaDa, type IdAccento, type TemaPersonale } from '$lib/temi';
 	import EditorTemi from '$lib/components/EditorTemi.svelte';
@@ -258,6 +258,7 @@
 	 */
 	let impaginato = $derived.by(() => {
 		const tab = store.activeTab;
+		if (tab?.duplicati && tab.query === '') return { voci: filtrate, zone: duplicateZones(tab.duplicati.groups) };
 		if (!tab || tab.query !== '' || tab.risultati) return { voci: filtrate, zone: [] };
 		const prefs = posizione === 'normale' ? preferiti.di(tab.path) : NESSUNO;
 		// I recenti valgono dove le voci hanno una data vera: non in Questo
@@ -1271,6 +1272,13 @@
 			return;
 		}
 
+		// Esc leaves the duplicates view and goes back to the folder.
+		if (e.key === 'Escape' && store.activeTab?.duplicati) {
+			e.preventDefault();
+			void store.fermaRicerca(store.activeId);
+			return;
+		}
+
 		if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
 			e.preventDefault();
 			// In griglia su e giù saltano una riga intera, non una cella.
@@ -1673,7 +1681,8 @@
 		const tab = store.activeTab;
 		if (!tab || tab.loading) return null;
 		if (tab.risultati) {
-			return tab.risultati.length === 0 && !tab.cercando ? ('nessunRisultato' as const) : null;
+			if (tab.risultati.length > 0 || tab.cercando) return null;
+			return tab.duplicati ? ('nessunDuplicato' as const) : ('nessunRisultato' as const);
 		}
 
 		if (tab.entries.length === 0) {
@@ -2031,6 +2040,14 @@
 				case 'copiaPercorso':
 					await copiaPercorsi(scelte);
 					break;
+				case 'duplicati': {
+					const cartella = cartellaDelMenu(scelte);
+					if (cartella && id !== null) {
+						if (cartella !== store.activeTab?.path) await store.navigate(id, cartella);
+						void store.trovaDuplicati(id, store.showHidden).catch((e) => (erroreOp = descriviErrore(e)));
+					}
+					break;
+				}
 				case 'terminale': {
 					const cartella = cartellaDelMenu(scelte);
 					if (cartella) await tauriBackend.openTerminal(cartella);
@@ -2330,6 +2347,13 @@
 			     si trova. La schermata intera compare solo se non c'è nulla. -->
 			{#if store.activeTab?.error && store.activeTab.entries.length > 0}
 				<div class="errore">{messaggioErrore(store.activeTab.error)}</div>
+			{/if}
+			{#if store.activeTab?.duplicati && store.activeTab.cercando}
+				<BarraProgresso
+					progresso={store.activeTab.duplicati.progress}
+					modo="duplicati"
+					oncancel={() => store.activeId !== null && store.fermaRicerca(store.activeId, { tieniRisultati: true })}
+				/>
 			{/if}
 			{#if progresso}
 				<BarraProgresso {progresso} modo={modoInCorso} oncancel={annullaTrasferimento} />

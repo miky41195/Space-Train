@@ -32,6 +32,7 @@ describe('vociMenu', () => {
 			'condividi',
 			'paginaIniziale',
 			'cartellaAvvio',
+			'duplicati',
 			'terminale',
 			'altreOpzioni',
 			'proprieta'

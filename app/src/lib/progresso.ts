@@ -7,4 +7,5 @@ export type ModoBarra =
 	| 'invio'
 	| 'ricezione'
 	| 'cestino'
-	| 'elimina';
+	| 'elimina'
+	| 'duplicati';

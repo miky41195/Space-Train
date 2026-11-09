@@ -1,5 +1,6 @@
 import type { Entry } from './ipc';
 import { categoryFor } from './icons';
+import { byte } from './posizioni';
 
 export type ModoGruppi = 'nessuno' | 'nome' | 'tipo' | 'data' | 'dimensione';
 
@@ -191,4 +192,12 @@ function impaginaBase(
 	}
 
 	return { voci: ordinate, zone };
+}
+
+/** One zone per group of identical files: size of each copy and the space the extra copies take. */
+export function duplicateZones(groups: Array<{ size: number; count: number }>): Zona[] {
+	return groups.map((g) => ({
+		etichetta: `${byte(g.size)} ciascuna · recuperabili ${byte(g.size * (g.count - 1))}`,
+		quante: g.count
+	}));
 }

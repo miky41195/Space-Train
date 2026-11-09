@@ -231,6 +231,8 @@ export class DiscoFinto {
 					args.criteri as { testo: string; contenuto: boolean },
 					args.onResults as Canale<Entry[]>
 				);
+			case 'find_duplicates':
+				return this.#duplicates(args.root as string, args.onEvent as Canale<unknown>);
 			case 'compress': {
 				const sources = args.sources as string[];
 				const base = sources.length === 1 ? nome(sources[0]).replace(/\.[^.]+$/, '') : 'Archivio';
@@ -463,6 +465,26 @@ export class DiscoFinto {
 		if (trovati.length > 0) canale.onmessage?.(trovati.slice(0, 1));
 		if (trovati.length > 1) canale.onmessage?.(trovati.slice(1));
 		return trovati.length;
+	}
+
+	/** Like Rust: files with the same text are identical; groups, then the final progress. */
+	async #duplicates(root: string, canale: Canale<unknown>) {
+		const prefix = root.endsWith('\\') ? root : root + '\\';
+		const byText = new Map<string, string[]>();
+		for (const [p, n] of this.nodi) {
+			const text = this.contenuti.get(p);
+			if (n.kind !== 'file' || !p.startsWith(prefix) || !text) continue;
+			byText.set(text, [...(byText.get(text) ?? []), p]);
+		}
+		await Promise.resolve();
+		let groups = 0;
+		for (const paths of byText.values()) {
+			if (paths.length < 2) continue;
+			groups++;
+			canale.onmessage?.({ kind: 'group', size: 100, entries: paths.sort().map((p) => this.#voce(p)) });
+		}
+		canale.onmessage?.({ kind: 'progress', done: 1, total: 1 });
+		return groups;
 	}
 
 	#ripristina(scegli: (v: { id: string; originale: string }) => boolean) {

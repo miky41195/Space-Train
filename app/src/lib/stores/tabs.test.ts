@@ -241,7 +241,8 @@ describe('TabsStore', () => {
 			loading: false,
 			risultati: null,
 			cercando: false,
-			ricercaOp: null
+			ricercaOp: null,
+			duplicati: null
 		});
 		s.setActive(1);
 

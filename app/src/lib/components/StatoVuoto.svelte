@@ -10,7 +10,7 @@
 		azione = undefined,
 		onazione = undefined
 	}: {
-		variante: 'cartellaVuota' | 'nessunRisultato' | 'accessoNegato' | 'nonPronta';
+		variante: 'cartellaVuota' | 'nessunRisultato' | 'nessunDuplicato' | 'accessoNegato' | 'nonPronta';
 		azione?: string;
 		onazione?: () => void;
 	} = $props();
@@ -23,6 +23,10 @@
 		nessunRisultato: {
 			titolo: 'Nessuna corrispondenza',
 			corpo: 'Nessun elemento di questa cartella corrisponde alla ricerca.'
+		},
+		nessunDuplicato: {
+			titolo: 'Nessun doppione',
+			corpo: 'In questa cartella e nelle sue sottocartelle non ci sono file con lo stesso contenuto.'
 		},
 		accessoNegato: {
 			titolo: 'Segnale rosso',
@@ -50,7 +54,7 @@
 			<rect class="interno" x="19" y="18" width="26" height="15" />
 			<rect class="tetto" x="14" y="11" width="36" height="3" />
 			<rect class="ombra" x="22" y="26" width="20" height="7" />
-		{:else if variante === 'nessunRisultato'}
+		{:else if variante === 'nessunRisultato' || variante === 'nessunDuplicato'}
 			<!-- Lente sopra il binario -->
 			<rect class="vetro" x="22" y="8" width="14" height="2" />
 			<rect class="vetro" x="20" y="10" width="2" height="10" />

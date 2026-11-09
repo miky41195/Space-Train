@@ -1,4 +1,4 @@
-import type { Backend, CriteriRicerca, Entry, FsError, SortSpec } from '../ipc';
+import type { Backend, CriteriRicerca, Entry, FsError, Progresso, SortSpec } from '../ipc';
 import { stessoPath } from '../posizioni';
 
 export interface Tab {
@@ -31,6 +31,11 @@ export interface Tab {
 	cercando: boolean;
 	/** Operazione di ricerca in corso, per poterla annullare. */
 	ricercaOp: number | null;
+	/**
+	 * Set when `risultati` holds duplicates: one entry per group, in the
+	 * order of the results, plus the comparison progress.
+	 */
+	duplicati: { groups: Array<{ size: number; count: number }>; progress: Progresso } | null;
 }
 
 /** Gli id delle ricerche stanno lontani da quelli dei trasferimenti. */
@@ -96,7 +101,8 @@ export class TabsStore {
 			loading: false,
 			risultati: null,
 			cercando: false,
-			ricercaOp: null
+			ricercaOp: null,
+			duplicati: null
 		};
 		this.tabs.push(tab);
 
@@ -230,6 +236,7 @@ export class TabsStore {
 		const op = prossimaRicerca++;
 		tab.ricercaOp = op;
 		tab.risultati = [];
+		tab.duplicati = null;
 		tab.cercando = true;
 		tab.selection = [];
 		tab.anchor = null;
@@ -253,6 +260,46 @@ export class TabsStore {
 		}
 	}
 
+	/**
+	 * Looks for identical files under the tab's folder. Results replace the
+	 * list like a recursive search, grouped by copy set as they are proven.
+	 */
+	async trovaDuplicati(id: number, hidden: boolean): Promise<void> {
+		const tab = this.#get(id);
+		if (!tab) return;
+		await this.fermaRicerca(id, { tieniRisultati: true });
+
+		const op = prossimaRicerca++;
+		tab.ricercaOp = op;
+		tab.risultati = [];
+		tab.duplicati = { groups: [], progress: { transferred: 0, total: 0 } };
+		tab.cercando = true;
+		tab.query = '';
+		tab.selection = [];
+		tab.anchor = null;
+
+		try {
+			await this.backend.findDuplicates({
+				opId: op,
+				root: tab.path,
+				hidden,
+				onEvent: (e) => {
+					if (tab.ricercaOp !== op || !tab.risultati || !tab.duplicati) return;
+					if (e.kind === 'progress') tab.duplicati.progress = { transferred: e.done, total: e.total };
+					else {
+						tab.risultati = [...tab.risultati, ...e.entries];
+						tab.duplicati.groups = [...tab.duplicati.groups, { size: e.size, count: e.entries.length }];
+					}
+				}
+			});
+		} finally {
+			if (tab.ricercaOp === op) {
+				tab.cercando = false;
+				tab.ricercaOp = null;
+			}
+		}
+	}
+
 	/** Ferma la ricerca e, salvo richiesta, torna al contenuto della cartella. */
 	async fermaRicerca(id: number, opts: { tieniRisultati?: boolean } = {}): Promise<void> {
 		const tab = this.#get(id);
@@ -260,7 +307,10 @@ export class TabsStore {
 		const op = tab.ricercaOp;
 		tab.ricercaOp = null;
 		tab.cercando = false;
-		if (!opts.tieniRisultati) tab.risultati = null;
+		if (!opts.tieniRisultati) {
+			tab.risultati = null;
+			tab.duplicati = null;
+		}
 		if (op !== null) await this.backend.cancelTransfer(op);
 	}
 
@@ -403,6 +453,7 @@ export class TabsStore {
 			tab.ricercaOp = null;
 			tab.cercando = false;
 			tab.risultati = null;
+			tab.duplicati = null;
 
 			if (opts.pushHistory) {
 				tab.history = tab.history.slice(0, tab.historyIndex + 1);

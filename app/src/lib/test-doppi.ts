@@ -150,6 +150,9 @@ export function backendFinto(over: Partial<Backend> = {}): Backend {
 		async search() {
 			return 0;
 		},
+		async findDuplicates() {
+			return 0;
+		},
 		async compress() {
 			return '';
 		},

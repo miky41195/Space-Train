@@ -570,6 +570,19 @@ describe('operazioni sui file', () => {
 		expect(disco.esiste('C:\\beta.txt')).toBe(true);
 	});
 
+	it('Trova duplicati groups files with the same content, Esc goes back to the folder', async () => {
+		disco = new DiscoFinto([...STRUTTURA, 'C:\\uno.txt=stesso', 'C:\\Dati\\due.txt=stesso', 'C:\\tre.txt=altro']);
+		await monta();
+		await fireEvent.contextMenu(document.querySelector('.viewport')!);
+		await fireEvent.click(await screen.findByRole('menuitem', { name: 'Trova duplicati qui' }));
+
+		await waitFor(() => expect(nomi()).toEqual(['due.txt', 'uno.txt']));
+		expect(screen.getByRole('separator', { name: /ciascuna/ })).toBeTruthy();
+
+		tasto('Escape');
+		await waitFor(() => expect(nomi()).toContain('alfa.txt'));
+	});
+
 	it('Esc durante la rinomina non tocca il disco', async () => {
 		await monta();
 		await fireEvent.click(riga('alfa.txt'));

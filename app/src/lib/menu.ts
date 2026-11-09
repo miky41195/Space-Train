@@ -26,6 +26,7 @@ export type AzioneMenu =
 	| 'copiaPercorso'
 	| 'mostraInEsplora'
 	| 'terminale'
+	| 'duplicati'
 	| 'paginaIniziale'
 	| 'cartellaAvvio'
 	| 'sessione'
@@ -195,7 +196,8 @@ function vociSfondo({
 		);
 		if (!iniziale) voci.push({ azione: 'paginaIniziale', etichetta: 'Imposta come pagina iniziale' });
 		voci.push(voceAvvio(allAvvio));
-		voci.push({ azione: 'terminale', etichetta: 'Apri nel terminale', stacca: true });
+		voci.push({ azione: 'duplicati', etichetta: 'Trova duplicati qui', stacca: true });
+		voci.push({ azione: 'terminale', etichetta: 'Apri nel terminale' });
 		voci.push({ azione: 'altreOpzioni', etichetta: 'Altre opzioni di Windows', stacca: true });
 		voci.push({ azione: 'proprieta', etichetta: 'Proprietà', scorciatoia: 'Alt+Invio' });
 	}
@@ -233,6 +235,7 @@ function vociElementi({
 			if (!iniziale) voci.push({ azione: 'paginaIniziale', etichetta: 'Imposta come pagina iniziale' });
 			voci.push(voceAvvio(allAvvio));
 			voci.push({ azione: 'terminale', etichetta: 'Apri nel terminale' });
+			voci.push({ azione: 'duplicati', etichetta: 'Trova duplicati qui' });
 		} else {
 			voci.push({ azione: 'apriCon', etichetta: 'Apri con…' });
 			if (eEseguibile(unica.name)) {

@@ -3,6 +3,7 @@ pub mod cerca;
 pub mod cestino;
 pub mod copy;
 pub mod dimensione;
+pub mod duplicates;
 pub mod elimina;
 pub mod entry;
 pub mod error;

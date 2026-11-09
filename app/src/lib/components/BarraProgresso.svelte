@@ -26,7 +26,8 @@
 		invio: 'Invio in rete locale',
 		ricezione: 'Ricezione dalla rete locale',
 		cestino: 'Spostamento nel Cestino',
-		elimina: 'Eliminazione'
+		elimina: 'Eliminazione',
+		duplicati: 'Confronto dei file'
 	} as const;
 
 	/** Deletions count items: bytes would say nothing about how long is left. */
