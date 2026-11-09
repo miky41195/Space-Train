@@ -131,3 +131,43 @@ describe('Row normale', () => {
 		expect(onactivate).toHaveBeenCalledTimes(1);
 	});
 });
+
+describe('Row in one-click mode', () => {
+	function mount(props: Record<string, unknown>) {
+		const onselect = vi.fn();
+		const { container } = render(Row, {
+			props: { entry: voce('note.txt'), onactivate: vi.fn(), onselect, ...props }
+		});
+		return { row: container.querySelector('.row') as HTMLElement, onselect };
+	}
+
+	it('selects the item the pointer rests on', () => {
+		vi.useFakeTimers();
+		try {
+			const { row, onselect } = mount({ unClic: true });
+			row.dispatchEvent(new MouseEvent('mouseenter'));
+			vi.advanceTimersByTime(600);
+			expect(onselect).toHaveBeenCalledWith(expect.objectContaining({ name: 'note.txt' }), {});
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('does nothing if the pointer leaves first, or without one-click mode', () => {
+		vi.useFakeTimers();
+		try {
+			const a = mount({ unClic: true });
+			a.row.dispatchEvent(new MouseEvent('mouseenter'));
+			a.row.dispatchEvent(new MouseEvent('mouseleave'));
+			vi.advanceTimersByTime(600);
+			expect(a.onselect).not.toHaveBeenCalled();
+
+			const b = mount({ unClic: false });
+			b.row.dispatchEvent(new MouseEvent('mouseenter'));
+			vi.advanceTimersByTime(600);
+			expect(b.onselect).not.toHaveBeenCalled();
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+});

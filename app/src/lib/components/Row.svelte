@@ -5,7 +5,7 @@
 	import type { Colonne } from '../stores/impostazioni.svelte';
 	import { grigliaColonne, descriviTipo } from '../colonne';
 	import { byte, senzaEstensione, estensione } from '../posizioni';
-	import { seTrascina } from '../trascina';
+	import { seTrascina, hoverSelect, cancelHoverSelect } from '../trascina';
 
 	let {
 		entry,
@@ -178,8 +178,14 @@
 		// lì si seleziona il testo.
 		if (ontrascina && !(e.target as HTMLElement).closest('input')) seTrascina(e, () => ontrascina(entry));
 	}}
+	onmouseenter={(e) => {
+		// An item already selected stays as is: passing over it must not undo a multiple selection.
+		if (unClic && !selected && !renaming) hoverSelect(e, () => onselect(entry, {}));
+	}}
+	onmouseleave={cancelHoverSelect}
 	ondblclick={() => !unClic && onactivate(entry)}
 	onclick={(e) => {
+		cancelHoverSelect();
 		onselect(entry, { ctrl: e.ctrlKey, shift: e.shiftKey });
 		// Con Ctrl o Maiusc si sta selezionando, non aprendo.
 		if (unClic && !e.ctrlKey && !e.shiftKey) onactivate(entry);

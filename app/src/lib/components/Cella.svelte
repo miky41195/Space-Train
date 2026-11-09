@@ -4,7 +4,7 @@
 	import type { IconeStore } from '../stores/icone.svelte';
 	import { senzaEstensione, byte } from '../posizioni';
 	import { descriviTipo } from '../colonne';
-	import { seTrascina } from '../trascina';
+	import { seTrascina, hoverSelect, cancelHoverSelect } from '../trascina';
 	import { misuraCella, type MisuraCella } from '../vista';
 
 	let {
@@ -80,8 +80,14 @@
 	data-voce={entry.path}
 	title={entry.name}
 	onmousedown={(e) => ontrascina && seTrascina(e, () => ontrascina(entry))}
+	onmouseenter={(e) => {
+		// An item already selected stays as is: passing over it must not undo a multiple selection.
+		if (unClic && !selected) hoverSelect(e, () => onselect(entry, {}));
+	}}
+	onmouseleave={cancelHoverSelect}
 	ondblclick={() => !unClic && onactivate(entry)}
 	onclick={(e) => {
+		cancelHoverSelect();
 		onselect(entry, { ctrl: e.ctrlKey, shift: e.shiftKey });
 		// Con Ctrl o Maiusc si sta selezionando, non aprendo.
 		if (unClic && !e.ctrlKey && !e.shiftKey) onactivate(entry);
