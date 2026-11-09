@@ -128,9 +128,10 @@
 
 	/** Il tema scelto, fra quelli inclusi e quelli creati con l'editor. */
 	let temaCorrente = $derived(temaDa(impostazioni.tema, impostazioni.temiPersonali));
-	let folderStyle = $derived(folderStyleOf(temaCorrente));
 	/** Il tema che l'editor sta mostrando dal vivo, prima di salvarlo. */
 	let anteprimaTema = $state<TemaPersonale | null>(null);
+	// The editor's preview counts too: the folders change while the user picks a style.
+	let folderStyle = $derived(folderStyleOf(anteprimaTema ?? temaCorrente));
 	let corteo = $derived(anteprimaTema?.corteo ?? temaCorrente.corteo);
 	/**
 	 * Spazio in più sopra il binario per i personaggi ingranditi: la linea

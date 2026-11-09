@@ -2187,6 +2187,16 @@ describe('editor dei temi', () => {
 		return screen.findByRole('dialog', { name: 'Editor dei temi' });
 	}
 
+	it('the folder style changes live in the list while the editor is open', async () => {
+		await monta();
+		const editor = await apriEditor();
+		await fireEvent.change(within(editor).getByLabelText('Cartelle'), { target: { value: 'wagon' } });
+		await waitFor(() => expect(riga('Dati').querySelector('.cartella-disegnata circle')).not.toBeNull());
+
+		await fireEvent.click(within(editor).getByRole('button', { name: 'Annulla' }));
+		await waitFor(() => expect(riga('Dati').querySelector('.cartella-disegnata circle')).toBeNull());
+	});
+
 	it('le modifiche si vedono dal vivo e Annulla le toglie', async () => {
 		await monta();
 		const editor = await apriEditor();
