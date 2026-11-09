@@ -251,6 +251,9 @@ function vociElementi({
 
 	if (unica) {
 		voci.push({ azione: 'rinomina', etichetta: 'Rinomina', scorciatoia: 'F2', stacca: true });
+	} else if (!ricerca) {
+		// Several items in one folder: the batch rename dialog.
+		voci.push({ azione: 'rinomina', etichetta: 'Rinomina…', scorciatoia: 'F2', stacca: true });
 	}
 
 	// I preferiti appartengono alla cartella aperta: fra i risultati di una

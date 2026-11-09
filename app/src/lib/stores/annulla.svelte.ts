@@ -9,6 +9,8 @@ import { nomeDi } from '../posizioni';
  */
 export type Operazione =
 	| { tipo: 'rinomina'; da: string; a: string }
+	/** Every single rename of a batch, temporary names included, in the order run. */
+	| { tipo: 'batchRename'; steps: Array<[string, string]> }
 	| { tipo: 'sposta'; coppie: Array<[string, string]> }
 	/** Elementi nati dall'operazione: copie, cartelle nuove, archivi. */
 	| { tipo: 'crea'; paths: string[]; descrizione: string }
@@ -31,6 +33,7 @@ export class AnnullaStore {
 		if (op.tipo === 'sposta' && op.coppie.length === 0) return;
 		if (op.tipo === 'crea' && op.paths.length === 0) return;
 		if (op.tipo === 'cestino' && op.originali.length === 0) return;
+		if (op.tipo === 'batchRename' && op.steps.length === 0) return;
 
 		this.pila = [...this.pila, op].slice(-MASSIMO);
 	}
@@ -56,6 +59,9 @@ export class AnnullaStore {
 		switch (op.tipo) {
 			case 'rinomina':
 				await this.backend.renameEntry(op.a, nomeDi(op.da));
+				break;
+			case 'batchRename':
+				for (const [from, to] of [...op.steps].reverse()) await this.backend.renameEntry(to, nomeDi(from));
 				break;
 			case 'crea':
 				// Nel Cestino, non eliminato: annullare non deve poter
@@ -97,6 +103,8 @@ export function descrivi(op: Operazione): string {
 	switch (op.tipo) {
 		case 'rinomina':
 			return `rinomina di «${nomeDi(op.a)}»`;
+		case 'batchRename':
+			return `rinomina di ${quanti(new Set(op.steps.map(([from]) => from)).size)}`;
 		case 'sposta':
 			return `spostamento di ${quanti(op.coppie.length)}`;
 		case 'crea':

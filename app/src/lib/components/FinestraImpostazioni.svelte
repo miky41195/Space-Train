@@ -2,6 +2,7 @@
 	import type { ImpostazioniStore, DimensioneCartelle } from '../stores/impostazioni.svelte';
 	import { PAUSE_TRENO, INIZIALE_PREDEFINITA, INIZIALE_ULTIMA } from '../menu';
 	import { SU_LINUX } from '../sistema';
+	import { SHORTCUT_GROUPS, GLOBAL_SHORTCUT } from '../scorciatoie';
 
 	let {
 		impostazioni,
@@ -44,6 +45,7 @@
 		{ id: 'generale', nome: 'Generale' },
 		{ id: 'file', nome: 'File e cartelle' },
 		{ id: 'aspetto', nome: 'Aspetto' },
+		{ id: 'scorciatoie', nome: 'Scorciatoie' },
 		{ id: 'rete', nome: 'Rete e amici' },
 		{ id: 'info', nome: 'Informazioni' }
 	] as const;
@@ -65,6 +67,17 @@
 		const scelta = await onscegliCartella('Dove salvare i file in arrivo', cartellaRicevuti || null).catch(() => null);
 		if (scelta) onricevuti(scelta);
 	}
+
+	let shortcutQuery = $state('');
+	let shortcutGroups = $derived.by(() => {
+		const q = shortcutQuery.trim().toLowerCase();
+		if (!q) return SHORTCUT_GROUPS;
+		const hit = (text: string) => text.toLowerCase().includes(q);
+		return SHORTCUT_GROUPS.map((g) => ({
+			name: g.name,
+			items: g.items.filter((i) => hit(i.label) || i.keys.some(hit))
+		})).filter((g) => g.items.length > 0);
+	});
 
 	let finestra = $state<HTMLDivElement | null>(null);
 	$effect(() => {
@@ -210,6 +223,32 @@
 						{#each PAUSE_TRENO as [secondi, nome] (secondi)}<option value={secondi}>{nome}</option>{/each}
 					</select>
 				</label>
+			{:else if sezione === 'scorciatoie'}
+				<h3>Scorciatoie</h3>
+				<input
+					class="cerca-tasti"
+					type="search"
+					placeholder="Cerca un’azione o un tasto…"
+					aria-label="Cerca fra le scorciatoie"
+					bind:value={shortcutQuery}
+				/>
+				<div class="globale">
+					<span class="testo">{GLOBAL_SHORTCUT.label}<small>Da qualsiasi programma</small></span>
+					<span class="tasti">{#each GLOBAL_SHORTCUT.keys as k (k)}<kbd>{k}</kbd>{/each}</span>
+				</div>
+				{#each shortcutGroups as g (g.name)}
+					<h4>{g.name}</h4>
+					<ul class="orario">
+						{#each g.items as i (i.label)}
+							<li>
+								<span>{i.label}</span>
+								<span class="tasti">{#each i.keys as k (k)}<kbd>{k}</kbd>{/each}</span>
+							</li>
+						{/each}
+					</ul>
+				{:else}
+					<p class="nota">Nessuna scorciatoia per «{shortcutQuery.trim()}».</p>
+				{/each}
 			{:else if sezione === 'rete'}
 				<h3>Rete e amici</h3>
 				<div class="voce">
@@ -405,6 +444,81 @@
 	.numero {
 		font-variant-numeric: tabular-nums;
 		color: var(--text-dim);
+	}
+
+	/* Shortcuts: a timetable, alternate rows and keys as small signs. */
+	.cerca-tasti {
+		width: 100%;
+		height: 28px;
+		margin: 4px 0 12px;
+		padding: 0 10px;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		clip-path: var(--forma-sm, none);
+		mask: var(--maschera-sm, none);
+		background: var(--bg);
+		color: var(--text);
+		font: inherit;
+	}
+	.cerca-tasti:hover {
+		border-color: var(--text-dim);
+	}
+	.globale {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		padding: 8px 10px;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		clip-path: var(--forma-sm, none);
+		mask: var(--maschera-sm, none);
+	}
+	h4 {
+		margin: 16px 0 4px;
+		font-family: var(--font-display);
+		font-size: calc(10px * var(--scala-testo, 1));
+		font-weight: 600;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		color: var(--text-dim);
+	}
+	.orario {
+		display: grid;
+		gap: 1px;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.orario li {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: center;
+		gap: 12px;
+		min-height: 28px;
+		padding: 2px 8px;
+		border-radius: var(--radius-sm);
+	}
+	.orario li:nth-child(odd) {
+		background: var(--row-hover);
+	}
+	.tasti {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: end;
+		gap: 4px;
+	}
+	kbd {
+		padding: 0 6px;
+		border: 1px solid var(--border);
+		border-bottom-width: 2px;
+		border-radius: 4px;
+		background: var(--bg);
+		color: var(--text);
+		font-family: var(--font-display);
+		font-size: calc(12px * var(--scala-testo, 1));
+		line-height: 1.6;
+		white-space: nowrap;
 	}
 
 	select {

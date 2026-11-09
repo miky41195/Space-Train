@@ -27,6 +27,8 @@
 	import FileList from '$lib/components/FileList.svelte';
 	import SearchBar from '$lib/components/SearchBar.svelte';
 	import ConfermaCestino from '$lib/components/ConfermaCestino.svelte';
+	import BatchRename from '$lib/components/BatchRename.svelte';
+	import { renameSteps, type PlannedRename } from '$lib/batch-rename';
 	import ConfermaConflitti from '$lib/components/ConfermaConflitti.svelte';
 	import BarraProgresso from '$lib/components/BarraProgresso.svelte';
 	import type { ModoBarra } from '$lib/progresso';
@@ -394,6 +396,8 @@
 
 	let rinominando = $state<string | null>(null);
 	let daCestinare = $state<Entry[]>([]);
+	/** Items in the batch rename dialog; empty when it is closed. */
+	let batchRename = $state<Entry[]>([]);
 	/** Eliminazione senza ritorno: dal disco, dal Cestino o svuotandolo. */
 	let daEliminare = $state<{ voci: Entry[]; tipo: 'disco' | 'cestino' | 'svuota' } | null>(null);
 	let erroreOp = $state<string | null>(null);
@@ -452,6 +456,46 @@
 	}
 
 	// ── Rinomina, cartelle, cestino ──────────────────────────────────
+
+	/** F2, the menu and the command bar: one item renames in place, several open the batch dialog. */
+	function startRename() {
+		if (!modificabile) return;
+		const scelte = selezionate();
+		if (scelte.length > 1) batchRename = scelte;
+		else {
+			const voce = selezionata();
+			if (voce) rinominando = voce.path;
+		}
+	}
+
+	async function runBatchRename(plan: PlannedRename[]) {
+		batchRename = [];
+		erroreOp = null;
+		const tabPath = store.activeTab?.path;
+		// Original path → where it is now; a failure halfway still records what moved.
+		const where = new Map(plan.map((p) => [p.item.path, p.item.path]));
+		const steps: Array<[string, string]> = [];
+		try {
+			for (const step of renameSteps(plan)) {
+				const arrived = await tauriBackend.renameEntry(step.from, step.to);
+				steps.push([step.from, arrived]);
+				for (const [origin, now] of where) if (now === step.from) where.set(origin, arrived);
+			}
+		} catch (e) {
+			erroreOp = descriviErrore(e);
+		}
+		for (const [origin, now] of where) {
+			if (origin === now) continue;
+			if (tabPath) preferiti.rinomina(tabPath, nomeDi(origin), nomeDi(now));
+			colori.sposta(origin, now);
+			accessoRapido.sposta(origin, now);
+		}
+		annulla.registra({ tipo: 'batchRename', steps });
+		if (store.activeId !== null) {
+			await store.reload(store.activeId);
+			if (store.activeTab) store.activeTab.selection = [...where.values()];
+		}
+	}
 
 	async function confermaRinomina(voce: Entry, nuovoNome: string) {
 		rinominando = null;
@@ -1203,7 +1247,7 @@
 
 		// Con una finestra modale aperta o un campo in modifica, le
 		// scorciatoie della lista non devono sparare.
-		if (daCestinare.length > 0 || daEliminare || rinominando !== null || conflitti.length > 0) return;
+		if (daCestinare.length > 0 || daEliminare || rinominando !== null || conflitti.length > 0 || batchRename.length > 0) return;
 
 		// Dentro un campo di testo i tasti servono a scrivere. Dal campo di
 		// ricerca passano solo quelli che muovono la selezione o la chiudono.
@@ -1282,11 +1326,8 @@
 				return mettiNegliAppunti(true);
 			case 'incolla':
 				return incolla();
-			case 'rinomina': {
-				const voce = selezionata();
-				if (voce && modificabile) rinominando = voce.path;
-				return;
-			}
+			case 'rinomina':
+				return startRename();
 			case 'nuovaCartella':
 				return nuovaCartella();
 			case 'cestina':
@@ -1964,7 +2005,7 @@
 					}
 					break;
 				case 'rinomina':
-					if (scelte[0]) rinominando = scelte[0].path;
+					startRename();
 					break;
 				case 'copia':
 					await mettiNegliAppunti(false);
@@ -2249,10 +2290,7 @@
 				ontaglia={() => mettiNegliAppunti(true)}
 				oncopia={() => mettiNegliAppunti(false)}
 				onincolla={incolla}
-				onrinomina={() => {
-					const voce = selezionata();
-					if (voce && modificabile) rinominando = voce.path;
-				}}
+				onrinomina={startRename}
 				onelimina={chiediCestino}
 				onordina={apriMenuOrdina}
 				onvista={apriMenuVista}
@@ -2465,6 +2503,15 @@
 
 	{#if daCestinare.length > 0}
 		<ConfermaCestino voci={daCestinare} onconfirm={() => cestina()} oncancel={() => (daCestinare = [])} />
+	{/if}
+
+	{#if batchRename.length > 0}
+		<BatchRename
+			entries={batchRename}
+			taken={new Set((store.activeTab?.entries ?? []).map((e) => e.name.toLowerCase()))}
+			onconfirm={runBatchRename}
+			oncancel={() => (batchRename = [])}
+		/>
 	{/if}
 
 	{#if amiciAperti && statoAmici}

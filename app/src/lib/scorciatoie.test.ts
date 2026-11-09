@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { azioneTasto } from './scorciatoie';
+import { azioneTasto, SHORTCUT_GROUPS } from './scorciatoie';
 
 describe('azioneTasto', () => {
 	it.each([
@@ -49,5 +49,35 @@ describe('azioneTasto', () => {
 	it('Ctrl+Maiusc+1…8 scelgono la vista, anche con la tastiera italiana', () => {
 		expect(azioneTasto({ key: '!', code: 'Digit1', ctrlKey: true, shiftKey: true })).toEqual({ vista: 0 });
 		expect(azioneTasto({ key: '(', code: 'Digit8', ctrlKey: true, shiftKey: true })).toEqual({ vista: 7 });
+	});
+});
+
+describe('SHORTCUT_GROUPS', () => {
+	const NAMES: Record<string, string> = {
+		Canc: 'Delete',
+		Invio: 'Enter',
+		'←': 'ArrowLeft',
+		'→': 'ArrowRight',
+		'↑': 'ArrowUp',
+		'↓': 'ArrowDown',
+		PagGiù: 'PageDown',
+		PagSu: 'PageUp'
+	};
+
+	function parse(shown: string) {
+		const parts = shown.split('+');
+		const key = parts.pop()!;
+		return {
+			key: NAMES[key] ?? key,
+			ctrlKey: parts.includes('Ctrl'),
+			shiftKey: parts.includes('Maiusc'),
+			altKey: parts.includes('Alt')
+		};
+	}
+
+	const listed = SHORTCUT_GROUPS.flatMap((g) => g.items).filter((i) => i.action);
+
+	it.each(listed.flatMap((i) => i.keys.map((k) => [k, i.action] as const)))('%s does %s', (shown, action) => {
+		expect(azioneTasto(parse(shown))).toEqual(action);
 	});
 });

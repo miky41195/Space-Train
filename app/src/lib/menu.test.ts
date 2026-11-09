@@ -129,13 +129,15 @@ describe('vociMenu', () => {
 		expect(a).toContain('mostraInEsplora');
 	});
 
-	it('su più voci non offre apri né rinomina', () => {
+	it('su più voci non offre apri, e rinomina apre la rinomina multipla', () => {
 		const a = azioni({ selezione: voci(3), appuntiPieni: false });
 
 		// Aprire venti file insieme è quasi sempre un incidente.
 		expect(a).not.toContain('apri');
-		expect(a).not.toContain('rinomina');
 		expect(a).not.toContain('mostraInEsplora');
+		expect(a).toContain('rinomina');
+		// Search results come from different folders: no batch rename there.
+		expect(azioni({ selezione: voci(3), appuntiPieni: false, ricerca: true })).not.toContain('rinomina');
 	});
 
 	it('la voce preferiti dice se aggiunge o toglie', () => {

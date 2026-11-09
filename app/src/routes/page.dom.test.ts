@@ -550,6 +550,26 @@ describe('operazioni sui file', () => {
 		expect(disco.esiste('C:\\alfa.txt')).toBe(false);
 	});
 
+	it('F2 on several files renames them with a counter, Ctrl+Z puts every name back', async () => {
+		await monta();
+		await fireEvent.click(riga('alfa.txt'));
+		await fireEvent.click(riga('beta.txt'), { ctrlKey: true });
+		tasto('F2');
+
+		const dialog = await screen.findByRole('dialog', { name: 'Rinomina 2 elementi' });
+		const name = within(dialog).getByRole('textbox');
+		await fireEvent.input(name, { target: { value: 'Nota_##' } });
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Rinomina' }));
+
+		await waitFor(() => expect(disco.esiste('C:\\Nota_01.txt')).toBe(true));
+		expect(disco.esiste('C:\\Nota_02.txt')).toBe(true);
+		expect(disco.esiste('C:\\alfa.txt')).toBe(false);
+
+		tasto('z', { ctrl: true });
+		await waitFor(() => expect(disco.esiste('C:\\alfa.txt')).toBe(true));
+		expect(disco.esiste('C:\\beta.txt')).toBe(true);
+	});
+
 	it('Esc durante la rinomina non tocca il disco', async () => {
 		await monta();
 		await fireEvent.click(riga('alfa.txt'));
@@ -2708,6 +2728,15 @@ describe('impostazioni', () => {
 		expect(within(f).getByRole('switch', { name: 'Animazione all’avvio' })).toBeTruthy();
 		tasto('Escape');
 		await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Impostazioni' })).toBeNull());
+	});
+
+	it('the shortcuts section lists the keys and filters them', async () => {
+		await monta();
+		const f = await apriImpostazioni('Scorciatoie');
+		expect(within(f).getByText('Win+Maiusc+E')).toBeTruthy();
+		await fireEvent.input(within(f).getByRole('searchbox'), { target: { value: 'cestino' } });
+		expect(within(f).getByText('Sposta nel Cestino')).toBeTruthy();
+		expect(within(f).queryByText('Nuova scheda')).toBeNull();
 	});
 
 	it('senza conferma Canc cestina subito', async () => {
