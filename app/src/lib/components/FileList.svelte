@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { FolderStyle } from '../icons';
 	import { selezioneRettangolo, type OpzioniRettangolo } from '../rettangolo';
 	import type { Entry, SortKey, SortSpec } from '../ipc';
 	import Intestazioni from './Intestazioni.svelte';
@@ -36,6 +37,7 @@
 		onsort = undefined,
 		onactivate,
 		unClic = false,
+		folderStyle = 'windows',
 		dimensioni = {},
 		oncalcola = undefined,
 		onselect,
@@ -85,6 +87,8 @@
 		onactivate: (e: Entry) => void;
 		/** Apre con un clic, come l'opzione di Esplora; il doppio clic non serve più. */
 		unClic?: boolean;
+		/** How the theme draws folders. */
+		folderStyle?: FolderStyle;
 		/** Dimensioni delle cartelle già calcolate (o in calcolo), per path. */
 		dimensioni?: Record<string, number | 'calcolo'>;
 		oncalcola?: (e: Entry) => void;
@@ -213,6 +217,7 @@
 					{ontrascina}
 					{onactivate}
 					{unClic}
+					{folderStyle}
 					peso={dimensioni[entry.path]}
 					{oncalcola}
 					{onselect}

@@ -70,5 +70,44 @@ export function iconFor(entry: Entry): string {
  * dietro più scura, il corpo davanti col colore scelto dall'utente.
  */
 export function iconaCartella(colore: string): string {
-	return `<svg viewBox="0 0 48 40" width="100%" height="100%" aria-hidden="true"><path d="M3 6a3 3 0 0 1 3-3h12l4 4h20a3 3 0 0 1 3 3v24a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z" fill="${colore}"/><path d="M3 6a3 3 0 0 1 3-3h12l4 4h20a3 3 0 0 1 3 3v24a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z" fill="#000" opacity=".28"/><path d="M3 14a3 3 0 0 1 3-3h36a3 3 0 0 1 3 3v20a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z" fill="${colore}"/><path d="M3 14a3 3 0 0 1 3-3h36a3 3 0 0 1 3 3v2H3z" fill="#fff" opacity=".18"/></svg>`;
+	return folderIcon('flat', colore);
+}
+
+/** How a theme draws folders; `windows` keeps the system icon. */
+export type FolderStyle = 'pixel' | 'wagon' | 'flat' | 'outline' | 'windows';
+
+/**
+ * The drawing an entry gets instead of the Windows icon, or null. A folder
+ * the user colored is always drawn (flat when the theme keeps Windows icons);
+ * drives and folders with an icon of their own keep the system one.
+ */
+export function drawnFolder(
+	entry: Entry,
+	color: string | undefined,
+	style: FolderStyle
+): Exclude<FolderStyle, 'windows'> | null {
+	if (entry.kind !== 'dir') return null;
+	if (color) return style === 'windows' ? 'flat' : style;
+	if (style === 'windows' || entry.libero !== undefined || entry.iconaPropria) return null;
+	return style;
+}
+
+/**
+ * A folder drawn in one of the theme styles, at any size. `color` may be a
+ * CSS variable: colors go through `style`, where `var()` works.
+ */
+export function folderIcon(style: Exclude<FolderStyle, 'windows'>, color: string): string {
+	const c = `fill:${color}`;
+	const dark = `fill:color-mix(in srgb, ${color} 62%, #000)`;
+	const light = `fill:color-mix(in srgb, ${color} 55%, #fff)`;
+	switch (style) {
+		case 'pixel':
+			return `<svg viewBox="0 0 20 17" width="100%" height="100%" shape-rendering="crispEdges" aria-hidden="true"><rect x="1" y="2" width="7" height="2" style="${dark}"/><rect x="1" y="4" width="18" height="2" style="${dark}"/><rect x="1" y="6" width="18" height="10" style="${c}"/><rect x="1" y="6" width="18" height="1" style="${light}"/><rect x="0" y="6" width="1" height="10" style="${dark}"/><rect x="19" y="6" width="1" height="10" style="${dark}"/><rect x="1" y="16" width="18" height="1" style="${dark}"/></svg>`;
+		case 'wagon':
+			return `<svg viewBox="0 0 48 40" width="100%" height="100%" aria-hidden="true"><rect x="7" y="5" width="34" height="6" rx="2" style="${dark}"/><rect x="3" y="9" width="42" height="24" rx="3" style="${c}"/><rect x="7" y="14" width="9" height="7" rx="1" fill="#000" opacity=".35"/><rect x="19.5" y="14" width="9" height="7" rx="1" fill="#000" opacity=".35"/><rect x="32" y="14" width="9" height="7" rx="1" fill="#000" opacity=".35"/><rect x="3" y="9" width="42" height="2" rx="1" style="${light}"/><circle cx="13" cy="35" r="3.5" style="${dark}"/><circle cx="35" cy="35" r="3.5" style="${dark}"/></svg>`;
+		case 'outline':
+			return `<svg viewBox="0 0 48 40" width="100%" height="100%" aria-hidden="true"><path d="M5 8a2 2 0 0 1 2-2h10l4 4h20a2 2 0 0 1 2 2v22a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z" style="fill:none;stroke:${color}" stroke-width="3.5" stroke-linejoin="round"/><path d="M5 15h38" style="stroke:${color}" stroke-width="3"/></svg>`;
+		case 'flat':
+			return `<svg viewBox="0 0 48 40" width="100%" height="100%" aria-hidden="true"><path d="M3 6a3 3 0 0 1 3-3h12l4 4h20a3 3 0 0 1 3 3v24a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z" style="${dark}"/><path d="M3 14a3 3 0 0 1 3-3h36a3 3 0 0 1 3 3v20a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z" style="${c}"/><path d="M3 14a3 3 0 0 1 3-3h36a3 3 0 0 1 3 3v2H3z" fill="#fff" opacity=".18"/></svg>`;
+	}
 }

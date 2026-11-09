@@ -10,6 +10,8 @@
 		SCHEDE,
 		CIELI,
 		CORNICI,
+		FOLDER_STYLES,
+		folderStyleOf,
 		variabiliDa,
 		temaDa,
 		type Tema,
@@ -20,6 +22,7 @@
 		type Cornice
 	} from '../temi';
 	import { FIGURE, svgFigura } from '../figure';
+	import type { FolderStyle } from '../icons';
 	import { nomeDi } from '../posizioni';
 	import { convertFileSrc } from '@tauri-apps/api/core';
 	import {
@@ -122,6 +125,7 @@
 	let scheda = $state<Scheda>(FORME_BASE.scheda);
 	let cielo = $state<Cielo>(FORME_BASE.cielo);
 	let cornice = $state<Cornice>(FORME_BASE.cornice);
+	let folder = $state<FolderStyle>('windows');
 	let corteoTipo = $state<'treno' | 'figure' | 'immagini'>('treno');
 	let figure = $state<string[]>([]);
 	let immagini = $state<string[]>([]);
@@ -163,6 +167,7 @@
 		scheda = t.forme?.scheda ?? FORME_BASE.scheda;
 		cielo = t.forme?.cielo ?? FORME_BASE.cielo;
 		cornice = t.forme?.cornice ?? FORME_BASE.cornice;
+		folder = folderStyleOf(t);
 		const voci = t.corteo ?? [];
 		const lette = voci.map((v) => leggiMovimento(v));
 		const mie = lette.filter((l) => mia(l.voce));
@@ -209,7 +214,7 @@
 		chiaro,
 		gruppo: 'personale',
 		variabili: variabiliDa(tavolozza, chiaro),
-		forme: { raggio, raggioPiccolo, carattere, carattereTitoli, dimensione, dimensioneTitoli, angolo, scheda, cielo, cornice },
+		forme: { raggio, raggioPiccolo, carattere, carattereTitoli, dimensione, dimensioneTitoli, angolo, scheda, cielo, cornice, folder },
 		corteo:
 			corteoTipo === 'treno'
 				? undefined
@@ -516,6 +521,14 @@
 					<select bind:value={cornice} aria-label="Cornice della finestra">
 						{#each CORNICI as c (c.valore)}
 							<option value={c.valore}>{c.nome}</option>
+						{/each}
+					</select>
+				</label>
+				<label class="riga">
+					<span>Cartelle</span>
+					<select bind:value={folder} aria-label="Cartelle">
+						{#each FOLDER_STYLES as f (f.valore)}
+							<option value={f.valore}>{f.nome}</option>
 						{/each}
 					</select>
 				</label>

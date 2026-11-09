@@ -69,7 +69,7 @@
 	import { filterEntries } from '$lib/fuzzy';
 	import { impagina, duplicateZones, type ModoGruppi } from '$lib/raggruppa';
 	import { misuraCella, zoom, LATO_MIN, LATO_MAX, type Vista } from '$lib/vista';
-	import { applicaTema, coloreAccento, scalaTesto, temaDa, type IdAccento, type TemaPersonale } from '$lib/temi';
+	import { applicaTema, coloreAccento, folderStyleOf, scalaTesto, temaDa, type IdAccento, type TemaPersonale } from '$lib/temi';
 	import EditorTemi from '$lib/components/EditorTemi.svelte';
 	import { EVENTO_EDITOR, type MessaggioEditor } from '$lib/editor-finestra';
 	import { ColoriStore, type IdColore } from '$lib/stores/colori.svelte';
@@ -128,6 +128,7 @@
 
 	/** Il tema scelto, fra quelli inclusi e quelli creati con l'editor. */
 	let temaCorrente = $derived(temaDa(impostazioni.tema, impostazioni.temiPersonali));
+	let folderStyle = $derived(folderStyleOf(temaCorrente));
 	/** Il tema che l'editor sta mostrando dal vivo, prima di salvarlo. */
 	let anteprimaTema = $state<TemaPersonale | null>(null);
 	let corteo = $derived(anteprimaTema?.corteo ?? temaCorrente.corteo);
@@ -2415,6 +2416,7 @@
 						{icone}
 						onactivate={apri}
 						unClic={impostazioni.unClic}
+						{folderStyle}
 						onselect={seleziona}
 						oncontext={menuSuVoce}
 						oncontextvuoto={menuSulVuoto}
@@ -2448,6 +2450,7 @@
 						oncolonne={apriMenuColonne}
 						onactivate={apri}
 						unClic={impostazioni.unClic}
+						{folderStyle}
 						onselect={seleziona}
 						oncontext={menuSuVoce}
 						oncontextvuoto={menuSulVuoto}

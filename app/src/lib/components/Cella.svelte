@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Entry } from '../ipc';
-	import { iconFor, categoryFor, iconaCartella } from '../icons';
+	import { iconFor, categoryFor, folderIcon, drawnFolder, type FolderStyle } from '../icons';
 	import type { IconeStore } from '../stores/icone.svelte';
 	import { senzaEstensione, byte } from '../posizioni';
 	import { descriviTipo } from '../colonne';
@@ -18,6 +18,7 @@
 		bersaglio = false,
 		onactivate,
 		unClic = false,
+		folderStyle = 'windows',
 		onselect,
 		oncontext = undefined,
 		ontrascina = undefined
@@ -35,6 +36,8 @@
 		onactivate: (e: Entry) => void;
 		/** Apre con un clic, come l'opzione di Esplora; il doppio clic non serve più. */
 		unClic?: boolean;
+		/** How the theme draws folders. */
+		folderStyle?: FolderStyle;
 		onselect: (e: Entry, modificatori: { ctrl?: boolean; shift?: boolean }) => void;
 		oncontext?: (e: Entry, evento: MouseEvent) => void;
 		ontrascina?: (e: Entry) => void;
@@ -47,8 +50,9 @@
 	// Sola lettura, come nella vista a righe: la richiesta la fa la griglia
 	// quando lo scorrimento si ferma. Una cartella colorata usa sempre il
 	// disegno interno, che è l'unico a cui si può dare un colore.
+	let drawn = $derived(drawnFolder(entry, colore, folderStyle));
 	let immagine = $derived(
-		colore ? null : icone ? icone.miniatura(entry) || icone.icona(entry, misura.icona > 24) : null
+		drawn ? null : icone ? icone.miniatura(entry) || icone.icona(entry, misura.icona > 24) : null
 	);
 
 	function data(ms: number | null): string {
@@ -103,8 +107,8 @@
 	}}
 >
 	<div class="riquadro">
-		{#if colore && entry.kind === 'dir'}
-			<span class="disegno">{@html iconaCartella(colore)}</span>
+		{#if drawn}
+			<span class="disegno">{@html folderIcon(drawn, colore ?? 'var(--accent)')}</span>
 		{:else if immagine}
 			<img src={immagine} alt="" draggable="false" />
 		{:else}

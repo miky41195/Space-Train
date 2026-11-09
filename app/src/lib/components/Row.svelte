@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Entry } from '../ipc';
-	import { iconFor, categoryFor, iconaCartella } from '../icons';
+	import { iconFor, categoryFor, folderIcon, drawnFolder, type FolderStyle } from '../icons';
 	import type { IconeStore } from '../stores/icone.svelte';
 	import type { Colonne } from '../stores/impostazioni.svelte';
 	import { grigliaColonne, descriviTipo } from '../colonne';
@@ -24,6 +24,7 @@
 		oncalcola = undefined,
 		onactivate,
 		unClic = false,
+		folderStyle = 'windows',
 		onselect,
 		oncontext = undefined,
 		onrename = undefined,
@@ -58,6 +59,8 @@
 		onactivate: (e: Entry) => void;
 		/** Apre con un clic, come l'opzione di Esplora; il doppio clic non serve più. */
 		unClic?: boolean;
+		/** How the theme draws folders. */
+		folderStyle?: FolderStyle;
 		onselect: (e: Entry, modificatori: { ctrl?: boolean; shift?: boolean }) => void;
 		oncontext?: (e: Entry, evento: MouseEvent) => void;
 		onrename?: (e: Entry, nuovoNome: string) => void;
@@ -73,8 +76,9 @@
 	// FileList a scorrimento fermo. La miniatura vince sull'icona di tipo;
 	// finché non c'è nessuna delle due resta il glifo interno, così la riga
 	// non lampeggia mai vuota mentre si scorre.
+	let drawn = $derived(drawnFolder(entry, colore, folderStyle));
 	let immagine = $derived(
-		colore ? null : icone ? icone.miniatura(entry) || icone.icona(entry) : null
+		drawn ? null : icone ? icone.miniatura(entry) || icone.icona(entry) : null
 	);
 
 	let campo = $state<HTMLInputElement | null>(null);
@@ -201,8 +205,8 @@
 	}}
 >
 	<span class="icon">
-		{#if colore && entry.kind === 'dir'}
-			<span class="cartella-colorata">{@html iconaCartella(colore)}</span>
+		{#if drawn}
+			<span class="cartella-disegnata" class:cartella-colorata={colore}>{@html folderIcon(drawn, colore ?? 'var(--accent)')}</span>
 		{:else if immagine}
 			<img src={immagine} alt="" draggable="false" />
 		{:else}
@@ -402,7 +406,7 @@
 		justify-content: center;
 		color: var(--text-dim);
 	}
-	.cartella-colorata {
+	.cartella-disegnata {
 		display: flex;
 		width: 20px;
 		height: 18px;

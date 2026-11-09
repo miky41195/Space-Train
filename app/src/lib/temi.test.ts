@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TEMI, variabiliPer, trasparente, temaDa, coloreAccento, variabiliDa, CARATTERI, FORME_BASE, scalaTesto, scalaTitoli, variabiliForme, variabiliCielo, categoriaDi, CATEGORIE, type Forme } from './temi';
+import { TEMI, variabiliPer, trasparente, temaDa, coloreAccento, variabiliDa, CARATTERI, FORME_BASE, scalaTesto, scalaTitoli, variabiliForme, variabiliCielo, categoriaDi, CATEGORIE, folderStyleOf, type Forme } from './temi';
 import { FIGURE, CORTEI, svgFigura, motivoFigura, misuraFigura } from './figure';
 
 describe('temi', () => {
@@ -203,5 +203,25 @@ describe('categorie', () => {
 
 	it('i temi personali stanno fra i tuoi', () => {
 		expect(categoriaDi({ ...TEMI[0], id: 'mio', gruppo: 'personale' })).toBe('tuoi');
+	});
+});
+
+describe('folderStyleOf', () => {
+	const of = (id: string) => folderStyleOf(temaDa(id));
+
+	it('gives each kind of theme its folder', () => {
+		expect(of('spazio')).toBe('pixel');
+		expect(of('orient')).toBe('wagon');
+		expect(of('cianografia')).toBe('outline');
+		expect(of('abisso')).toBe('pixel');
+		expect(of('notte')).toBe('flat');
+		expect(of('natale')).toBe('pixel');
+	});
+
+	it('honours the editor choice and keeps Windows icons for the user themes by default', () => {
+		const base = temaDa('spazio');
+		expect(folderStyleOf({ ...base, gruppo: 'personale', forme: {} })).toBe('windows');
+		expect(folderStyleOf({ ...base, forme: { folder: 'outline' } })).toBe('outline');
+		expect(folderStyleOf({ ...base, forme: { folder: 'nonsense' as never } })).toBe('pixel');
 	});
 });

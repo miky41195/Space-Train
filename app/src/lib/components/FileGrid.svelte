@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { FolderStyle } from '../icons';
 	import { selezioneRettangolo, type OpzioniRettangolo } from '../rettangolo';
 	import type { Entry } from '../ipc';
 	import {
@@ -28,6 +29,7 @@
 		icone = undefined,
 		onactivate,
 		unClic = false,
+		folderStyle = 'windows',
 		onselect,
 		oncontext = undefined,
 		oncontextvuoto = undefined,
@@ -53,6 +55,8 @@
 		onactivate: (e: Entry) => void;
 		/** Apre con un clic, come l'opzione di Esplora; il doppio clic non serve più. */
 		unClic?: boolean;
+		/** How the theme draws folders. */
+		folderStyle?: FolderStyle;
 		onselect: (e: Entry, modificatori: { ctrl?: boolean; shift?: boolean }) => void;
 		oncontext?: (e: Entry, evento: MouseEvent) => void;
 		oncontextvuoto?: (evento: MouseEvent) => void;
@@ -187,6 +191,7 @@
 					{ontrascina}
 					{onactivate}
 					{unClic}
+					{folderStyle}
 					{onselect}
 					{oncontext}
 				/>

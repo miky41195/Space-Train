@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { categoryFor, chiaveIcona, vuoleMiniatura } from './icons';
+import { categoryFor, chiaveIcona, vuoleMiniatura, drawnFolder } from './icons';
 import type { Entry } from './ipc';
 
 function voce(name: string, kind: Entry['kind'] = 'file'): Entry {
@@ -65,5 +65,22 @@ describe('vuoleMiniatura', () => {
 		expect(vuoleMiniatura({ ...voce('Gioco.exe'), iconaPropria: true })).toBe(true);
 		expect(vuoleMiniatura({ ...voce('Steam', 'dir'), iconaPropria: true })).toBe(true);
 		expect(vuoleMiniatura(voce('Steam', 'dir'))).toBe(false);
+	});
+});
+
+describe('drawnFolder', () => {
+	const dir = { name: 'D', path: 'C:\\D', kind: 'dir' as const, size: 0, modified: null, hidden: false };
+
+	it('draws folders in the theme style, colored ones always', () => {
+		expect(drawnFolder(dir, undefined, 'pixel')).toBe('pixel');
+		expect(drawnFolder(dir, undefined, 'windows')).toBeNull();
+		expect(drawnFolder(dir, '#f00', 'windows')).toBe('flat');
+		expect(drawnFolder(dir, '#f00', 'wagon')).toBe('wagon');
+	});
+
+	it('leaves files, drives and folders with their own icon to Windows', () => {
+		expect(drawnFolder({ ...dir, kind: 'file' }, undefined, 'pixel')).toBeNull();
+		expect(drawnFolder({ ...dir, libero: 5 }, undefined, 'pixel')).toBeNull();
+		expect(drawnFolder({ ...dir, iconaPropria: true }, undefined, 'pixel')).toBeNull();
 	});
 });

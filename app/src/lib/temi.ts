@@ -7,6 +7,7 @@
  * cambiano anche le forme, lo sfondo e chi sfila sul binario.
  */
 import { FIGURE, CORTEI, motivoFigura } from './figure';
+import type { FolderStyle } from './icons';
 
 export interface Forme {
 	/** Arrotondamento di finestre e pannelli, in pixel. */
@@ -35,6 +36,8 @@ export interface Forme {
 	cielo: Cielo;
 	/** Il bordo della finestra. */
 	cornice: Cornice;
+	/** How folders are drawn. Missing = the default for the theme's category. */
+	folder?: FolderStyle;
 }
 
 export type Angolo = 'tondo' | 'smusso' | 'tacca' | 'pillola';
@@ -66,6 +69,14 @@ export const CIELI: readonly { valore: Cielo; nome: string }[] = [
 export const CORNICI: readonly { valore: Cornice; nome: string }[] = [
 	{ valore: 'filo', nome: 'Filo sottile' },
 	{ valore: 'doppia', nome: 'Doppio filo' }
+];
+
+export const FOLDER_STYLES: readonly { valore: FolderStyle; nome: string }[] = [
+	{ valore: 'pixel', nome: 'Pixel' },
+	{ valore: 'wagon', nome: 'Vagone' },
+	{ valore: 'flat', nome: 'Piatta' },
+	{ valore: 'outline', nome: 'Contorno' },
+	{ valore: 'windows', nome: 'Icona di Windows' }
 ];
 
 /** Il valore se è una delle scelte ammesse, altrimenti quello di base. */
@@ -111,6 +122,29 @@ export function categoriaDi(tema: Tema): IdCategoria {
 	if (STAGIONI.has(tema.id)) return 'stagioni';
 	if (FESTE.has(tema.id)) return 'feste';
 	return 'mondi';
+}
+
+const OUTLINE_WORLDS = new Set(['cianografia', 'atlante']);
+
+/** The folder style a theme asks for, or the one its category suggests. */
+export function folderStyleOf(tema: Tema): FolderStyle {
+	const chosen = tema.forme?.folder;
+	if (FOLDER_STYLES.some((f) => f.valore === chosen)) return chosen as FolderStyle;
+	if (tema.gruppo === 'personale') return 'windows';
+	if (tema.id === 'spazio') return 'pixel';
+	if (tema.id === 'orient') return 'wagon';
+	if (OUTLINE_WORLDS.has(tema.id)) return 'outline';
+	switch (categoriaDi(tema)) {
+		case 'mondi':
+		case 'feste':
+			return 'pixel';
+		case 'scuri':
+		case 'stagioni':
+			return 'flat';
+		default:
+			// Light themes and the user's own: the Windows icon until they pick one.
+			return 'windows';
+	}
 }
 
 /** Il tema personale come lo salva l'editor. */
