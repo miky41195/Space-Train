@@ -28,6 +28,43 @@ pub struct Criteri {
     /// Cerca il testo anche dentro i file, non solo nei nomi.
     pub contenuto: bool,
     pub nascosti: bool,
+    /// Smart folder filters. Any of them set limits the results to files.
+    /// Lowercase extensions without the dot.
+    #[serde(default)]
+    pub extensions: Option<Vec<String>>,
+    #[serde(default)]
+    pub min_size: Option<u64>,
+    /// Milliseconds since the Unix epoch.
+    #[serde(default)]
+    pub modified_after: Option<i64>,
+    #[serde(default)]
+    pub modified_before: Option<i64>,
+}
+
+impl Criteri {
+    fn has_filters(&self) -> bool {
+        self.extensions.is_some() || self.min_size.is_some() || self.modified_after.is_some() || self.modified_before.is_some()
+    }
+
+    /// True if `e` passes the smart folder filters (always true without filters).
+    fn passes(&self, e: &Entry) -> bool {
+        if !self.has_filters() {
+            return true;
+        }
+        if e.kind != EntryKind::File {
+            return false;
+        }
+        if let Some(ext) = &self.extensions {
+            let own = e.name.rsplit_once('.').map(|(_, x)| x.to_lowercase()).unwrap_or_default();
+            if !ext.iter().any(|x| *x == own) {
+                return false;
+            }
+        }
+        let modified = e.modified.unwrap_or(0);
+        self.min_size.map_or(true, |m| e.size >= m)
+            && self.modified_after.map_or(true, |t| modified >= t)
+            && self.modified_before.map_or(true, |t| modified < t)
+    }
 }
 
 /// Visita `radice` e consegna i risultati a lotti. Ritorna quanti ne ha trovati.
@@ -38,7 +75,7 @@ pub fn cerca(
     consegna: &mut dyn FnMut(Vec<Entry>),
 ) -> usize {
     let testo = criteri.testo.trim().to_lowercase();
-    if testo.is_empty() {
+    if testo.is_empty() && !criteri.has_filters() {
         return 0;
     }
     let confronto = Confronto::nuovo(&testo);
@@ -73,7 +110,10 @@ pub fn cerca(
                 pila.push(de.path());
             }
 
-            let nome_ok = confronto.nome(&e.name.to_lowercase());
+            if !criteri.passes(&e) {
+                continue;
+            }
+            let nome_ok = testo.is_empty() || confronto.nome(&e.name.to_lowercase());
             if !nome_ok && criteri.contenuto && e.kind == EntryKind::File && e.size <= MASSIMO_CONTENUTO {
                 e.snippet = find_in_content(&de.path(), &testo);
             }
@@ -219,6 +259,10 @@ mod tests {
             testo: testo.into(),
             contenuto,
             nascosti: false,
+            extensions: None,
+            min_size: None,
+            modified_after: None,
+            modified_before: None,
         }
     }
 
@@ -300,6 +344,31 @@ mod tests {
         let shown: String = s.text.chars().skip(s.at).take(s.len).collect();
         assert_eq!(shown, "ago");
         assert_eq!(s.text.chars().count(), SNIPPET_MAX + 2);
+    }
+
+    #[test]
+    fn filters_alone_find_files_by_type_and_size() {
+        let d = tempdir().unwrap();
+        fs::create_dir_all(d.path().join("sub")).unwrap();
+        fs::write(d.path().join("sub").join("big.MP4"), vec![0u8; 2000]).unwrap();
+        fs::write(d.path().join("small.mp4"), b"x").unwrap();
+        fs::write(d.path().join("big.txt"), vec![b'x'; 2000]).unwrap();
+        let mut c = criteri("", false);
+        c.extensions = Some(vec!["mp4".into()]);
+        c.min_size = Some(1000);
+        assert_eq!(nomi(d.path(), &c), vec!["big.MP4"]);
+    }
+
+    #[test]
+    fn date_filter_keeps_recent_files() {
+        let d = tempdir().unwrap();
+        fs::write(d.path().join("new.txt"), b"x").unwrap();
+        let mut c = criteri("new", false);
+        c.modified_after = Some(0);
+        assert_eq!(nomi(d.path(), &c), vec!["new.txt"]);
+        c.modified_after = None;
+        c.modified_before = Some(1);
+        assert!(nomi(d.path(), &c).is_empty());
     }
 
     #[test]

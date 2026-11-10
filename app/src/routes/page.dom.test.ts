@@ -2881,6 +2881,26 @@ describe('folder comparison', () => {
 	});
 });
 
+describe('smart folders', () => {
+	it('a type filter finds files with no text, «Salva ricerca» adds a sidebar stop that reopens it', async () => {
+		aggiungi('C:\\Dati\\film.mp4');
+		await monta();
+		tasto('f', { ctrl: true });
+		await fireEvent.click(await screen.findByRole('button', { name: 'Sottocartelle' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Filtri' }));
+		await fireEvent.click(within(screen.getByRole('group', { name: 'Filtri' })).getByRole('button', { name: 'Video' }));
+		await waitFor(() => expect(nomi()).toEqual(['film.mp4']));
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Salva ricerca' }));
+		const stop = await screen.findByRole('button', { name: 'Video in C:' });
+
+		tasto('Escape');
+		await waitFor(() => expect(nomi()).toContain('alfa.txt'));
+		await fireEvent.click(stop);
+		await waitFor(() => expect(nomi()).toEqual(['film.mp4']));
+	});
+});
+
 describe('colour labels', () => {
 	it('a file gets a colour, the sidebar stop lists every labelled item, Esc goes back', async () => {
 		await monta();

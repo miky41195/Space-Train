@@ -29,6 +29,8 @@
 	import TestataPannello from '$lib/components/TestataPannello.svelte';
 	import { followActive, otherPane, type Split } from '$lib/split';
 	import { alignPlan, compareZones } from '$lib/confronto';
+	import { NESSUN_FILTRO, criteriFiltri, descriviRicerca, filtriAttivi, type Filtri } from '$lib/filtri';
+	import { RICERCHE_PRONTE, RicercheStore, type RicercaSalvata } from '$lib/stores/ricerche.svelte';
 	import SearchBar from '$lib/components/SearchBar.svelte';
 	import ConfermaCestino from '$lib/components/ConfermaCestino.svelte';
 	import BatchRename from '$lib/components/BatchRename.svelte';
@@ -107,6 +109,7 @@
 	const preferiti = new PreferitiStore();
 	const colori = new ColoriStore();
 	const accessoRapido = new AccessoRapidoStore();
+	const ricerche = new RicercheStore();
 
 	/**
 	 * Quale finestra è questa. «main» è quella aperta all'avvio; le altre
@@ -286,6 +289,8 @@
 	let ricercaAperta = $state(false);
 	let ricercaRicorsiva = $state(false);
 	let ricercaContenuto = $state(false);
+	/** Smart folder filters of the subfolder search. */
+	let filtri = $state<Filtri>(NESSUN_FILTRO);
 
 	let risultati = $derived.by(() => {
 		const tab = store.activeTab;
@@ -412,6 +417,7 @@
 
 	function chiudiRicerca() {
 		ricercaAperta = false;
+		filtri = NESSUN_FILTRO;
 		if (store.activeId === null) return;
 		store.clearQuery(store.activeId);
 		void store.fermaRicerca(store.activeId);
@@ -429,18 +435,46 @@
 		const testo = tab.query.trim();
 		const contenuto = ricercaContenuto;
 		const nascosti = store.showHidden;
+		const f = filtri;
 
-		if (testo === '') {
+		if (testo === '' && !filtriAttivi(f)) {
 			void store.fermaRicerca(id);
 			return;
 		}
 		const attesa = setTimeout(() => {
-			void store.cercaRicorsivo(id, { testo, contenuto, nascosti }).catch((e) => {
+			void store.cercaRicorsivo(id, { testo, contenuto, nascosti, ...criteriFiltri(f) }).catch((e) => {
 				erroreOp = descriviErrore(e);
 			});
 		}, 350);
 		return () => clearTimeout(attesa);
 	});
+
+	/** Opens a smart folder: its folder (or the one open), subfolder search with its text and filters. */
+	async function apriRicercaSalvata(r: RicercaSalvata) {
+		const id = store.activeId;
+		if (id === null) return;
+		if (r.cartella && r.cartella !== store.activeTab?.path) await store.navigate(id, r.cartella);
+		if (store.activeTab && eVirtuale(store.activeTab.path)) return;
+		ricercaAperta = true;
+		ricercaRicorsiva = true;
+		ricercaContenuto = r.contenuto;
+		filtri = { ...r.filtri };
+		store.setQuery(id, r.testo);
+	}
+
+	function salvaRicerca() {
+		const tab = store.activeTab;
+		if (!tab) return;
+		const testo = tab.query.trim();
+		ricerche.salva({
+			nome: `${descriviRicerca(testo, filtri)} in ${nomePosizione(tab.path)}`,
+			cartella: tab.path,
+			testo,
+			contenuto: ricercaContenuto,
+			filtri: { ...filtri }
+		});
+		avvisa('Ricerca salvata nella barra laterale.');
+	}
 
 	function alternaRicorsiva() {
 		ricercaRicorsiva = !ricercaRicorsiva;
@@ -2425,6 +2459,9 @@
 			etichette={colori.usati}
 			etichettaAperta={store.activeTab?.etichetta ?? null}
 			onetichetta={(id) => void mostraEtichetta(id)}
+			ricerche={[...RICERCHE_PRONTE, ...ricerche.voci]}
+			onricerca={(r) => void apriRicercaSalvata(r)}
+			ontogliricerca={(nome) => ricerche.togli(nome)}
 		/>
 		<Rail orientamento="verticale" attivo={sottoCarico} />
 		</div>
@@ -2479,6 +2516,9 @@
 					cercando={store.activeTab.cercando}
 					ontogglesottocartelle={posizione === 'normale' ? alternaRicorsiva : undefined}
 					ontogglecontenuto={() => (ricercaContenuto = !ricercaContenuto)}
+					{filtri}
+					onfiltri={(f) => (filtri = f)}
+					onsalva={salvaRicerca}
 				/>
 			{/if}
 

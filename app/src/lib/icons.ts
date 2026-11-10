@@ -25,6 +25,11 @@ const CATEGORIE: Record<string, string[]> = {
 	config: ['ini', 'cfg', 'conf', 'env', 'lock']
 };
 
+/** Every extension of the given categories (smart folder type filter). */
+export function estensioniDi(categorie: string[]): string[] {
+	return categorie.flatMap((c) => CATEGORIE[c] ?? []);
+}
+
 const PER_ESTENSIONE = new Map<string, string>();
 for (const [categoria, estensioni] of Object.entries(CATEGORIE)) {
 	for (const e of estensioni) PER_ESTENSIONE.set(e, categoria);

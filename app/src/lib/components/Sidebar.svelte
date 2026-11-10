@@ -5,6 +5,7 @@
 	import { QUESTO_PC, RETE, CESTINO, RETE_LOCALE, AMICI, byte, stessoPath, nomeDi, dentroDi } from '../posizioni';
 	import { SU_LINUX } from '../sistema';
 	import type { IdColore } from '../stores/colori.svelte';
+	import type { RicercaSalvata } from '../stores/ricerche.svelte';
 
 	let {
 		store,
@@ -22,7 +23,10 @@
 		onmenuaccesso = undefined,
 		etichette = [],
 		etichettaAperta = null,
-		onetichetta = undefined
+		onetichetta = undefined,
+		ricerche = [],
+		onricerca = undefined,
+		ontogliricerca = undefined
 	}: {
 		store: TabsStore;
 		backend: Backend;
@@ -52,6 +56,10 @@
 		/** Name of the label whose items the active tab shows. */
 		etichettaAperta?: string | null;
 		onetichetta?: (id: IdColore) => void;
+		/** Smart folders: ready-made ones (no folder) first, then the saved ones. */
+		ricerche?: RicercaSalvata[];
+		onricerca?: (r: RicercaSalvata) => void;
+		ontogliricerca?: (nome: string) => void;
 	} = $props();
 
 	let drives = $state<Drive[]>([]);
@@ -261,6 +269,24 @@
 			</button>
 		{/each}
 	</div>
+
+	{#if onricerca && ricerche.length > 0}
+		<div class="gruppo">
+			<div class="titolo">Ricerche</div>
+			{#each ricerche as r (r.nome)}
+				<div class="ricerca-salvata">
+					<button class="voce" title={r.cartella ? `${r.nome}` : `${r.nome}, nella cartella aperta`} onclick={() => onricerca(r)}>
+						{r.nome}
+					</button>
+					{#if r.cartella && ontogliricerca}
+						<button class="togli" aria-label={`Togli la ricerca «${r.nome}»`} onclick={() => ontogliricerca(r.nome)}
+							><Icona nome="chiudi" lato={10} /></button
+						>
+					{/if}
+				</div>
+			{/each}
+		</div>
+	{/if}
 
 	{#if etichette.length > 0}
 		<div class="gruppo">
@@ -483,6 +509,39 @@
 		margin-right: 8px;
 		border-radius: 50%;
 		vertical-align: middle;
+	}
+	/* Saved search: the remove button shows on hover, over the stop's right end. */
+	.ricerca-salvata {
+		position: relative;
+	}
+	.ricerca-salvata .voce {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		padding-right: 28px;
+	}
+	.togli {
+		position: absolute;
+		top: 50%;
+		right: 4px;
+		width: 20px;
+		height: 20px;
+		transform: translateY(-50%);
+		display: grid;
+		place-items: center;
+		border: none;
+		border-radius: 6px;
+		background: transparent;
+		color: var(--text-dim);
+		opacity: 0;
+	}
+	.ricerca-salvata:hover .togli,
+	.togli:focus-visible {
+		opacity: 1;
+	}
+	.togli:hover {
+		background: var(--row-hover);
+		color: var(--text);
 	}
 	/* How many items carry the label: a timetable figure at the end of the stop. */
 	.quante {

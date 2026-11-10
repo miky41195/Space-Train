@@ -98,6 +98,11 @@ export interface CriteriRicerca {
 	testo: string;
 	contenuto: boolean;
 	nascosti: boolean;
+	/** Smart folder filters: any of them limits the results to files. */
+	extensions?: string[];
+	minSize?: number;
+	modifiedAfter?: number;
+	modifiedBefore?: number;
 }
 
 export interface ContenutoAppunti {

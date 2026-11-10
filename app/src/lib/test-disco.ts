@@ -228,7 +228,7 @@ export class DiscoFinto {
 			case 'search':
 				return this.#cerca(
 					args.root as string,
-					args.criteri as { testo: string; contenuto: boolean },
+					args.criteri as { testo: string; contenuto: boolean; extensions?: string[] },
 					args.onResults as Canale<Entry[]>
 				);
 			case 'entries_for': {
@@ -457,11 +457,18 @@ export class DiscoFinto {
 		return { cartella: genitore(pulito), seleziona: pulito };
 	}
 
-	async #cerca(root: string, criteri: { testo: string; contenuto: boolean }, canale: Canale<Entry[]>) {
+	async #cerca(
+		root: string,
+		criteri: { testo: string; contenuto: boolean; extensions?: string[] },
+		canale: Canale<Entry[]>
+	) {
 		const testo = criteri.testo.toLowerCase();
 		const prefisso = root.endsWith('\\') ? root : root + '\\';
+		const ext = criteri.extensions;
 		const trovati = [...this.nodi.keys()]
 			.filter((p) => p.startsWith(prefisso))
+			// Like Rust: a type filter keeps only files with one of those extensions.
+			.filter((p) => !ext || (this.nodi.get(p)!.kind === 'file' && ext.includes(p.split('.').pop()!.toLowerCase())))
 			.filter(
 				(p) =>
 					nome(p).toLowerCase().includes(testo) ||
@@ -476,7 +483,6 @@ export class DiscoFinto {
 		return trovati.length;
 	}
 
-	/** Like Rust: files with the same text are identical; groups, then the final progress. */
 	/** Same rules as Rust: names match ignoring case, files differ by their text. */
 	#compare(here: string, there: string) {
 		const out = { onlyHere: [] as Entry[], onlyThere: [] as Entry[], different: [] as unknown[] };
@@ -502,6 +508,7 @@ export class DiscoFinto {
 		return out;
 	}
 
+	/** Like Rust: files with the same text are identical; groups, then the final progress. */
 	async #duplicates(root: string, canale: Canale<unknown>) {
 		const prefix = root.endsWith('\\') ? root : root + '\\';
 		const byText = new Map<string, string[]>();

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icona from './Icona.svelte';
+	import { DATE, PESI, TIPI, filtriAttivi, type Filtri } from '../filtri';
 	let {
 		query,
 		risultati,
@@ -11,7 +12,10 @@
 		contenuto = false,
 		cercando = false,
 		ontogglesottocartelle = undefined,
-		ontogglecontenuto = undefined
+		ontogglecontenuto = undefined,
+		filtri = undefined,
+		onfiltri = undefined,
+		onsalva = undefined
 	}: {
 		query: string;
 		risultati: number;
@@ -28,7 +32,21 @@
 		cercando?: boolean;
 		ontogglesottocartelle?: () => void;
 		ontogglecontenuto?: () => void;
+		/** Smart folder filters (subfolder search only). */
+		filtri?: Filtri;
+		onfiltri?: (f: Filtri) => void;
+		/** Keeps this search as a stop in the sidebar. */
+		onsalva?: () => void;
 	} = $props();
+
+	let filtriAperti = $state(false);
+	let conFiltri = $derived(!!filtri && filtriAttivi(filtri));
+
+	/** Picks one value of a filter group; picking it again clears it. */
+	function scegli<K extends keyof Filtri>(chiave: K, valore: Filtri[K]) {
+		if (!filtri || !onfiltri) return;
+		onfiltri({ ...filtri, [chiave]: filtri[chiave] === valore ? null : valore });
+	}
 
 	let campo = $state<HTMLInputElement | null>(null);
 
@@ -84,8 +102,49 @@
 			title="Cerca il testo anche dentro i file">Contenuto</button
 		>
 	{/if}
+	{#if onfiltri && sottocartelle}
+		<button
+			class="opzione"
+			class:accesa={filtriAperti || conFiltri}
+			aria-pressed={filtriAperti}
+			aria-expanded={filtriAperti}
+			onclick={() => (filtriAperti = !filtriAperti)}
+			title="Filtra per tipo, peso e data">Filtri</button
+		>
+	{/if}
+	{#if onsalva && sottocartelle && (query.trim() !== '' || conFiltri)}
+		<button class="opzione" onclick={onsalva} title="Tieni questa ricerca nella barra laterale">Salva ricerca</button>
+	{/if}
 	<button onclick={onclose} aria-label="Chiudi la ricerca"><Icona nome="chiudi" /></button>
 </div>
+{#if filtri && onfiltri && sottocartelle && (filtriAperti || conFiltri)}
+	<div class="filtri" role="group" aria-label="Filtri">
+		<span class="gruppo-filtri">
+			<span class="nome-filtro">Tipo</span>
+			{#each TIPI as t (t.id)}
+				<button class="opzione" class:accesa={filtri.tipo === t.id} aria-pressed={filtri.tipo === t.id} onclick={() => scegli('tipo', t.id)}
+					>{t.nome}</button
+				>
+			{/each}
+		</span>
+		<span class="gruppo-filtri">
+			<span class="nome-filtro">Peso</span>
+			{#each PESI as p (p.id)}
+				<button class="opzione" class:accesa={filtri.peso === p.id} aria-pressed={filtri.peso === p.id} onclick={() => scegli('peso', p.id)}
+					>{p.nome}</button
+				>
+			{/each}
+		</span>
+		<span class="gruppo-filtri">
+			<span class="nome-filtro">Modificati</span>
+			{#each DATE as d (d.id)}
+				<button class="opzione" class:accesa={filtri.data === d.id} aria-pressed={filtri.data === d.id} onclick={() => scegli('data', d.id)}
+					>{d.nome}</button
+				>
+			{/each}
+		</span>
+	</div>
+{/if}
 
 <style>
 	.ricerca {
@@ -147,5 +206,32 @@
 	.opzione.accesa {
 		border-color: var(--current);
 		color: var(--current);
+	}
+	/* Smart folder filters: a second row of chip groups under the search field. */
+	.filtri {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px 20px;
+		padding: 6px 12px 8px 36px;
+		background: var(--surface);
+		border-bottom: 1px solid var(--border);
+	}
+	.gruppo-filtri {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 4px;
+	}
+	.nome-filtro {
+		margin-right: 4px;
+		color: var(--text-dim);
+		font-family: var(--font-display);
+		font-size: calc(10px * var(--scala-testo, 1));
+		font-weight: 600;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+	}
+	.filtri .opzione {
+		height: 24px;
 	}
 </style>
