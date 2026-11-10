@@ -10,6 +10,8 @@
 		modificabile = true,
 		mostraNascosti = false,
 		anteprima = false,
+		doppio = false,
+		ontoggledoppio = undefined,
 		recenti = false,
 		onnuovo,
 		ontaglia,
@@ -30,6 +32,9 @@
 		modificabile?: boolean;
 		mostraNascosti?: boolean;
 		anteprima?: boolean;
+		/** The dual pane is open. */
+		doppio?: boolean;
+		ontoggledoppio?: () => void;
 		/** La zona «Modificati di recente» è accesa. */
 		recenti?: boolean;
 		onnuovo: (evento: MouseEvent) => void;
@@ -164,6 +169,21 @@
 				<circle cx="10.4" cy="5" r="1" fill="currentColor" />
 			</svg>
 		</button>
+		{#if ontoggledoppio}
+			<button
+				class="icona"
+				class:acceso={doppio}
+				onclick={ontoggledoppio}
+				aria-pressed={doppio}
+				title="Doppio pannello (Ctrl+Maiusc+D)"
+				aria-label="Doppio pannello"
+			>
+				<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+					<rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3" />
+					<path d="M8 3v10" stroke="currentColor" stroke-width="1.3" />
+				</svg>
+			</button>
+		{/if}
 		<button
 			class="icona"
 			class:acceso={anteprima}

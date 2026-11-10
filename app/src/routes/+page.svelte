@@ -25,6 +25,9 @@
 	import AmiciFinestra from '$lib/components/Amici.svelte';
 	import { NOVITA, novitaDaMostrare, type Novita } from '$lib/novita';
 	import FileList from '$lib/components/FileList.svelte';
+	import PannelloPassivo from '$lib/components/PannelloPassivo.svelte';
+	import TestataPannello from '$lib/components/TestataPannello.svelte';
+	import { followActive, otherPane, type Split } from '$lib/split';
 	import SearchBar from '$lib/components/SearchBar.svelte';
 	import ConfermaCestino from '$lib/components/ConfermaCestino.svelte';
 	import BatchRename from '$lib/components/BatchRename.svelte';
@@ -236,6 +239,41 @@
 
 	/** Vero se il tab mostra i risultati di una ricerca nelle sottocartelle. */
 	let inRicerca = $derived(store.activeTab?.risultati != null);
+	// ── Dual pane ────────────────────────────────────────────────────
+	let split = $state<Split | null>(null);
+	let ultimaAttiva: number | null = null;
+	$effect(() => {
+		const attiva = store.activeId;
+		const ids = store.tabs.map((t) => t.id);
+		const prima = untrack(() => split);
+		const dopo = followActive(prima, attiva, ultimaAttiva, ids);
+		if (dopo !== prima) split = dopo;
+		ultimaAttiva = attiva;
+	});
+	/** The tab shown in the passive half, when the dual pane is open. */
+	let tabAltro = $derived(store.tabs.find((t) => t.id === otherPane(split, store.activeId)));
+	/** The active pane sits on the right when its tab is the split's right one. */
+	let attivaADestra = $derived(split !== null && store.activeId === split.right);
+
+	async function alternaDoppio() {
+		const id = store.activeId;
+		if (split || id === null) {
+			split = null;
+			return;
+		}
+		const nuovo = await store.openTab(store.activeTab?.path ?? RADICE_SISTEMA);
+		store.setActive(id);
+		split = { left: id, right: nuovo };
+	}
+
+	/** Copies or moves the selection into the folder of the other pane. */
+	async function versoAltro(mode: 'copy' | 'move') {
+		const dest = tabAltro?.path;
+		const sel = store.activeTab?.selection ?? [];
+		if (!dest || eVirtuale(dest) || sel.length === 0) return;
+		await trasferisci([...sel], dest, mode);
+	}
+
 	/** Content search found text inside files: rows grow to show the found line. */
 	let conFrammenti = $derived(store.activeTab?.risultati?.some((e) => e.snippet) ?? false);
 
@@ -1400,6 +1438,17 @@
 				return SU_LINUX ? undefined : proprieta();
 			case 'anteprima':
 				return impostazioni.imposta('anteprima', !impostazioni.anteprima);
+			case 'doppioPannello':
+				return alternaDoppio();
+			case 'altroPannello': {
+				const altro = otherPane(split, id);
+				if (altro !== null) store.setActive(altro);
+				return;
+			}
+			case 'copiaAltroPannello':
+				return versoAltro('copy');
+			case 'spostaAltroPannello':
+				return versoAltro('move');
 		}
 	}
 
@@ -2327,6 +2376,8 @@
 				{modificabile}
 				mostraNascosti={store.showHidden}
 				anteprima={impostazioni.anteprima}
+				doppio={split !== null}
+				ontoggledoppio={() => void alternaDoppio()}
 				onnuovo={apriMenuNuovo}
 				ontaglia={() => mettiNegliAppunti(true)}
 				oncopia={() => mettiNegliAppunti(false)}
@@ -2417,6 +2468,8 @@
 			{/if}
 
 			<div class="contenuto">
+				<div class="pannello-attivo" class:diviso={tabAltro} style:order={attivaADestra ? 2 : 0}>
+				{#if tabAltro && store.activeTab}<TestataPannello path={store.activeTab.path} attivo />{/if}
 				{#if statoVuoto}
 					<StatoVuoto
 						variante={statoVuoto}
@@ -2488,6 +2541,24 @@
 						oncancelrename={() => (rinominando = null)}
 						ontrascina={trascina}
 						{rettangolo}
+					/>
+				{/if}
+				</div>
+
+				{#if tabAltro}
+					<PannelloPassivo
+						tab={tabAltro}
+						{altezzaRiga}
+						colonne={impostazioni.colonne}
+						nascondiEstensione={!impostazioni.estensioni}
+						coloreDi={coloreVoce}
+						{icone}
+						{folderStyle}
+						unClic={impostazioni.unClic}
+						{bersaglio}
+						onattiva={() => tabAltro && store.setActive(tabAltro.id)}
+						onapri={apri}
+						onseleziona={seleziona}
 					/>
 				{/if}
 
@@ -2755,6 +2826,27 @@
 	.contenuto > :global(:first-child) {
 		flex: 1;
 		min-width: 0;
+	}
+	.pannello-attivo {
+		display: flex;
+		flex-direction: column;
+		min-height: 0;
+	}
+	.pannello-attivo > :global(:last-child) {
+		flex: 1;
+		min-height: 0;
+	}
+	/* Dual pane: two equal halves split by a hairline; the passive one is order 1. */
+	.contenuto > :global(.pannello.passivo) {
+		flex: 1;
+		order: 1;
+		border-inline: 1px solid var(--border);
+	}
+	.contenuto > :global(.anteprima) {
+		order: 3;
+	}
+	.pannello-attivo.diviso {
+		background: color-mix(in srgb, var(--text) 2%, transparent);
 	}
 	.impostazioni {
 		display: flex;

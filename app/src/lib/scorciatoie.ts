@@ -29,6 +29,10 @@ export type AzioneTasto =
 	| 'su'
 	| 'proprieta'
 	| 'anteprima'
+	| 'doppioPannello'
+	| 'altroPannello'
+	| 'copiaAltroPannello'
+	| 'spostaAltroPannello'
 	| { scheda: number }
 	/** Ctrl+Maiusc+1…8: le otto viste di Esplora, dalle icone più grandi. */
 	| { vista: number };
@@ -53,6 +57,9 @@ export function azioneTasto(e: Tasto): AzioneTasto | null {
 		if (k === 'PageDown') return 'schedaSuccessiva';
 		if (k === 'PageUp') return 'schedaPrecedente';
 		if (shift && k === 'n') return 'nuovaCartella';
+		if (shift && k === 'd') return 'doppioPannello';
+		if (shift && k === 'c') return 'copiaAltroPannello';
+		if (shift && k === 'x') return 'spostaAltroPannello';
 		const cifra = /^Digit([1-8])$/.exec(e.code ?? '');
 		if (shift && cifra) return { vista: Number(cifra[1]) - 1 };
 		if (shift) return null;
@@ -118,6 +125,8 @@ export function azioneTasto(e: Tasto): AzioneTasto | null {
 			return 'indirizzo';
 		case 'F5':
 			return 'ricarica';
+		case 'F6':
+			return 'altroPannello';
 		case 'Backspace':
 			return 'indietro';
 	}
@@ -187,6 +196,15 @@ export const SHORTCUT_GROUPS: { name: string; items: ShortcutItem[] }[] = [
 			{ label: 'Scheda precedente', keys: ['Ctrl+Maiusc+Tab', 'Ctrl+PagSu'], action: 'schedaPrecedente' },
 			{ label: 'Vai alla scheda 1–9', keys: ['Ctrl+1…9'] },
 			{ label: 'Nuova finestra', keys: ['Ctrl+N'], action: 'nuovaFinestra' }
+		]
+	},
+	{
+		name: 'Doppio pannello',
+		items: [
+			{ label: 'Apri o chiudi il doppio pannello', keys: ['Ctrl+Maiusc+D'], action: 'doppioPannello' },
+			{ label: 'Passa all’altro pannello', keys: ['F6'], action: 'altroPannello' },
+			{ label: 'Copia nell’altro pannello', keys: ['Ctrl+Maiusc+C'], action: 'copiaAltroPannello' },
+			{ label: 'Sposta nell’altro pannello', keys: ['Ctrl+Maiusc+X'], action: 'spostaAltroPannello' }
 		]
 	},
 	{

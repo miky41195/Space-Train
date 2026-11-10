@@ -2823,3 +2823,27 @@ describe('impostazioni', () => {
 		await waitFor(() => expect(riga('Dati').querySelector('.size')?.textContent?.trim()).toBe('2 KB'));
 	});
 });
+
+describe('dual pane', () => {
+	it('opens beside the list, F6 switches side, Ctrl+Maiusc+C copies into the other folder', async () => {
+		await monta();
+		tasto('D', { ctrl: true, shift: true });
+		await waitFor(() => expect(document.querySelector('.pannello.passivo')).not.toBeNull());
+
+		// Right pane becomes active and goes into Dati.
+		tasto('F6');
+		await fireEvent.dblClick(riga('Dati'));
+		await waitFor(() => expect(nomi()).toContain('interno.txt'));
+
+		// Back to the left pane (C:), copy alfa.txt across.
+		tasto('F6');
+		await waitFor(() => expect(nomi()[0]).not.toBe('interno.txt'));
+		await fireEvent.click(riga('alfa.txt'));
+		tasto('C', { ctrl: true, shift: true });
+		await waitFor(() => expect(disco.esiste('C:\\Dati\\alfa.txt')).toBe(true));
+		expect(disco.esiste('C:\\alfa.txt')).toBe(true);
+
+		tasto('D', { ctrl: true, shift: true });
+		await waitFor(() => expect(document.querySelector('.pannello.passivo')).toBeNull());
+	});
+});
