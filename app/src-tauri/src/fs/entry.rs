@@ -33,6 +33,24 @@ pub struct Entry {
     /// chiesta alla Shell sul file vero, non sull'estensione.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub icona_propria: bool,
+    /// Only in content search results: where the text was found.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub snippet: Option<Snippet>,
+}
+
+/// The first line of a file that contains the searched text.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Snippet {
+    /// 1-based line number.
+    pub line: usize,
+    /// The line, trimmed around the match so it fits a list row.
+    pub text: String,
+    /// Where the match starts in `text` and how long it is, in characters.
+    pub at: usize,
+    pub len: usize,
+    /// How many other lines contain the text.
+    pub more: usize,
 }
 
 /// Estensioni i cui file portano un'icona propria.
@@ -108,6 +126,7 @@ pub fn entry_from_dir_entry(de: &DirEntry) -> Option<Entry> {
         libero: None,
         totale: None,
         icona_propria,
+        snippet: None,
     })
 }
 

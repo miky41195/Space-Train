@@ -221,6 +221,7 @@ pub fn come_voci() -> Vec<crate::fs::entry::Entry> {
             totale: d.totale,
             // L'icona vera del disco: chiavetta, lettore, unità di rete.
             icona_propria: true,
+            snippet: None,
         })
         .collect()
 }

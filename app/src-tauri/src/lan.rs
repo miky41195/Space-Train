@@ -1084,6 +1084,7 @@ pub fn voci_pari(lan: &Lan) -> Vec<Entry> {
             libero: None,
             totale: None,
             icona_propria: false,
+            snippet: None,
         })
         .collect()
 }
@@ -1108,6 +1109,7 @@ pub fn elenca_remoto(lan: &Lan, path: &str) -> Result<Vec<Entry>, FsError> {
             libero: None,
             totale: None,
             icona_propria: false,
+            snippet: None,
         })
         .collect())
 }

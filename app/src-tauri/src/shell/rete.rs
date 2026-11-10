@@ -51,6 +51,7 @@ fn cartella(nome: String, path: String) -> Entry {
         libero: None,
         totale: None,
         icona_propria: false,
+        snippet: None,
     }
 }
 

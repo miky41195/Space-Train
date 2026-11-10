@@ -19,6 +19,19 @@ export interface Entry {
 	 * collegamento, una cartella personalizzata, un disco.
 	 */
 	iconaPropria?: boolean;
+	/** Only in content search results: the first line that contains the text. */
+	snippet?: Snippet;
+}
+
+export interface Snippet {
+	/** 1-based line number. */
+	line: number;
+	text: string;
+	/** Match start and length in `text`, counted in characters (code points). */
+	at: number;
+	len: number;
+	/** How many other lines contain the text. */
+	more: number;
 }
 
 export interface Listing {

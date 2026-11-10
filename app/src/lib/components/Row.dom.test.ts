@@ -171,3 +171,19 @@ describe('Row in one-click mode', () => {
 		}
 	});
 });
+
+describe('Row with a content search snippet', () => {
+	it('shows the found line with the match highlighted and the extra count', () => {
+		const entry = { ...voce('note.txt'), snippet: { line: 42, text: '…la 😀 fattura 2024 qui', at: 6, len: 12, more: 2 } };
+		const { container } = render(Row, { props: { entry, onactivate: vi.fn(), onselect: vi.fn() } });
+		const f = container.querySelector('.frammento')!;
+		expect(f.querySelector('.riga-num')?.textContent).toBe('42');
+		expect(f.querySelector('mark')?.textContent).toBe('fattura 2024');
+		expect(f.textContent).toContain('+2 altre righe');
+	});
+
+	it('plain rows have no snippet line', () => {
+		const { container } = render(Row, { props: { entry: voce('note.txt'), onactivate: vi.fn(), onselect: vi.fn() } });
+		expect(container.querySelector('.frammento')).toBeNull();
+	});
+});

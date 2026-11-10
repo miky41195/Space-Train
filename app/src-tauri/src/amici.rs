@@ -593,6 +593,7 @@ impl Amici {
                 libero: None,
                 totale: None,
                 icona_propria: false,
+                snippet: None,
             })
             .collect()
     }
@@ -618,6 +619,7 @@ impl Amici {
                 libero: None,
                 totale: None,
                 icona_propria: false,
+                snippet: None,
             })
             .collect())
     }

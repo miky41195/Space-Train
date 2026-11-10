@@ -120,6 +120,18 @@
 		oncancelrename?.();
 	}
 
+	/** Content search: the found line split around the match (code points, as Rust counts them). */
+	let frammento = $derived.by(() => {
+		const s = entry.snippet;
+		if (!s) return null;
+		const c = Array.from(s.text);
+		return {
+			prima: c.slice(0, s.at).join(''),
+			trovato: c.slice(s.at, s.at + s.len).join(''),
+			dopo: c.slice(s.at + s.len).join('')
+		};
+	});
+
 	/**
 	 * Spezza il nome in tratti evidenziati e non. Senza posizioni restituisce
 	 * un tratto unico: il rendering resta identico a prima della ricerca.
@@ -232,11 +244,19 @@
 			}}
 		/>
 	{:else}
-		<span class="nome-blocco">
+		<span class="nome-blocco" class:con-frammento={frammento}>
 			<span class="name" title={entry.name}
 				>{#each tratti as t, i (i)}{#if t.forte}<mark>{t.testo}</mark>{:else}{t.testo}{/if}{/each}</span
 			>
 			{#if cartella}<span class="cartella" title={cartella}>{cartella}</span>{/if}
+			{#if frammento && entry.snippet}
+				<span class="frammento" title={entry.snippet.text}
+					><span class="riga-num">{entry.snippet.line}</span>{frammento.prima}<mark>{frammento.trovato}</mark
+					>{frammento.dopo}{#if entry.snippet.more > 0}<span class="altre"
+							>+{entry.snippet.more} {entry.snippet.more === 1 ? 'altra riga' : 'altre righe'}</span
+						>{/if}</span
+				>
+			{/if}
 			{#if occupato !== null}
 				<span class="riempimento" class:pieno={occupato > 0.9}
 					><span style:width="{Math.round(occupato * 100)}%"></span></span
@@ -304,6 +324,31 @@
 		min-width: 0;
 		position: relative;
 	}
+	/* Content search: the found line goes on a second line under the name. */
+	.nome-blocco.con-frammento {
+		flex-wrap: wrap;
+		row-gap: 0;
+	}
+	.frammento {
+		flex-basis: 100%;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		color: var(--text-dim);
+		font-size: calc(11.5px * var(--scala-testo, 1));
+	}
+	.riga-num,
+	.altre {
+		font-family: var(--font-display);
+		font-variant-numeric: tabular-nums;
+	}
+	.riga-num {
+		margin-right: 6px;
+	}
+	.altre {
+		margin-left: 8px;
+	}
 	.cartella {
 		flex-shrink: 1;
 		min-width: 0;
@@ -355,7 +400,8 @@
 	}
 
 	/* Solo colore e peso: nessun cambio di dimensione, la riga resta 32px. */
-	.name :global(mark) {
+	.name :global(mark),
+	.frammento mark {
 		background: transparent;
 		color: var(--accent);
 		font-weight: 600;

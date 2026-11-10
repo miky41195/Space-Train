@@ -56,6 +56,7 @@ pub fn elenca() -> Result<Vec<Entry>, FsError> {
                 libero: None,
                 totale: None,
                 icona_propria: false,
+                snippet: None,
             }
         })
         .collect();

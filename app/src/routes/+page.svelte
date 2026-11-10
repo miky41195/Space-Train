@@ -236,6 +236,8 @@
 
 	/** Vero se il tab mostra i risultati di una ricerca nelle sottocartelle. */
 	let inRicerca = $derived(store.activeTab?.risultati != null);
+	/** Content search found text inside files: rows grow to show the found line. */
+	let conFrammenti = $derived(store.activeTab?.risultati?.some((e) => e.snippet) ?? false);
 
 	/** Si può creare, incollare, rinominare: una cartella vera, non risultati. */
 	let modificabile = $derived(posizione === 'normale' && !inRicerca);
@@ -2465,7 +2467,7 @@
 						nascondiEstensione={!impostazioni.estensioni}
 						cartellaDi={cartellaVoce}
 						coloreDi={coloreVoce}
-						{altezzaRiga}
+						altezzaRiga={conFrammenti ? Math.round(altezzaRiga * 1.55) : altezzaRiga}
 						{bersaglio}
 						selection={insiemeSelezione}
 						matches={store.activeTab.query === '' || inRicerca ? undefined : evidenziazioni}

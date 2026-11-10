@@ -91,6 +91,7 @@ mod tests {
             libero: None,
             totale: None,
             icona_propria: false,
+            snippet: None,
         }
     }
 

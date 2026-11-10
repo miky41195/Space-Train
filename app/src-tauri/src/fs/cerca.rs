@@ -3,7 +3,7 @@
 //! I risultati escono a gruppi mentre la visita procede: aspettare la
 //! fine su un disco intero vorrebbe dire minuti di schermo vuoto.
 
-use crate::fs::entry::{entry_from_dir_entry, Entry, EntryKind};
+use crate::fs::entry::{entry_from_dir_entry, Entry, EntryKind, Snippet};
 use crate::fs::paths;
 use serde::Deserialize;
 use std::io::Read;
@@ -74,13 +74,11 @@ pub fn cerca(
             }
 
             let nome_ok = confronto.nome(&e.name.to_lowercase());
-            let contenuto_ok = !nome_ok
-                && criteri.contenuto
-                && e.kind == EntryKind::File
-                && e.size <= MASSIMO_CONTENUTO
-                && contiene(&de.path(), &testo);
+            if !nome_ok && criteri.contenuto && e.kind == EntryKind::File && e.size <= MASSIMO_CONTENUTO {
+                e.snippet = find_in_content(&de.path(), &testo);
+            }
 
-            if nome_ok || contenuto_ok {
+            if nome_ok || e.snippet.is_some() {
                 e.path = paths::display(Path::new(&e.path));
                 lotto.push(e);
                 trovati += 1;
@@ -154,21 +152,60 @@ fn corrisponde(modello: &[char], nome: &[char]) -> bool {
     m == modello.len()
 }
 
-/// Vero se il file è testo e contiene `testo` (già minuscolo).
-fn contiene(path: &Path, testo: &str) -> bool {
-    let Ok(mut f) = std::fs::File::open(paths::extended(path)) else {
-        return false;
-    };
+/// Characters kept before the match in a snippet, and the snippet's maximum length.
+const SNIPPET_LEAD: usize = 40;
+const SNIPPET_MAX: usize = 160;
+
+/// The first line of a text file that contains `testo` (already lowercase), or None.
+fn find_in_content(path: &Path, testo: &str) -> Option<Snippet> {
+    let mut f = std::fs::File::open(paths::extended(path)).ok()?;
     let mut dati = Vec::new();
-    if f.by_ref().take(MASSIMO_CONTENUTO).read_to_end(&mut dati).is_err() {
-        return false;
-    }
+    f.by_ref().take(MASSIMO_CONTENUTO).read_to_end(&mut dati).ok()?;
     // Un byte nullo all'inizio indica un file binario: cercarci dentro
     // darebbe solo falsi positivi.
     if dati.iter().take(8000).any(|b| *b == 0) {
-        return false;
+        return None;
     }
-    String::from_utf8_lossy(&dati).to_lowercase().contains(testo)
+    snippet_of(&String::from_utf8_lossy(&dati), testo)
+}
+
+fn snippet_of(text: &str, testo: &str) -> Option<Snippet> {
+    let mut first: Option<Snippet> = None;
+    for (n, line) in text.lines().enumerate() {
+        let lower = line.to_lowercase();
+        let Some(byte) = lower.find(testo) else { continue };
+        match first.as_mut() {
+            Some(s) => s.more += 1,
+            None => {
+                let (text, at) = excerpt(line, &lower, byte);
+                let len = testo.chars().count();
+                first = Some(Snippet { line: n + 1, text, at, len, more: 0 });
+            }
+        }
+    }
+    first
+}
+
+/// Cuts `line` to a window around the match so the match is always visible.
+/// Returns the excerpt and where the match starts in it (characters).
+fn excerpt(line: &str, lower: &str, byte: usize) -> (String, usize) {
+    let chars: Vec<char> = line.chars().collect();
+    // Lowercasing can change the length of a few characters (İ): then the
+    // position is unknown and the line is shown from its start.
+    let pos = if lower.chars().count() == chars.len() { lower[..byte].chars().count() } else { 0 };
+    let lead = chars[..pos].iter().take_while(|c| c.is_whitespace()).count();
+    let start = pos.saturating_sub(SNIPPET_LEAD).max(lead);
+    let end = (start + SNIPPET_MAX).min(chars.len());
+    let mut out: String = chars[start..end].iter().collect();
+    let mut at = pos - start;
+    if start > lead {
+        out.insert(0, '…');
+        at += 1;
+    }
+    if end < chars.len() {
+        out.push('…');
+    }
+    (out.trim_end().to_string(), at)
 }
 
 #[cfg(test)]
@@ -233,6 +270,36 @@ mod tests {
 
         assert!(nomi(d.path(), &criteri("segreta", false)).is_empty());
         assert_eq!(nomi(d.path(), &criteri("SEGRETA", true)), vec!["note.txt"]);
+    }
+
+    #[test]
+    fn content_match_carries_first_line_and_count() {
+        let d = tempdir().unwrap();
+        fs::write(d.path().join("note.txt"), "intro\n    la Parola segreta\nancora parola\nfine").unwrap();
+        let mut out = Vec::new();
+        cerca(&d.path().to_string_lossy(), &criteri("parola", true), &AtomicBool::new(false), &mut |l| out.extend(l));
+        let s = out[0].snippet.clone().unwrap();
+        assert_eq!((s.line, s.text.as_str(), s.more), (2, "la Parola segreta", 1));
+        assert_eq!((s.at, s.len), (3, 6));
+    }
+
+    #[test]
+    fn name_match_has_no_snippet() {
+        let d = tempdir().unwrap();
+        fs::write(d.path().join("parola.txt"), "parola").unwrap();
+        let mut out = Vec::new();
+        cerca(&d.path().to_string_lossy(), &criteri("parola", true), &AtomicBool::new(false), &mut |l| out.extend(l));
+        assert!(out[0].snippet.is_none());
+    }
+
+    #[test]
+    fn long_lines_are_cut_around_the_match() {
+        let line = format!("{}ago{}", "x".repeat(300), "y".repeat(300));
+        let s = snippet_of(&line, "ago").unwrap();
+        assert!(s.text.starts_with('…') && s.text.ends_with('…'));
+        let shown: String = s.text.chars().skip(s.at).take(s.len).collect();
+        assert_eq!(shown, "ago");
+        assert_eq!(s.text.chars().count(), SNIPPET_MAX + 2);
     }
 
     #[test]
