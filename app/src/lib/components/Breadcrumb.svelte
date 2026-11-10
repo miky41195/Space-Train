@@ -34,7 +34,9 @@
 				? `Confronto con ${nomePosizione(store.activeTab.confronto.altro)}`
 				: store.activeTab?.etichetta
 					? `Etichetta ${store.activeTab.etichetta}`
-					: null
+					: store.activeTab?.spazio
+						? 'Spazio'
+						: null
 	);
 	let stazioni = $derived(
 		fermataExtra ? [...briciole(percorso), { nome: fermataExtra, path: DUPLICATES_STOP }] : briciole(percorso)
@@ -79,7 +81,8 @@
 	function vaiA(path: string) {
 		if (id === null || path === DUPLICATES_STOP) return;
 		if (path === percorso) {
-			if (fermataExtra) void store.fermaRicerca(id);
+			if (store.activeTab?.spazio) void store.impostaSpazio(id, false);
+			else if (fermataExtra) void store.fermaRicerca(id);
 			return;
 		}
 		if (onvai) onvai(path);

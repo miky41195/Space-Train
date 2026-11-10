@@ -28,6 +28,7 @@ export type AzioneMenu =
 	| 'terminale'
 	| 'duplicati'
 	| 'confronta'
+	| 'spazio'
 	| 'paginaIniziale'
 	| 'cartellaAvvio'
 	| 'sessione'
@@ -209,6 +210,7 @@ function vociSfondo({
 		voci.push(voceAvvio(allAvvio));
 		voci.push({ azione: 'duplicati', etichetta: 'Trova duplicati qui', stacca: true });
 		voci.push(voceConfronta(altroPannello));
+		voci.push({ azione: 'spazio', etichetta: 'Analizza spazio' });
 		voci.push({ azione: 'terminale', etichetta: 'Apri nel terminale' });
 		voci.push({ azione: 'altreOpzioni', etichetta: 'Altre opzioni di Windows', stacca: true });
 		voci.push({ azione: 'proprieta', etichetta: 'Proprietà', scorciatoia: 'Alt+Invio' });
@@ -250,6 +252,7 @@ function vociElementi({
 			voci.push({ azione: 'terminale', etichetta: 'Apri nel terminale' });
 			voci.push({ azione: 'duplicati', etichetta: 'Trova duplicati qui' });
 			voci.push(voceConfronta(altroPannello));
+			voci.push({ azione: 'spazio', etichetta: 'Analizza spazio' });
 		} else {
 			voci.push({ azione: 'apriCon', etichetta: 'Apri con…' });
 			if (eEseguibile(unica.name)) {
@@ -387,6 +390,7 @@ function vociVirtuali({ selezione, iniziale = false }: ContestoMenu, posizione: 
 		{ azione: 'copiaPercorso', etichetta: 'Copia percorso', stacca: true }
 	];
 	if (posizione === 'pc') {
+		if (selezione[0].kind === 'dir') voci.push({ azione: 'spazio', etichetta: 'Analizza spazio' });
 		voci.push({ azione: 'altreOpzioni', etichetta: 'Altre opzioni di Windows', stacca: true });
 		voci.push({ azione: 'proprieta', etichetta: 'Proprietà', scorciatoia: 'Alt+Invio' });
 	}

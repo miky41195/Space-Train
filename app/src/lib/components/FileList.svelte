@@ -25,6 +25,7 @@
 		nascondiEstensione = false,
 		cartellaDi = undefined,
 		coloreDi = undefined,
+		quotaDi = undefined,
 		altezzaRiga = ROW_HEIGHT,
 		bersaglio = null,
 		selection = undefined,
@@ -66,6 +67,8 @@
 		cartellaDi?: (e: Entry) => string | undefined;
 		/** Colore scelto per una cartella, se ne ha uno. */
 		coloreDi?: (e: Entry) => string | undefined;
+		/** Space view: share of the largest item, for the bar. */
+		quotaDi?: (e: Entry) => number | undefined;
 		/** Altezza delle righe: più bassa nella visualizzazione compatta. */
 		altezzaRiga?: number;
 		/** Cartella sopra cui passa un trascinamento. */
@@ -212,6 +215,7 @@
 					{nascondiEstensione}
 					cartella={cartellaDi?.(entry)}
 					colore={coloreDi?.(entry)}
+					quota={quotaDi?.(entry)}
 					altezza={altezzaRiga}
 					bersaglio={entry.path === bersaglio}
 					{ontrascina}

@@ -34,6 +34,7 @@ describe('vociMenu', () => {
 			'cartellaAvvio',
 			'duplicati',
 			'confronta',
+			'spazio',
 			'terminale',
 			'altreOpzioni',
 			'proprieta'

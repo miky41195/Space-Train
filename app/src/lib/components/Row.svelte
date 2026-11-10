@@ -18,6 +18,7 @@
 		nascondiEstensione = false,
 		cartella = undefined,
 		colore = undefined,
+		quota = undefined,
 		altezza = 32,
 		bersaglio = false,
 		peso = undefined,
@@ -48,6 +49,8 @@
 		cartella?: string;
 		/** Colore scelto dall'utente per questa cartella. */
 		colore?: string;
+		/** Space view: this item's share of the largest one (0–1), drawn as a bar. */
+		quota?: number;
 		/** Altezza della riga in pixel: deve coincidere con quella della lista. */
 		altezza?: number;
 		/** Un trascinamento sta passando sopra questa cartella. */
@@ -258,6 +261,9 @@
 						>{/if}</span
 				>
 			{/if}
+			{#if quota !== undefined}
+				<span class="riempimento quota"><span style:width="{Math.max(1, Math.round(quota * 100))}%"></span></span>
+			{/if}
 			{#if occupato !== null}
 				<span class="riempimento" class:pieno={occupato > 0.9}
 					><span style:width="{Math.round(occupato * 100)}%"></span></span
@@ -388,6 +394,10 @@
 		display: block;
 		height: 100%;
 		background: var(--current);
+	}
+	/* Space view: the same bar as the drives, in the current's plasma-to-cyan. */
+	.riempimento.quota span {
+		background: linear-gradient(90deg, var(--plasma, var(--accent)), var(--current));
 	}
 	.riempimento.pieno span {
 		background: #ff5f6e;

@@ -311,6 +311,9 @@
 		const tab = store.activeTab;
 		if (tab?.duplicati && tab.query === '') return { voci: filtrate, zone: duplicateZones(tab.duplicati.groups) };
 		if (tab?.confronto && tab.query === '') return { voci: filtrate, zone: compareZones(tab.confronto) };
+		if (tab?.spazio && !tab.risultati && posizione === 'normale') {
+			return { voci: [...filtrate].sort((a, b) => pesoVoce(b) - pesoVoce(a)), zone: [] };
+		}
 		if (!tab || tab.query !== '' || tab.risultati) return { voci: filtrate, zone: [] };
 		const prefs = posizione === 'normale' ? preferiti.di(tab.path) : NESSUNO;
 		// I recenti valgono dove le voci hanno una data vera: non in Questo
@@ -336,6 +339,29 @@
 		void tauriBackend.turnoDimensioni(turnoPesi).catch(() => {});
 	}
 
+	// ── Space view ───────────────────────────────────────────────────
+	let inSpazio = $derived(!!store.activeTab?.spazio && !store.activeTab.risultati && posizione === 'normale');
+	/** Size used by the space view: folders once weighed (-1 while unknown), files as they are. */
+	function pesoVoce(e: Entry): number {
+		if (e.kind !== 'dir') return e.size;
+		const d = dimensioni[e.path];
+		return typeof d === 'number' ? d : -1;
+	}
+	let spazioMassimo = $derived(inSpazio ? Math.max(1, ...vociVisibili.map(pesoVoce)) : 1);
+	let spazioTotale = $derived(inSpazio ? vociVisibili.reduce((n, e) => n + Math.max(0, pesoVoce(e)), 0) : 0);
+	let spazioInCalcolo = $derived(inSpazio ? vociVisibili.filter((e) => dimensioni[e.path] === 'calcolo').length : 0);
+	function quotaVoce(e: Entry): number | undefined {
+		const p = pesoVoce(e);
+		return p < 0 ? undefined : p / spazioMassimo;
+	}
+
+	async function analizzaSpazio(cartella: string) {
+		const id = store.activeId;
+		if (id === null) return;
+		if (cartella !== store.activeTab?.path) await store.navigate(id, cartella);
+		await store.impostaSpazio(id, true);
+	}
+
 	async function pesa(cartelle: string[], turno = turnoPesi) {
 		for (const c of cartelle) {
 			if (turno !== turnoPesi) return;
@@ -351,14 +377,16 @@
 	$effect(() => {
 		const modo = impostazioni.dimensioneCartelle;
 		const percorso = store.activeTab?.path;
+		const spazio = inSpazio;
 		const cartelle =
 			posizione === 'normale' ? vociVisibili.filter((e) => e.kind === 'dir').map((e) => e.path) : [];
 		untrack(() => {
-			if (percorso !== cartellaPesata || (modo === 'mai' && Object.keys(dimensioni).length > 0)) {
+			if (percorso !== cartellaPesata || (modo === 'mai' && !spazio && Object.keys(dimensioni).length > 0)) {
 				cartellaPesata = percorso;
 				nuovoTurnoPesi();
 			}
-			if (modo === 'aperta') void pesa(cartelle.filter((c) => dimensioni[c] === undefined));
+			// The space view weighs every folder whatever the setting says.
+			if (modo === 'aperta' || spazio) void pesa(cartelle.filter((c) => dimensioni[c] === undefined));
 		});
 	});
 	let evidenziazioni = $derived(new Map(risultati.map((r) => [r.item.path, r.positions])));
@@ -1425,6 +1453,11 @@
 		}
 
 		// Esc leaves the duplicates or comparison view and goes back to the folder.
+		if (e.key === 'Escape' && store.activeTab?.spazio && !store.activeTab.risultati) {
+			e.preventDefault();
+			void store.impostaSpazio(store.activeId, false);
+			return;
+		}
 		if (e.key === 'Escape' && (store.activeTab?.duplicati || store.activeTab?.confronto || store.activeTab?.etichetta)) {
 			e.preventDefault();
 			void store.fermaRicerca(store.activeId);
@@ -2212,6 +2245,11 @@
 					}
 					break;
 				}
+				case 'spazio': {
+					const cartella = cartellaDelMenu(scelte);
+					if (cartella) await analizzaSpazio(cartella);
+					break;
+				}
 				case 'confronta': {
 					const cartella = cartellaDelMenu(scelte);
 					if (cartella) await confrontaCon(cartella);
@@ -2542,6 +2580,13 @@
 					<button onclick={selectExtraCopies} title="Tutte tranne la più vecchia di ogni gruppo">Seleziona le copie in più</button>
 				</div>
 			{/if}
+			{#if inSpazio && store.activeTab}
+				<div class="riepilogo-duplicati" role="status">
+					<span><b>{byte(spazioTotale)}</b> in {nomePosizione(store.activeTab.path)}</span>
+					{#if spazioInCalcolo > 0}<span>pesando <b>{spazioInCalcolo}</b> {spazioInCalcolo === 1 ? 'cartella' : 'cartelle'}…</span>{/if}
+					<button onclick={() => store.activeId !== null && store.impostaSpazio(store.activeId, false)}>Chiudi l’analisi</button>
+				</div>
+			{/if}
 			{#if store.activeTab?.confronto}
 				{@const c = store.activeTab.confronto}
 				<div class="riepilogo-duplicati" role="status">
@@ -2649,6 +2694,7 @@
 						cartellaDi={cartellaVoce}
 						coloreDi={coloreVoce}
 						altezzaRiga={conFrammenti ? Math.round(altezzaRiga * 1.55) : altezzaRiga}
+						quotaDi={inSpazio ? quotaVoce : undefined}
 						{bersaglio}
 						selection={insiemeSelezione}
 						matches={store.activeTab.query === '' || inRicerca ? undefined : evidenziazioni}

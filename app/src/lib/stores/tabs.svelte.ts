@@ -51,6 +51,8 @@ export interface Tab {
 	} | null;
 	/** Set when `risultati` lists the items carrying a colour label: the colour's name. */
 	etichetta: string | null;
+	/** «Analizza spazio»: the list is sorted by size with a bar; it stays on while browsing. */
+	spazio: boolean;
 }
 
 /** Gli id delle ricerche stanno lontani da quelli dei trasferimenti. */
@@ -119,7 +121,8 @@ export class TabsStore {
 			ricercaOp: null,
 			duplicati: null,
 			confronto: null,
-			etichetta: null
+			etichetta: null,
+			spazio: false
 		};
 		this.tabs.push(tab);
 
@@ -319,6 +322,14 @@ export class TabsStore {
 				tab.ricercaOp = null;
 			}
 		}
+	}
+
+	/** Turns the space view on or off; on, it leaves any search or special view. */
+	async impostaSpazio(id: number, acceso: boolean): Promise<void> {
+		const tab = this.#get(id);
+		if (!tab) return;
+		if (acceso) await this.fermaRicerca(id);
+		tab.spazio = acceso;
 	}
 
 	/** Shows `voci` in place of the folder, as a named view (a colour label). */

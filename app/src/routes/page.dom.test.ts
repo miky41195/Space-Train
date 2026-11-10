@@ -2881,6 +2881,25 @@ describe('folder comparison', () => {
 	});
 });
 
+describe('space analysis', () => {
+	it('sorts the folder by size with a bar on every row, weighing folders; Esc leaves it', async () => {
+		disco.pesoCartelle = 5000;
+		disco.nodi.get('C:\\gamma.txt')!.size = 10_000;
+		await monta();
+		await fireEvent.contextMenu(document.querySelector('.viewport')!);
+		await fireEvent.click(await screen.findByRole('menuitem', { name: 'Analizza spazio' }));
+
+		await waitFor(() => expect(nomi()[0]).toBe('gamma.txt'));
+		await waitFor(() => expect(nomi()[1]).toBe('Dati'));
+		expect(document.querySelectorAll('.riempimento.quota').length).toBeGreaterThan(3);
+		expect(screen.getByText('Spazio')).toBeTruthy();
+
+		tasto('Escape');
+		await waitFor(() => expect(document.querySelector('.riempimento.quota')).toBeNull());
+		expect(nomi()[0]).not.toBe('gamma.txt');
+	});
+});
+
 describe('smart folders', () => {
 	it('a type filter finds files with no text, «Salva ricerca» adds a sidebar stop that reopens it', async () => {
 		aggiungi('C:\\Dati\\film.mp4');
