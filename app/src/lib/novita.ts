@@ -14,6 +14,19 @@ export interface Novita {
 
 export const NOVITA: Novita[] = [
 	{
+		versione: '0.6.0',
+		voci: [
+			'Doppio pannello: Ctrl+Maiusc+D (o il pulsante nella barra dei comandi) mostra due cartelle affiancate. F6 passa da un lato all’altro, Ctrl+Maiusc+C e Ctrl+Maiusc+X copiano o spostano la selezione nell’altra cartella, e si può trascinare da un lato all’altro.',
+			'Confronta due cartelle: dal menu di una cartella, «Confronta con…» mostra cosa manca da una parte, cosa manca dall’altra e quali file sono diversi. «Allinea» copia ciò che manca e le versioni più recenti, senza cancellare niente.',
+			'Analizza spazio: dal menu di una cartella o di un disco, l’elenco si ordina per peso con una barra per ogni elemento, per trovare subito cosa occupa più spazio.',
+			'Etichette colorate: anche i file possono avere un colore. Nella barra laterale il gruppo «Etichette» raccoglie tutti gli elementi di un colore, ovunque siano.',
+			'Cartelle intelligenti: nella ricerca nelle sottocartelle si filtra per tipo, peso e data, anche senza scrivere niente. «Salva ricerca» la tiene nella barra laterale; «Modificati questa settimana» e «File oltre 1 GB» sono già pronte.',
+			'La ricerca nel contenuto dei file mostra la riga in cui ha trovato il testo, con il testo evidenziato.',
+			'Nei risultati di ricerca il nome del file resta leggibile anche quando la cartella è lunga.',
+			'Protezione più stretta contro i contenuti esterni: l’app non carica script o immagini da internet.'
+		]
+	},
+	{
 		versione: '0.5.1',
 		voci: [
 			'Trova duplicati mostra in cima quanti gruppi di copie ha trovato e quanto spazio si può recuperare.',
