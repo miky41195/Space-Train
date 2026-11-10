@@ -185,7 +185,7 @@
 					tagliato={tagliati.has(entry.path)}
 					{icone}
 					{misura}
-					colore={entry.kind === 'dir' ? coloreDi?.(entry) : undefined}
+					colore={coloreDi?.(entry)}
 					{nascondiEstensione}
 					bersaglio={entry.path === bersaglio}
 					{ontrascina}

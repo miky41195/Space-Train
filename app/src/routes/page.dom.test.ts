@@ -1458,11 +1458,11 @@ describe('cartelle colorate', () => {
 		await waitFor(() => expect(riga('Dati').querySelector('.cartella-colorata')?.innerHTML).toContain('#22c55e'));
 	});
 
-	it('i file non hanno la tavolozza', async () => {
+	it('files get the palette too, as a colour label', async () => {
 		await monta();
 		await fireEvent.contextMenu(riga('alfa.txt'));
 		const menu = await screen.findByRole('menu');
-		expect(within(menu).queryByRole('group', { name: 'Colore cartella' })).toBeNull();
+		expect(within(menu).getByRole('menuitemradio', { name: 'Verde' })).toBeTruthy();
 	});
 
 	it('il colore si toglie con «Nessun colore»', async () => {
@@ -2878,5 +2878,22 @@ describe('folder comparison', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'Allinea Copia' }));
 		await waitFor(() => expect(disco.esiste('C:\\Copia\\solo-qui.txt')).toBe(true));
 		expect(disco.esiste('C:\\Dati\\solo-la.txt')).toBe(false);
+	});
+});
+
+describe('colour labels', () => {
+	it('a file gets a colour, the sidebar stop lists every labelled item, Esc goes back', async () => {
+		await monta();
+		await fireEvent.contextMenu(riga('beta.txt'));
+		await fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitemradio', { name: 'Rosso' }));
+		await waitFor(() => expect(riga('beta.txt').querySelector('.etichetta-colore')).not.toBeNull());
+
+		const stop = await screen.findByRole('button', { name: /Rosso/ });
+		await fireEvent.click(stop);
+		await waitFor(() => expect(nomi()).toEqual(['beta.txt']));
+		expect(screen.getByText('Etichetta Rosso')).toBeTruthy();
+
+		tasto('Escape');
+		await waitFor(() => expect(nomi()).toContain('alfa.txt'));
 	});
 });

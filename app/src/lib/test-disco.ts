@@ -231,6 +231,13 @@ export class DiscoFinto {
 					args.criteri as { testo: string; contenuto: boolean },
 					args.onResults as Canale<Entry[]>
 				);
+			case 'entries_for': {
+				const chiavi = [...this.nodi.keys()];
+				return (args.paths as string[])
+					.map((p) => chiavi.find((k) => k.toLowerCase() === p.toLowerCase()))
+					.filter((k): k is string => k !== undefined)
+					.map((k) => this.#voce(k));
+			}
 			case 'compare_folders':
 				return this.#compare(args.here as string, args.there as string);
 			case 'find_duplicates':

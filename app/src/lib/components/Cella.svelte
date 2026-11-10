@@ -116,7 +116,10 @@
 		{/if}
 	</div>
 	<div class="testi">
-		<span class="nome">{nome}</span>
+		<span class="nome"
+			>{#if colore && entry.kind !== 'dir'}<span class="etichetta-colore" style:background={colore} aria-hidden="true"
+				></span>{/if}{nome}</span
+		>
 		{#if misura.dettagli}
 			<span class="info">{descriviTipo(entry)}</span>
 			{#if entry.kind !== 'dir' || entry.libero !== undefined}
@@ -241,5 +244,14 @@
 
 	.cella[data-category='dir'] .glifo {
 		color: var(--folder, var(--accent));
+	}
+	/* Colour label on a file: a dot before the name. */
+	.etichetta-colore {
+		display: inline-block;
+		width: 8px;
+		height: 8px;
+		margin-right: 6px;
+		border-radius: 50%;
+		vertical-align: middle;
 	}
 </style>

@@ -211,7 +211,7 @@
 					{colonne}
 					{nascondiEstensione}
 					cartella={cartellaDi?.(entry)}
-					colore={entry.kind === 'dir' ? coloreDi?.(entry) : undefined}
+					colore={coloreDi?.(entry)}
 					altezza={altezzaRiga}
 					bersaglio={entry.path === bersaglio}
 					{ontrascina}

@@ -32,7 +32,9 @@
 			? 'Duplicati'
 			: store.activeTab?.confronto
 				? `Confronto con ${nomePosizione(store.activeTab.confronto.altro)}`
-				: null
+				: store.activeTab?.etichetta
+					? `Etichetta ${store.activeTab.etichetta}`
+					: null
 	);
 	let stazioni = $derived(
 		fermataExtra ? [...briciole(percorso), { nome: fermataExtra, path: DUPLICATES_STOP }] : briciole(percorso)

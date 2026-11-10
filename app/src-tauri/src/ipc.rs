@@ -23,6 +23,18 @@ async fn fuori_dalla_finestra<T: Send + 'static>(
         })?
 }
 
+/// Entries for paths gathered from anywhere (colour labels); paths that no longer exist are left out.
+#[tauri::command]
+pub async fn entries_for(paths: Vec<String>) -> Result<Vec<crate::fs::entry::Entry>, FsError> {
+    fuori_dalla_finestra(move || {
+        Ok(paths
+            .iter()
+            .filter_map(|p| crate::fs::entry::entry_from_path(std::path::Path::new(p)))
+            .collect())
+    })
+    .await
+}
+
 #[tauri::command]
 pub async fn list_dir(
     lan: tauri::State<'_, std::sync::Arc<crate::lan::Lan>>,

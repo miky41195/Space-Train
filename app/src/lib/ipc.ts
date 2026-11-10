@@ -300,6 +300,8 @@ export interface Backend {
 		hidden: boolean;
 		onEvent: (e: DuplicateEvent) => void;
 	}): Promise<number>;
+	/** Entries for paths from anywhere (colour labels); missing ones are left out. */
+	entriesFor(paths: string[]): Promise<Entry[]>;
 	compareFolders(opts: { opId: number; here: string; there: string; content: boolean; hidden: boolean }): Promise<Comparison>;
 	compress(opts: {
 		opId: number;
@@ -398,6 +400,7 @@ export const tauriBackend: Backend = {
 		invoke('search', { opId, root, criteri, onResults: canale(onResults) }),
 	findDuplicates: ({ opId, root, hidden, onEvent }) =>
 		invoke('find_duplicates', { opId, root, hidden, onEvent: canale(onEvent) }),
+	entriesFor: (paths) => invoke('entries_for', { paths }),
 	compareFolders: ({ opId, here, there, content, hidden }) =>
 		invoke('compare_folders', { opId, here, there, content, hidden }),
 	compress: ({ opId, sources, dest, onProgress }) =>

@@ -49,6 +49,8 @@ export interface Tab {
 		/** The comparison is still running: counts are not known yet. */
 		inCorso: boolean;
 	} | null;
+	/** Set when `risultati` lists the items carrying a colour label: the colour's name. */
+	etichetta: string | null;
 }
 
 /** Gli id delle ricerche stanno lontani da quelli dei trasferimenti. */
@@ -116,7 +118,8 @@ export class TabsStore {
 			cercando: false,
 			ricercaOp: null,
 			duplicati: null,
-			confronto: null
+			confronto: null,
+			etichetta: null
 		};
 		this.tabs.push(tab);
 
@@ -252,6 +255,7 @@ export class TabsStore {
 		tab.risultati = [];
 		tab.duplicati = null;
 		tab.confronto = null;
+		tab.etichetta = null;
 		tab.cercando = true;
 		tab.selection = [];
 		tab.anchor = null;
@@ -289,6 +293,7 @@ export class TabsStore {
 		tab.risultati = [];
 		tab.duplicati = { groups: [], progress: { transferred: 0, total: 0 } };
 		tab.confronto = null;
+		tab.etichetta = null;
 		tab.cercando = true;
 		tab.query = '';
 		tab.selection = [];
@@ -314,6 +319,18 @@ export class TabsStore {
 				tab.ricercaOp = null;
 			}
 		}
+	}
+
+	/** Shows `voci` in place of the folder, as a named view (a colour label). */
+	async mostraVoci(id: number, voci: Entry[], etichetta: string): Promise<void> {
+		const tab = this.#get(id);
+		if (!tab) return;
+		await this.fermaRicerca(id);
+		tab.risultati = voci;
+		tab.etichetta = etichetta;
+		tab.query = '';
+		tab.selection = [];
+		tab.anchor = null;
 	}
 
 	/** Compares the tab's folder with `altro`; the differences replace the list. */
@@ -347,6 +364,7 @@ export class TabsStore {
 			if (tab.ricercaOp === op) {
 				tab.risultati = null;
 				tab.confronto = null;
+				tab.etichetta = null;
 			}
 			throw e;
 		} finally {
@@ -368,6 +386,7 @@ export class TabsStore {
 			tab.risultati = null;
 			tab.duplicati = null;
 			tab.confronto = null;
+			tab.etichetta = null;
 		}
 		if (op !== null) await this.backend.cancelTransfer(op);
 	}
@@ -513,6 +532,7 @@ export class TabsStore {
 			tab.risultati = null;
 			tab.duplicati = null;
 			tab.confronto = null;
+			tab.etichetta = null;
 
 			if (opts.pushHistory) {
 				tab.history = tab.history.slice(0, tab.historyIndex + 1);

@@ -4,6 +4,7 @@
 	import Icona from './Icona.svelte';
 	import { QUESTO_PC, RETE, CESTINO, RETE_LOCALE, AMICI, byte, stessoPath, nomeDi, dentroDi } from '../posizioni';
 	import { SU_LINUX } from '../sistema';
+	import type { IdColore } from '../stores/colori.svelte';
 
 	let {
 		store,
@@ -18,7 +19,10 @@
 		amici = null,
 		onapriamici = undefined,
 		accessoRapido = [],
-		onmenuaccesso = undefined
+		onmenuaccesso = undefined,
+		etichette = [],
+		etichettaAperta = null,
+		onetichetta = undefined
 	}: {
 		store: TabsStore;
 		backend: Backend;
@@ -43,6 +47,11 @@
 		accessoRapido?: string[];
 		/** Clic destro su una voce dell'Accesso rapido. */
 		onmenuaccesso?: (path: string, evento: MouseEvent) => void;
+		/** Colour labels in use: one stop each, listing every item that carries it. */
+		etichette?: Array<{ id: IdColore; nome: string; esadecimale: string; quante: number }>;
+		/** Name of the label whose items the active tab shows. */
+		etichettaAperta?: string | null;
+		onetichetta?: (id: IdColore) => void;
 	} = $props();
 
 	let drives = $state<Drive[]>([]);
@@ -253,6 +262,19 @@
 		{/each}
 	</div>
 
+	{#if etichette.length > 0}
+		<div class="gruppo">
+			<div class="titolo">Etichette</div>
+			{#each etichette as e (e.id)}
+				<button class="voce" class:corrente={etichettaAperta === e.nome} onclick={() => onetichetta?.(e.id)}>
+					<span class="pallino" style:background={e.esadecimale}></span>
+					{e.nome}
+					<span class="quante">{e.quante}</span>
+				</button>
+			{/each}
+		</div>
+	{/if}
+
 	<div class="gruppo">
 		<div class="titolo">Unità</div>
 		{#each drives as d (d.path)}
@@ -461,6 +483,15 @@
 		margin-right: 8px;
 		border-radius: 50%;
 		vertical-align: middle;
+	}
+	/* How many items carry the label: a timetable figure at the end of the stop. */
+	.quante {
+		float: right;
+		padding-left: 8px;
+		color: var(--text-dim);
+		font-family: var(--font-display);
+		font-variant-numeric: tabular-nums;
+		font-size: calc(11px * var(--scala-testo, 1));
 	}
 	.voce.bersaglio {
 		--nodo: var(--current);

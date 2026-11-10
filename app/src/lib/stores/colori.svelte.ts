@@ -47,6 +47,21 @@ export class ColoriStore {
 		return COLORI_CARTELLA.find((c) => c.id === id)?.esadecimale;
 	}
 
+	/** Colours in use, in palette order, with how many items carry each. */
+	get usati(): Array<{ id: IdColore; nome: string; esadecimale: string; quante: number }> {
+		const valori = Object.values(this.#mappa);
+		return COLORI_CARTELLA.map((c) => ({ ...c, quante: valori.filter((v) => v === c.id).length })).filter(
+			(c) => c.quante > 0
+		);
+	}
+
+	/** Every path carrying `colore`, in lowercase as stored. */
+	percorsiDi(colore: IdColore): string[] {
+		return Object.entries(this.#mappa)
+			.filter(([, v]) => v === colore)
+			.map(([k]) => k);
+	}
+
 	idDi(path: string): IdColore | undefined {
 		return this.#mappa[path.toLowerCase()];
 	}

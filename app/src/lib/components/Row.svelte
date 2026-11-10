@@ -245,6 +245,7 @@
 		/>
 	{:else}
 		<span class="nome-blocco" class:con-frammento={frammento}>
+			{#if colore && entry.kind !== 'dir'}<span class="etichetta-colore" style:background={colore} aria-hidden="true"></span>{/if}
 			<span class="name" title={entry.name}
 				>{#each tratti as t, i (i)}{#if t.forte}<mark>{t.testo}</mark>{:else}{t.testo}{/if}{/each}</span
 			>
@@ -323,6 +324,15 @@
 		gap: 10px;
 		min-width: 0;
 		position: relative;
+	}
+	/* Colour label on a file: a dot before the name, as on the sidebar stops. */
+	.etichetta-colore {
+		flex: none;
+		align-self: center;
+		width: 8px;
+		height: 8px;
+		margin-right: -4px;
+		border-radius: 50%;
 	}
 	/* Content search: the found line goes on a second line under the name. */
 	.nome-blocco.con-frammento {

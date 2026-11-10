@@ -292,10 +292,10 @@ describe('vociOrdina', () => {
 });
 
 describe('colore cartella', () => {
-	it('la tavolozza compare solo se fra le voci c è una cartella', () => {
+	it('the palette is offered for files (colour label) and folders, with the current colour marked', () => {
 		const file = voci(1);
 		const cartella = [{ ...voci(1)[0], kind: 'dir' as const }];
-		expect(azioni({ selezione: file, appuntiPieni: false })).not.toContain('coloreCartella');
+		expect(azioni({ selezione: file, appuntiPieni: false })).toContain('coloreCartella');
 		const v = vociMenu({ selezione: cartella, appuntiPieni: false, coloreAttuale: 'verde' });
 		const tavolozza = v.find((x) => x.azione === 'coloreCartella')?.tavolozza ?? [];
 		expect(tavolozza.find((c) => c.attivo)?.azione).toBe('colore:verde');

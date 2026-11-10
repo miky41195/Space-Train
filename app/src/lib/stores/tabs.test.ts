@@ -243,7 +243,8 @@ describe('TabsStore', () => {
 			cercando: false,
 			ricercaOp: null,
 			duplicati: null,
-			confronto: null
+			confronto: null,
+			etichetta: null
 		});
 		s.setActive(1);
 

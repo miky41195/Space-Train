@@ -76,7 +76,7 @@
 	import { applicaTema, coloreAccento, folderStyleOf, scalaTesto, temaDa, type IdAccento, type TemaPersonale } from '$lib/temi';
 	import EditorTemi from '$lib/components/EditorTemi.svelte';
 	import { EVENTO_EDITOR, type MessaggioEditor } from '$lib/editor-finestra';
-	import { ColoriStore, type IdColore } from '$lib/stores/colori.svelte';
+	import { COLORI_CARTELLA, ColoriStore, type IdColore } from '$lib/stores/colori.svelte';
 	import { azioneTasto } from '$lib/scorciatoie';
 	import {
 		CESTINO,
@@ -198,7 +198,7 @@
 
 	/** Il colore che l'utente ha dato a una cartella, se gliene ha dato uno. */
 	function coloreVoce(e: Entry): string | undefined {
-		return e.kind === 'dir' ? colori.di(e.path) : undefined;
+		return colori.di(e.path);
 	}
 	const annulla = new AnnullaStore(tauriBackend);
 	const appunti = new ClipboardStore();
@@ -529,6 +529,14 @@
 			i += g.count;
 		}
 		store.selezionaPercorsi(store.activeId, extra);
+	}
+
+	/** Every item carrying a colour label, wherever it is, in place of the folder. */
+	async function mostraEtichetta(id: IdColore) {
+		const c = COLORI_CARTELLA.find((x) => x.id === id);
+		if (!c || store.activeId === null) return;
+		const voci = await tauriBackend.entriesFor(colori.percorsiDi(id)).catch(() => []);
+		await store.mostraVoci(store.activeId, voci, c.nome);
 	}
 
 	/** Folder comparison: starts it against the other pane, or a folder the user picks. */
@@ -1383,7 +1391,7 @@
 		}
 
 		// Esc leaves the duplicates or comparison view and goes back to the folder.
-		if (e.key === 'Escape' && (store.activeTab?.duplicati || store.activeTab?.confronto)) {
+		if (e.key === 'Escape' && (store.activeTab?.duplicati || store.activeTab?.confronto || store.activeTab?.etichetta)) {
 			e.preventDefault();
 			void store.fermaRicerca(store.activeId);
 			return;
@@ -1978,9 +1986,8 @@
 
 	/** Colore comune delle cartelle selezionate, o `null` se diverso o assente. */
 	function coloreComune(scelte: Entry[]): IdColore | null {
-		const cartelle = scelte.filter((e) => e.kind === 'dir');
-		const primo = cartelle[0] ? colori.idDi(cartelle[0].path) : undefined;
-		return primo && cartelle.every((e) => colori.idDi(e.path) === primo) ? primo : null;
+		const primo = scelte[0] ? colori.idDi(scelte[0].path) : undefined;
+		return primo && scelte.every((e) => colori.idDi(e.path) === primo) ? primo : null;
 	}
 
 	/**
@@ -2038,7 +2045,7 @@
 				return true;
 			case 'colore':
 				colori.imposta(
-					scelte.filter((e) => e.kind === 'dir').map((e) => e.path),
+					scelte.map((e) => e.path),
 					valore as IdColore
 				);
 				return true;
@@ -2264,7 +2271,7 @@
 					break;
 				case 'coloreNessuno':
 					colori.imposta(
-						scelte.filter((e) => e.kind === 'dir').map((e) => e.path),
+						scelte.map((e) => e.path),
 						null
 					);
 					break;
@@ -2415,6 +2422,9 @@
 				impostaLan(indirizzi.length > (statoLan?.indirizzi?.length ?? 0) ? { indirizzi, visibile: true } : { indirizzi })}
 			accessoRapido={accessoRapido.cartelle}
 			onmenuaccesso={apriMenuAccesso}
+			etichette={colori.usati}
+			etichettaAperta={store.activeTab?.etichetta ?? null}
+			onetichetta={(id) => void mostraEtichetta(id)}
 		/>
 		<Rail orientamento="verticale" attivo={sottoCarico} />
 		</div>

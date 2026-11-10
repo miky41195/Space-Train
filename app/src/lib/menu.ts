@@ -285,11 +285,8 @@ function vociElementi({
 		});
 	}
 
-	// Il colore si dà alle cartelle: con una selezione mista si colorano
-	// solo quelle, i file restano come sono.
-	if (selezione.some((e) => e.kind === 'dir')) {
-		voci.push(tavolozzaCartelle(coloreAttuale));
-	}
+	// Folders change colour, files get a coloured label: same palette for both.
+	voci.push(tavolozzaCartelle(coloreAttuale));
 
 	voci.push({
 		azione: 'copiaPercorso',
@@ -400,7 +397,7 @@ function vociVirtuali({ selezione, iniziale = false }: ContestoMenu, posizione: 
 export function tavolozzaCartelle(attuale: IdColore | null): VoceMenu {
 	return {
 		azione: 'coloreCartella',
-		etichetta: 'Colore cartella',
+		etichetta: 'Colore',
 		stacca: true,
 		tavolozza: [
 			{ azione: 'coloreNessuno', nome: 'Nessun colore', colore: null, attivo: attuale === null },

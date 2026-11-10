@@ -89,9 +89,24 @@ fn cartella_personalizzabile(_meta: &std::fs::Metadata) -> bool {
 /// fallire la conversione: la voce entra con dimensione 0 e data assente.
 pub fn entry_from_dir_entry(de: &DirEntry) -> Option<Entry> {
     let name = de.file_name().into_string().ok()?;
-    let path = de.path().to_string_lossy().into_owned();
+    build(name, &de.path(), de.metadata().ok())
+}
 
-    let meta = de.metadata().ok();
+/// The entry for one path, found in its parent folder so the name keeps
+/// its real case (colour labels store paths in lowercase). `None` if gone.
+pub fn entry_from_path(path: &std::path::Path) -> Option<Entry> {
+    let name = path.file_name()?.to_str()?.to_lowercase();
+    let de = std::fs::read_dir(crate::fs::paths::extended(path.parent()?))
+        .ok()?
+        .filter_map(|d| d.ok())
+        .find(|d| d.file_name().to_str().map(|n| n.to_lowercase() == name).unwrap_or(false))?;
+    let mut e = entry_from_dir_entry(&de)?;
+    e.path = crate::fs::paths::display(std::path::Path::new(&e.path));
+    Some(e)
+}
+
+fn build(name: String, full: &std::path::Path, meta: Option<std::fs::Metadata>) -> Option<Entry> {
+    let path = full.to_string_lossy().into_owned();
 
     let kind = match &meta {
         Some(m) if m.is_dir() => EntryKind::Dir,
@@ -113,7 +128,7 @@ pub fn entry_from_dir_entry(de: &DirEntry) -> Option<Entry> {
     });
 
     let hidden = meta.as_ref().map(is_hidden).unwrap_or(false);
-    let icona_propria = ha_icona_propria(&de.path(), kind, meta.as_ref());
+    let icona_propria = ha_icona_propria(full, kind, meta.as_ref());
 
     Some(Entry {
         name,
@@ -149,6 +164,16 @@ mod tests {
     use super::*;
     use std::fs;
     use tempfile::tempdir;
+
+    #[test]
+    fn entry_from_path_reads_one_item_and_skips_missing_ones() {
+        let d = tempdir().unwrap();
+        fs::write(d.path().join("a.txt"), b"abc").unwrap();
+        fs::write(d.path().join("Mixed.TXT"), b"abc").unwrap();
+        let e = entry_from_path(&d.path().join("mixed.txt")).unwrap();
+        assert_eq!((e.name.as_str(), e.size, e.kind), ("Mixed.TXT", 3, EntryKind::File));
+        assert!(entry_from_path(&d.path().join("gone.txt")).is_none());
+    }
 
     #[test]
     fn legge_un_file_normale() {
