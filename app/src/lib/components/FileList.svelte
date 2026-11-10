@@ -1,3 +1,12 @@
+<script lang="ts" module>
+	/**
+	 * Where each list was scrolled, by content key: the dual pane remounts a
+	 * list when you switch side, and going back to a folder finds it as you left it.
+	 */
+	const scrollSalvati = new Map<string, number>();
+	const MASSIMO_SALVATI = 200;
+</script>
+
 <script lang="ts">
 	import type { FolderStyle } from '../icons';
 	import { selezioneRettangolo, type OpzioniRettangolo } from '../rettangolo';
@@ -149,13 +158,22 @@
 	let visible = $derived(finestre.flatMap((f) => f.voci));
 
 	// Tornare in cima quando cambia il contenuto: senza questo, entrando in una
-	// cartella più corta si resta a uno scroll che non esiste più.
+	// cartella più corta si resta a uno scroll che non esiste più. A contenuto
+	// già visto si torna dove si era.
 	$effect(() => {
 		if (chiave === undefined) entries;
-		else chiave;
-		if (viewport) viewport.scrollTop = 0;
-		scrollTop = 0;
+		const salvato = chiave !== undefined ? (scrollSalvati.get(chiave) ?? 0) : 0;
+		if (viewport) viewport.scrollTop = salvato;
+		scrollTop = viewport?.scrollTop ?? salvato;
 	});
+
+	function salvaScroll(top: number) {
+		scrollTop = top;
+		if (chiave === undefined) return;
+		scrollSalvati.delete(chiave);
+		scrollSalvati.set(chiave, top);
+		if (scrollSalvati.size > MASSIMO_SALVATI) scrollSalvati.delete(scrollSalvati.keys().next().value!);
+	}
 
 	// La riga scelta da tastiera può stare fuori dalla finestra visibile:
 	// con le righe virtualizzate non esiste un elemento su cui chiamare
@@ -182,7 +200,7 @@
 	<div
 		class="viewport"
 		bind:this={viewport}
-		onscroll={(e) => (scrollTop = e.currentTarget.scrollTop)}
+		onscroll={(e) => salvaScroll(e.currentTarget.scrollTop)}
 		bind:clientHeight={viewportHeight}
 		role="presentation"
 		oncontextmenu={(e) => {

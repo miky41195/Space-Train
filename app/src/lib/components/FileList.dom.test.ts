@@ -93,3 +93,22 @@ describe('FileList virtualizzata', () => {
 		expect(spacer.style.height).toBe(`${10 * ROW_HEIGHT + 2 * ZONA_TESTATA}px`);
 	});
 });
+
+describe('scroll memory', () => {
+	it('a list mounted again with the same content key comes back where it was', async () => {
+		const props = { entries: voci(1000), chiave: 'tab1:cartella', onactivate: vi.fn(), onselect: vi.fn() };
+		const primo = render(FileList, { props });
+		const v1 = primo.container.querySelector('.viewport') as HTMLElement;
+		v1.scrollTop = 640;
+		v1.dispatchEvent(new Event('scroll'));
+		primo.unmount();
+
+		const secondo = render(FileList, { props });
+		await Promise.resolve();
+		expect((secondo.container.querySelector('.viewport') as HTMLElement).scrollTop).toBe(640);
+
+		const altro = render(FileList, { props: { ...props, chiave: 'tab1:altra' } });
+		await Promise.resolve();
+		expect((altro.container.querySelectorAll('.viewport')[0] as HTMLElement).scrollTop).toBe(0);
+	});
+});

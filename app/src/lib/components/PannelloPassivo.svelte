@@ -54,7 +54,7 @@
 	<TestataPannello path={tab.path} />
 	<FileList
 		entries={tab.risultati ?? tab.entries}
-		chiave={`${tab.id}:${tab.path}`}
+		chiave={`${tab.id}:${tab.path}:${tab.risultati !== null}`}
 		{colonne}
 		{nascondiEstensione}
 		{coloreDi}
