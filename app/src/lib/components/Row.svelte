@@ -365,8 +365,9 @@
 	.altre {
 		margin-left: 8px;
 	}
+	/* The folder hint gives way first: the name is what the row is about. */
 	.cartella {
-		flex-shrink: 1;
+		flex-shrink: 100;
 		min-width: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
