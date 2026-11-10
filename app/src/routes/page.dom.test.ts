@@ -578,8 +578,25 @@ describe('operazioni sui file', () => {
 
 		await waitFor(() => expect(nomi()).toEqual(['due.txt', 'uno.txt']));
 		expect(screen.getByRole('separator', { name: /ciascuna/ })).toBeTruthy();
+		expect(screen.getByRole('button', { name: 'Duplicati' }).getAttribute('aria-current')).toBe('location');
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Seleziona le copie in più' }));
+		await waitFor(() => expect(riga('uno.txt').classList.contains('selected')).toBe(true));
+		expect(riga('due.txt').classList.contains('selected')).toBe(false);
 
 		tasto('Escape');
+		await waitFor(() => expect(nomi()).toContain('alfa.txt'));
+		expect(screen.queryByRole('button', { name: 'Duplicati' })).toBeNull();
+	});
+
+	it('the folder stop before «Duplicati» goes back to the folder', async () => {
+		disco = new DiscoFinto([...STRUTTURA, 'C:\\uno.txt=stesso', 'C:\\Dati\\due.txt=stesso']);
+		await monta();
+		await fireEvent.contextMenu(document.querySelector('.viewport')!);
+		await fireEvent.click(await screen.findByRole('menuitem', { name: 'Trova duplicati qui' }));
+		const stop = await screen.findByRole('button', { name: 'Duplicati' });
+
+		await fireEvent.click(stop.previousElementSibling as HTMLElement);
 		await waitFor(() => expect(nomi()).toContain('alfa.txt'));
 	});
 

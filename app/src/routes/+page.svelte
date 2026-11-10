@@ -86,6 +86,7 @@
 		eReteLocale,
 		eVirtuale,
 		nomeDi,
+		byte,
 		stessoPath,
 		stessoVolume
 	} from '$lib/posizioni';
@@ -459,6 +460,25 @@
 	}
 
 	// ── Rinomina, cartelle, cestino ──────────────────────────────────
+
+	/** Groups found so far and the space their extra copies take. */
+	let duplicateSummary = $derived.by(() => {
+		const groups = store.activeTab?.duplicati?.groups ?? [];
+		return { groups: groups.length, recoverable: groups.reduce((n, g) => n + g.size * (g.count - 1), 0) };
+	});
+
+	/** Every copy but the first of each group: the oldest, which Rust puts first. */
+	function selectExtraCopies() {
+		const tab = store.activeTab;
+		if (!tab?.duplicati || !tab.risultati || store.activeId === null) return;
+		const extra: string[] = [];
+		let i = 0;
+		for (const g of tab.duplicati.groups) {
+			extra.push(...tab.risultati.slice(i + 1, i + g.count).map((e) => e.path));
+			i += g.count;
+		}
+		store.selezionaPercorsi(store.activeId, extra);
+	}
 
 	/** F2, the menu and the command bar: one item renames in place, several open the batch dialog. */
 	function startRename() {
@@ -2357,6 +2377,13 @@
 					oncancel={() => store.activeId !== null && store.fermaRicerca(store.activeId, { tieniRisultati: true })}
 				/>
 			{/if}
+			{#if duplicateSummary.groups > 0}
+				<div class="riepilogo-duplicati">
+					<span><b>{duplicateSummary.groups}</b> {duplicateSummary.groups === 1 ? 'gruppo di copie' : 'gruppi di copie'}</span>
+					<span><b>{byte(duplicateSummary.recoverable)}</b> recuperabili</span>
+					<button onclick={selectExtraCopies} title="Tutte tranne la più vecchia di ogni gruppo">Seleziona le copie in più</button>
+				</div>
+			{/if}
 			{#if progresso}
 				<BarraProgresso {progresso} modo={modoInCorso} oncancel={annullaTrasferimento} />
 			{/if}
@@ -2805,6 +2832,41 @@
 		background: rgba(196, 43, 28, 0.12);
 		border-bottom: 1px solid rgba(196, 43, 28, 0.3);
 		color: var(--errore-testo);
+	}
+	/* Duplicates summary: counts as timetable figures, one action at the end. */
+	.riepilogo-duplicati {
+		display: flex;
+		align-items: center;
+		gap: 20px;
+		min-height: 40px;
+		padding: 0 12px 0 16px;
+		background: var(--surface);
+		border-bottom: 1px solid var(--border);
+		color: var(--text-dim);
+	}
+	.riepilogo-duplicati b {
+		margin-right: 4px;
+		color: var(--text);
+		font-family: var(--font-display);
+		font-weight: 400;
+		font-size: calc(15px * var(--scala-testo, 1));
+		font-variant-numeric: tabular-nums;
+	}
+	.riepilogo-duplicati button {
+		margin-left: auto;
+		height: 24px;
+		padding: 0 10px;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		clip-path: var(--forma-sm, none);
+		mask: var(--maschera-sm, none);
+		background: transparent;
+		color: var(--text);
+		font: inherit;
+		cursor: default;
+	}
+	.riepilogo-duplicati button:hover {
+		background: var(--row-hover);
 	}
 	.avviso {
 		padding: 8px 16px;

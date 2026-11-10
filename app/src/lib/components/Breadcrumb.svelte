@@ -2,6 +2,8 @@
 	import type { TabsStore } from '../stores/tabs.svelte';
 	import { briciole, eVirtuale, nomePosizione } from '../posizioni';
 
+	const DUPLICATES_STOP = '::duplicati';
+
 	let {
 		store,
 		inModifica = $bindable(false),
@@ -24,7 +26,12 @@
 	} = $props();
 
 	let percorso = $derived(store.activeTab?.path ?? '');
-	let stazioni = $derived(briciole(percorso));
+	// The duplicates view is one more stop after its folder: clicking the folder goes back to it.
+	let stazioni = $derived(
+		store.activeTab?.duplicati
+			? [...briciole(percorso), { nome: 'Duplicati', path: DUPLICATES_STOP }]
+			: briciole(percorso)
+	);
 	let campo = $state<HTMLInputElement | null>(null);
 	let linea = $state<HTMLDivElement | null>(null);
 
@@ -63,7 +70,11 @@
 	let id = $derived(store.activeId);
 
 	function vaiA(path: string) {
-		if (path === percorso || id === null) return;
+		if (id === null || path === DUPLICATES_STOP) return;
+		if (path === percorso) {
+			if (store.activeTab?.duplicati) void store.fermaRicerca(id);
+			return;
+		}
 		if (onvai) onvai(path);
 		else store.navigate(id, path);
 	}
@@ -119,7 +130,7 @@
 					class="stazione"
 					class:capolinea={i === stazioni.length - 1}
 					class:bersaglio={bersaglio === s.path}
-					data-cartella={eVirtuale(s.path) ? undefined : s.path}
+					data-cartella={eVirtuale(s.path) || s.path === DUPLICATES_STOP ? undefined : s.path}
 					onclick={(e) => {
 						e.stopPropagation();
 						vaiA(s.path);
