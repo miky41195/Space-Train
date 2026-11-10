@@ -14,6 +14,14 @@ export interface Novita {
 
 export const NOVITA: Novita[] = [
 	{
+		versione: '0.5.1',
+		voci: [
+			'Trova duplicati mostra in cima quanti gruppi di copie ha trovato e quanto spazio si può recuperare.',
+			'«Seleziona le copie in più» seleziona tutte le copie tranne la più vecchia di ogni gruppo: poi Canc le sposta nel Cestino.',
+			'Nella barra dell’indirizzo i duplicati sono una fermata dopo la cartella: un clic sulla cartella torna al suo contenuto.'
+		]
+	},
+	{
 		versione: '0.5.0',
 		voci: [
 			'Rinomina multipla: seleziona più file e premi F2 per dare a tutti un nome con un contatore (per esempio Vacanze_### diventa Vacanze_001, 002…) o per sostituire un pezzo di testo. L’anteprima mostra i nuovi nomi prima di confermare e Ctrl+Z li rimette come prima.',
