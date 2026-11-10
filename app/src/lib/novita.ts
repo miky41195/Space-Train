@@ -14,6 +14,18 @@ export interface Novita {
 
 export const NOVITA: Novita[] = [
 	{
+		versione: '0.5.0',
+		voci: [
+			'Rinomina multipla: seleziona più file e premi F2 per dare a tutti un nome con un contatore (per esempio Vacanze_### diventa Vacanze_001, 002…) o per sostituire un pezzo di testo. L’anteprima mostra i nuovi nomi prima di confermare e Ctrl+Z li rimette come prima.',
+			'Trova duplicati: dal menu di una cartella, «Trova duplicati qui» cerca nelle sottocartelle i file con lo stesso contenuto e li raggruppa, con lo spazio che si può recuperare.',
+			'Ogni tema disegna le cartelle a modo suo: in pixel, a vagone, piatte o a contorno. Nell’editor dei temi si può scegliere lo stile, compresa l’icona di Windows.',
+			'Il colore delle cartelle segue il tema e non cambia più insieme al colore d’evidenziazione.',
+			'Nelle impostazioni c’è l’elenco di tutte le scorciatoie da tastiera, con una ricerca.',
+			'Con l’apertura a un clic, fermare il puntatore su un file lo seleziona.',
+			'La scorciatoia che riporta Space Train in primo piano da qualsiasi programma è ora Win+Maiusc+E: quella di prima intercettava AltGr+E e impediva di scrivere € ed é.'
+		]
+	},
+	{
 		versione: '0.4.0',
 		voci: [
 			'Anche l’eliminazione ha la sua barra di avanzamento: spostare nel cestino, eliminare definitivamente e svuotare il cestino mostrano quanti elementi mancano, e si possono annullare a metà.',
