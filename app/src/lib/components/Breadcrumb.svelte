@@ -26,11 +26,16 @@
 	} = $props();
 
 	let percorso = $derived(store.activeTab?.path ?? '');
-	// The duplicates view is one more stop after its folder: clicking the folder goes back to it.
-	let stazioni = $derived(
+	// Duplicates and folder comparison are one more stop after their folder: clicking the folder goes back to it.
+	let fermataExtra = $derived(
 		store.activeTab?.duplicati
-			? [...briciole(percorso), { nome: 'Duplicati', path: DUPLICATES_STOP }]
-			: briciole(percorso)
+			? 'Duplicati'
+			: store.activeTab?.confronto
+				? `Confronto con ${nomePosizione(store.activeTab.confronto.altro)}`
+				: null
+	);
+	let stazioni = $derived(
+		fermataExtra ? [...briciole(percorso), { nome: fermataExtra, path: DUPLICATES_STOP }] : briciole(percorso)
 	);
 	let campo = $state<HTMLInputElement | null>(null);
 	let linea = $state<HTMLDivElement | null>(null);
@@ -72,7 +77,7 @@
 	function vaiA(path: string) {
 		if (id === null || path === DUPLICATES_STOP) return;
 		if (path === percorso) {
-			if (store.activeTab?.duplicati) void store.fermaRicerca(id);
+			if (fermataExtra) void store.fermaRicerca(id);
 			return;
 		}
 		if (onvai) onvai(path);

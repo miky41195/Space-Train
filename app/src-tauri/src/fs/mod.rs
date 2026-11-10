@@ -1,6 +1,7 @@
 pub mod archivi;
 pub mod cerca;
 pub mod cestino;
+pub mod compare;
 pub mod copy;
 pub mod dimensione;
 pub mod duplicates;

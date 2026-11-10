@@ -29,7 +29,7 @@ pub enum DuplicateEvent {
 }
 
 /// Hash of `len` bytes from the start of the file, or `None` if unreadable.
-fn hash(path: &Path, len: u64, cancel: &AtomicBool) -> Option<[u8; 32]> {
+pub(crate) fn hash(path: &Path, len: u64, cancel: &AtomicBool) -> Option<[u8; 32]> {
     let file = std::fs::File::open(paths::extended(path)).ok()?;
     let mut reader = file.take(len);
     let mut hasher = blake3::Hasher::new();

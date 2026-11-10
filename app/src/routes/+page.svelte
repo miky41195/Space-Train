@@ -28,6 +28,7 @@
 	import PannelloPassivo from '$lib/components/PannelloPassivo.svelte';
 	import TestataPannello from '$lib/components/TestataPannello.svelte';
 	import { followActive, otherPane, type Split } from '$lib/split';
+	import { alignPlan, compareZones } from '$lib/confronto';
 	import SearchBar from '$lib/components/SearchBar.svelte';
 	import ConfermaCestino from '$lib/components/ConfermaCestino.svelte';
 	import BatchRename from '$lib/components/BatchRename.svelte';
@@ -88,6 +89,8 @@
 		cartellaDi,
 		eReteLocale,
 		eVirtuale,
+		dentroDi,
+		nomePosizione,
 		nomeDi,
 		byte,
 		stessoPath,
@@ -302,6 +305,7 @@
 	let impaginato = $derived.by(() => {
 		const tab = store.activeTab;
 		if (tab?.duplicati && tab.query === '') return { voci: filtrate, zone: duplicateZones(tab.duplicati.groups) };
+		if (tab?.confronto && tab.query === '') return { voci: filtrate, zone: compareZones(tab.confronto) };
 		if (!tab || tab.query !== '' || tab.risultati) return { voci: filtrate, zone: [] };
 		const prefs = posizione === 'normale' ? preferiti.di(tab.path) : NESSUNO;
 		// I recenti valgono dove le voci hanno una data vera: non in Questo
@@ -370,6 +374,13 @@
 	/** Accanto al nome: la cartella dei risultati di ricerca, l'origine nel Cestino. */
 	function cartellaVoce(e: Entry): string | undefined {
 		if (posizione === 'cestino') return e.origine;
+		const c = store.activeTab?.confronto;
+		if (c && store.activeTab) {
+			// Comparison: only the subfolder below the compared folder, which is the same on both sides.
+			const radice = dentroDi(e.path, store.activeTab.path) ? store.activeTab.path : c.altro;
+			const taglia = (p: string) => p.replace(/[\\/]+$/, '');
+			return taglia(cartellaDi(e.path)).slice(taglia(radice).length + 1) || undefined;
+		}
 		if (inRicerca) return cartellaDi(e.path);
 		return undefined;
 	}
@@ -518,6 +529,43 @@
 			i += g.count;
 		}
 		store.selezionaPercorsi(store.activeId, extra);
+	}
+
+	/** Folder comparison: starts it against the other pane, or a folder the user picks. */
+	async function confrontaCon(cartella: string) {
+		const id = store.activeId;
+		if (id === null) return;
+		const altro =
+			tabAltro && !eVirtuale(tabAltro.path)
+				? tabAltro.path
+				: await tauriBackend.scegliCartella('Confronta con…', cartella);
+		if (!altro) return;
+		// One inside the other, «Allinea» would copy a folder into itself.
+		if (dentroDi(altro, cartella) || dentroDi(cartella, altro)) {
+			erroreOp = 'Una cartella sta dentro l’altra: scegli due cartelle separate.';
+			return;
+		}
+		if (cartella !== store.activeTab?.path) await store.navigate(id, cartella);
+		await store.confronta(id, altro, false, store.showHidden).catch((e) => (erroreOp = descriviErrore(e)));
+	}
+
+	/** Copies what is missing or older on one side, then compares again. */
+	async function allinea(verso: 'la' | 'qui') {
+		const tab = store.activeTab;
+		const c = tab?.confronto;
+		if (!tab || !c || !tab.risultati || store.activeId === null) return;
+		const id = store.activeId;
+		for (const g of alignPlan(c, tab.risultati, tab.path, verso)) {
+			await esegui('sovrascrivi', { sources: g.sources, dest: g.dest, mode: 'copy' });
+		}
+		await store.confronta(id, c.altro, c.contenuto, store.showHidden).catch((e) => (erroreOp = descriviErrore(e)));
+	}
+
+	/** Same comparison, reading the files instead of trusting size and date. */
+	function confrontaContenuto() {
+		const c = store.activeTab?.confronto;
+		if (!c || store.activeId === null) return;
+		void store.confronta(store.activeId, c.altro, true, store.showHidden).catch((e) => (erroreOp = descriviErrore(e)));
 	}
 
 	/** F2, the menu and the command bar: one item renames in place, several open the batch dialog. */
@@ -1334,8 +1382,8 @@
 			return;
 		}
 
-		// Esc leaves the duplicates view and goes back to the folder.
-		if (e.key === 'Escape' && store.activeTab?.duplicati) {
+		// Esc leaves the duplicates or comparison view and goes back to the folder.
+		if (e.key === 'Escape' && (store.activeTab?.duplicati || store.activeTab?.confronto)) {
 			e.preventDefault();
 			void store.fermaRicerca(store.activeId);
 			return;
@@ -1755,6 +1803,7 @@
 		if (!tab || tab.loading) return null;
 		if (tab.risultati) {
 			if (tab.risultati.length > 0 || tab.cercando) return null;
+			if (tab.confronto) return 'cartelleUguali' as const;
 			return tab.duplicati ? ('nessunDuplicato' as const) : ('nessunRisultato' as const);
 		}
 
@@ -1862,7 +1911,8 @@
 					stessoPath(statoLan.condivisa, store.activeTab.path),
 				fissata: accessoRapido.contiene(cartellaDelMenu(scelte) ?? ''),
 				iniziale: eIniziale(scelte),
-				allAvvio: eAllAvvio(scelte)
+				allAvvio: eAllAvvio(scelte),
+				altroPannello: tabAltro && !eVirtuale(tabAltro.path) ? tabAltro.path : null
 			}),
 			x,
 			y
@@ -2119,6 +2169,11 @@
 						if (cartella !== store.activeTab?.path) await store.navigate(id, cartella);
 						void store.trovaDuplicati(id, store.showHidden).catch((e) => (erroreOp = descriviErrore(e)));
 					}
+					break;
+				}
+				case 'confronta': {
+					const cartella = cartellaDelMenu(scelte);
+					if (cartella) await confrontaCon(cartella);
 					break;
 				}
 				case 'terminale': {
@@ -2435,6 +2490,29 @@
 					<span><b>{duplicateSummary.groups}</b> {duplicateSummary.groups === 1 ? 'gruppo di copie' : 'gruppi di copie'}</span>
 					<span><b>{byte(duplicateSummary.recoverable)}</b> recuperabili</span>
 					<button onclick={selectExtraCopies} title="Tutte tranne la più vecchia di ogni gruppo">Seleziona le copie in più</button>
+				</div>
+			{/if}
+			{#if store.activeTab?.confronto}
+				{@const c = store.activeTab.confronto}
+				<div class="riepilogo-duplicati" role="status">
+					{#if c.inCorso}
+						<span>Confronto in corso…</span>
+					{:else}
+						<span><b>{c.onlyHere}</b> mancano in {nomePosizione(c.altro)}</span>
+						<span><b>{c.different.length}</b> {c.different.length === 1 ? 'diverso' : 'diversi'}</span>
+						<span><b>{c.onlyThere}</b> mancano qui</span>
+						{#if !c.contenuto}
+							<button onclick={confrontaContenuto} title="Legge i file invece di guardare dimensione e data">Controlla il contenuto</button>
+						{/if}
+						{#if c.onlyThere > 0 || c.different.some((d) => !d.newerHere)}
+							<button onclick={() => void allinea('qui')} title="Copia qui ciò che manca e le versioni più recenti">Allinea qui</button>
+						{/if}
+						{#if c.onlyHere > 0 || c.different.some((d) => d.newerHere)}
+							<button class="primario" onclick={() => void allinea('la')} title="Copia ciò che manca e le versioni più recenti; non cancella niente"
+								>Allinea {nomePosizione(c.altro)}</button
+							>
+						{/if}
+					{/if}
 				</div>
 			{/if}
 			{#if progresso}
@@ -2946,6 +3024,9 @@
 		font-size: calc(15px * var(--scala-testo, 1));
 		font-variant-numeric: tabular-nums;
 	}
+	.riepilogo-duplicati button + button {
+		margin-left: -12px;
+	}
 	.riepilogo-duplicati button {
 		margin-left: auto;
 		height: 24px;
@@ -2961,6 +3042,11 @@
 	}
 	.riepilogo-duplicati button:hover {
 		background: var(--row-hover);
+	}
+	.riepilogo-duplicati button.primario {
+		background: var(--accent);
+		border-color: var(--accent);
+		color: #fff;
 	}
 	.avviso {
 		padding: 8px 16px;

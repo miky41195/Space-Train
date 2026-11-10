@@ -61,6 +61,7 @@
 		{altezzaRiga}
 		{bersaglio}
 		selection={selezione}
+		sort={tab.sort}
 		{icone}
 		{folderStyle}
 		{unClic}

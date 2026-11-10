@@ -173,6 +173,26 @@ pub async fn find_duplicates(
     })
 }
 
+/// Compares two folder trees. Cancelled with `cancel_transfer` and the same `op_id`.
+#[tauri::command]
+pub async fn compare_folders(
+    state: tauri::State<'_, Operazioni>,
+    op_id: u64,
+    here: String,
+    there: String,
+    content: bool,
+    hidden: bool,
+) -> Result<crate::fs::compare::Comparison, FsError> {
+    let cancel = state.registra(op_id);
+    let work = tauri::async_runtime::spawn_blocking(move || {
+        let opts = crate::fs::compare::Options { content, hidden };
+        crate::fs::compare::compare(&here, &there, &opts, &cancel)
+    })
+    .await;
+    state.dimentica(op_id);
+    work.map_err(|e| FsError::Io { message: format!("Confronto interrotto: {}", e) })?
+}
+
 /// Esegue un lavoro lungo su archivi con barra d'avanzamento e annullamento.
 async fn con_avanzamento<T: Send + 'static>(
     state: &Operazioni,

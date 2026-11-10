@@ -33,6 +33,7 @@ describe('vociMenu', () => {
 			'paginaIniziale',
 			'cartellaAvvio',
 			'duplicati',
+			'confronta',
 			'terminale',
 			'altreOpzioni',
 			'proprieta'

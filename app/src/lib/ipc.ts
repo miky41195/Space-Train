@@ -87,6 +87,13 @@ export type DuplicateEvent =
 	| { kind: 'progress'; done: number; total: number }
 	| { kind: 'group'; size: number; entries: Entry[] };
 
+/** Two folder trees compared: what is only on one side, what differs. */
+export interface Comparison {
+	onlyHere: Entry[];
+	onlyThere: Entry[];
+	different: Array<{ here: Entry; there: Entry; newerHere: boolean }>;
+}
+
 export interface CriteriRicerca {
 	testo: string;
 	contenuto: boolean;
@@ -293,6 +300,7 @@ export interface Backend {
 		hidden: boolean;
 		onEvent: (e: DuplicateEvent) => void;
 	}): Promise<number>;
+	compareFolders(opts: { opId: number; here: string; there: string; content: boolean; hidden: boolean }): Promise<Comparison>;
 	compress(opts: {
 		opId: number;
 		sources: string[];
@@ -390,6 +398,8 @@ export const tauriBackend: Backend = {
 		invoke('search', { opId, root, criteri, onResults: canale(onResults) }),
 	findDuplicates: ({ opId, root, hidden, onEvent }) =>
 		invoke('find_duplicates', { opId, root, hidden, onEvent: canale(onEvent) }),
+	compareFolders: ({ opId, here, there, content, hidden }) =>
+		invoke('compare_folders', { opId, here, there, content, hidden }),
 	compress: ({ opId, sources, dest, onProgress }) =>
 		invoke('compress', { opId, sources, dest, onProgress: canale(onProgress) }),
 	extract: ({ opId, archive, onProgress }) =>

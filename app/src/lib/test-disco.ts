@@ -231,6 +231,8 @@ export class DiscoFinto {
 					args.criteri as { testo: string; contenuto: boolean },
 					args.onResults as Canale<Entry[]>
 				);
+			case 'compare_folders':
+				return this.#compare(args.here as string, args.there as string);
 			case 'find_duplicates':
 				return this.#duplicates(args.root as string, args.onEvent as Canale<unknown>);
 			case 'compress': {
@@ -468,6 +470,31 @@ export class DiscoFinto {
 	}
 
 	/** Like Rust: files with the same text are identical; groups, then the final progress. */
+	/** Same rules as Rust: names match ignoring case, files differ by their text. */
+	#compare(here: string, there: string) {
+		const out = { onlyHere: [] as Entry[], onlyThere: [] as Entry[], different: [] as unknown[] };
+		const walk = (a: string, b: string) => {
+			const fa = new Map(this.figli(a).map((p) => [nome(p).toLowerCase(), p]));
+			const fb = new Map(this.figli(b).map((p) => [nome(p).toLowerCase(), p]));
+			for (const [k, pa] of fa) {
+				const pb = fb.get(k);
+				if (!pb) {
+					out.onlyHere.push(this.#voce(pa));
+					continue;
+				}
+				fb.delete(k);
+				const na = this.nodi.get(pa)!;
+				const nb = this.nodi.get(pb)!;
+				if (na.kind === 'dir' && nb.kind === 'dir') walk(pa, pb);
+				else if (na.kind !== nb.kind || (this.contenuti.get(pa) ?? '') !== (this.contenuti.get(pb) ?? ''))
+					out.different.push({ here: this.#voce(pa), there: this.#voce(pb), newerHere: na.modified > nb.modified });
+			}
+			for (const pb of fb.values()) out.onlyThere.push(this.#voce(pb));
+		};
+		walk(here, there);
+		return out;
+	}
+
 	async #duplicates(root: string, canale: Canale<unknown>) {
 		const prefix = root.endsWith('\\') ? root : root + '\\';
 		const byText = new Map<string, string[]>();

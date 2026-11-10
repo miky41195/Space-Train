@@ -1,4 +1,4 @@
-import type { Backend, CriteriRicerca, Entry, FsError, Progresso, SortSpec } from '../ipc';
+import type { Backend, Comparison, CriteriRicerca, Entry, FsError, Progresso, SortSpec } from '../ipc';
 import { stessoPath } from '../posizioni';
 
 export interface Tab {
@@ -36,6 +36,19 @@ export interface Tab {
 	 * order of the results, plus the comparison progress.
 	 */
 	duplicati: { groups: Array<{ size: number; count: number }>; progress: Progresso } | null;
+	/**
+	 * Set when `risultati` holds a folder comparison, in this order: only
+	 * here, different (this side's copy), only in `altro`.
+	 */
+	confronto: {
+		altro: string;
+		contenuto: boolean;
+		onlyHere: number;
+		onlyThere: number;
+		different: Comparison['different'];
+		/** The comparison is still running: counts are not known yet. */
+		inCorso: boolean;
+	} | null;
 }
 
 /** Gli id delle ricerche stanno lontani da quelli dei trasferimenti. */
@@ -102,7 +115,8 @@ export class TabsStore {
 			risultati: null,
 			cercando: false,
 			ricercaOp: null,
-			duplicati: null
+			duplicati: null,
+			confronto: null
 		};
 		this.tabs.push(tab);
 
@@ -237,6 +251,7 @@ export class TabsStore {
 		tab.ricercaOp = op;
 		tab.risultati = [];
 		tab.duplicati = null;
+		tab.confronto = null;
 		tab.cercando = true;
 		tab.selection = [];
 		tab.anchor = null;
@@ -273,6 +288,7 @@ export class TabsStore {
 		tab.ricercaOp = op;
 		tab.risultati = [];
 		tab.duplicati = { groups: [], progress: { transferred: 0, total: 0 } };
+		tab.confronto = null;
 		tab.cercando = true;
 		tab.query = '';
 		tab.selection = [];
@@ -300,6 +316,47 @@ export class TabsStore {
 		}
 	}
 
+	/** Compares the tab's folder with `altro`; the differences replace the list. */
+	async confronta(id: number, altro: string, contenuto: boolean, hidden: boolean): Promise<void> {
+		const tab = this.#get(id);
+		if (!tab) return;
+		await this.fermaRicerca(id);
+
+		const op = prossimaRicerca++;
+		tab.ricercaOp = op;
+		tab.risultati = [];
+		tab.cercando = true;
+		tab.query = '';
+		tab.selection = [];
+		tab.anchor = null;
+		tab.confronto = { altro, contenuto, onlyHere: 0, onlyThere: 0, different: [], inCorso: true };
+
+		try {
+			const c = await this.backend.compareFolders({ opId: op, here: tab.path, there: altro, content: contenuto, hidden });
+			if (tab.ricercaOp !== op) return;
+			tab.risultati = [...c.onlyHere, ...c.different.map((d) => d.here), ...c.onlyThere];
+			tab.confronto = {
+				altro,
+				contenuto,
+				onlyHere: c.onlyHere.length,
+				onlyThere: c.onlyThere.length,
+				different: c.different,
+				inCorso: false
+			};
+		} catch (e) {
+			if (tab.ricercaOp === op) {
+				tab.risultati = null;
+				tab.confronto = null;
+			}
+			throw e;
+		} finally {
+			if (tab.ricercaOp === op) {
+				tab.cercando = false;
+				tab.ricercaOp = null;
+			}
+		}
+	}
+
 	/** Ferma la ricerca e, salvo richiesta, torna al contenuto della cartella. */
 	async fermaRicerca(id: number, opts: { tieniRisultati?: boolean } = {}): Promise<void> {
 		const tab = this.#get(id);
@@ -310,6 +367,7 @@ export class TabsStore {
 		if (!opts.tieniRisultati) {
 			tab.risultati = null;
 			tab.duplicati = null;
+			tab.confronto = null;
 		}
 		if (op !== null) await this.backend.cancelTransfer(op);
 	}
@@ -454,6 +512,7 @@ export class TabsStore {
 			tab.cercando = false;
 			tab.risultati = null;
 			tab.duplicati = null;
+			tab.confronto = null;
 
 			if (opts.pushHistory) {
 				tab.history = tab.history.slice(0, tab.historyIndex + 1);

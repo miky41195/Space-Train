@@ -2847,3 +2847,36 @@ describe('dual pane', () => {
 		await waitFor(() => expect(document.querySelector('.pannello.passivo')).toBeNull());
 	});
 });
+
+describe('folder comparison', () => {
+	it('compares with the other pane, lists the differences, «Allinea» copies them across', async () => {
+		aggiungi('C:\\Dati\\solo-qui.txt');
+		aggiungi('C:\\Copia\\');
+		aggiungi('C:\\Copia\\interno.txt');
+		aggiungi('C:\\Copia\\solo-la.txt');
+		await monta();
+		await fireEvent.dblClick(riga('Dati'));
+		await waitFor(() => expect(nomi()).toContain('interno.txt'));
+		tasto('D', { ctrl: true, shift: true });
+		await waitFor(() => expect(document.querySelector('.pannello.passivo')).not.toBeNull());
+		tasto('F6');
+		await fireEvent.click(document.querySelector('.pannello-attivo .testata')!);
+		tasto('ArrowUp', { alt: true });
+		await waitFor(() => expect(nomi()).toContain('Copia'));
+		await fireEvent.dblClick(riga('Copia'));
+		await waitFor(() => expect(nomi()).toContain('solo-la.txt'));
+		tasto('F6');
+		await waitFor(() => expect(nomi()).toContain('solo-qui.txt'));
+
+		await fireEvent.contextMenu(document.querySelector('.pannello-attivo .viewport')!);
+		await fireEvent.click(await screen.findByRole('menuitem', { name: 'Confronta con «Copia»' }));
+
+		await screen.findByText(/mancano in Copia/);
+		const attivi = () => [...document.querySelectorAll('.pannello-attivo .row .name')].map((n) => n.textContent);
+		await waitFor(() => expect(attivi()).toEqual(['solo-qui.txt', 'solo-la.txt']));
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Allinea Copia' }));
+		await waitFor(() => expect(disco.esiste('C:\\Copia\\solo-qui.txt')).toBe(true));
+		expect(disco.esiste('C:\\Dati\\solo-la.txt')).toBe(false);
+	});
+});

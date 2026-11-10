@@ -153,6 +153,9 @@ export function backendFinto(over: Partial<Backend> = {}): Backend {
 		async findDuplicates() {
 			return 0;
 		},
+		async compareFolders() {
+			return { onlyHere: [], onlyThere: [], different: [] };
+		},
 		async compress() {
 			return '';
 		},

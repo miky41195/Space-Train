@@ -1,5 +1,5 @@
 import type { Entry, SortKey, SortSpec } from './ipc';
-import { eEseguibile, eZip, nomeDi } from './posizioni';
+import { eEseguibile, eZip, nomeDi, nomePosizione } from './posizioni';
 import { RADICE_SISTEMA, SOLO_WINDOWS, SU_LINUX } from './sistema';
 import type { ModoGruppi } from './raggruppa';
 import { TAGLIE, type Vista } from './vista';
@@ -27,6 +27,7 @@ export type AzioneMenu =
 	| 'mostraInEsplora'
 	| 'terminale'
 	| 'duplicati'
+	| 'confronta'
 	| 'paginaIniziale'
 	| 'cartellaAvvio'
 	| 'sessione'
@@ -135,6 +136,8 @@ export interface ContestoMenu {
 	iniziale?: boolean;
 	/** La cartella del menu si apre sempre all'avvio, in una scheda sua. */
 	allAvvio?: boolean;
+	/** Folder of the other pane when the dual pane is open: «Confronta» uses it. */
+	altroPannello?: string | null;
 }
 
 /**
@@ -144,6 +147,13 @@ export interface ContestoMenu {
  * disabilitate: un menu di cinque voci tutte attive si legge più in fretta
  * di uno da nove di cui quattro grigie.
  */
+function voceConfronta(altro: string | null): VoceMenu {
+	return {
+		azione: 'confronta',
+		etichetta: altro ? `Confronta con «${nomePosizione(altro)}»` : 'Confronta con un’altra cartella…'
+	};
+}
+
 export function vociMenu(c: ContestoMenu, linux = SU_LINUX): VoceMenu[] {
 	const voci = vociPerPosizione(c);
 	return linux ? voci.filter((v) => !SOLO_WINDOWS.has(v.azione)) : voci;
@@ -164,7 +174,8 @@ function vociSfondo({
 	condivisaQui = false,
 	fissata = false,
 	iniziale = false,
-	allAvvio = false
+	allAvvio = false,
+	altroPannello = null
 }: ContestoMenu): VoceMenu[] {
 	const voci: VoceMenu[] = [];
 	if (!ricerca) {
@@ -197,6 +208,7 @@ function vociSfondo({
 		if (!iniziale) voci.push({ azione: 'paginaIniziale', etichetta: 'Imposta come pagina iniziale' });
 		voci.push(voceAvvio(allAvvio));
 		voci.push({ azione: 'duplicati', etichetta: 'Trova duplicati qui', stacca: true });
+		voci.push(voceConfronta(altroPannello));
 		voci.push({ azione: 'terminale', etichetta: 'Apri nel terminale' });
 		voci.push({ azione: 'altreOpzioni', etichetta: 'Altre opzioni di Windows', stacca: true });
 		voci.push({ azione: 'proprieta', etichetta: 'Proprietà', scorciatoia: 'Alt+Invio' });
@@ -214,7 +226,8 @@ function vociElementi({
 	condivisa = null,
 	fissata = false,
 	iniziale = false,
-	allAvvio = false
+	allAvvio = false,
+	altroPannello = null
 }: ContestoMenu): VoceMenu[] {
 	const voci: VoceMenu[] = [];
 	const quante = selezione.length;
@@ -236,6 +249,7 @@ function vociElementi({
 			voci.push(voceAvvio(allAvvio));
 			voci.push({ azione: 'terminale', etichetta: 'Apri nel terminale' });
 			voci.push({ azione: 'duplicati', etichetta: 'Trova duplicati qui' });
+			voci.push(voceConfronta(altroPannello));
 		} else {
 			voci.push({ azione: 'apriCon', etichetta: 'Apri con…' });
 			if (eEseguibile(unica.name)) {
