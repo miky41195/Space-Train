@@ -108,7 +108,7 @@
 >
 	<div class="riquadro">
 		{#if drawn}
-			<span class="disegno">{@html folderIcon(drawn, colore ?? 'var(--accent)')}</span>
+			<span class="disegno">{@html folderIcon(drawn, colore ?? 'var(--folder, var(--accent))')}</span>
 		{:else if immagine}
 			<img src={immagine} alt="" draggable="false" />
 		{:else}
@@ -240,6 +240,6 @@
 	}
 
 	.cella[data-category='dir'] .glifo {
-		color: var(--accent);
+		color: var(--folder, var(--accent));
 	}
 </style>

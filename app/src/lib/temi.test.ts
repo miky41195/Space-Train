@@ -24,6 +24,11 @@ describe('temi', () => {
 		expect(v['--accent-soft']).toBe('rgba(34, 197, 94, 0.26)');
 	});
 
+	it('the highlight color leaves the folders in the theme color', () => {
+		const v = variabiliPer(temaDa('spazio'), '#22c55e');
+		expect(v['--folder']).toBe('#8b5cf6');
+	});
+
 	it('l accento personalizzato usa il colore scelto dall utente', () => {
 		expect(coloreAccento(temaDa('spazio'), 'personalizzato', '#123456')).toBe('#123456');
 	});

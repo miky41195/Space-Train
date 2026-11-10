@@ -445,6 +445,8 @@ export function variabiliPer(tema: Tema, accento: string): Record<string, string
 	const figura = tema.motivo ? FIGURE[tema.motivo] : undefined;
 	return {
 		...tema.variabili,
+		// Folders keep the theme's own color: the highlight choice is for selection.
+		'--folder': tema.variabili['--plasma'] ?? accento,
 		'--plasma': accento,
 		'--accent': accento,
 		// Su fondo chiaro la tinta della selezione deve essere più decisa

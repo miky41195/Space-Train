@@ -206,7 +206,7 @@
 >
 	<span class="icon">
 		{#if drawn}
-			<span class="cartella-disegnata" class:cartella-colorata={colore}>{@html folderIcon(drawn, colore ?? 'var(--accent)')}</span>
+			<span class="cartella-disegnata" class:cartella-colorata={colore}>{@html folderIcon(drawn, colore ?? 'var(--folder, var(--accent))')}</span>
 		{:else if immagine}
 			<img src={immagine} alt="" draggable="false" />
 		{:else}
@@ -420,7 +420,7 @@
 
 	/* La categoria colora l'icona: differenziazione visiva senza secondo glifo. */
 	.row[data-category='dir'] .icon {
-		color: var(--accent);
+		color: var(--folder, var(--accent));
 	}
 	.row[data-category='code'] .icon,
 	.row[data-category='markup'] .icon,
