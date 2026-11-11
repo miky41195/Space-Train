@@ -37,7 +37,7 @@
 	import SommaControllo from '$lib/components/SommaControllo.svelte';
 	import Palette from '$lib/components/Palette.svelte';
 	import type { Comando } from '$lib/palette';
-	import { SHORTCUT_GROUPS } from '$lib/scorciatoie';
+	import { SHORTCUT_GROUPS, type AzioneTasto } from '$lib/scorciatoie';
 	import { TEMI } from '$lib/temi';
 	import BatchRename from '$lib/components/BatchRename.svelte';
 	import { renameSteps, type PlannedRename } from '$lib/batch-rename';
@@ -85,7 +85,7 @@
 	import EditorTemi from '$lib/components/EditorTemi.svelte';
 	import { EVENTO_EDITOR, type MessaggioEditor } from '$lib/editor-finestra';
 	import { COLORI_CARTELLA, ColoriStore, type IdColore } from '$lib/stores/colori.svelte';
-	import { azioneTasto } from '$lib/scorciatoie';
+	import { azioneConPersonalizzate, tastiDi } from '$lib/scorciatoie-personali';
 	import {
 		CESTINO,
 		QUESTO_PC,
@@ -272,7 +272,7 @@
 			for (const it of g.items) {
 				const a = it.action;
 				if (!a || typeof a === 'object' || a === 'palette') continue;
-				out.push({ tipo: 'azione', nome: it.label, tasti: it.keys[0], esegui: () => void eseguiTasto(a) });
+				out.push({ tipo: 'azione', nome: it.label, tasti: tastiDi(a, impostazioni.scorciatoie)[0], esegui: () => void eseguiTasto(a) });
 			}
 		}
 		const qui = store.activeTab && posizione === 'normale' ? store.activeTab.path : null;
@@ -1545,7 +1545,7 @@
 			if (!ricerca || !(ammessi.includes(e.key) || (e.ctrlKey && e.key.toLowerCase() === 'f'))) return;
 		}
 
-		const azione = azioneTasto(e);
+		const azione = azioneConPersonalizzate(e, impostazioni.scorciatoie);
 		if (azione !== null) {
 			e.preventDefault();
 			void eseguiTasto(azione);
@@ -1592,7 +1592,7 @@
 		}
 	}
 
-	async function eseguiTasto(azione: NonNullable<ReturnType<typeof azioneTasto>>) {
+	async function eseguiTasto(azione: AzioneTasto) {
 		const id = store.activeId;
 		if (id === null) return;
 
@@ -2896,6 +2896,7 @@
 			ricevutiScelta={statoLan?.ricevuti != null}
 			onricevuti={(cartella) => void impostaLan({ ricevuti: cartella })}
 			onscegliCartella={(titolo, da) => tauriBackend.scegliCartella(titolo, da)}
+			onprovaScorciatoia={(acc) => tauriBackend.shortcutFree(acc)}
 			onnovita={() => {
 				impostazioniAperte = false;
 				riapriNovita();

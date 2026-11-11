@@ -2,7 +2,16 @@
 	import type { ImpostazioniStore, DimensioneCartelle } from '../stores/impostazioni.svelte';
 	import { PAUSE_TRENO, INIZIALE_PREDEFINITA, INIZIALE_ULTIMA } from '../menu';
 	import { SU_LINUX } from '../sistema';
-	import { SHORTCUT_GROUPS, GLOBAL_SHORTCUT } from '../scorciatoie';
+	import { SHORTCUT_GROUPS, GLOBAL_SHORTCUT, type ShortcutItem } from '../scorciatoie';
+	import {
+		acceleratore,
+		assegna,
+		combinazione,
+		ripristina,
+		tastiDi,
+		verifica,
+		type AzioneSemplice
+	} from '../scorciatoie-personali';
 
 	let {
 		impostazioni,
@@ -18,7 +27,8 @@
 		onnovita,
 		ongalleria,
 		oneditor,
-		onchiudi
+		onchiudi,
+		onprovaScorciatoia = undefined
 	}: {
 		impostazioni: ImpostazioniStore;
 		/** Gli elementi nascosti vivono nello store delle schede, non qui. */
@@ -39,7 +49,65 @@
 		ongalleria: () => void;
 		oneditor: () => void;
 		onchiudi: () => void;
+		/** Asks Windows whether another program holds a combination (`null` = cannot tell). */
+		onprovaScorciatoia?: (acceleratore: string) => Promise<boolean | null>;
 	} = $props();
+
+	// ── Custom shortcuts ─────────────────────────────────────────────
+	const AZIONI: AzioneSemplice[] = [
+		...new Set(
+			SHORTCUT_GROUPS.flatMap((g) => g.items)
+				.map((i) => i.action)
+				.filter((a): a is AzioneSemplice => typeof a === 'string')
+		)
+	];
+	/** The action waiting for its new key combination. */
+	let registrando = $state<AzioneSemplice | null>(null);
+	/** Why the last combination was refused, next to its action. */
+	let rifiuto = $state<{ azione: AzioneSemplice; testo: string } | null>(null);
+	/** Every change is confirmed: what the user is asked, warnings first. */
+	let conferma = $state<{ azione: AzioneSemplice; nome: string; combo: string; avvisi: string[]; daTogliere: AzioneSemplice[] } | null>(null);
+
+	function tastiVoce(i: ShortcutItem): string[] {
+		return typeof i.action === 'string' ? tastiDi(i.action, impostazioni.scorciatoie) : i.keys;
+	}
+
+	function avviaRegistrazione(azione: AzioneSemplice) {
+		rifiuto = null;
+		registrando = azione;
+	}
+
+	async function registra(e: KeyboardEvent) {
+		if (!registrando) return;
+		// The keys go to the recording, not to the app or the window.
+		e.preventDefault();
+		e.stopImmediatePropagation();
+		if (e.key === 'Escape' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
+			registrando = null;
+			return;
+		}
+		const combo = combinazione(e);
+		if (combo === null) return;
+		const azione = registrando;
+		registrando = null;
+		const v = verifica(combo, azione, impostazioni.scorciatoie, AZIONI);
+		if (v.rifiuto) {
+			rifiuto = { azione, testo: v.rifiuto };
+			return;
+		}
+		const avvisi = [...v.avvisi];
+		const acc = acceleratore(combo);
+		const libera = acc && onprovaScorciatoia ? await onprovaScorciatoia(acc).catch(() => null) : null;
+		if (libera === false) avvisi.unshift(`Un altro programma tiene già ${combo} per sé: la intercetta prima che arrivi a Space Train.`);
+		const nome = SHORTCUT_GROUPS.flatMap((g) => g.items).find((i) => i.action === azione)?.label ?? azione;
+		conferma = { azione, nome, combo, avvisi, daTogliere: v.daTogliere };
+	}
+
+	function confermaScorciatoia() {
+		if (!conferma) return;
+		impostazioni.imposta('scorciatoie', assegna(impostazioni.scorciatoie, conferma.azione, conferma.combo, conferma.daTogliere));
+		conferma = null;
+	}
 
 	const SEZIONI = [
 		{ id: 'generale', nome: 'Generale' },
@@ -85,7 +153,14 @@
 	});
 </script>
 
-<svelte:window onkeydown={(e) => e.key === 'Escape' && onchiudi()} />
+<svelte:window
+	onkeydowncapture={registra}
+	onkeydown={(e) => {
+		if (e.key !== 'Escape') return;
+		if (conferma) conferma = null;
+		else onchiudi();
+	}}
+/>
 
 {#snippet interruttore(acceso: boolean, nome: string, cambia: () => void)}
 	<button class="interruttore" class:acceso role="switch" aria-checked={acceso} aria-label={nome} onclick={cambia}
@@ -240,15 +315,51 @@
 					<h4>{g.name}</h4>
 					<ul class="orario">
 						{#each g.items as i (i.label)}
-							<li>
-								<span>{i.label}</span>
-								<span class="tasti">{#each i.keys as k (k)}<kbd>{k}</kbd>{/each}</span>
+							{@const azione = typeof i.action === 'string' ? i.action : null}
+							<li class:registra={azione !== null && registrando === azione}>
+								<span
+									>{i.label}{#if azione && registrando === azione}<small class="nota-registra"
+											>Premi la combinazione nuova… (Esc annulla)</small
+										>{/if}{#if azione && rifiuto?.azione === azione}<small class="rifiuto">{rifiuto.testo}</small>{/if}</span
+								>
+								<span class="tasti"
+									>{#each tastiVoce(i) as k (k)}<kbd>{k}</kbd>{:else}{#if azione}<span class="senza">nessuna</span>{/if}{/each}</span
+								>
+								<span class="cambia">
+									{#if azione}
+										{#if impostazioni.scorciatoie[azione] !== undefined}
+											<button class="link" onclick={() => impostazioni.imposta('scorciatoie', ripristina(impostazioni.scorciatoie, azione))}
+												>Ripristina</button
+											>
+										{/if}
+										<button class="pulsante piccolo" onclick={() => avviaRegistrazione(azione)} aria-label={`Cambia la scorciatoia di «${i.label}»`}
+											>Cambia</button
+										>
+									{/if}
+								</span>
 							</li>
 						{/each}
 					</ul>
 				{:else}
 					<p class="nota">Nessuna scorciatoia per «{shortcutQuery.trim()}».</p>
 				{/each}
+				{#if Object.keys(impostazioni.scorciatoie).length > 0}
+					<button class="pulsante ripristina-tutte" onclick={() => impostazioni.imposta('scorciatoie', {})}>Ripristina tutte</button>
+				{/if}
+				{#if conferma}
+					<div class="conferma" role="alertdialog" aria-modal="true" aria-label="Conferma scorciatoia">
+						<h4>Usare {conferma.combo} per «{conferma.nome}»?</h4>
+						{#each conferma.avvisi as a, k (k)}
+							<p class="avviso">{a}</p>
+						{:else}
+							<p>La combinazione è libera.</p>
+						{/each}
+						<div class="azioni">
+							<button class="pulsante" onclick={() => (conferma = null)}>Annulla</button>
+							<button class="pulsante primario" onclick={confermaScorciatoia}>Usa {conferma.combo}</button>
+						</div>
+					</div>
+				{/if}
 			{:else if sezione === 'rete'}
 				<h3>Rete e amici</h3>
 				<div class="voce">
@@ -492,7 +603,7 @@
 	}
 	.orario li {
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) auto;
+		grid-template-columns: minmax(0, 1fr) auto auto;
 		align-items: center;
 		gap: 12px;
 		min-height: 28px;
@@ -501,6 +612,87 @@
 	}
 	.orario li:nth-child(odd) {
 		background: var(--row-hover);
+	}
+	/* Waiting for keys: the drop-target line, so it reads as «listening». */
+	.orario li.registra {
+		background: color-mix(in srgb, var(--current) 10%, transparent);
+		box-shadow: inset 0 0 0 1px var(--current);
+	}
+	.orario li > span:first-child small {
+		display: block;
+		font-size: calc(11px * var(--scala-testo, 1));
+	}
+	.nota-registra {
+		color: var(--current);
+	}
+	.rifiuto {
+		color: var(--errore-testo);
+	}
+	.senza {
+		color: var(--text-dim);
+		font-size: calc(11px * var(--scala-testo, 1));
+	}
+	.cambia {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+	.pulsante.piccolo {
+		height: 22px;
+		padding: 0 8px;
+		font-size: calc(11.5px * var(--scala-testo, 1));
+	}
+	.link {
+		border: none;
+		background: none;
+		padding: 0;
+		color: var(--text-dim);
+		font: inherit;
+		font-size: calc(11.5px * var(--scala-testo, 1));
+		text-decoration: underline;
+		cursor: default;
+	}
+	.link:hover {
+		color: var(--text);
+	}
+	.ripristina-tutte {
+		justify-self: start;
+		margin-top: 12px;
+	}
+	/* Confirmation of a new shortcut: always asked, warnings in signal amber. */
+	.conferma {
+		position: sticky;
+		bottom: 0;
+		display: grid;
+		gap: 8px;
+		margin-top: 12px;
+		padding: 14px 16px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+	}
+	.conferma h4 {
+		margin: 0;
+	}
+	.conferma p {
+		margin: 0;
+	}
+	.conferma .avviso {
+		padding: 8px 10px;
+		border: 1px solid color-mix(in srgb, var(--signal, #ffb454) 45%, transparent);
+		border-radius: var(--radius-sm);
+		background: color-mix(in srgb, var(--signal, #ffb454) 8%, transparent);
+	}
+	.conferma .azioni {
+		display: flex;
+		justify-content: flex-end;
+		gap: 8px;
+	}
+	.pulsante.primario {
+		border-color: var(--accent);
+		background: var(--accent);
+		color: #fff;
 	}
 	.tasti {
 		display: flex;

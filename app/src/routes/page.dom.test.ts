@@ -2812,6 +2812,43 @@ describe('impostazioni', () => {
 		expect(within(f).queryByText('Nuova scheda')).toBeNull();
 	});
 
+	it('a shortcut is changed only after confirming, with a warning when another action uses it', async () => {
+		await monta();
+		const f = await apriImpostazioni('Scorciatoie');
+		await fireEvent.click(within(f).getByRole('button', { name: 'Cambia la scorciatoia di «Apri o chiudi il doppio pannello»' }));
+		expect(within(f).getByText('Premi la combinazione nuova… (Esc annulla)')).toBeTruthy();
+		await fireEvent.keyDown(window, { key: 'd', code: 'KeyD', ctrlKey: true });
+
+		const c = await within(f).findByRole('alertdialog', { name: 'Conferma scorciatoia' });
+		expect(c.textContent).toContain('«Aggiungi ai preferiti»');
+		// Nothing changed yet, and the key went to the recording, not to the app.
+		expect(document.querySelector('.pannello.passivo')).toBeNull();
+		await fireEvent.click(within(c).getByRole('button', { name: 'Usa Ctrl+D' }));
+		await fireEvent.click(within(f).getByRole('button', { name: 'Chiudi le impostazioni' }));
+
+		tasto('d', { ctrl: true });
+		await waitFor(() => expect(document.querySelector('.pannello.passivo')).not.toBeNull());
+	});
+
+	it('refuses keys Windows keeps, warns when another program holds a combination, Esc cancels', async () => {
+		disco.scorciatoieOccupate.add('ctrl+shift+KeyO');
+		await monta();
+		const f = await apriImpostazioni('Scorciatoie');
+		const cambia = () => within(f).getByRole('button', { name: 'Cambia la scorciatoia di «Copia»' });
+
+		await fireEvent.click(cambia());
+		await fireEvent.keyDown(window, { key: 'Tab', code: 'Tab', altKey: true });
+		expect(await within(f).findByText(/riservata da Windows/)).toBeTruthy();
+
+		await fireEvent.click(cambia());
+		await fireEvent.keyDown(window, { key: 'O', code: 'KeyO', ctrlKey: true, shiftKey: true });
+		const c = await within(f).findByRole('alertdialog', { name: 'Conferma scorciatoia' });
+		expect(c.textContent).toContain('Un altro programma tiene già Ctrl+Maiusc+O');
+		await fireEvent.click(within(c).getByRole('button', { name: 'Annulla' }));
+		expect(within(f).queryByRole('alertdialog')).toBeNull();
+		expect(within(f).getAllByText('Ctrl+C').length).toBeGreaterThan(0);
+	});
+
 	it('senza conferma Canc cestina subito', async () => {
 		await monta();
 		const f = await apriImpostazioni('File e cartelle');

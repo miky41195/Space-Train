@@ -5,6 +5,7 @@ import { limita, type Vista } from '../vista';
 import type { Archivio } from './preferiti.svelte';
 import { alCambioDi } from './sincronizza';
 import { RADICE_SISTEMA } from '../sistema';
+import type { Personalizzate } from '../scorciatoie-personali';
 
 const CHIAVE = 'space-train.impostazioni';
 
@@ -59,6 +60,8 @@ interface Valori {
 	confermaCestino: boolean;
 	/** Aprire con un clic invece che con il doppio clic, come l'opzione di Esplora. */
 	unClic: boolean;
+	/** Custom shortcuts: action → key combinations, in place of its defaults. */
+	scorciatoie: Personalizzate;
 }
 
 /** `mai`: come Esplora; `aperta`: in sottofondo per la cartella aperta; `richiesta`: solo quando la si chiede. */
@@ -87,7 +90,8 @@ const PREDEFINITE: Valori = {
 	cartelleAvvio: [],
 	dimensioneCartelle: 'mai',
 	confermaCestino: true,
-	unClic: false
+	unClic: false,
+	scorciatoie: {}
 };
 
 /** Le viste delle versioni precedenti, tradotte nelle attuali. */
@@ -123,6 +127,7 @@ export class ImpostazioniStore {
 	paginaIniziale = $state(PREDEFINITE.paginaIniziale);
 	sessione = $state(PREDEFINITE.sessione);
 	cartelleAvvio = $state<string[]>([]);
+	scorciatoie = $state<Personalizzate>({});
 	dimensioneCartelle = $state<DimensioneCartelle>(PREDEFINITE.dimensioneCartelle);
 	confermaCestino = $state(PREDEFINITE.confermaCestino);
 	unClic = $state(PREDEFINITE.unClic);
@@ -165,6 +170,11 @@ export class ImpostazioniStore {
 			if (DIMENSIONI_CARTELLE.includes(v.dimensioneCartelle as DimensioneCartelle)) this.dimensioneCartelle = v.dimensioneCartelle!;
 			if (typeof v.confermaCestino === 'boolean') this.confermaCestino = v.confermaCestino;
 			if (typeof v.unClic === 'boolean') this.unClic = v.unClic;
+			if (v.scorciatoie && typeof v.scorciatoie === 'object') {
+				this.scorciatoie = Object.fromEntries(
+					Object.entries(v.scorciatoie).filter(([, t]) => Array.isArray(t) && t.every((k) => typeof k === 'string'))
+				);
+			}
 		} catch {
 			// Preferenze illeggibili: si parte da quelle predefinite.
 		}
@@ -233,7 +243,8 @@ export class ImpostazioniStore {
 			cartelleAvvio: this.cartelleAvvio,
 			dimensioneCartelle: this.dimensioneCartelle,
 			confermaCestino: this.confermaCestino,
-			unClic: this.unClic
+			unClic: this.unClic,
+			scorciatoie: this.scorciatoie
 		};
 		try {
 			this.archivio?.setItem(CHIAVE, JSON.stringify(v));
