@@ -297,6 +297,47 @@ pub async fn extract(
     .await
 }
 
+/// Every item inside an archive (any format Space Train reads).
+#[tauri::command]
+pub async fn archive_list(archive: String) -> Result<Vec<crate::fs::archive_formats::ArchiveItem>, FsError> {
+    tauri::async_runtime::spawn_blocking(move || crate::fs::archive_formats::list(&archive))
+        .await
+        .map_err(|e| FsError::Io { message: e.to_string() })?
+}
+
+/// Extracts chosen items of an archive into `dest`, with progress. Folders bring their contents.
+#[tauri::command]
+pub async fn archive_extract(
+    state: tauri::State<'_, Operazioni>,
+    op_id: u64,
+    archive: String,
+    items: Vec<String>,
+    dest: String,
+    on_progress: Channel<Progresso>,
+) -> Result<(), FsError> {
+    let for_size = (archive.clone(), items.clone());
+    con_avanzamento(
+        &state,
+        op_id,
+        move || {
+            let (a, chosen) = for_size;
+            crate::fs::archive_formats::list(&a)
+                .map(|v| {
+                    v.iter()
+                        .filter(|i| chosen.iter().any(|c| i.path == *c || i.path.starts_with(&format!("{c}/"))))
+                        .map(|i| i.size)
+                        .sum()
+                })
+                .unwrap_or(0)
+        },
+        on_progress,
+        move |cancel, progress| {
+            crate::fs::archive_formats::extract(&archive, std::path::Path::new(&dest), Some(&items), cancel, progress)
+        },
+    )
+    .await
+}
+
 /// What a deletion with progress removes.
 #[derive(serde::Deserialize, Clone, Copy)]
 #[serde(rename_all = "camelCase")]

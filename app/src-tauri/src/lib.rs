@@ -177,6 +177,8 @@ pub fn run() {
             transfer::compare_folders,
             transfer::file_checksum,
             transfer::pause_transfer,
+            transfer::archive_list,
+            transfer::archive_extract,
             ipc::entries_for,
             ipc::shortcut_free,
             transfer::compress,
