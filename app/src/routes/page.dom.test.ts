@@ -3062,6 +3062,76 @@ describe('archive as a folder', () => {
 	});
 });
 
+describe('transfer queue', () => {
+	it('queues copies behind the running one: count, list, move up, remove, pause', async () => {
+		let sblocca = () => {};
+		disco.bloccaTrasferimento = new Promise((r) => (sblocca = r));
+		await monta();
+		await entraIn('Dati');
+		await waitFor(() => expect(nomi()).toEqual(['interno.txt']));
+
+		// First paste runs (blocked), the next two wait.
+		disco.appunti = { paths: ['C:\\alfa.txt'], taglia: false };
+		tasto('v', { ctrl: true });
+		await screen.findByText(/in corso/);
+		disco.appunti = { paths: ['C:\\beta.txt'], taglia: false };
+		tasto('v', { ctrl: true });
+		disco.appunti = { paths: ['C:\\gamma.txt'], taglia: false };
+		tasto('v', { ctrl: true });
+		await fireEvent.click(await screen.findByRole('button', { name: '+2 in coda' }));
+
+		const coda = screen.getByRole('list', { name: 'Coda dei trasferimenti' });
+		const titoli = () => [...coda.querySelectorAll('li:not(.corrente) .titolo')].map((t) => t.firstChild?.textContent);
+		expect(titoli()).toEqual(['Copia «beta.txt» → Dati', 'Copia «gamma.txt» → Dati']);
+
+		await fireEvent.click(within(coda).getByRole('button', { name: 'Anticipa «Copia «gamma.txt» → Dati»' }));
+		expect(titoli()).toEqual(['Copia «gamma.txt» → Dati', 'Copia «beta.txt» → Dati']);
+		await fireEvent.click(within(coda).getByRole('button', { name: 'Togli dalla coda «Copia «beta.txt» → Dati»' }));
+		expect(titoli()).toEqual(['Copia «gamma.txt» → Dati']);
+
+		await fireEvent.click(within(coda).getByRole('button', { name: 'Pausa' }));
+		await waitFor(() => expect([...disco.pause.values()]).toEqual([true]));
+		expect(within(coda).getByRole('button', { name: 'Riprendi' })).toBeTruthy();
+
+		sblocca();
+		await waitFor(() => expect(nomi()).toEqual(['alfa.txt', 'gamma.txt', 'interno.txt']));
+		expect(disco.esiste('C:\\Dati\\beta.txt')).toBe(false);
+	});
+});
+
+describe('image tools', () => {
+	it('rotates from the menu and Ctrl+Z turns it back', async () => {
+		aggiungi('C:\\foto.jpg');
+		await monta();
+		await voceMenu(riga('foto.jpg'), 'Ruota a destra');
+		await waitFor(() => expect(disco.ruotate).toEqual([{ path: 'C:\\foto.jpg', clockwise: true }]));
+
+		tasto('z', { ctrl: true });
+		await waitFor(() => expect(disco.ruotate[1]).toEqual({ path: 'C:\\foto.jpg', clockwise: false }));
+	});
+
+	it('converts into a new file beside the original and selects it', async () => {
+		aggiungi('C:\\foto.jpg');
+		await monta();
+		await voceMenu(riga('foto.jpg'), 'Converti e ridimensiona…');
+		const dialog = await screen.findByRole('dialog', { name: 'Converti immagini' });
+		await fireEvent.click(within(dialog).getByRole('radio', { name: 'PNG' }));
+		await fireEvent.click(within(dialog).getByRole('radio', { name: 'Originale' }));
+		expect(within(dialog).getByText('foto.png')).toBeTruthy();
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Converti' }));
+
+		await waitFor(() => expect(selezionati()).toEqual(['foto.png']));
+		expect(disco.esiste('C:\\foto.jpg')).toBe(true);
+	});
+
+	it('offers no image tools on other files', async () => {
+		await monta();
+		await fireEvent.contextMenu(riga('alfa.txt'));
+		await screen.findAllByRole('menuitem');
+		expect(screen.queryByRole('menuitem', { name: 'Ruota a destra' })).toBeNull();
+	});
+});
+
 describe('checksum', () => {
 	it('computes SHA-256 at once, switches algorithm and compares a pasted value', async () => {
 		aggiungi('C:\\setup.exe', 'X');

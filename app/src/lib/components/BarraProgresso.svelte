@@ -37,11 +37,12 @@
 		ricezione: 'Ricezione dalla rete locale',
 		cestino: 'Spostamento nel Cestino',
 		elimina: 'Eliminazione',
-		duplicati: 'Confronto dei file'
+		duplicati: 'Confronto dei file',
+		immagini: 'Conversione delle immagini'
 	} as const;
 
 	/** Deletions count items: bytes would say nothing about how long is left. */
-	let aElementi = $derived(modo === 'cestino' || modo === 'elimina');
+	let aElementi = $derived(modo === 'cestino' || modo === 'elimina' || modo === 'immagini');
 
 	function elementi(n: number): string {
 		return n === 1 ? '1 elemento' : `${n} elementi`;

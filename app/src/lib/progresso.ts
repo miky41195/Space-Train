@@ -8,4 +8,5 @@ export type ModoBarra =
 	| 'ricezione'
 	| 'cestino'
 	| 'elimina'
-	| 'duplicati';
+	| 'duplicati'
+	| 'immagini';

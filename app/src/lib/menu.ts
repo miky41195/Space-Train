@@ -30,6 +30,9 @@ export type AzioneMenu =
 	| 'confronta'
 	| 'spazio'
 	| 'checksum'
+	| 'ruotaDestra'
+	| 'ruotaSinistra'
+	| 'convertiImmagini'
 	| 'estraiQui'
 	| 'estraiIn'
 	| 'paginaIniziale'
@@ -222,6 +225,12 @@ function vociSfondo({
 	return voci;
 }
 
+/** Formats the Rust image tools can read and write back. */
+const IMMAGINI_MODIFICABILI = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'];
+export function eImmagineModificabile(nome: string): boolean {
+	return IMMAGINI_MODIFICABILI.includes(nome.split('.').pop()?.toLowerCase() ?? '');
+}
+
 function vociElementi({
 	selezione,
 	appuntiPieni,
@@ -304,6 +313,12 @@ function vociElementi({
 
 	if (unica) {
 		voci.push({ azione: 'mostraInEsplora', etichetta: 'Mostra in Esplora risorse' });
+	}
+
+	if (selezione.every((e) => e.kind === 'file' && eImmagineModificabile(e.name))) {
+		voci.push({ azione: 'ruotaDestra', etichetta: 'Ruota a destra', stacca: true });
+		voci.push({ azione: 'ruotaSinistra', etichetta: 'Ruota a sinistra' });
+		voci.push({ azione: 'convertiImmagini', etichetta: 'Converti e ridimensiona…' });
 	}
 
 	if (!ricerca) {

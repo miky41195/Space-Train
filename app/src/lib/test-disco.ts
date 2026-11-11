@@ -37,6 +37,8 @@ export class DiscoFinto {
 	aperti: string[] = [];
 	/** While set, `delete_items` waits for it: lets a test see the bar. */
 	bloccaEliminazione: Promise<void> | null = null;
+	/** While set, `transfer` waits for it: lets a test fill the queue. */
+	bloccaTrasferimento: Promise<void> | null = null;
 	/** Byte liberi su C:, che un test può cambiare come farebbe un altro programma. */
 	liberoC = 40;
 	/** Gli appunti di Windows. */
@@ -208,6 +210,7 @@ export class DiscoFinto {
 					.map(nome)
 					.filter((n) => this.esiste(unisci(args.dest as string, n)));
 			case 'transfer':
+				if (this.bloccaTrasferimento) await this.bloccaTrasferimento;
 				return this.#trasferisci(
 					args.sources as string[],
 					args.dest as string,

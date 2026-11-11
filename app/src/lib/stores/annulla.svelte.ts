@@ -14,7 +14,9 @@ export type Operazione =
 	| { tipo: 'sposta'; coppie: Array<[string, string]> }
 	/** Elementi nati dall'operazione: copie, cartelle nuove, archivi. */
 	| { tipo: 'crea'; paths: string[]; descrizione: string }
-	| { tipo: 'cestino'; originali: string[] };
+	| { tipo: 'cestino'; originali: string[] }
+	/** Images turned a quarter: undone by turning them back. */
+	| { tipo: 'ruota'; paths: string[]; orario: boolean };
 
 const MASSIMO = 50;
 
@@ -34,6 +36,7 @@ export class AnnullaStore {
 		if (op.tipo === 'crea' && op.paths.length === 0) return;
 		if (op.tipo === 'cestino' && op.originali.length === 0) return;
 		if (op.tipo === 'batchRename' && op.steps.length === 0) return;
+		if (op.tipo === 'ruota' && op.paths.length === 0) return;
 
 		this.pila = [...this.pila, op].slice(-MASSIMO);
 	}
@@ -70,6 +73,9 @@ export class AnnullaStore {
 				break;
 			case 'cestino':
 				await this.backend.trashRestoreOriginals(op.originali);
+				break;
+			case 'ruota':
+				await this.backend.imageRotate(op.paths, !op.orario);
 				break;
 			case 'sposta':
 				for (const [sorgente, arrivo] of [...op.coppie].reverse()) {
@@ -111,5 +117,7 @@ export function descrivi(op: Operazione): string {
 			return op.descrizione;
 		case 'cestino':
 			return `eliminazione di ${quanti(op.originali.length)}`;
+		case 'ruota':
+			return `rotazione di ${op.paths.length === 1 ? `«${nomeDi(op.paths[0])}»` : quanti(op.paths.length)}`;
 	}
 }

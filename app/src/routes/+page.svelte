@@ -35,6 +35,7 @@
 	import SearchBar from '$lib/components/SearchBar.svelte';
 	import ConfermaCestino from '$lib/components/ConfermaCestino.svelte';
 	import SommaControllo from '$lib/components/SommaControllo.svelte';
+	import ConvertiImmagini from '$lib/components/ConvertiImmagini.svelte';
 	import Palette from '$lib/components/Palette.svelte';
 	import CodaLavori from '$lib/components/CodaLavori.svelte';
 	import type { Comando } from '$lib/palette';
@@ -57,7 +58,7 @@
 	import { AccessoRapidoStore } from '$lib/stores/accessoRapido.svelte';
 	import { ImpostazioniStore, type Colonne } from '$lib/stores/impostazioni.svelte';
 	import { AnnullaStore } from '$lib/stores/annulla.svelte';
-	import type { ModoElimina, Politica, Progresso, SortKey } from '$lib/ipc';
+	import type { ImageTarget, ModoElimina, Politica, Progresso, SortKey } from '$lib/ipc';
 	import MenuContestuale from '$lib/components/MenuContestuale.svelte';
 	import GalleriaTemi from '$lib/components/GalleriaTemi.svelte';
 	import FinestraImpostazioni from '$lib/components/FinestraImpostazioni.svelte';
@@ -256,6 +257,8 @@
 	let inRicerca = $derived(store.activeTab?.risultati != null);
 	/** The file whose checksum dialog is open. */
 	let sommaDi = $state<Entry | null>(null);
+	/** Images waiting in the «Converti e ridimensiona» dialog. */
+	let daConvertire = $state<Entry[] | null>(null);
 
 	// ── Command palette ──────────────────────────────────────────────
 	let paletteAperta = $state(false);
@@ -1426,6 +1429,51 @@
 		return accoda(titolo, () => archivioOra(tipo, tab.path, scelte));
 	}
 
+	async function ruotaImmagini(orario: boolean) {
+		const paths = selezionate().map((e) => e.path);
+		if (paths.length === 0) return;
+		erroreOp = null;
+		try {
+			await tauriBackend.imageRotate(paths, orario);
+			annulla.registra({ tipo: 'ruota', paths, orario });
+		} catch (e) {
+			erroreOp = descriviErrore(e);
+		}
+		await ricarica();
+	}
+
+	function convertiImmagini(voci: Entry[], o: { target: ImageTarget; maxSide: number | null; quality: number }) {
+		daConvertire = null;
+		const cartella = store.activeTab?.path;
+		if (!cartella) return;
+		return accoda(`Converti ${quanti(voci.map((e) => e.path))}`, async () => {
+			const opId = prossimoOpId++;
+			modoInCorso = 'immagini';
+			opInCorso = opId;
+			progresso = { transferred: 0, total: voci.length };
+			erroreOp = null;
+			try {
+				const creati = await tauriBackend.imageConvert({
+					opId,
+					paths: voci.map((e) => e.path),
+					...o,
+					onProgress: (p) => (progresso = p)
+				});
+				annulla.registra({ tipo: 'crea', paths: creati, descrizione: `conversione di ${quanti(creati)}` });
+				if (store.activeId !== null && store.activeTab?.path === cartella) {
+					await store.reload(store.activeId);
+					store.selezionaPercorsi(store.activeId, creati);
+				}
+				aggiornamentoDischi++;
+			} catch (e) {
+				erroreOp = descriviErrore(e);
+			} finally {
+				opInCorso = null;
+				progresso = null;
+			}
+		});
+	}
+
 	async function archivioOra(tipo: 'comprimi' | 'estrai', cartella: string, scelte: Entry[]) {
 		const opId = prossimoOpId++;
 		modoInCorso = tipo;
@@ -2527,6 +2575,13 @@
 				case 'comprimi':
 					await archivio('comprimi');
 					break;
+				case 'ruotaDestra':
+				case 'ruotaSinistra':
+					await ruotaImmagini(azione === 'ruotaDestra');
+					break;
+				case 'convertiImmagini':
+					daConvertire = scelte;
+					break;
 				case 'estrai':
 					await archivio('estrai');
 					break;
@@ -3064,6 +3119,10 @@
 	{/if}
 	{#if paletteAperta}
 		<Palette comandi={comandiPalette()} onclose={() => (paletteAperta = false)} />
+	{/if}
+	{#if daConvertire}
+		{@const voci = daConvertire}
+		<ConvertiImmagini {voci} onconverti={(o) => void convertiImmagini(voci, o)} onclose={() => (daConvertire = null)} />
 	{/if}
 	{#if sommaDi}
 		<SommaControllo voce={sommaDi} backend={tauriBackend} onclose={() => (sommaDi = null)} />
