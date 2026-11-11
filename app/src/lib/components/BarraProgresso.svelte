@@ -5,11 +5,21 @@
 	let {
 		progresso,
 		modo,
-		oncancel
+		oncancel,
+		inPausa = false,
+		onpausa = undefined,
+		inCoda = 0,
+		oncoda = undefined
 	}: {
 		progresso: Progresso;
 		modo: ModoBarra;
 		oncancel: () => void;
+		inPausa?: boolean;
+		/** Present when the job can pause between one file and the next. */
+		onpausa?: () => void;
+		/** Jobs waiting after this one. */
+		inCoda?: number;
+		oncoda?: () => void;
 	} = $props();
 
 	let percentuale = $derived(
@@ -46,7 +56,7 @@
 </script>
 
 <div class="barra">
-	<span class="etichetta">{ETICHETTE[modo]} in corso…</span>
+	<span class="etichetta">{ETICHETTE[modo]} {inPausa ? 'in pausa' : 'in corso…'}</span>
 
 	<div
 		class="traccia"
@@ -68,6 +78,12 @@
 		{/if}
 	</span>
 
+	{#if oncoda && inCoda > 0}
+		<button class="coda" onclick={oncoda}>+{inCoda} in coda</button>
+	{/if}
+	{#if onpausa}
+		<button onclick={onpausa}>{inPausa ? 'Riprendi' : 'Pausa'}</button>
+	{/if}
 	<button onclick={oncancel}>Annulla</button>
 </div>
 

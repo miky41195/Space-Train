@@ -36,6 +36,7 @@
 	import ConfermaCestino from '$lib/components/ConfermaCestino.svelte';
 	import SommaControllo from '$lib/components/SommaControllo.svelte';
 	import Palette from '$lib/components/Palette.svelte';
+	import CodaLavori from '$lib/components/CodaLavori.svelte';
 	import type { Comando } from '$lib/palette';
 	import { SHORTCUT_GROUPS, type AzioneTasto } from '$lib/scorciatoie';
 	import { TEMI } from '$lib/temi';
@@ -676,18 +677,22 @@
 	}
 
 	/** Extracts the selection (or everything) from the open archive into `dest`. */
-	async function estraiDaArchivio(dest: string) {
+	function estraiDaArchivio(dest: string) {
 		const arc = store.activeTab?.archivio;
-		if (!arc || opInCorso !== null) return;
+		if (!arc) return;
 		const scelte = selezionate();
 		const items = scelte.length > 0 ? scelte.map((e) => internoDi(e.path)) : (store.activeTab?.risultati ?? []).map((e) => internoDi(e.path));
+		return accoda(`Estrai da «${nomeDi(arc.file)}» → ${nomePosizione(dest)}`, () => estraiDaArchivioOra(arc.file, items, dest));
+	}
+
+	async function estraiDaArchivioOra(file: string, items: string[], dest: string) {
 		const opId = prossimoOpId++;
 		modoInCorso = 'estrai';
 		opInCorso = opId;
 		progresso = { transferred: 0, total: 0 };
 		erroreOp = null;
 		try {
-			await tauriBackend.archiveExtract({ opId, archive: arc.file, items, dest, onProgress: (p) => (progresso = p) });
+			await tauriBackend.archiveExtract({ opId, archive: file, items, dest, onProgress: (p) => (progresso = p) });
 			avvisa(`Estratto in ${dest}.`);
 			void store.aggiornaCartella(dest);
 			aggiornamentoDischi++;
@@ -972,6 +977,78 @@
 	let progresso = $state<Progresso | null>(null);
 	let modoInCorso = $state<ModoBarra>('copy');
 	let opInCorso = $state<number | null>(null);
+
+	// ── Transfer queue ───────────────────────────────────────────────
+	// Copies, moves, archives and LAN transfers run one at a time: a new one
+	// waits its turn instead of fighting the running one for the bar.
+	interface Lavoro {
+		id: number;
+		titolo: string;
+		avvia: () => Promise<unknown>;
+		finito: (v: unknown) => void;
+	}
+	let coda = $state<Lavoro[]>([]);
+	let lavoroCorrente = $state<{ id: number; titolo: string } | null>(null);
+	let codaAperta = $state(false);
+	let inPausa = $state(false);
+	let prossimoLavoro = 1;
+	let svuotando = false;
+
+	/** Puts a job in the queue; resolves with its result when it has run. */
+	function accoda<T>(titolo: string, avvia: () => Promise<T>): Promise<T | undefined> {
+		return new Promise((finito) => {
+			coda = [...coda, { id: prossimoLavoro++, titolo, avvia, finito: finito as (v: unknown) => void }];
+			void svuotaCoda();
+		});
+	}
+
+	async function svuotaCoda() {
+		if (svuotando) return;
+		svuotando = true;
+		try {
+			while (coda.length > 0) {
+				const [lavoro, ...resto] = coda;
+				coda = resto;
+				lavoroCorrente = { id: lavoro.id, titolo: lavoro.titolo };
+				inPausa = false;
+				let esito: unknown;
+				try {
+					esito = await lavoro.avvia();
+				} catch (e) {
+					erroreOp = descriviErrore(e);
+				}
+				lavoro.finito(esito);
+			}
+		} finally {
+			lavoroCorrente = null;
+			codaAperta = false;
+			svuotando = false;
+		}
+	}
+
+	function togliDallaCoda(id: number) {
+		const l = coda.find((x) => x.id === id);
+		coda = coda.filter((x) => x.id !== id);
+		l?.finito(undefined);
+	}
+
+	function suNellaCoda(id: number) {
+		const i = coda.findIndex((x) => x.id === id);
+		if (i <= 0) return;
+		const c = [...coda];
+		[c[i - 1], c[i]] = [c[i], c[i - 1]];
+		coda = c;
+	}
+
+	async function alternaPausa() {
+		if (opInCorso === null) return;
+		const nuova = !inPausa;
+		if (await tauriBackend.pauseTransfer(opInCorso, nuova).catch(() => false)) inPausa = nuova;
+	}
+
+	function quanti(paths: readonly string[]): string {
+		return paths.length === 1 ? `«${nomeDi(paths[0])}»` : `${paths.length} elementi`;
+	}
 	/** Trasferimento in attesa che l'utente risolva i conflitti di nome. */
 	let inSospeso = $state<{ sources: string[]; dest: string; mode: 'copy' | 'move' } | null>(null);
 	let conflitti = $state<string[]>([]);
@@ -1048,7 +1125,7 @@
 	}
 
 	async function incolla() {
-		if (!store.activeTab || opInCorso !== null || !modificabile) return;
+		if (!store.activeTab || !modificabile) return;
 		erroreOp = null;
 		const contenuto = await daIncollare();
 		if (!contenuto) return;
@@ -1079,13 +1156,19 @@
 		}
 	}
 
-	async function esegui(
+	function esegui(
 		policy: Politica,
 		op: { sources: string[]; dest: string; mode: 'copy' | 'move' } | null = inSospeso
 	) {
 		conflitti = [];
 		inSospeso = null;
-		if (!op || store.activeId === null) return;
+		if (!op) return Promise.resolve(undefined);
+		const titolo = `${op.mode === 'move' ? 'Sposta' : 'Copia'} ${quanti(op.sources)} → ${nomePosizione(op.dest)}`;
+		return accoda(titolo, () => eseguiOra(policy, op));
+	}
+
+	async function eseguiOra(policy: Politica, op: { sources: string[]; dest: string; mode: 'copy' | 'move' }) {
+		if (store.activeId === null) return;
 
 		const { sources, dest, mode } = op;
 		const opId = prossimoOpId++;
@@ -1141,8 +1224,11 @@
 	}
 
 	/** Copia dalla cartella condivisa di un altro PC, con la barra d'avanzamento. */
-	async function scaricaDaRete(sources: string[], dest: string) {
-		if (opInCorso !== null) return;
+	function scaricaDaRete(sources: string[], dest: string) {
+		return accoda(`Scarica ${quanti(sources)} → ${nomePosizione(dest)}`, () => scaricaDaReteOra(sources, dest));
+	}
+
+	async function scaricaDaReteOra(sources: string[], dest: string) {
 		const opId = prossimoOpId++;
 		modoInCorso = 'ricezione';
 		opInCorso = opId;
@@ -1171,10 +1257,14 @@
 	}
 
 	/** Invia la selezione a un altro PC: parte solo quando l'altro accetta. */
-	async function inviaA(peer: string) {
+	function inviaA(peer: string) {
 		const scelte = selezionate();
-		if (scelte.length === 0 || opInCorso !== null) return;
+		if (scelte.length === 0) return;
 		const nome = destinatari.find((p) => p.id === peer)?.nome ?? peer;
+		return accoda(`Invia ${quanti(scelte.map((e) => e.path))} a ${nome}`, () => inviaAOra(peer, nome, scelte));
+	}
+
+	async function inviaAOra(peer: string, nome: string, scelte: Entry[]) {
 		const opId = prossimoOpId++;
 		modoInCorso = 'invio';
 		opInCorso = opId;
@@ -1328,10 +1418,15 @@
 	}
 
 	/** Comprime o estrae con la stessa barra d'avanzamento dei trasferimenti. */
-	async function archivio(tipo: 'comprimi' | 'estrai') {
+	function archivio(tipo: 'comprimi' | 'estrai') {
 		const tab = store.activeTab;
 		const scelte = selezionate();
-		if (!tab || scelte.length === 0 || opInCorso !== null) return;
+		if (!tab || scelte.length === 0) return;
+		const titolo = tipo === 'comprimi' ? `Comprimi ${quanti(scelte.map((e) => e.path))}` : `Estrai «${scelte[0].name}»`;
+		return accoda(titolo, () => archivioOra(tipo, tab.path, scelte));
+	}
+
+	async function archivioOra(tipo: 'comprimi' | 'estrai', cartella: string, scelte: Entry[]) {
 		const opId = prossimoOpId++;
 		modoInCorso = tipo;
 		opInCorso = opId;
@@ -1343,7 +1438,7 @@
 					? await tauriBackend.compress({
 							opId,
 							sources: scelte.map((e) => e.path),
-							dest: tab.path,
+							dest: cartella,
 							onProgress: (p) => (progresso = p)
 						})
 					: await tauriBackend.extract({
@@ -2752,7 +2847,26 @@
 				</div>
 			{/if}
 			{#if progresso}
-				<BarraProgresso {progresso} modo={modoInCorso} oncancel={annullaTrasferimento} />
+				<BarraProgresso
+					{progresso}
+					modo={modoInCorso}
+					oncancel={annullaTrasferimento}
+					{inPausa}
+					onpausa={lavoroCorrente ? alternaPausa : undefined}
+					inCoda={coda.length}
+					oncoda={() => (codaAperta = !codaAperta)}
+				/>
+				{#if codaAperta && lavoroCorrente}
+					<CodaLavori
+						corrente={lavoroCorrente}
+						{coda}
+						{inPausa}
+						onpausa={alternaPausa}
+						onannullaCorrente={annullaTrasferimento}
+						onsu={suNellaCoda}
+						ontogli={togliDallaCoda}
+					/>
+				{/if}
 			{/if}
 
 			{#if erroreOp}
