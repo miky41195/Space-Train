@@ -125,6 +125,8 @@ export interface ContestoMenu {
 	annullabile?: string | null;
 	/** Colore comune delle cartelle selezionate, se ne hanno uno. */
 	coloreAttuale?: IdColore | null;
+	/** Name the user gave each colour label. */
+	labelName?: (id: IdColore) => string;
 	/** Altri PC con Space Train in rete locale, a cui si può inviare. */
 	pari?: ReadonlyArray<{ id: string; nome: string }>;
 	/** La cartella aperta è quella che questo PC condivide in rete locale. */
@@ -237,6 +239,7 @@ function vociElementi({
 	giaPreferiti = false,
 	ricerca = false,
 	coloreAttuale = null,
+	labelName,
 	pari = [],
 	condivisa = null,
 	fissata = false,
@@ -303,7 +306,7 @@ function vociElementi({
 	}
 
 	// Folders change colour, files get a coloured label: same palette for both.
-	voci.push(tavolozzaCartelle(coloreAttuale));
+	voci.push(tavolozzaCartelle(coloreAttuale, labelName));
 
 	voci.push({
 		azione: 'copiaPercorso',
@@ -428,7 +431,10 @@ function vociVirtuali({ selezione, iniziale = false }: ContestoMenu, posizione: 
 }
 
 /** La tavolozza «Colore cartella», con il colore attuale segnato. */
-export function tavolozzaCartelle(attuale: IdColore | null): VoceMenu {
+export function tavolozzaCartelle(
+	attuale: IdColore | null,
+	labelName: (id: IdColore) => string = (id) => COLORI_CARTELLA.find((c) => c.id === id)?.nome ?? id
+): VoceMenu {
 	return {
 		azione: 'coloreCartella',
 		etichetta: 'Colore',
@@ -437,7 +443,7 @@ export function tavolozzaCartelle(attuale: IdColore | null): VoceMenu {
 			{ azione: 'coloreNessuno', nome: 'Nessun colore', colore: null, attivo: attuale === null },
 			...COLORI_CARTELLA.map((c) => ({
 				azione: `colore:${c.id}` as AzioneMenu,
-				nome: c.nome,
+				nome: labelName(c.id),
 				colore: c.esadecimale,
 				attivo: attuale === c.id
 			}))

@@ -3076,6 +3076,21 @@ describe('colour labels', () => {
 		tasto('Escape');
 		await waitFor(() => expect(nomi()).toContain('alfa.txt'));
 	});
+	it('right-click on a label stop renames it, and the menu shows the new name', async () => {
+		await monta();
+		await fireEvent.contextMenu(riga('beta.txt'));
+		await fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitemradio', { name: 'Rosso' }));
+		const stop = await screen.findByRole('button', { name: /Rosso/ });
+		await fireEvent.contextMenu(stop);
+		const campo = await screen.findByLabelText("Nome dell'etichetta Rosso");
+		await fireEvent.input(campo, { target: { value: 'Lavoro' } });
+		await fireEvent.keyDown(campo, { key: 'Enter' });
+		await fireEvent.blur(campo);
+		await screen.findByRole('button', { name: /Lavoro/ });
+
+		await fireEvent.contextMenu(riga('alfa.txt'));
+		expect(within(await screen.findByRole('menu')).getByRole('menuitemradio', { name: 'Lavoro' })).toBeTruthy();
+	});
 });
 
 describe('command palette', () => {

@@ -24,6 +24,7 @@
 		etichette = [],
 		etichettaAperta = null,
 		onetichetta = undefined,
+		onrenamelabel = undefined,
 		ricerche = [],
 		onricerca = undefined,
 		ontogliricerca = undefined
@@ -56,6 +57,8 @@
 		/** Name of the label whose items the active tab shows. */
 		etichettaAperta?: string | null;
 		onetichetta?: (id: IdColore) => void;
+		/** Blank name restores the colour's own name. */
+		onrenamelabel?: (id: IdColore, name: string) => void;
 		/** Smart folders: ready-made ones (no folder) first, then the saved ones. */
 		ricerche?: RicercaSalvata[];
 		onricerca?: (r: RicercaSalvata) => void;
@@ -78,6 +81,8 @@
 
 	/** Il campo per aggiungere un PC per indirizzo, aperto o chiuso. */
 	let aggiungendo = $state(false);
+	/** Colour label whose name is being edited in place. */
+	let renamingLabel = $state<IdColore | null>(null);
 	let nuovoIndirizzo = $state('');
 
 	function aggiungiIndirizzo() {
@@ -292,11 +297,48 @@
 		<div class="gruppo">
 			<div class="titolo">Etichette</div>
 			{#each etichette as e (e.id)}
-				<button class="voce" class:corrente={etichettaAperta === e.nome} onclick={() => onetichetta?.(e.id)}>
-					<span class="pallino" style:background={e.esadecimale}></span>
-					{e.nome}
-					<span class="quante">{e.quante}</span>
-				</button>
+				{#if renamingLabel === e.id}
+					<label class="voce rinomina-etichetta">
+						<span class="pallino" style:background={e.esadecimale}></span>
+						<input
+							value={e.nome}
+							maxlength="40"
+							aria-label={`Nome dell'etichetta ${e.nome}`}
+							{@attach (el: HTMLInputElement) => {
+								el.focus();
+								el.select();
+							}}
+							onkeydown={(ev) => {
+								if (ev.key === 'Enter') ev.currentTarget.blur();
+								else if (ev.key === 'Escape') {
+									ev.currentTarget.value = e.nome;
+									ev.currentTarget.blur();
+								}
+							}}
+							onblur={(ev) => {
+								const name = ev.currentTarget.value;
+								renamingLabel = null;
+								if (name !== e.nome) onrenamelabel?.(e.id, name);
+							}}
+						/>
+					</label>
+				{:else}
+					<button
+						class="voce"
+						class:corrente={etichettaAperta === e.nome}
+						title={onrenamelabel ? 'Clic destro per rinominare' : undefined}
+						onclick={() => onetichetta?.(e.id)}
+						oncontextmenu={(ev) => {
+							if (!onrenamelabel) return;
+							ev.preventDefault();
+							renamingLabel = e.id;
+						}}
+					>
+						<span class="pallino" style:background={e.esadecimale}></span>
+						{e.nome}
+						<span class="quante">{e.quante}</span>
+					</button>
+				{/if}
 			{/each}
 		</div>
 	{/if}
@@ -391,7 +433,12 @@
 	.voce.aggiungi-pc:hover {
 		color: var(--text);
 	}
-	.nuovo-indirizzo input {
+	.rinomina-etichetta {
+		display: flex;
+		align-items: center;
+	}
+	.nuovo-indirizzo input,
+	.rinomina-etichetta input {
 		width: 100%;
 		box-sizing: border-box;
 		height: 26px;

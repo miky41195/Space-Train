@@ -716,7 +716,7 @@
 		const c = COLORI_CARTELLA.find((x) => x.id === id);
 		if (!c || store.activeId === null) return;
 		const voci = await tauriBackend.entriesFor(colori.percorsiDi(id)).catch(() => []);
-		await store.mostraVoci(store.activeId, voci, c.nome);
+		await store.mostraVoci(store.activeId, voci, colori.nameOf(id));
 	}
 
 	/** Folder comparison: starts it against the other pane, or a folder the user picks. */
@@ -2299,6 +2299,7 @@
 				ricerca: inRicerca,
 				annullabile: annulla.prossima(),
 				coloreAttuale: coloreComune(scelte),
+				labelName: (id) => colori.nameOf(id),
 				pari: destinatari,
 				condivisa: statoLan?.condivisa ?? null,
 				condivisaQui:
@@ -2845,6 +2846,12 @@
 			etichette={colori.usati}
 			etichettaAperta={store.activeTab?.etichetta ?? null}
 			onetichetta={(id) => void mostraEtichetta(id)}
+			onrenamelabel={(id, name) => {
+				const before = colori.nameOf(id);
+				colori.rename(id, name);
+				// The open label view is titled with the old name: follow it.
+				if (store.activeTab?.etichetta === before) void mostraEtichetta(id);
+			}}
 			ricerche={[...RICERCHE_PRONTE, ...ricerche.voci]}
 			onricerca={(r) => void apriRicercaSalvata(r)}
 			ontogliricerca={(nome) => ricerche.togli(nome)}

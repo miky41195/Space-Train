@@ -2,6 +2,8 @@ import type { Archivio } from './preferiti.svelte';
 import { alCambioDi } from './sincronizza';
 
 const CHIAVE = 'space-train.colori';
+const NAMES_KEY = 'space-train.nomi-colori';
+const MAX_NAME = 40;
 
 /** I colori che si possono dare a una cartella, nell'ordine del menu. */
 export const COLORI_CARTELLA = [
@@ -27,10 +29,49 @@ export type IdColore = (typeof COLORI_CARTELLA)[number]['id'];
  */
 export class ColoriStore {
 	#mappa = $state<Record<string, IdColore>>({});
+	/** Names the user gave to colours ("Rosso" → "Lavoro"); missing = default name. */
+	#names = $state<Partial<Record<IdColore, string>>>({});
 
 	constructor(private archivio: Archivio | null = archivioPredefinito()) {
 		this.#leggi(archivio?.getItem(CHIAVE) ?? null);
+		this.#readNames(archivio?.getItem(NAMES_KEY) ?? null);
 		alCambioDi(CHIAVE, (v) => this.#leggi(v));
+		alCambioDi(NAMES_KEY, (v) => this.#readNames(v));
+	}
+
+	#readNames(raw: string | null): void {
+		try {
+			const parsed: unknown = raw ? JSON.parse(raw) : {};
+			const names: Partial<Record<IdColore, string>> = {};
+			if (parsed && typeof parsed === 'object') {
+				for (const c of COLORI_CARTELLA) {
+					const v = (parsed as Record<string, unknown>)[c.id];
+					if (typeof v === 'string' && v.trim()) names[c.id] = v.trim().slice(0, MAX_NAME);
+				}
+			}
+			this.#names = names;
+		} catch {
+			this.#names = {};
+		}
+	}
+
+	/** The label's name: the one the user chose, or the colour's own. */
+	nameOf(id: IdColore): string {
+		return this.#names[id] ?? COLORI_CARTELLA.find((c) => c.id === id)?.nome ?? id;
+	}
+
+	/** Blank restores the colour's own name. */
+	rename(id: IdColore, name: string): void {
+		const clean = name.trim().slice(0, MAX_NAME);
+		const names = { ...this.#names };
+		if (clean && clean !== COLORI_CARTELLA.find((c) => c.id === id)?.nome) names[id] = clean;
+		else delete names[id];
+		this.#names = names;
+		try {
+			this.archivio?.setItem(NAMES_KEY, JSON.stringify(names));
+		} catch {
+			// Storage denied: names last for this session.
+		}
 	}
 
 	#leggi(grezzo: string | null): void {
@@ -50,7 +91,11 @@ export class ColoriStore {
 	/** Colours in use, in palette order, with how many items carry each. */
 	get usati(): Array<{ id: IdColore; nome: string; esadecimale: string; quante: number }> {
 		const valori = Object.values(this.#mappa);
-		return COLORI_CARTELLA.map((c) => ({ ...c, quante: valori.filter((v) => v === c.id).length })).filter(
+		return COLORI_CARTELLA.map((c) => ({
+			...c,
+			nome: this.nameOf(c.id),
+			quante: valori.filter((v) => v === c.id).length
+		})).filter(
 			(c) => c.quante > 0
 		);
 	}

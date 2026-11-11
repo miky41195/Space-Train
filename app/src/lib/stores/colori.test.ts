@@ -48,3 +48,26 @@ describe('ColoriStore', () => {
 		expect(c.idDi('C:\\Dati2')).toBe('rosa');
 	});
 });
+
+describe('ColoriStore label names', () => {
+	it('names a colour, keeps it after restart, and blank restores the default', () => {
+		const a = archivio();
+		const c = new ColoriStore(a);
+		c.imposta(['C:\Lavoro'], 'rosso');
+		c.rename('rosso', '  Lavoro  ');
+		expect(c.nameOf('rosso')).toBe('Lavoro');
+		expect(c.usati[0].nome).toBe('Lavoro');
+		expect(new ColoriStore(a).nameOf('rosso')).toBe('Lavoro');
+
+		c.rename('rosso', '   ');
+		expect(c.nameOf('rosso')).toBe('Rosso');
+	});
+
+	it('ignores junk in saved names', () => {
+		const a = archivio();
+		a.setItem('space-train.nomi-colori', '{"rosso":3,"verde":"Fatto","nope":"x"}');
+		const c = new ColoriStore(a);
+		expect(c.nameOf('rosso')).toBe('Rosso');
+		expect(c.nameOf('verde')).toBe('Fatto');
+	});
+});
