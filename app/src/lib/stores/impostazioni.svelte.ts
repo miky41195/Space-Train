@@ -62,6 +62,8 @@ interface Valori {
 	confermaCestino: boolean;
 	/** Aprire con un clic invece che con il doppio clic, come l'opzione di Esplora. */
 	unClic: boolean;
+	/** Show git marks and branch in folders that are repositories. */
+	git: boolean;
 	/** Custom shortcuts: action → key combinations, in place of its defaults. */
 	scorciatoie: Personalizzate;
 }
@@ -93,6 +95,7 @@ const PREDEFINITE: Valori = {
 	dimensioneCartelle: 'mai',
 	confermaCestino: true,
 	unClic: false,
+	git: true,
 	scorciatoie: {}
 };
 
@@ -133,6 +136,7 @@ export class ImpostazioniStore {
 	dimensioneCartelle = $state<DimensioneCartelle>(PREDEFINITE.dimensioneCartelle);
 	confermaCestino = $state(PREDEFINITE.confermaCestino);
 	unClic = $state(PREDEFINITE.unClic);
+	git = $state(PREDEFINITE.git);
 
 	constructor(private archivio: Archivio | null = archivioPredefinito()) {
 		this.#leggi(archivio?.getItem(CHIAVE) ?? null);
@@ -172,6 +176,7 @@ export class ImpostazioniStore {
 			if (DIMENSIONI_CARTELLE.includes(v.dimensioneCartelle as DimensioneCartelle)) this.dimensioneCartelle = v.dimensioneCartelle!;
 			if (typeof v.confermaCestino === 'boolean') this.confermaCestino = v.confermaCestino;
 			if (typeof v.unClic === 'boolean') this.unClic = v.unClic;
+			if (typeof v.git === 'boolean') this.git = v.git;
 			if (v.scorciatoie && typeof v.scorciatoie === 'object') {
 				this.scorciatoie = Object.fromEntries(
 					Object.entries(v.scorciatoie).filter(([, t]) => Array.isArray(t) && t.every((k) => typeof k === 'string'))
@@ -246,6 +251,7 @@ export class ImpostazioniStore {
 			dimensioneCartelle: this.dimensioneCartelle,
 			confermaCestino: this.confermaCestino,
 			unClic: this.unClic,
+			git: this.git,
 			scorciatoie: this.scorciatoie
 		};
 		try {

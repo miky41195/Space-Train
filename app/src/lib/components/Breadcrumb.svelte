@@ -10,7 +10,8 @@
 		onindirizzo = undefined,
 		onvai = undefined,
 		oncerca = undefined,
-		bersaglio = null
+		bersaglio = null,
+		ramo = null
 	}: {
 		store: TabsStore;
 		/** La barra mostra il campo di testo invece delle stazioni. */
@@ -23,7 +24,21 @@
 		oncerca?: () => void;
 		/** Cartella sopra cui passa un trascinamento. */
 		bersaglio?: string | null;
+		/** Git branch of the open folder, with commits to push and to pull. */
+		ramo?: { branch: string; ahead: number; behind: number } | null;
 	} = $props();
+
+	let titoloRamo = $derived(
+		ramo
+			? [
+					`Ramo git ${ramo.branch}`,
+					ramo.ahead ? `${ramo.ahead} commit da inviare` : '',
+					ramo.behind ? `${ramo.behind} da ricevere` : ''
+				]
+					.filter(Boolean)
+					.join(', ')
+			: ''
+	);
 
 	let percorso = $derived(store.activeTab?.path ?? '');
 	// Duplicates and folder comparison are one more stop after their folder: clicking the folder goes back to it.
@@ -156,6 +171,13 @@
 		</div>
 	{/if}
 
+	{#if ramo && !inModifica}
+		<span class="ramo" title={titoloRamo}
+			><span class="ramo-nodo" aria-hidden="true"></span><span class="ramo-nome">{ramo.branch}</span
+			>{#if ramo.ahead}<span class="conta">↑{ramo.ahead}</span>{/if}{#if ramo.behind}<span class="conta">↓{ramo.behind}</span>{/if}</span
+		>
+	{/if}
+
 	{#if oncerca}
 		<button class="cerca" onclick={oncerca} title="Cerca (Ctrl+F)">
 			<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
@@ -168,6 +190,39 @@
 </div>
 
 <style>
+	/* Git branch: a route sign after the last stop, outlined in rail metal. */
+	.ramo {
+		flex: none;
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		max-width: 220px;
+		height: 22px;
+		padding: 0 9px;
+		border: 1px solid var(--rail-metal, var(--border));
+		border-radius: 11px;
+		color: var(--text);
+		font-family: var(--font-display);
+		font-size: calc(11px * var(--scala-testo, 1));
+		letter-spacing: 0.04em;
+		font-variant-numeric: tabular-nums;
+	}
+	.ramo-nome {
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+	}
+	.ramo-nodo {
+		flex: none;
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: var(--in-linea, #22c55e);
+	}
+	.conta {
+		flex: none;
+		color: var(--text-dim);
+	}
 	.barra {
 		display: flex;
 		align-items: center;

@@ -188,6 +188,9 @@ export function backendFinto(over: Partial<Backend> = {}): Backend {
 			return true;
 		},
 		async imageRotate() {},
+		async gitStatus() {
+			return null;
+		},
 		async mediaProps(paths: string[]) {
 			return paths.map(() => null);
 		},

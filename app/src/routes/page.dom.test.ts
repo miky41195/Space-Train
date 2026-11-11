@@ -3117,6 +3117,29 @@ describe('media columns', () => {
 	});
 });
 
+describe('git status', () => {
+	it('marks modified and new items, greys ignored ones, shows the branch; the setting turns it off', async () => {
+		disco.git.set('C:\\', {
+			branch: 'main',
+			ahead: 2,
+			behind: 0,
+			items: { 'alfa.txt': 'modified', 'beta.txt': 'new', 'gamma.txt': 'ignored' }
+		});
+		await monta();
+		await waitFor(() => expect(riga('alfa.txt').querySelector('.git')?.textContent).toBe('M'));
+		expect(riga('beta.txt').querySelector('.git')?.textContent).toBe('N');
+		expect(riga('gamma.txt').classList.contains('ignorato')).toBe(true);
+		expect(riga('delta.txt').querySelector('.git')).toBeNull();
+		expect(document.querySelector('.ramo')?.textContent).toContain('main');
+		expect(document.querySelector('.ramo')?.textContent).toContain('↑2');
+
+		localStorage.setItem('space-train.impostazioni', JSON.stringify({ git: false }));
+		window.dispatchEvent(new StorageEvent('storage', { key: 'space-train.impostazioni', newValue: JSON.stringify({ git: false }) }));
+		await waitFor(() => expect(document.querySelector('.ramo')).toBeNull());
+		expect(riga('alfa.txt').querySelector('.git')).toBeNull();
+	});
+});
+
 describe('workspaces', () => {
 	it('saves the open tabs as an area, switches to another and back', async () => {
 		await monta();

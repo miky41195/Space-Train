@@ -249,6 +249,10 @@
 					{@render interruttore(impostazioni.unClic, 'Apri con un clic', () => impostazioni.imposta('unClic', !impostazioni.unClic))}
 				</div>
 				<div class="voce">
+					<span class="testo">Stato Git nelle cartelle dei progetti<small>Segna i file modificati e nuovi e mostra il ramo. Serve git installato.</small></span>
+					{@render interruttore(impostazioni.git, 'Stato Git nelle cartelle dei progetti', () => impostazioni.imposta('git', !impostazioni.git))}
+				</div>
+				<div class="voce">
 					<span class="testo">Chiedi conferma prima di spostare nel cestino</span>
 					{@render interruttore(impostazioni.confermaCestino, 'Chiedi conferma prima di spostare nel cestino', () =>
 						impostazioni.imposta('confermaCestino', !impostazioni.confermaCestino)

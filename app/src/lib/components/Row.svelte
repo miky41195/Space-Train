@@ -5,7 +5,14 @@
 	import type { Colonne } from '../stores/impostazioni.svelte';
 	import { grigliaColonne, descriviTipo } from '../colonne';
 	import { formatMedia, MEDIA_COLUMNS } from '../media';
-	import type { MediaProps } from '../ipc';
+	import type { GitMark, MediaProps } from '../ipc';
+
+	const GIT_LETTER: Record<GitMark, { letter: string; label: string }> = {
+		modified: { letter: 'M', label: 'Modificato' },
+		new: { letter: 'N', label: 'Nuovo' },
+		conflict: { letter: '!', label: 'In conflitto' },
+		ignored: { letter: '', label: 'Ignorato da git' }
+	};
 	import { byte, senzaEstensione, estensione } from '../posizioni';
 	import { seTrascina, hoverSelect, cancelHoverSelect } from '../trascina';
 
@@ -33,7 +40,8 @@
 		onrename = undefined,
 		oncancelrename = undefined,
 		ontrascina = undefined,
-		media = undefined
+		media = undefined,
+		git = undefined
 	}: {
 		entry: Entry;
 		selected?: boolean;
@@ -75,6 +83,8 @@
 		ontrascina?: (e: Entry) => void;
 		/** Photo/video/music details for the media columns. */
 		media?: MediaProps | null;
+		/** How git sees this item, inside a repository. */
+		git?: GitMark;
 	} = $props();
 
 	let nascosta = $derived(nascondiEstensione && entry.kind !== 'dir' && estensione(entry.name) !== '');
@@ -190,6 +200,7 @@
 	class:selected
 	class:tagliato
 	class:bersaglio
+	class:ignorato={git === 'ignored'}
 	role="row"
 	tabindex="-1"
 	style:grid-template-columns={grigliaColonne(colonne)}
@@ -225,6 +236,9 @@
 	}}
 >
 	<span class="icon">
+		{#if git && git !== 'ignored'}<span class="git {git}" title={GIT_LETTER[git].label} aria-label={GIT_LETTER[git].label}
+				>{GIT_LETTER[git].letter}</span
+			>{/if}
 		{#if drawn}
 			<span class="cartella-disegnata" class:cartella-colorata={colore}>{@html folderIcon(drawn, colore ?? 'var(--folder, var(--accent))')}</span>
 		{:else if immagine}
@@ -437,6 +451,34 @@
 	}
 	/* Testo secondario: carattere del corpo, non quello dei titoli (che il
 	   tema può cambiare). Cifre tabellari perché le colonne restino in fila. */
+	/* Git mark: a signal letter hung on the icon's left edge, so the grid stays put. */
+	.icon {
+		position: relative;
+	}
+	.git {
+		position: absolute;
+		left: -11px;
+		top: 50%;
+		transform: translateY(-50%);
+		width: 10px;
+		text-align: center;
+		font-family: var(--font-display);
+		font-size: calc(10.5px * var(--scala-testo, 1));
+		font-weight: 600;
+		line-height: 1;
+	}
+	.git.modified {
+		color: var(--signal, #ffb454);
+	}
+	.git.new {
+		color: var(--in-linea, #22c55e);
+	}
+	.git.conflict {
+		color: var(--lamp-red, #ff5f6e);
+	}
+	.row.ignorato > :not(.media) {
+		opacity: 0.45;
+	}
 	.media {
 		overflow: hidden;
 		text-overflow: ellipsis;

@@ -11,7 +11,7 @@
 	import type { FolderStyle } from '../icons';
 	import type { MediaKey } from '../media';
 	import { selezioneRettangolo, type OpzioniRettangolo } from '../rettangolo';
-	import type { Entry, MediaProps, SortKey, SortSpec } from '../ipc';
+	import type { Entry, GitMark, MediaProps, SortKey, SortSpec } from '../ipc';
 	import Intestazioni from './Intestazioni.svelte';
 	import {
 		impaginaZone,
@@ -60,6 +60,7 @@
 		rettangolo = undefined,
 		oncolonne = undefined,
 		mediaDi = undefined,
+		gitDi = undefined,
 		mediaSort = null,
 		onsortmedia = undefined
 	}: {
@@ -121,6 +122,8 @@
 		oncolonne?: (evento: MouseEvent) => void;
 		/** Photo/video/music details of an entry, for the media columns. */
 		mediaDi?: (e: Entry) => MediaProps | null | undefined;
+		/** Git mark of an entry, inside a repository. */
+		gitDi?: (e: Entry) => GitMark | undefined;
 		mediaSort?: { key: MediaKey; ascending: boolean } | null;
 		onsortmedia?: (key: MediaKey) => void;
 	} = $props();
@@ -243,6 +246,7 @@
 					colore={coloreDi?.(entry)}
 					quota={quotaDi?.(entry)}
 					media={mediaDi?.(entry)}
+					git={gitDi?.(entry)}
 					altezza={altezzaRiga}
 					bersaglio={entry.path === bersaglio}
 					{ontrascina}

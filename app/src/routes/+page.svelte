@@ -12,7 +12,8 @@
 		type StatoLan,
 		type Pari,
 		type RichiestaInvio,
-		type StatoAmici
+		type StatoAmici,
+		type GitStatus
 	} from '$lib/ipc';
 	import { TabsStore } from '$lib/stores/tabs.svelte';
 	import TitleBar from '$lib/components/TitleBar.svelte';
@@ -453,6 +454,32 @@
 	$effect(() => {
 		if (impostazioni.anteprima && voceAnteprima) void media.request([voceAnteprima]);
 	});
+
+	// ── Git ──────────────────────────────────────────────────────────
+	/** Git status of the open folder, asked again whenever its items change. */
+	let statoGit = $state<{ path: string; status: GitStatus } | null>(null);
+	let richiestaGit = 0;
+	$effect(() => {
+		const tab = store.activeTab;
+		const path = tab?.path;
+		void tab?.entries;
+		const n = ++richiestaGit;
+		if (!path || !impostazioni.git || posizione !== 'normale') {
+			statoGit = null;
+			return;
+		}
+		tauriBackend
+			.gitStatus(path)
+			.catch(() => null)
+			.then((status) => {
+				if (n === richiestaGit) statoGit = status ? { path, status } : null;
+			});
+	});
+	let gitQui = $derived(
+		statoGit && store.activeTab && stessoPath(statoGit.path, store.activeTab.path) && !store.activeTab.risultati
+			? statoGit.status
+			: null
+	);
 
 	function ordinaPerMedia(key: MediaKey) {
 		const id = store.activeId;
@@ -3004,6 +3031,7 @@
 				onindirizzo={vaiAIndirizzo}
 				oncerca={apriRicerca}
 				{bersaglio}
+				ramo={gitQui}
 			/>
 			<BarraComandi
 				haSelezione={selezione.length > 0}
@@ -3204,6 +3232,7 @@
 						chiave={chiaveContenuto}
 						colonne={colonneVista}
 						mediaDi={(e) => media.of(e)}
+						gitDi={gitQui ? (e) => gitQui?.items[e.name] : undefined}
 						mediaSort={ordineMedia}
 						onsortmedia={ordinaPerMedia}
 						nascondiEstensione={!impostazioni.estensioni}

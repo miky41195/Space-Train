@@ -186,6 +186,7 @@ pub fn run() {
             transfer::archive_open_item,
             transfer::image_rotate,
             shell::media::media_props,
+            crate::fs::git::git_status,
             transfer::image_convert,
             ipc::entries_for,
             ipc::shortcut_free,

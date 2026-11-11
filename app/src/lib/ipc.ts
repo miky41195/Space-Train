@@ -23,6 +23,17 @@ export interface Entry {
 	snippet?: Snippet;
 }
 
+/** How git sees an item of the open folder. */
+export type GitMark = 'ignored' | 'new' | 'modified' | 'conflict';
+
+export interface GitStatus {
+	branch: string;
+	ahead: number;
+	behind: number;
+	/** Children of the folder, by name, that have a mark. */
+	items: Record<string, GitMark>;
+}
+
 /** Photo, video and music details Windows knows about a file. */
 export interface MediaProps {
 	/** Date taken, ms since the epoch. */
@@ -373,6 +384,8 @@ export interface Backend {
 	imageRotate(paths: string[], clockwise: boolean): Promise<void>;
 	/** Details of each path, null where none could be read (at most 500 per call). */
 	mediaProps(paths: string[]): Promise<Array<MediaProps | null>>;
+	/** Git status of a folder's items; null outside a repository or without git. */
+	gitStatus(folder: string): Promise<GitStatus | null>;
 	imageConvert(opts: {
 		opId: number;
 		paths: string[];
@@ -496,6 +509,7 @@ export const tauriBackend: Backend = {
 	shortcutFree: (accelerator) => invoke('shortcut_free', { accelerator }),
 	imageRotate: (paths, clockwise) => invoke('image_rotate', { paths, clockwise }),
 	mediaProps: (paths) => invoke('media_props', { paths }),
+	gitStatus: (folder) => invoke('git_status', { folder }),
 	imageConvert: ({ opId, paths, target, maxSide, quality, onProgress }) =>
 		invoke('image_convert', { opId, paths, target, maxSide, quality, onProgress: canale(onProgress) }),
 	deleteItems: ({ opId, mode, paths, onProgress }) =>

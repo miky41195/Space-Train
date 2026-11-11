@@ -10,6 +10,7 @@ pub mod duplicates;
 pub mod elimina;
 pub mod entry;
 pub mod error;
+pub mod git;
 pub mod immagini;
 pub mod listing;
 pub mod names;

@@ -62,6 +62,8 @@ export class DiscoFinto {
 	risposte: Array<{ id: number; accetta: boolean; cartella: string | null }> = [];
 	/** Cosa risponde il selettore di cartelle: null è «annullato». */
 	cartellaScelta: string | null = null;
+	/** Git status by folder, for git_status. */
+	git = new Map<string, import('./ipc').GitStatus>();
 	/** Photo/video/music details by path, for media_props. */
 	media = new Map<string, import('./ipc').MediaProps>();
 	/** Archive contents by archive path, for archive_list / archive_extract. */
@@ -293,6 +295,8 @@ export class DiscoFinto {
 				return true;
 			case 'shortcut_free':
 				return !this.scorciatoieOccupate.has(args.accelerator as string);
+			case 'git_status':
+				return this.git.get(args.folder as string) ?? null;
 			case 'media_props':
 				return (args.paths as string[]).map((p) => this.media.get(p) ?? null);
 			case 'image_rotate':
