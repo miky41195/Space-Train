@@ -14,6 +14,23 @@ export interface Novita {
 
 export const NOVITA: Novita[] = [
 	{
+		versione: '0.7.0',
+		voci: [
+			'Coda dei trasferimenti: una copia lanciata mentre un’altra è in corso aspetta il suo turno. «+1 in coda» sulla barra apre l’elenco, dove si mette in pausa, si anticipa o si toglie un lavoro.',
+			'Archivi 7z, RAR e TAR (oltre a ZIP) si aprono con un doppio clic come cartelle: si sfogliano, si apre un file e si estrae solo ciò che serve.',
+			'Palette dei comandi: Ctrl+Maiusc+P cerca azioni, cartelle, temi e impostazioni scrivendo poche lettere.',
+			'Anteprima più ricca: Markdown formattato, codice con i colori della sintassi, file CSV come tabella e contenuto degli archivi.',
+			'Somma di controllo: dal menu di un file si calcola SHA-256, SHA-1 o MD5 e si confronta con il valore pubblicato da un sito.',
+			'Strumenti per le immagini: «Ruota a destra/a sinistra» dal menu (Ctrl+Z la annulla) e «Converti e ridimensiona…» in JPG, PNG o WebP, con i file nuovi accanto agli originali.',
+			'Backup verso un amico: dalla finestra Amici una cartella resta allineata ogni giorno sul PC di un amico, mandando solo i file nuovi o cambiati e senza cancellare niente. L’amico accetta la prima volta, poi i backup arrivano da soli.',
+			'Scorciatoie personalizzabili: in Impostazioni → Scorciatoie ogni azione si può cambiare. Prima di salvare si viene avvisati se la combinazione è già usata da Space Train, riservata da Windows o presa da un altro programma.',
+			'Animazioni dei temi: nell’editor dei temi si sceglie l’animazione all’avvio (treno, corrente, pioggia di stelle o una figura a scelta) e una breve animazione all’apertura delle cartelle.',
+			'Spostando nel Cestino o eliminando più elementi, un file bloccato non ferma più gli altri: alla fine si vede quali non è stato possibile eliminare e perché.',
+			'Il treno e il binario non scattano più avanti e indietro mentre una cartella si carica.',
+			'Nel doppio pannello ogni lato ricorda dove si era arrivati nell’elenco. Su Linux arrivano le miniature delle immagini e gli appunti condivisi con gli altri programmi.'
+		]
+	},
+	{
 		versione: '0.6.0',
 		voci: [
 			'Doppio pannello: Ctrl+Maiusc+D (o il pulsante nella barra dei comandi) mostra due cartelle affiancate. F6 passa da un lato all’altro, Ctrl+Maiusc+C e Ctrl+Maiusc+X copiano o spostano la selezione nell’altra cartella, e si può trascinare da un lato all’altro.',
