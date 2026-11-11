@@ -13,6 +13,10 @@ pub enum FsError {
     NotADirectory,
     DeviceNotReady,
     Io { message: String },
+    /// A remote server's key the user has not confirmed yet, or a key that changed.
+    ServerKey { fingerprint: String, changed: bool },
+    /// The remote server wants a password (none known, or the one known was refused).
+    ServerPassword,
 }
 
 pub fn from_io(e: &std::io::Error) -> FsError {

@@ -78,6 +78,8 @@ pub fn testo(e: &crate::fs::error::FsError) -> String {
         NotADirectory => "Non è una cartella.".into(),
         DeviceNotReady => "Disco non pronto.".into(),
         Io { message } => message.clone(),
+        ServerKey { .. } => "Chiave del server da confermare.".into(),
+        ServerPassword => "Il server chiede la password.".into(),
     }
 }
 

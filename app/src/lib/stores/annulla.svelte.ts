@@ -34,6 +34,8 @@ export class AnnullaStore {
 		// sembrerebbe non fare nulla, e l'utente premerebbe di nuovo.
 		if (op.tipo === 'sposta' && op.coppie.length === 0) return;
 		if (op.tipo === 'crea' && op.paths.length === 0) return;
+		// Servers have no Recycle Bin: undoing a creation there would delete for good.
+		if (op.tipo === 'crea' && op.paths.some((p) => p.startsWith('::server'))) return;
 		if (op.tipo === 'cestino' && op.originali.length === 0) return;
 		if (op.tipo === 'batchRename' && op.steps.length === 0) return;
 		if (op.tipo === 'ruota' && op.paths.length === 0) return;

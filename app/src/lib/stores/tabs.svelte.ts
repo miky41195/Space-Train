@@ -23,6 +23,8 @@ export interface Tab {
 	/** Numero della richiesta il cui risultato è attualmente a schermo. */
 	lastApplied: number;
 	error: FsError | null;
+	/** The folder that failed to open, when it is not `path` (the tab stays where it was). */
+	failedPath: string | null;
 	loading: boolean;
 	/**
 	 * Risultati della ricerca nelle sottocartelle. `null` = nessuna ricerca
@@ -118,6 +120,7 @@ export class TabsStore {
 			reqSeq: 0,
 			lastApplied: 0,
 			error: null,
+			failedPath: null,
 			loading: false,
 			risultati: null,
 			cercando: false,
@@ -543,6 +546,7 @@ export class TabsStore {
 			tab.entries = listing.entries;
 			tab.sort = sort;
 			tab.error = null;
+			tab.failedPath = null;
 			tab.loading = false;
 
 			if (opts.mantieni) {
@@ -577,6 +581,7 @@ export class TabsStore {
 			tab.lastApplied = req;
 			// Il path corrente non cambia: l'utente resta dove si trova.
 			tab.error = e as FsError;
+			tab.failedPath = path;
 			tab.loading = false;
 			return false;
 		}

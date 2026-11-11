@@ -107,7 +107,14 @@ pub async fn transfer(
             }
         };
 
-        let esito = if sposta {
+        // Into a server: an upload. Moving copies there (the originals stay): a
+        // network failure halfway must not lose anything.
+        let esito = if crate::server::is_server(&dest) {
+            crate::server::servers().and_then(|s| {
+                let coppie = s.upload(&sources, &dest, &annulla, &mut |fatti, _| avanzamento(fatti))?;
+                Ok(copy::Esito { copiati: coppie.len() as u64, saltati: 0, annullato: false, coppie })
+            })
+        } else if sposta {
             copy::move_all(&sources, &dest, policy, &annulla, &mut avanzamento)
         } else {
             copy::copy_all(&sources, &dest, policy, &annulla, &mut avanzamento)

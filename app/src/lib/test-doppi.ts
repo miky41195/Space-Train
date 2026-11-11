@@ -188,6 +188,16 @@ export function backendFinto(over: Partial<Backend> = {}): Backend {
 			return true;
 		},
 		async imageRotate() {},
+		async serverList() {
+			return [];
+		},
+		async serverPut(c: import('./ipc').ServerConfig) {
+			return c;
+		},
+		async serverRemove() {},
+		async serverTrust() {},
+		async serverPassword() {},
+		async serverTest() {},
 		async vaultCreate() {
 			return '';
 		},

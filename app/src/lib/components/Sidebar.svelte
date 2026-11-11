@@ -5,6 +5,8 @@
 	import { QUESTO_PC, RETE, CESTINO, RETE_LOCALE, AMICI, byte, stessoPath, nomeDi, dentroDi } from '../posizioni';
 	import { SU_LINUX } from '../sistema';
 	import type { IdColore } from '../stores/colori.svelte';
+	import type { ServerConfig } from '../ipc';
+	import { SERVER } from '../posizioni';
 	import type { RicercaSalvata } from '../stores/ricerche.svelte';
 
 	let {
@@ -25,6 +27,9 @@
 		etichettaAperta = null,
 		onetichetta = undefined,
 		onrenamelabel = undefined,
+		server = undefined,
+		onaggiungiserver = undefined,
+		onmodificaserver = undefined,
 		ricerche = [],
 		onricerca = undefined,
 		ontogliricerca = undefined
@@ -59,6 +64,11 @@
 		onetichetta?: (id: IdColore) => void;
 		/** Blank name restores the colour's own name. */
 		onrenamelabel?: (id: IdColore, name: string) => void;
+		/** Remote servers the user added; absent = no «Server» group. */
+		server?: ServerConfig[];
+		onaggiungiserver?: () => void;
+		/** Right-click on a server stop: change or remove it. */
+		onmodificaserver?: (s: ServerConfig) => void;
 		/** Smart folders: ready-made ones (no folder) first, then the saved ones. */
 		ricerche?: RicercaSalvata[];
 		onricerca?: (r: RicercaSalvata) => void;
@@ -209,6 +219,30 @@
 				</form>
 			{:else}
 				<button class="voce aggiungi-pc" onclick={() => (aggiungendo = true)}>Aggiungi PC per indirizzo</button>
+			{/if}
+		</div>
+	{/if}
+
+	{#if server}
+		<div class="gruppo">
+			<div class="titolo">Server</div>
+			{#each server as s (s.id)}
+				{@const path = `${SERVER}\\${s.id}`}
+				<button
+					class="voce"
+					class:corrente={store.activeTab?.path === path || (store.activeTab?.path.startsWith(path + '\\') ?? false)}
+					title={`${s.protocol.toUpperCase()} · ${s.user ? s.user + '@' : ''}${s.host}`}
+					onclick={() => vai(path)}
+					oncontextmenu={(e) => {
+						e.preventDefault();
+						onmodificaserver?.(s);
+					}}
+				>
+					{s.name}
+				</button>
+			{/each}
+			{#if onaggiungiserver}
+				<button class="voce aggiungi-pc" onclick={onaggiungiserver}>Aggiungi server</button>
 			{/if}
 		</div>
 	{/if}

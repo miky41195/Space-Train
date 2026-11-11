@@ -3117,6 +3117,30 @@ describe('media columns', () => {
 	});
 });
 
+describe('remote servers', () => {
+	it('adds a server from the sidebar, asks the password when the server wants it, then lists its files', async () => {
+		await monta();
+		await fireEvent.click(await screen.findByRole('button', { name: 'Aggiungi server' }));
+		const dialog = await screen.findByRole('dialog', { name: 'Aggiungi server' });
+		await fireEvent.click(within(dialog).getByRole('radio', { name: 'FTP' }));
+		expect(within(dialog).getByText(/non è cifrato/)).toBeTruthy();
+		await fireEvent.click(within(dialog).getByRole('radio', { name: 'SFTP' }));
+		await fireEvent.input(within(dialog).getByLabelText('Indirizzo'), { target: { value: 'nas.casa' } });
+		await fireEvent.input(within(dialog).getByLabelText('Utente'), { target: { value: 'io' } });
+		aggiungi('::server\\s1\\');
+		aggiungi('::server\\s1\\foto.jpg');
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Aggiungi' }));
+
+		// No password given: the server asks for it.
+		const chiede = await screen.findByRole('dialog', { name: 'Password per «nas.casa»' });
+		expect(disco.server[0]).toMatchObject({ host: 'nas.casa', protocol: 'sftp', port: 22, user: 'io' });
+		await fireEvent.input(within(chiede).getByLabelText(/Password/), { target: { value: 'segreta' } });
+		await fireEvent.click(within(chiede).getByRole('button', { name: 'Collegati' }));
+		await waitFor(() => expect(nomi()).toEqual(['foto.jpg']));
+		expect(document.querySelector('.voce[title="SFTP · io@nas.casa"]')?.classList.contains('corrente')).toBe(true);
+	});
+});
+
 describe('vault', () => {
 	it('asks the password, refuses a wrong one, lists the items, and locks back to the folder', async () => {
 		aggiungi('C:\\Privato.cassaforte\\');

@@ -69,6 +69,17 @@ pub async fn list_dir(
     fuori_dalla_finestra(move || {
         // Rete locale e amici hanno bisogno dello stato dei loro servizi:
         // li si gestisce qui, il resto passa da `elenca`.
+        if path == crate::server::RADICE {
+            return Ok(Listing { path, entries: crate::server::servers()?.entries() });
+        }
+        if crate::server::is_server(&path) {
+            let mut entries = crate::server::servers()?.list(&path)?;
+            if !show_hidden {
+                entries.retain(|e| !e.hidden);
+            }
+            crate::fs::sort::sort_entries(&mut entries, &sort);
+            return Ok(Listing { path, entries });
+        }
         if path == crate::amici::RADICE {
             return Ok(Listing { path, entries: amici.voci() });
         }
@@ -134,7 +145,10 @@ pub fn open_entry(path: String) -> Result<(), FsError> {
 pub fn navigate(path: String, direction: String) -> Result<String, FsError> {
     match direction.as_str() {
         "up" => {
-            if let Some(g) = crate::lan::genitore(&path).or_else(|| crate::amici::genitore(&path)) {
+            if let Some(g) = crate::lan::genitore(&path)
+                .or_else(|| crate::amici::genitore(&path))
+                .or_else(|| crate::server::genitore(&path))
+            {
                 return Ok(g);
             }
             if path.starts_with("::") {
@@ -206,13 +220,25 @@ pub async fn thumbnail(path: String, size: u32) -> Result<Option<String>, FsErro
 use crate::fs::ops;
 
 #[tauri::command]
-pub fn create_folder(parent: String, name: String) -> Result<String, FsError> {
-    ops::create_folder(&parent, &name)
+pub async fn create_folder(parent: String, name: String) -> Result<String, FsError> {
+    fuori_dalla_finestra(move || {
+        if crate::server::is_server(&parent) {
+            return crate::server::servers()?.mkdir(&parent, &name);
+        }
+        ops::create_folder(&parent, &name)
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn rename_entry(path: String, name: String) -> Result<String, FsError> {
-    ops::rename(&path, &name)
+pub async fn rename_entry(path: String, name: String) -> Result<String, FsError> {
+    fuori_dalla_finestra(move || {
+        if crate::server::is_server(&path) {
+            return crate::server::servers()?.rename(&path, &name);
+        }
+        ops::rename(&path, &name)
+    })
+    .await
 }
 
 /// Sposta nel Cestino: gli elementi restano recuperabili da Windows.
@@ -313,7 +339,13 @@ pub async fn is_default() -> Result<bool, FsError> {
 /// Elimina senza Cestino. La conferma esplicita sta nel frontend.
 #[tauri::command]
 pub async fn delete_permanently(paths: Vec<String>) -> Result<(), FsError> {
-    fuori_dalla_finestra(move || ops::delete_permanently(&paths)).await
+    fuori_dalla_finestra(move || {
+        if paths.first().is_some_and(|p| crate::server::is_server(p)) {
+            return crate::server::servers()?.delete(&paths);
+        }
+        ops::delete_permanently(&paths)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -602,7 +634,9 @@ pub fn scarica_remoto(
     annulla: &std::sync::atomic::AtomicBool,
     avanzamento: &mut dyn FnMut(u64, u64),
 ) -> Result<Vec<[String; 2]>, FsError> {
-    if sorgenti.first().is_some_and(|p| crate::amici::dividi(p).is_some()) {
+    if sorgenti.first().is_some_and(|p| crate::server::is_server(p)) {
+        crate::server::servers()?.download(sorgenti, dest, annulla, avanzamento)
+    } else if sorgenti.first().is_some_and(|p| crate::amici::dividi(p).is_some()) {
         amici.scarica(sorgenti, dest, annulla, avanzamento)
     } else {
         crate::lan::scarica(lan, sorgenti, dest, annulla, avanzamento)

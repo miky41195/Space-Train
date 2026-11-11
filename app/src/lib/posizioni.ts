@@ -10,6 +10,8 @@ export const CESTINO = '::cestino';
 export const RETE_LOCALE = '::lan';
 /** Gli amici su Space Train, ovunque siano. */
 export const AMICI = '::amici';
+/** Remote servers (SFTP, FTP, WebDAV) the user added. */
+export const SERVER = '::server';
 /**
  * Non è una posizione: è lo spazio libero fra le schede, dove rilasciare
  * una cartella la apre in una scheda nuova.
@@ -21,7 +23,8 @@ const NOMI_VIRTUALI: Record<string, string> = {
 	[RETE]: 'Rete',
 	[CESTINO]: 'Cestino',
 	[RETE_LOCALE]: 'Rete locale',
-	[AMICI]: 'Amici'
+	[AMICI]: 'Amici',
+	[SERVER]: 'Server'
 };
 
 /**
@@ -29,7 +32,19 @@ const NOMI_VIRTUALI: Record<string, string> = {
  * che vi si sfoglia dentro. Si apre, si copia e si trascina allo stesso modo.
  */
 export function eReteLocale(path: string): boolean {
-	return [RETE_LOCALE, AMICI].some((r) => path === r || path.startsWith(r + '\\'));
+	return [RETE_LOCALE, AMICI, SERVER].some((r) => path === r || path.startsWith(r + '\\'));
+}
+
+/** A folder on a remote server (or the list of servers). */
+export function eServer(path: string): boolean {
+	return path === SERVER || path.startsWith(SERVER + '\\');
+}
+
+/** Server names by id: the path carries the id, the route shows the name. */
+let nomiServer: Record<string, string> = {};
+
+export function impostaNomiServer(nomi: Record<string, string>) {
+	nomiServer = nomi;
 }
 
 /**
@@ -58,14 +73,15 @@ export interface Briciola {
  * la catena arriva sempre fino a una radice cliccabile.
  */
 export function briciole(path: string): Briciola[] {
-	for (const radice of [RETE_LOCALE, AMICI]) {
+	for (const radice of [RETE_LOCALE, AMICI, SERVER]) {
 		if (!path.startsWith(radice + '\\')) continue;
 		const parti = path.slice(radice.length + 1).split('\\').filter(Boolean);
 		const out: Briciola[] = [{ nome: NOMI_VIRTUALI[radice], path: radice }];
 		let corrente = radice;
 		parti.forEach((p, i) => {
 			corrente = `${corrente}\\${p}`;
-			const nome = radice === AMICI && i === 0 ? (nomiAmici[p] ?? 'Amico') : p;
+			const nome =
+				radice === AMICI && i === 0 ? (nomiAmici[p] ?? 'Amico') : radice === SERVER && i === 0 ? (nomiServer[p] ?? 'Server') : p;
 			out.push({ nome, path: corrente });
 		});
 		return out;

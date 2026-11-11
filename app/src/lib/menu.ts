@@ -124,7 +124,7 @@ export interface VoceMenu {
 }
 
 /** Dove si trova l'utente: ogni posizione ha le sue operazioni. */
-export type Posizione = 'normale' | 'cestino' | 'pc' | 'rete' | 'lan' | 'archivio';
+export type Posizione = 'normale' | 'cestino' | 'pc' | 'rete' | 'lan' | 'archivio' | 'server';
 
 export interface ContestoMenu {
 	/** Voci selezionate al momento del clic destro. Vuoto = clic sul vuoto. */
@@ -191,6 +191,7 @@ function vociPerPosizione(c: ContestoMenu): VoceMenu[] {
 	if (posizione === 'archivio') return vociArchivio(c);
 	if (posizione === 'pc' || posizione === 'rete') return vociVirtuali(c, posizione);
 	if (posizione === 'lan') return vociReteLocale(c);
+	if (posizione === 'server') return vociServer(c);
 	return c.selezione.length === 0 ? vociSfondo(c) : vociElementi(c);
 }
 
@@ -393,6 +394,24 @@ function vociReteLocale({ selezione }: ContestoMenu): VoceMenu[] {
 	if (unica) voci.push({ azione: 'apri', etichetta: 'Apri', scorciatoia: 'Invio' });
 	voci.push({ azione: 'copia', etichetta: 'Copia', scorciatoia: 'Ctrl+C', stacca: unica !== null });
 	voci.push({ azione: 'scarica', etichetta: 'Scarica nella cartella Ricevuti' });
+	return voci;
+}
+
+/** A folder on a remote server: open, copy out, paste in, rename, new folder, delete for good. */
+function vociServer({ selezione, appuntiPieni = false }: ContestoMenu): VoceMenu[] {
+	if (selezione.length === 0) {
+		const voci: VoceMenu[] = [];
+		if (appuntiPieni) voci.push({ azione: 'incolla', etichetta: 'Incolla (carica sul server)', scorciatoia: 'Ctrl+V' });
+		voci.push({ azione: 'nuovaCartella', etichetta: 'Nuova cartella', scorciatoia: 'Ctrl+Maiusc+N' });
+		voci.push({ azione: 'aggiorna', etichetta: 'Aggiorna', scorciatoia: 'F5', stacca: true });
+		return voci;
+	}
+	const voci: VoceMenu[] = [{ azione: 'apri', etichetta: 'Apri', scorciatoia: 'Invio' }];
+	voci.push({ azione: 'copia', etichetta: 'Copia', scorciatoia: 'Ctrl+C', stacca: true });
+	voci.push({ azione: 'scarica', etichetta: 'Scarica nella cartella Ricevuti' });
+	if (selezione.length === 1) voci.push({ azione: 'rinomina', etichetta: 'Rinomina…', scorciatoia: 'F2', stacca: true });
+	voci.push({ azione: 'eliminaDefinitivo', etichetta: 'Elimina dal server', scorciatoia: 'Canc', pericolosa: true, stacca: selezione.length !== 1 });
+	voci.push({ azione: 'copiaPercorso', etichetta: 'Copia percorso', stacca: true });
 	return voci;
 }
 

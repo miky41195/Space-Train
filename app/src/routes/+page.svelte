@@ -13,7 +13,8 @@
 		type Pari,
 		type RichiestaInvio,
 		type StatoAmici,
-		type GitStatus
+		type GitStatus,
+		type ServerConfig
 	} from '$lib/ipc';
 	import { TabsStore } from '$lib/stores/tabs.svelte';
 	import TitleBar from '$lib/components/TitleBar.svelte';
@@ -41,6 +42,7 @@
 	import { RulesStore } from '$lib/stores/rules.svelte';
 	import RulesDialog from '$lib/components/RulesDialog.svelte';
 	import VaultDialog from '$lib/components/VaultDialog.svelte';
+	import ServerDialog from '$lib/components/ServerDialog.svelte';
 	import { samePath as stessaCartella } from '$lib/rules';
 	import { sortByMedia, type MediaKey } from '$lib/media';
 	import SommaControllo from '$lib/components/SommaControllo.svelte';
@@ -109,6 +111,8 @@
 		AMICI,
 		NUOVA_SCHEDA,
 		impostaNomiAmici,
+		impostaNomiServer,
+		eServer,
 		cartellaDi,
 		eArchivio,
 		eReteLocale,
@@ -273,6 +277,7 @@
 		if (p === CESTINO) return 'cestino';
 		if (p === QUESTO_PC) return 'pc';
 		if (p === RETE || /^\\\\[^\\]+\\?$/.test(p)) return 'rete';
+		if (eServer(p)) return 'server';
 		if (eReteLocale(p)) return 'lan';
 		return 'normale';
 	});
@@ -423,6 +428,8 @@
 
 	/** Si può creare, incollare, rinominare: una cartella vera, non risultati. */
 	let modificabile = $derived(posizione === 'normale' && !inRicerca);
+	/** Paste, new folder, rename and drop also work on a remote server. */
+	let scrivibile = $derived(modificabile || (posizione === 'server' && store.activeTab?.path !== '::server' && !inRicerca));
 
 	let ricercaAperta = $state(false);
 	let ricercaRicorsiva = $state(false);
@@ -466,6 +473,93 @@
 	$effect(() => {
 		if (impostazioni.anteprima && voceAnteprima) void media.request([voceAnteprima]);
 	});
+
+	// ── Remote servers ───────────────────────────────────────────────
+	let serverSalvati = $state<ServerConfig[]>([]);
+	let dialogoServer = $state<{
+		mode:
+			| { kind: 'edit'; server: ServerConfig | null }
+			| { kind: 'key'; server: ServerConfig; fingerprint: string; changed: boolean }
+			| { kind: 'password'; server: ServerConfig };
+		error: string | null;
+		busy: boolean;
+	} | null>(null);
+
+	async function caricaServer() {
+		serverSalvati = await tauriBackend.serverList().catch(() => []);
+		impostaNomiServer(Object.fromEntries(serverSalvati.map((s) => [s.id, s.name])));
+	}
+	$effect(() => {
+		void caricaServer();
+	});
+
+	const serverDi = (path: string) => serverSalvati.find((s) => path === `::server\\${s.id}` || path.startsWith(`::server\\${s.id}\\`));
+
+	// A server folder that needs a key confirmation or a password asks for it.
+	$effect(() => {
+		const tab = store.activeTab;
+		const err = tab?.error;
+		if (!tab || !err || dialogoServer || (err.kind !== 'serverKey' && err.kind !== 'serverPassword')) return;
+		const server = untrack(() => serverDi(tab.failedPath ?? tab.path));
+		if (!server) return;
+		dialogoServer =
+			err.kind === 'serverKey'
+				? { mode: { kind: 'key', server, fingerprint: err.fingerprint, changed: err.changed }, error: null, busy: false }
+				: { mode: { kind: 'password', server }, error: null, busy: false };
+	});
+
+	async function salvaServer(config: ServerConfig, password: string | null) {
+		const d = dialogoServer;
+		if (!d) return;
+		dialogoServer = { ...d, busy: true, error: null };
+		try {
+			const saved = await tauriBackend.serverPut(config, password);
+			await caricaServer();
+			dialogoServer = null;
+			if (store.activeId !== null) await store.navigate(store.activeId, `::server\\${saved.id}`);
+		} catch (err) {
+			dialogoServer = { ...d, busy: false, error: descriviErrore(err) };
+		}
+	}
+
+	/** Opens again the server folder that asked for a key or a password. */
+	async function riprovaServer() {
+		const tab = store.activeTab;
+		if (!tab || store.activeId === null) return;
+		if (tab.failedPath) await store.navigate(store.activeId, tab.failedPath);
+		else await ricarica();
+	}
+
+	async function rimuoviServer(id: string) {
+		await tauriBackend.serverRemove(id).catch((err) => (erroreOp = descriviErrore(err)));
+		dialogoServer = null;
+		await caricaServer();
+		for (const t of store.tabs) if (t.path === `::server\\${id}` || t.path.startsWith(`::server\\${id}\\`)) await store.navigate(t.id, QUESTO_PC);
+	}
+
+	async function confermaChiaveServer() {
+		const d = dialogoServer;
+		if (d?.mode.kind !== 'key') return;
+		await tauriBackend.serverTrust(d.mode.server.id, d.mode.fingerprint);
+		dialogoServer = null;
+		await caricaServer();
+		await riprovaServer();
+	}
+
+	async function passwordServer(password: string, remember: boolean) {
+		const d = dialogoServer;
+		if (d?.mode.kind !== 'password') return;
+		dialogoServer = { ...d, busy: true, error: null };
+		try {
+			await tauriBackend.serverPassword(d.mode.server.id, password, remember);
+			await tauriBackend.serverTest(d.mode.server.id);
+			dialogoServer = null;
+			await riprovaServer();
+		} catch (err) {
+			const e = err as FsError;
+			dialogoServer = { ...d, busy: false, error: e?.kind === 'serverPassword' ? 'Password sbagliata.' : descriviErrore(err) };
+		}
+	}
 
 	// ── Vaults ───────────────────────────────────────────────────────
 	let dialogoCassaforte = $state<{
@@ -884,7 +978,7 @@
 	/** Items in the batch rename dialog; empty when it is closed. */
 	let batchRename = $state<Entry[]>([]);
 	/** Eliminazione senza ritorno: dal disco, dal Cestino o svuotandolo. */
-	let daEliminare = $state<{ voci: Entry[]; tipo: 'disco' | 'cestino' | 'svuota' } | null>(null);
+	let daEliminare = $state<{ voci: Entry[]; tipo: 'disco' | 'cestino' | 'svuota' | 'server' } | null>(null);
 	let erroreOp = $state<string | null>(null);
 	/** Messaggio informativo che sparisce da solo. */
 	let avviso = $state<string | null>(null);
@@ -1061,7 +1155,7 @@
 
 	/** F2, the menu and the command bar: one item renames in place, several open the batch dialog. */
 	function startRename() {
-		if (!modificabile) return;
+		if (!scrivibile) return;
 		const scelte = selezionate();
 		if (scelte.length > 1) batchRename = scelte;
 		else {
@@ -1123,7 +1217,7 @@
 	 * resta in Rust.
 	 */
 	async function nuovaCartella() {
-		if (!store.activeTab || store.activeId === null || !modificabile) return;
+		if (!store.activeTab || store.activeId === null || !scrivibile) return;
 		erroreOp = null;
 
 		const parent = store.activeTab.path;
@@ -1182,6 +1276,7 @@
 		if (scelte.length === 0) return;
 		// Nel Cestino «elimina» non può che essere definitivo.
 		if (posizione === 'cestino') daEliminare = { voci: scelte, tipo: 'cestino' };
+		else if (posizione === 'server' && scrivibile) daEliminare = { voci: scelte, tipo: 'server' };
 		else if (posizione === 'normale') {
 			// Senza conferma, se l'utente l'ha spenta: il cestino resta un ripensamento possibile.
 			if (impostazioni.confermaCestino) daCestinare = scelte;
@@ -1193,6 +1288,7 @@
 		const scelte = selezionate();
 		if (scelte.length === 0) return;
 		if (posizione === 'cestino') daEliminare = { voci: scelte, tipo: 'cestino' };
+		else if (posizione === 'server' && scrivibile) daEliminare = { voci: scelte, tipo: 'server' };
 		else if (posizione === 'normale') daEliminare = { voci: scelte, tipo: 'disco' };
 	}
 
@@ -1256,6 +1352,11 @@
 		erroreOp = null;
 		try {
 			const paths = richiesta.voci.map((v) => v.path);
+			if (richiesta.tipo === 'server') {
+				await tauriBackend.deletePermanently(paths);
+				await ricarica();
+				return;
+			}
 			const modo: ModoElimina =
 				richiesta.tipo === 'disco' ? 'disco' : richiesta.tipo === 'cestino' ? 'dalCestino' : 'svuota';
 			segnalaFalliti(await eliminaConBarra(modo, modo === 'svuota' ? [] : paths));
@@ -1465,7 +1566,7 @@
 	}
 
 	async function incolla() {
-		if (!store.activeTab || !modificabile) return;
+		if (!store.activeTab || !scrivibile) return;
 		erroreOp = null;
 		const contenuto = await daIncollare();
 		if (!contenuto) return;
@@ -1478,6 +1579,10 @@
 	 * nessuna finestra e l'operazione parte subito.
 	 */
 	async function trasferisci(sources: string[], dest: string, mode: 'copy' | 'move') {
+		if (sources.length > 0 && eServer(sources[0]) && eServer(dest)) {
+			erroreOp = 'Fra due cartelle di server si copia passando dal PC: scarica e poi carica.';
+			return;
+		}
 		// Da un altro PC si copia sempre, e i nomi occupati si numerano da soli.
 		if (sources.length > 0 && eReteLocale(sources[0])) {
 			await scaricaDaRete(sources, dest);
@@ -1918,7 +2023,7 @@
 		if (store.activeTab?.archivio?.cassaforte) return aggiungiInCassaforte(paths);
 		const sopra = cartellaSotto(x, y);
 		if (sopra === NUOVA_SCHEDA) return apriInSchede(paths);
-		const dest = sopra ?? (modificabile ? (store.activeTab?.path ?? null) : null);
+		const dest = sopra ?? (scrivibile ? (store.activeTab?.path ?? null) : null);
 		if (!dest || paths.length === 0) return;
 
 		if (dest === CESTINO) {
@@ -2605,7 +2710,7 @@
 		const y = evento.clientY;
 		const scelte = selezionate();
 		const inCassaforte = !!store.activeTab?.archivio?.cassaforte;
-		const pieni = modificabile || inCassaforte ? (await daIncollare()) !== null : false;
+		const pieni = scrivibile || inCassaforte ? (await daIncollare()) !== null : false;
 		menu = {
 			voci: vociMenu({
 				selezione: scelte,
@@ -3146,6 +3251,10 @@
 				return 'Unità non pronta. Controlla che il supporto sia inserito.';
 			case 'io':
 				return err.message;
+			case 'serverKey':
+				return err.changed ? 'La chiave del server è cambiata: Space Train non si collega.' : 'Conferma la chiave del server per collegarti.';
+			case 'serverPassword':
+				return 'Il server chiede la password.';
 			default:
 				return '';
 		}
@@ -3216,6 +3325,9 @@
 			etichette={colori.usati}
 			etichettaAperta={store.activeTab?.etichetta ?? null}
 			onetichetta={(id) => void mostraEtichetta(id)}
+			server={serverSalvati}
+			onaggiungiserver={() => (dialogoServer = { mode: { kind: 'edit', server: null }, error: null, busy: false })}
+			onmodificaserver={(s) => (dialogoServer = { mode: { kind: 'edit', server: s }, error: null, busy: false })}
 			onrenamelabel={(id, name) => {
 				const before = colori.nameOf(id);
 				colori.rename(id, name);
@@ -3561,6 +3673,19 @@
 				conflitti = [];
 				inSospeso = null;
 			}}
+		/>
+	{/if}
+
+	{#if dialogoServer}
+		<ServerDialog
+			mode={dialogoServer.mode}
+			error={dialogoServer.error}
+			busy={dialogoServer.busy}
+			onsave={(c, pw) => void salvaServer(c, pw)}
+			onremove={(id) => void rimuoviServer(id)}
+			ontrust={() => void confermaChiaveServer()}
+			onpassword={(pw, r) => void passwordServer(pw, r)}
+			oncancel={() => (dialogoServer = null)}
 		/>
 	{/if}
 

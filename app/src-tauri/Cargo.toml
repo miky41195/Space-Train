@@ -48,6 +48,13 @@ image = { version = "0.25", default-features = false, features = ["jpeg", "png",
 argon2 = "0.5"
 chacha20poly1305 = { version = "0.10", features = ["stream"] }
 zeroize = "1"
+russh = { version = "0.65", default-features = false, features = ["ring", "flate2", "rsa"] }
+russh-sftp = "3"
+suppaftp = { version = "12", features = ["rustls-ring"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-platform-verifier = "0.7"
+quick-xml = "0.41"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62.2", features = [
@@ -56,6 +63,7 @@ windows = { version = "0.62.2", features = [
     "Win32_UI_Shell_PropertiesSystem",
     "Win32_Storage_EnhancedStorage",
     "Win32_System_Variant",
+    "Win32_Security_Credentials",
     "Win32_UI_WindowsAndMessaging",
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_Graphics_Gdi",

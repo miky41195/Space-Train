@@ -238,6 +238,7 @@ describe('TabsStore', () => {
 			reqSeq: 0,
 			lastApplied: 0,
 			error: null,
+			failedPath: null,
 			loading: false,
 			risultati: null,
 			cercando: false,

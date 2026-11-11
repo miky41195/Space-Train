@@ -62,6 +62,9 @@ export class DiscoFinto {
 	risposte: Array<{ id: number; accetta: boolean; cartella: string | null }> = [];
 	/** Cosa risponde il selettore di cartelle: null è «annullato». */
 	cartellaScelta: string | null = null;
+	/** Saved remote servers, and the passwords typed for them. */
+	server: import('./ipc').ServerConfig[] = [];
+	passwordServer = new Map<string, string>();
 	/** Vaults by folder path: password, open or not, inner items. */
 	casseforti = new Map<string, { password: string; aperta: boolean; voci: Array<{ path: string; size: number; dir: boolean; modified: number | null }> }>();
 	/** Git status by folder, for git_status. */
@@ -134,11 +137,16 @@ export class DiscoFinto {
 
 	async invoke(cmd: string, args: Record<string, unknown> = {}): Promise<unknown> {
 		switch (cmd) {
-			case 'list_dir':
-				return this.#listDir(args.path as string, args.sort as SortSpec);
+			case 'list_dir': {
+				const path = args.path as string;
+				const server = this.server.find((x) => path === `::server\\${x.id}` || path.startsWith(`::server\\${x.id}\\`));
+				if (server && !this.passwordServer.has(server.id)) throw errore({ kind: 'serverPassword' });
+				if (server && !this.nodi.has(path)) return { path, entries: [] };
+				return this.#listDir(path, args.sort as SortSpec);
+			}
 			case 'navigate': {
 				const path = args.path as string;
-				if (path.startsWith('::lan\\') || path.startsWith('::amici\\')) return genitore(path);
+				if (path.startsWith('::lan\\') || path.startsWith('::amici\\') || path.startsWith('::server\\')) return genitore(path);
 				if (path.startsWith('::')) throw errore({ kind: 'notFound' });
 				// Sopra la radice del disco c'è Questo PC, come nel backend.
 				if (path === 'C:\\') return '::pc';
@@ -297,6 +305,27 @@ export class DiscoFinto {
 				return true;
 			case 'shortcut_free':
 				return !this.scorciatoieOccupate.has(args.accelerator as string);
+			case 'server_list':
+				return this.server;
+			case 'server_put': {
+				const c = { ...(args.config as import('./ipc').ServerConfig) };
+				if (!c.id) c.id = `s${this.server.length + 1}`;
+				if (!c.name) c.name = c.host;
+				this.server = [...this.server.filter((s) => s.id !== c.id), c];
+				if (args.password) this.passwordServer.set(c.id, args.password as string);
+				return c;
+			}
+			case 'server_remove':
+				this.server = this.server.filter((s) => s.id !== args.id);
+				return;
+			case 'server_trust':
+				this.server = this.server.map((s) => (s.id === args.id ? { ...s, fingerprint: args.fingerprint as string } : s));
+				return;
+			case 'server_password':
+				this.passwordServer.set(args.id as string, args.password as string);
+				return;
+			case 'server_test':
+				return;
 			case 'vault_create': {
 				const dir = unisci(args.parent as string, `${args.name as string}.cassaforte`);
 				if ((args.password as string).length < 8) throw { kind: 'io', message: 'La password deve avere almeno 8 caratteri.' };

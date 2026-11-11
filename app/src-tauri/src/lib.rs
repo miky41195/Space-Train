@@ -11,6 +11,7 @@ pub mod registry;
 pub mod shell;
 pub mod transfer;
 pub mod vault;
+pub mod server;
 
 /// System-wide hotkey that brings the window back to the front.
 ///
@@ -105,6 +106,9 @@ pub fn run() {
                 .app_local_data_dir()
                 .unwrap_or_else(|_| std::env::temp_dir().join("space-train"));
             let lan = lan::Lan::avvia(app.handle().clone(), dati.clone());
+            let servers = std::sync::Arc::new(server::Servers::load(dati.join("server.json")));
+            server::install(servers.clone());
+            app.manage(servers);
             // Gli amici usano la stessa cartella condivisa e lo stesso nome
             // della rete locale, ma viaggiano su internet, cifrati.
             app.manage(amici::Amici::avvia(
@@ -200,6 +204,12 @@ pub fn run() {
             vault::vault_extract,
             vault::vault_open_item,
             vault::vault_delete,
+            server::server_list,
+            server::server_put,
+            server::server_remove,
+            server::server_trust,
+            server::server_password,
+            server::server_test,
             transfer::image_convert,
             ipc::entries_for,
             ipc::shortcut_free,

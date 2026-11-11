@@ -94,7 +94,28 @@ export type FsError =
 	| { kind: 'notFound' }
 	| { kind: 'notADirectory' }
 	| { kind: 'deviceNotReady' }
-	| { kind: 'io'; message: string };
+	| { kind: 'io'; message: string }
+	/** A remote server's key to confirm (first time) or that changed (danger). */
+	| { kind: 'serverKey'; fingerprint: string; changed: boolean }
+	/** The remote server wants a password. */
+	| { kind: 'serverPassword' };
+
+export type ServerProtocol = 'sftp' | 'ftp' | 'ftps' | 'webdav';
+
+/** A saved remote server. The password is never here. */
+export interface ServerConfig {
+	id: string;
+	name: string;
+	protocol: ServerProtocol;
+	host: string;
+	port: number;
+	user: string;
+	/** Start folder on the server. */
+	path: string;
+	fingerprint?: string | null;
+	/** The password is kept in the Windows Credential Manager. */
+	remember: boolean;
+}
 
 /** Cosa fare quando a destinazione esiste già un elemento con lo stesso nome. */
 export type Politica = 'sovrascrivi' | 'rinomina' | 'salta';
@@ -386,6 +407,15 @@ export interface Backend {
 	mediaProps(paths: string[]): Promise<Array<MediaProps | null>>;
 	/** Git status of a folder's items; null outside a repository or without git. */
 	gitStatus(folder: string): Promise<GitStatus | null>;
+	serverList(): Promise<ServerConfig[]>;
+	/** Adds (empty id) or changes a server; the password, when given, is kept as `remember` says. */
+	serverPut(config: ServerConfig, password: string | null): Promise<ServerConfig>;
+	serverRemove(id: string): Promise<void>;
+	/** The user confirmed this server key. */
+	serverTrust(id: string, fingerprint: string): Promise<void>;
+	serverPassword(id: string, password: string, remember: boolean): Promise<void>;
+	/** Tries to connect, nothing else. */
+	serverTest(id: string): Promise<void>;
 	/** Vault: a folder `<name>.cassaforte` encrypted with a password. Create leaves it open. */
 	vaultCreate(parent: string, name: string, password: string): Promise<string>;
 	vaultUnlock(path: string, password: string): Promise<void>;
@@ -521,6 +551,12 @@ export const tauriBackend: Backend = {
 	imageRotate: (paths, clockwise) => invoke('image_rotate', { paths, clockwise }),
 	mediaProps: (paths) => invoke('media_props', { paths }),
 	gitStatus: (folder) => invoke('git_status', { folder }),
+	serverList: () => invoke('server_list'),
+	serverPut: (config, password) => invoke('server_put', { config, password }),
+	serverRemove: (id) => invoke('server_remove', { id }),
+	serverTrust: (id, fingerprint) => invoke('server_trust', { id, fingerprint }),
+	serverPassword: (id, password, remember) => invoke('server_password', { id, password, remember }),
+	serverTest: (id) => invoke('server_test', { id }),
 	vaultCreate: (parent, name, password) => invoke('vault_create', { parent, name, password }),
 	vaultUnlock: (path, password) => invoke('vault_unlock', { path, password }),
 	vaultLock: (path) => invoke('vault_lock', { path }),
