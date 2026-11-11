@@ -245,6 +245,7 @@ describe('TabsStore', () => {
 			duplicati: null,
 			confronto: null,
 			etichetta: null,
+			archivio: null,
 			spazio: false
 		});
 		s.setActive(1);

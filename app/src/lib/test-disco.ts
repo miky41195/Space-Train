@@ -56,6 +56,14 @@ export class DiscoFinto {
 	risposte: Array<{ id: number; accetta: boolean; cartella: string | null }> = [];
 	/** Cosa risponde il selettore di cartelle: null è «annullato». */
 	cartellaScelta: string | null = null;
+	/** Archive contents by archive path, for archive_list / archive_extract. */
+	archivi = new Map<string, Array<{ path: string; size: number; dir: boolean; modified: number | null }>>();
+	/** Key combinations another program holds (shortcut_free answers false). */
+	scorciatoieOccupate = new Set<string>();
+	/** Images rotated, with the direction. */
+	ruotate: Array<{ path: string; clockwise: boolean }> = [];
+	/** Transfers paused or resumed: op id → paused. */
+	pause = new Map<number, boolean>();
 	/** Immagini salvate dall'editor dei temi. */
 	immaginiTema: string[] = [];
 	/** I loro byte in base64, per percorso salvato. */
@@ -248,6 +256,43 @@ export class DiscoFinto {
 				const zip = this.#libero(args.dest as string, `${base}.zip`);
 				this.nodi.set(zip, nodo('file'));
 				return zip;
+			}
+			case 'file_checksum':
+				// Like a real digest: lowercase, no prefix.
+				return `${args.algorithm}ff${this.contenuti.get(args.path as string) ?? ''}`.toLowerCase();
+			case 'archive_list':
+				return this.archivi.get(args.archive as string) ?? [];
+			case 'archive_extract': {
+				const voci = this.archivi.get(args.archive as string) ?? [];
+				const scelti = args.items as string[];
+				const dest = args.dest as string;
+				for (const v of voci) {
+					const c = scelti.find((s) => v.path === s || v.path.startsWith(s + '/'));
+					if (c === undefined) continue;
+					const taglio = c.lastIndexOf('/') + 1;
+					const rel = v.path.slice(taglio).split('/').join('\\');
+					this.nodi.set(unisci(dest, rel), nodo(v.dir ? 'dir' : 'file'));
+				}
+				return;
+			}
+			case 'pause_transfer':
+				this.pause.set(args.opId as number, args.paused as boolean);
+				return true;
+			case 'shortcut_free':
+				return !this.scorciatoieOccupate.has(args.accelerator as string);
+			case 'image_rotate':
+				for (const p of args.paths as string[]) this.ruotate.push({ path: p, clockwise: args.clockwise as boolean });
+				return;
+			case 'image_convert': {
+				const fatti: string[] = [];
+				for (const p of args.paths as string[]) {
+					const base = nome(p).replace(/\.[^.]+$/, '');
+					const lato = args.maxSide ? ` (${args.maxSide})` : '';
+					const nuovo = this.#libero(genitore(p), `${base}${lato}.${args.target}`);
+					this.nodi.set(nuovo, nodo('file'));
+					fatti.push(nuovo);
+				}
+				return fatti;
 			}
 			case 'extract': {
 				const archivio = args.archive as string;

@@ -179,6 +179,7 @@ pub fn run() {
             transfer::pause_transfer,
             transfer::archive_list,
             transfer::archive_extract,
+            transfer::archive_open_item,
             transfer::image_rotate,
             transfer::image_convert,
             ipc::entries_for,

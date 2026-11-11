@@ -29,6 +29,9 @@ export type AzioneMenu =
 	| 'duplicati'
 	| 'confronta'
 	| 'spazio'
+	| 'checksum'
+	| 'estraiQui'
+	| 'estraiIn'
 	| 'paginaIniziale'
 	| 'cartellaAvvio'
 	| 'sessione'
@@ -103,7 +106,7 @@ export interface VoceMenu {
 }
 
 /** Dove si trova l'utente: ogni posizione ha le sue operazioni. */
-export type Posizione = 'normale' | 'cestino' | 'pc' | 'rete' | 'lan';
+export type Posizione = 'normale' | 'cestino' | 'pc' | 'rete' | 'lan' | 'archivio';
 
 export interface ContestoMenu {
 	/** Voci selezionate al momento del clic destro. Vuoto = clic sul vuoto. */
@@ -163,6 +166,7 @@ export function vociMenu(c: ContestoMenu, linux = SU_LINUX): VoceMenu[] {
 function vociPerPosizione(c: ContestoMenu): VoceMenu[] {
 	const posizione = c.posizione ?? 'normale';
 	if (posizione === 'cestino') return vociCestino(c);
+	if (posizione === 'archivio') return vociArchivio(c);
 	if (posizione === 'pc' || posizione === 'rete') return vociVirtuali(c, posizione);
 	if (posizione === 'lan') return vociReteLocale(c);
 	return c.selezione.length === 0 ? vociSfondo(c) : vociElementi(c);
@@ -255,6 +259,7 @@ function vociElementi({
 			voci.push({ azione: 'spazio', etichetta: 'Analizza spazio' });
 		} else {
 			voci.push({ azione: 'apriCon', etichetta: 'Apri con…' });
+			voci.push({ azione: 'checksum', etichetta: 'Somma di controllo…' });
 			if (eEseguibile(unica.name)) {
 				voci.push({ azione: 'amministratore', etichetta: 'Esegui come amministratore' });
 			}
@@ -374,6 +379,16 @@ function vociCestino({ selezione }: ContestoMenu): VoceMenu[] {
 			pericolosa: true
 		}
 	];
+}
+
+/** Inside an archive opened like a folder: open and extract, nothing that writes into it. */
+function vociArchivio({ selezione }: ContestoMenu): VoceMenu[] {
+	const voci: VoceMenu[] = [];
+	if (selezione.length === 1) voci.push({ azione: 'apri', etichetta: 'Apri', scorciatoia: 'Invio' });
+	const cosa = selezione.length === 0 ? 'tutto' : selezione.length === 1 ? '' : `${selezione.length} elementi`;
+	voci.push({ azione: 'estraiQui', etichetta: `Estrai ${cosa} accanto all’archivio`.replace('  ', ' '), stacca: voci.length > 0 });
+	voci.push({ azione: 'estraiIn', etichetta: `Estrai ${cosa} in…`.replace('  ', ' ') });
+	return voci;
 }
 
 function vociVirtuali({ selezione, iniziale = false }: ContestoMenu, posizione: 'pc' | 'rete'): VoceMenu[] {

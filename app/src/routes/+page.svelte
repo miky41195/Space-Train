@@ -29,10 +29,12 @@
 	import TestataPannello from '$lib/components/TestataPannello.svelte';
 	import { followActive, otherPane, type Split } from '$lib/split';
 	import { alignPlan, compareZones } from '$lib/confronto';
+	import { internoDi, sopra } from '$lib/archivio';
 	import { NESSUN_FILTRO, criteriFiltri, descriviRicerca, filtriAttivi, type Filtri } from '$lib/filtri';
 	import { RICERCHE_PRONTE, RicercheStore, type RicercaSalvata } from '$lib/stores/ricerche.svelte';
 	import SearchBar from '$lib/components/SearchBar.svelte';
 	import ConfermaCestino from '$lib/components/ConfermaCestino.svelte';
+	import SommaControllo from '$lib/components/SommaControllo.svelte';
 	import BatchRename from '$lib/components/BatchRename.svelte';
 	import { renameSteps, type PlannedRename } from '$lib/batch-rename';
 	import ConfermaConflitti from '$lib/components/ConfermaConflitti.svelte';
@@ -89,6 +91,7 @@
 		NUOVA_SCHEDA,
 		impostaNomiAmici,
 		cartellaDi,
+		eArchivio,
 		eReteLocale,
 		eVirtuale,
 		dentroDi,
@@ -235,6 +238,7 @@
 
 	/** Che genere di posizione mostra il tab: decide menu e operazioni. */
 	let posizione = $derived.by((): Posizione => {
+		if (store.activeTab?.archivio) return 'archivio';
 		const p = store.activeTab?.path ?? '';
 		if (p === CESTINO) return 'cestino';
 		if (p === QUESTO_PC) return 'pc';
@@ -245,6 +249,9 @@
 
 	/** Vero se il tab mostra i risultati di una ricerca nelle sottocartelle. */
 	let inRicerca = $derived(store.activeTab?.risultati != null);
+	/** The file whose checksum dialog is open. */
+	let sommaDi = $state<Entry | null>(null);
+
 	// ── Dual pane ────────────────────────────────────────────────────
 	let split = $state<Split | null>(null);
 	let ultimaAttiva: number | null = null;
@@ -591,6 +598,52 @@
 			i += g.count;
 		}
 		store.selezionaPercorsi(store.activeId, extra);
+	}
+
+	// ── Archives opened like folders ─────────────────────────────────
+	async function apriArchivio(file: string) {
+		const id = store.activeId;
+		if (id === null) return;
+		try {
+			const voci = await tauriBackend.archiveList(file);
+			await store.mostraArchivio(id, file, '', voci);
+		} catch (err) {
+			erroreOp = descriviErrore(err);
+		}
+	}
+
+	/** One level up inside the archive; above its root, back to the folder. */
+	function suNellArchivio(): boolean {
+		const tab = store.activeTab;
+		if (!tab?.archivio || store.activeId === null) return false;
+		const su = sopra(tab.archivio.dentro);
+		if (su === null) void store.fermaRicerca(store.activeId);
+		else void store.mostraArchivio(store.activeId, tab.archivio.file, su, tab.archivio.voci);
+		return true;
+	}
+
+	/** Extracts the selection (or everything) from the open archive into `dest`. */
+	async function estraiDaArchivio(dest: string) {
+		const arc = store.activeTab?.archivio;
+		if (!arc || opInCorso !== null) return;
+		const scelte = selezionate();
+		const items = scelte.length > 0 ? scelte.map((e) => internoDi(e.path)) : (store.activeTab?.risultati ?? []).map((e) => internoDi(e.path));
+		const opId = prossimoOpId++;
+		modoInCorso = 'estrai';
+		opInCorso = opId;
+		progresso = { transferred: 0, total: 0 };
+		erroreOp = null;
+		try {
+			await tauriBackend.archiveExtract({ opId, archive: arc.file, items, dest, onProgress: (p) => (progresso = p) });
+			avvisa(`Estratto in ${dest}.`);
+			void store.aggiornaCartella(dest);
+			aggiornamentoDischi++;
+		} catch (err) {
+			erroreOp = descriviErrore(err);
+		} finally {
+			opInCorso = null;
+			progresso = null;
+		}
 	}
 
 	/** Every item carrying a colour label, wherever it is, in place of the folder. */
@@ -1428,7 +1481,7 @@
 
 		// Con una finestra modale aperta o un campo in modifica, le
 		// scorciatoie della lista non devono sparare.
-		if (daCestinare.length > 0 || daEliminare || rinominando !== null || conflitti.length > 0 || batchRename.length > 0) return;
+		if (daCestinare.length > 0 || daEliminare || rinominando !== null || conflitti.length > 0 || batchRename.length > 0 || sommaDi) return;
 
 		// Dentro un campo di testo i tasti servono a scrivere. Dal campo di
 		// ricerca passano solo quelli che muovono la selezione o la chiudono.
@@ -1458,7 +1511,7 @@
 			void store.impostaSpazio(store.activeId, false);
 			return;
 		}
-		if (e.key === 'Escape' && (store.activeTab?.duplicati || store.activeTab?.confronto || store.activeTab?.etichetta)) {
+		if (e.key === 'Escape' && (store.activeTab?.duplicati || store.activeTab?.confronto || store.activeTab?.etichetta || store.activeTab?.archivio)) {
 			e.preventDefault();
 			void store.fermaRicerca(store.activeId);
 			return;
@@ -1511,6 +1564,11 @@
 			impostazioni.impostaVista(vista, lato);
 			return;
 		}
+
+		// Inside an archive nothing can be written, cut or deleted: its items are not real files.
+		const scrive = ['copia', 'taglia', 'incolla', 'rinomina', 'nuovaCartella', 'cestina', 'eliminaDefinitivo', 'copiaAltroPannello', 'spostaAltroPannello', 'preferito'];
+		if (store.activeTab?.archivio && typeof azione === 'string' && scrive.includes(azione)) return;
+		if (store.activeTab?.archivio && (azione === 'su' || azione === 'indietro') && suNellArchivio()) return;
 
 		switch (azione) {
 			case 'copia':
@@ -1800,6 +1858,20 @@
 
 	function apri(e: Entry) {
 		if (store.activeId === null || posizione === 'cestino') return;
+		const arc = store.activeTab?.archivio;
+		if (arc) {
+			if (e.kind === 'dir') void store.mostraArchivio(store.activeId, arc.file, internoDi(e.path), arc.voci);
+			else
+				tauriBackend
+					.archiveOpenItem(arc.file, internoDi(e.path))
+					.then((p) => tauriBackend.openEntry(p))
+					.catch((err) => (erroreOp = descriviErrore(err)));
+			return;
+		}
+		if (e.kind !== 'dir' && posizione === 'normale' && eArchivio(e.name)) {
+			void apriArchivio(e.path);
+			return;
+		}
 		if (e.kind === 'dir') store.navigate(store.activeId, e.path);
 		// Un file di un altro PC si scarica in una cartella temporanea e si apre.
 		else if (eReteLocale(e.path))
@@ -2245,6 +2317,20 @@
 					}
 					break;
 				}
+				case 'estraiQui': {
+					const arc = store.activeTab?.archivio;
+					if (arc) await estraiDaArchivio(cartellaDi(arc.file));
+					break;
+				}
+				case 'estraiIn': {
+					const arc = store.activeTab?.archivio;
+					const dest = arc ? await tauriBackend.scegliCartella('Estrai in…', cartellaDi(arc.file)) : null;
+					if (dest) await estraiDaArchivio(dest);
+					break;
+				}
+				case 'checksum':
+					if (scelte[0]) sommaDi = scelte[0];
+					break;
 				case 'spazio': {
 					const cartella = cartellaDelMenu(scelte);
 					if (cartella) await analizzaSpazio(cartella);
@@ -2805,6 +2891,9 @@
 
 	{#if daCestinare.length > 0}
 		<ConfermaCestino voci={daCestinare} onconfirm={() => cestina()} oncancel={() => (daCestinare = [])} />
+	{/if}
+	{#if sommaDi}
+		<SommaControllo voce={sommaDi} backend={tauriBackend} onclose={() => (sommaDi = null)} />
 	{/if}
 
 	{#if batchRename.length > 0}

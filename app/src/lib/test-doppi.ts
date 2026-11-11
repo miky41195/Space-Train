@@ -162,6 +162,26 @@ export function backendFinto(over: Partial<Backend> = {}): Backend {
 		async compress() {
 			return '';
 		},
+		async fileChecksum() {
+			return 'ab'.repeat(32);
+		},
+		async archiveList() {
+			return [];
+		},
+		async archiveExtract() {},
+		async archiveOpenItem() {
+			return '';
+		},
+		async pauseTransfer() {
+			return true;
+		},
+		async shortcutFree() {
+			return true;
+		},
+		async imageRotate() {},
+		async imageConvert() {
+			return [];
+		},
 		async extract() {
 			return '';
 		},

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { TabsStore } from '../stores/tabs.svelte';
-	import { briciole, eVirtuale, nomePosizione } from '../posizioni';
+	import { briciole, eVirtuale, nomeDi, nomePosizione } from '../posizioni';
 
 	const DUPLICATES_STOP = '::duplicati';
 
@@ -32,7 +32,9 @@
 			? 'Duplicati'
 			: store.activeTab?.confronto
 				? `Confronto con ${nomePosizione(store.activeTab.confronto.altro)}`
-				: store.activeTab?.etichetta
+				: store.activeTab?.archivio
+					? [nomeDi(store.activeTab.archivio.file), ...store.activeTab.archivio.dentro.split('/').filter(Boolean)].join(' › ')
+					: store.activeTab?.etichetta
 					? `Etichetta ${store.activeTab.etichetta}`
 					: store.activeTab?.spazio
 						? 'Spazio'

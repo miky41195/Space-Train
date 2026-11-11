@@ -2936,3 +2936,55 @@ describe('colour labels', () => {
 		await waitFor(() => expect(nomi()).toContain('alfa.txt'));
 	});
 });
+
+describe('archive as a folder', () => {
+	it('opens a 7z like a folder, walks in and out, extracts a chosen item, Esc leaves', async () => {
+		aggiungi('C:\\p.7z');
+		disco.archivi.set('C:\\p.7z', [
+			{ path: 'src/a.txt', size: 5, dir: false, modified: 1 },
+			{ path: 'README.md', size: 2, dir: false, modified: 1 }
+		]);
+		await monta();
+		await fireEvent.dblClick(riga('p.7z'));
+		await waitFor(() => expect(nomi()).toEqual(['src', 'README.md']));
+		expect(screen.getByText('p.7z')).toBeTruthy();
+
+		await fireEvent.dblClick(riga('src'));
+		await waitFor(() => expect(nomi()).toEqual(['a.txt']));
+		tasto('Backspace');
+		await waitFor(() => expect(nomi()).toEqual(['src', 'README.md']));
+
+		// Nothing that writes works inside the archive.
+		await fireEvent.click(riga('README.md'));
+		tasto('Delete');
+		expect(document.querySelector('[aria-label="Conferma eliminazione"]')).toBeNull();
+
+		await fireEvent.contextMenu(riga('README.md'));
+		await fireEvent.click(await screen.findByRole('menuitem', { name: 'Estrai accanto all’archivio' }));
+		await waitFor(() => expect(disco.esiste('C:\\README.md')).toBe(true));
+
+		tasto('Escape');
+		await waitFor(() => expect(nomi()).toContain('alfa.txt'));
+	});
+});
+
+describe('checksum', () => {
+	it('computes SHA-256 at once, switches algorithm and compares a pasted value', async () => {
+		aggiungi('C:\\setup.exe', 'X');
+		await monta();
+		await fireEvent.contextMenu(riga('setup.exe'));
+		await fireEvent.click(await screen.findByRole('menuitem', { name: 'Somma di controllo…' }));
+		const dialog = await screen.findByRole('dialog', { name: 'Somma di controllo' });
+		await waitFor(() => expect(within(dialog).getByText('sha256ffx')).toBeTruthy());
+
+		await fireEvent.click(within(dialog).getByRole('radio', { name: 'MD5' }));
+		await waitFor(() => expect(within(dialog).getByText('md5ffx')).toBeTruthy());
+
+		const campo = within(dialog).getByPlaceholderText('Incolla qui') as HTMLInputElement;
+		// As pages print it: other case, a «MD5:» label, spaces.
+		await fireEvent.input(campo, { target: { value: '  MD5: MD5FFX ' } });
+		expect(within(dialog).getByRole('status').textContent).toContain('Coincide');
+		await fireEvent.input(campo, { target: { value: 'other' } });
+		expect(within(dialog).getByRole('status').textContent).toContain('Non coincide');
+	});
+});

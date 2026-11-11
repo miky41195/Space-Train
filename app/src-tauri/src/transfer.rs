@@ -338,6 +338,22 @@ pub async fn archive_extract(
     .await
 }
 
+/// Extracts one file of an archive into a temporary folder (one per archive)
+/// and returns its path, so it can be opened like any file.
+#[tauri::command]
+pub async fn archive_open_item(archive: String, item: String) -> Result<String, FsError> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let key = blake3::hash(archive.to_lowercase().as_bytes()).to_hex();
+        let dir = std::env::temp_dir().join("space-train-archivi").join(&key.as_str()[..16]);
+        let flag = AtomicBool::new(false);
+        crate::fs::archive_formats::extract(&archive, &dir, Some(std::slice::from_ref(&item)), &flag, &mut |_| {})?;
+        let name = item.rsplit('/').next().unwrap_or(&item);
+        Ok(crate::fs::paths::display(&dir.join(name)))
+    })
+    .await
+    .map_err(|e| FsError::Io { message: e.to_string() })?
+}
+
 /// Rotates images a quarter turn, rewriting each file.
 #[tauri::command]
 pub async fn image_rotate(paths: Vec<String>, clockwise: bool) -> Result<(), FsError> {

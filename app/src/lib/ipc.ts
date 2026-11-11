@@ -94,6 +94,16 @@ export interface Comparison {
 	different: Array<{ here: Entry; there: Entry; newerHere: boolean }>;
 }
 
+/** One item inside an archive; `path` uses `/` with no leading separator. */
+export interface ArchiveItem {
+	path: string;
+	size: number;
+	dir: boolean;
+	modified: number | null;
+}
+
+export type ImageTarget = 'jpg' | 'png' | 'webp';
+
 export interface CriteriRicerca {
 	testo: string;
 	contenuto: boolean;
@@ -315,6 +325,32 @@ export interface Backend {
 		onProgress: (p: Progresso) => void;
 	}): Promise<string>;
 	extract(opts: { opId: number; archive: string; onProgress: (p: Progresso) => void }): Promise<string>;
+	/** Hex checksum of a file; `null` when cancelled. */
+	fileChecksum(opts: { opId: number; path: string; algorithm: 'sha256' | 'sha1' | 'md5' }): Promise<string | null>;
+	archiveList(archive: string): Promise<ArchiveItem[]>;
+	/** Extracts one inner file to a temporary folder and returns its path, to open it. */
+	archiveOpenItem(archive: string, item: string): Promise<string>;
+	/** Extracts chosen inner items (folders with their contents) into `dest`. */
+	archiveExtract(opts: {
+		opId: number;
+		archive: string;
+		items: string[];
+		dest: string;
+		onProgress: (p: Progresso) => void;
+	}): Promise<void>;
+	/** Pauses or resumes a running job between items. */
+	pauseTransfer(opId: number, paused: boolean): Promise<boolean>;
+	/** Free system-wide (no other program holds it)? `null` = not a valid combination. */
+	shortcutFree(accelerator: string): Promise<boolean | null>;
+	imageRotate(paths: string[], clockwise: boolean): Promise<void>;
+	imageConvert(opts: {
+		opId: number;
+		paths: string[];
+		target: ImageTarget;
+		maxSide: number | null;
+		quality: number;
+		onProgress: (p: Progresso) => void;
+	}): Promise<string[]>;
 	/**
 	 * Deletes with progress counted in items. Cancellable between items:
 	 * resolves with the paths actually removed.
@@ -412,6 +448,16 @@ export const tauriBackend: Backend = {
 		invoke('compress', { opId, sources, dest, onProgress: canale(onProgress) }),
 	extract: ({ opId, archive, onProgress }) =>
 		invoke('extract', { opId, archive, onProgress: canale(onProgress) }),
+	fileChecksum: ({ opId, path, algorithm }) => invoke('file_checksum', { opId, path, algorithm }),
+	archiveList: (archive) => invoke('archive_list', { archive }),
+	archiveOpenItem: (archive, item) => invoke('archive_open_item', { archive, item }),
+	archiveExtract: ({ opId, archive, items, dest, onProgress }) =>
+		invoke('archive_extract', { opId, archive, items, dest, onProgress: canale(onProgress) }),
+	pauseTransfer: (opId, paused) => invoke('pause_transfer', { opId, paused }),
+	shortcutFree: (accelerator) => invoke('shortcut_free', { accelerator }),
+	imageRotate: (paths, clockwise) => invoke('image_rotate', { paths, clockwise }),
+	imageConvert: ({ opId, paths, target, maxSide, quality, onProgress }) =>
+		invoke('image_convert', { opId, paths, target, maxSide, quality, onProgress: canale(onProgress) }),
 	deleteItems: ({ opId, mode, paths, onProgress }) =>
 		invoke('delete_items', { opId, mode, paths, onProgress: canale(onProgress) })
 };

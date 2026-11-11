@@ -1,4 +1,5 @@
-import type { Backend, Comparison, CriteriRicerca, Entry, FsError, Progresso, SortSpec } from '../ipc';
+import type { ArchiveItem, Backend, Comparison, CriteriRicerca, Entry, FsError, Progresso, SortSpec } from '../ipc';
+import { livello } from '../archivio';
 import { stessoPath } from '../posizioni';
 
 export interface Tab {
@@ -51,6 +52,8 @@ export interface Tab {
 	} | null;
 	/** Set when `risultati` lists the items carrying a colour label: the colour's name. */
 	etichetta: string | null;
+	/** An archive opened like a folder: its items, and the inner folder shown ('' = root). */
+	archivio: { file: string; dentro: string; voci: ArchiveItem[] } | null;
 	/** «Analizza spazio»: the list is sorted by size with a bar; it stays on while browsing. */
 	spazio: boolean;
 }
@@ -122,6 +125,7 @@ export class TabsStore {
 			duplicati: null,
 			confronto: null,
 			etichetta: null,
+			archivio: null,
 			spazio: false
 		};
 		this.tabs.push(tab);
@@ -259,6 +263,7 @@ export class TabsStore {
 		tab.duplicati = null;
 		tab.confronto = null;
 		tab.etichetta = null;
+		tab.archivio = null;
 		tab.cercando = true;
 		tab.selection = [];
 		tab.anchor = null;
@@ -297,6 +302,7 @@ export class TabsStore {
 		tab.duplicati = { groups: [], progress: { transferred: 0, total: 0 } };
 		tab.confronto = null;
 		tab.etichetta = null;
+		tab.archivio = null;
 		tab.cercando = true;
 		tab.query = '';
 		tab.selection = [];
@@ -330,6 +336,18 @@ export class TabsStore {
 		if (!tab) return;
 		if (acceso) await this.fermaRicerca(id);
 		tab.spazio = acceso;
+	}
+
+	/** Shows one level of an archive in place of the folder. */
+	async mostraArchivio(id: number, file: string, dentro: string, voci: ArchiveItem[]): Promise<void> {
+		const tab = this.#get(id);
+		if (!tab) return;
+		if (tab.archivio?.file !== file) await this.fermaRicerca(id);
+		tab.archivio = { file, dentro, voci };
+		tab.risultati = livello(voci, dentro, file);
+		tab.query = '';
+		tab.selection = [];
+		tab.anchor = null;
 	}
 
 	/** Shows `voci` in place of the folder, as a named view (a colour label). */
@@ -376,6 +394,7 @@ export class TabsStore {
 				tab.risultati = null;
 				tab.confronto = null;
 				tab.etichetta = null;
+				tab.archivio = null;
 			}
 			throw e;
 		} finally {
@@ -398,6 +417,7 @@ export class TabsStore {
 			tab.duplicati = null;
 			tab.confronto = null;
 			tab.etichetta = null;
+			tab.archivio = null;
 		}
 		if (op !== null) await this.backend.cancelTransfer(op);
 	}
@@ -544,6 +564,7 @@ export class TabsStore {
 			tab.duplicati = null;
 			tab.confronto = null;
 			tab.etichetta = null;
+			tab.archivio = null;
 
 			if (opts.pushHistory) {
 				tab.history = tab.history.slice(0, tab.historyIndex + 1);
