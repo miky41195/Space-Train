@@ -37,6 +37,8 @@ export class DiscoFinto {
 	aperti: string[] = [];
 	/** While set, `delete_items` waits for it: lets a test see the bar. */
 	bloccaEliminazione: Promise<void> | null = null;
+	/** Paths that refuse deletion, as a file open in another program does. */
+	inUso = new Set<string>();
 	/** While set, `transfer` waits for it: lets a test fill the queue. */
 	bloccaTrasferimento: Promise<void> | null = null;
 	/** Byte liberi su C:, che un test può cambiare come farebbe un altro programma. */
@@ -201,9 +203,13 @@ export class DiscoFinto {
 				canale.onmessage?.({ transferred: 0, total: totale });
 				if (this.bloccaEliminazione) await this.bloccaEliminazione;
 				const comando = { cestino: 'move_to_trash', disco: 'delete_permanently', dalCestino: 'trash_purge', svuota: 'trash_empty' }[mode];
-				await this.invoke(comando, { paths });
+				const done = paths.filter((p) => !this.inUso.has(p));
+				await this.invoke(comando, { paths: done });
 				canale.onmessage?.({ transferred: totale, total: totale });
-				return paths;
+				const failed = paths
+					.filter((p) => this.inUso.has(p))
+					.map((path) => ({ path, error: { kind: 'io', message: 'File in uso da un altro programma.' } }));
+				return { done, failed };
 			}
 			case 'scan_conflicts':
 				return (args.sources as string[])

@@ -58,7 +58,7 @@
 	import { AccessoRapidoStore } from '$lib/stores/accessoRapido.svelte';
 	import { ImpostazioniStore, type Colonne } from '$lib/stores/impostazioni.svelte';
 	import { AnnullaStore } from '$lib/stores/annulla.svelte';
-	import type { ImageTarget, ModoElimina, Politica, Progresso, SortKey } from '$lib/ipc';
+	import type { Eliminati, ImageTarget, ModoElimina, Politica, Progresso, SortKey } from '$lib/ipc';
 	import MenuContestuale from '$lib/components/MenuContestuale.svelte';
 	import GalleriaTemi from '$lib/components/GalleriaTemi.svelte';
 	import FinestraImpostazioni from '$lib/components/FinestraImpostazioni.svelte';
@@ -894,7 +894,7 @@
 	 * With a transfer already on the bar, the deletion runs without showing
 	 * it. Returns the paths actually removed: the user can stop halfway.
 	 */
-	async function eliminaConBarra(mode: ModoElimina, paths: string[]): Promise<string[]> {
+	async function eliminaConBarra(mode: ModoElimina, paths: string[]): Promise<Eliminati> {
 		const opId = prossimoOpId++;
 		const mostra = opInCorso === null;
 		if (mostra) {
@@ -919,12 +919,22 @@
 		}
 	}
 
+	/** Items the deletion had to leave: named, with the reason, the rest went. */
+	function segnalaFalliti(esito: Eliminati) {
+		if (esito.failed.length === 0) return;
+		const righe = esito.failed.slice(0, 3).map((f) => `«${nomeDi(f.path)}»: ${descriviErrore(f.error)}`);
+		const altri = esito.failed.length - righe.length;
+		const titolo = esito.failed.length === 1 ? '1 elemento non eliminato' : `${esito.failed.length} elementi non eliminati`;
+		erroreOp = `${titolo} (gli altri sì). ${righe.join(' · ')}${altri > 0 ? ` e altri ${altri}` : ''}`;
+	}
+
 	async function cestina(voci = daCestinare) {
 		daCestinare = [];
 		erroreOp = null;
 		try {
-			const fatti = await eliminaConBarra('cestino', voci.map((v) => v.path));
-			if (fatti.length > 0) annulla.registra({ tipo: 'cestino', originali: fatti });
+			const esito = await eliminaConBarra('cestino', voci.map((v) => v.path));
+			if (esito.done.length > 0) annulla.registra({ tipo: 'cestino', originali: esito.done });
+			segnalaFalliti(esito);
 			await ricarica();
 		} catch (e) {
 			erroreOp = descriviErrore(e);
@@ -941,7 +951,7 @@
 			const paths = richiesta.voci.map((v) => v.path);
 			const modo: ModoElimina =
 				richiesta.tipo === 'disco' ? 'disco' : richiesta.tipo === 'cestino' ? 'dalCestino' : 'svuota';
-			await eliminaConBarra(modo, modo === 'svuota' ? [] : paths);
+			segnalaFalliti(await eliminaConBarra(modo, modo === 'svuota' ? [] : paths));
 			await ricarica();
 		} catch (e) {
 			erroreOp = descriviErrore(e);

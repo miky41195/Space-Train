@@ -397,7 +397,8 @@ pub enum ModoElimina {
 }
 
 /// Deletes with a progress bar counted in items. Can be cancelled between
-/// items: returns the paths actually removed, so the frontend undoes only
+/// items; an item that refuses is reported and skipped, never stops the rest.
+/// Returns the paths actually removed, so the frontend undoes only
 /// those. The user's confirmation happens in the frontend, before this.
 #[tauri::command]
 pub async fn delete_items(
@@ -406,7 +407,7 @@ pub async fn delete_items(
     mode: ModoElimina,
     paths: Vec<String>,
     on_progress: Channel<Progresso>,
-) -> Result<Vec<String>, FsError> {
+) -> Result<crate::fs::elimina::Eliminati, FsError> {
     use crate::fs::elimina;
     let per_conto = paths.clone();
     con_avanzamento(

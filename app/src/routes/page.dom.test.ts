@@ -626,6 +626,24 @@ describe('operazioni sui file', () => {
 		await waitFor(() => expect(nomi()).not.toContain('alfa.txt'));
 	});
 
+	it('a file that refuses the Trash does not stop the others, and is named', async () => {
+		disco.inUso.add('C:\\beta.txt');
+		await monta();
+		tasto('a', { ctrl: true });
+		await fireEvent.click(riga('alfa.txt'), { ctrlKey: true });
+		await fireEvent.click(riga('Dati'), { ctrlKey: true });
+		await fireEvent.click(riga('Vuota'), { ctrlKey: true });
+		await fireEvent.click(riga('Segreta'), { ctrlKey: true });
+		// Selected now: beta, gamma, delta.
+		tasto('Delete');
+		await fireEvent.click(await screen.findByRole('button', { name: 'Sposta nel Cestino' }));
+
+		await waitFor(() => expect([...disco.cestino].sort()).toEqual(['C:\\delta.txt', 'C:\\gamma.txt']));
+		await waitFor(() => expect(document.querySelector('.errore')?.textContent).toContain('1 elemento non eliminato'));
+		expect(document.querySelector('.errore')?.textContent).toContain('«beta.txt»: File in uso');
+		expect(nomi()).toContain('beta.txt');
+	});
+
 	it('annullare la conferma non cestina nulla', async () => {
 		await monta();
 		await fireEvent.click(riga('alfa.txt'));

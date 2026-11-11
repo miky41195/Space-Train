@@ -352,15 +352,21 @@ export interface Backend {
 		onProgress: (p: Progresso) => void;
 	}): Promise<string[]>;
 	/**
-	 * Deletes with progress counted in items. Cancellable between items:
-	 * resolves with the paths actually removed.
+	 * Deletes with progress counted in items. Cancellable between items;
+	 * an item that refuses is skipped and reported, the others go on.
 	 */
 	deleteItems(opts: {
 		opId: number;
 		mode: ModoElimina;
 		paths: string[];
 		onProgress: (p: Progresso) => void;
-	}): Promise<string[]>;
+	}): Promise<Eliminati>;
+}
+
+/** What a deletion removed, and what it had to leave with the reason. */
+export interface Eliminati {
+	done: string[];
+	failed: Array<{ path: string; error: FsError }>;
 }
 
 /** To the Trash, from disk, selected items out of the Trash, or all of it. */
