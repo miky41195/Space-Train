@@ -43,6 +43,24 @@ describe('passaggi del treno', () => {
 		expect(convoglio(container)).not.toBe(primo);
 	});
 
+	it('a folder loading mid-run does not change the speed of the run in progress', async () => {
+		// A new animation-duration mid-flight makes the train jump back and forth.
+		const { container, rerender } = render(Treno, { pausa: 5000 });
+		await vi.advanceTimersByTimeAsync(1300);
+		const inCorsa = convoglio(container);
+		await rerender({ pausa: 5000, attivo: true });
+		expect(convoglio(container)).toBe(inCorsa);
+		expect(inCorsa.classList.contains('carico')).toBe(false);
+		await rerender({ pausa: 5000, attivo: false });
+		expect(inCorsa.classList.contains('carico')).toBe(false);
+
+		// The next run, started under load, goes at the fast speed.
+		await rerender({ pausa: 5000, attivo: true });
+		await fireEvent.animationEnd(inCorsa);
+		await vi.advanceTimersByTimeAsync(700);
+		expect(convoglio(container).classList.contains('carico')).toBe(true);
+	});
+
 	it('«solo durante i trasferimenti»: a riposo non passa mai, sotto carico sì', async () => {
 		const { container, rerender } = render(Treno, { pausa: null });
 		const fermo = convoglio(container);

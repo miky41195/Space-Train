@@ -1073,9 +1073,24 @@
 	 * trasferimento in corso o una cartella in lettura. È l'unica cosa che
 	 * accende i binari — senza questo aggancio sarebbero decorazione.
 	 */
-	let sottoCarico = $derived(
+	let caricoOra = $derived(
 		opInCorso !== null || (store.activeTab?.loading ?? false) || (store.activeTab?.cercando ?? false)
 	);
+	/**
+	 * The load the rails show: on only after it lasts a moment. A folder
+	 * that reads in a blink (or a watcher refresh) used to flip it on and off,
+	 * and each flip changed the animation speeds mid-run: the train and the
+	 * current jumped back and forth.
+	 */
+	let sottoCarico = $state(false);
+	$effect(() => {
+		if (!caricoOra) {
+			sottoCarico = false;
+			return;
+		}
+		const t = setTimeout(() => (sottoCarico = true), 400);
+		return () => clearTimeout(t);
+	});
 
 	/**
 	 * Cambia colonna d'ordinamento, o inverte il verso se è già quella.

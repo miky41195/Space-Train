@@ -79,6 +79,11 @@
 	/** Cambia a ogni partenza: rimonta l'SVG e fa ripartire l'animazione. */
 	let corsa = $state(0);
 	let inViaggio = $state(false);
+	/**
+	 * Speed is chosen at departure. A folder that loads mid-run flips `attivo`,
+	 * and a new animation-duration mid-flight makes the train jump back and forth.
+	 */
+	let veloce = $state(false);
 
 	/**
 	 * La pausa si conta da quando il convoglio esce di scena: le traversate
@@ -104,6 +109,7 @@
 	let fineScena: ReturnType<typeof setTimeout> | undefined;
 
 	function parti() {
+		veloce = attivo;
 		corsa += 1;
 		inViaggio = true;
 		clearTimeout(prossima);
@@ -157,7 +163,7 @@
 		{#if conConvoglio}
 		<div
 			class="convoglio"
-			class:carico={attivo}
+			class:carico={veloce}
 			class:a-piedi={sfilata.length > 0}
 			onanimationend={(e) => e.target === e.currentTarget && finitaUnaParte()}
 		>
