@@ -311,8 +311,8 @@ describe('vociNuovo', () => {
 			{ ext: '.txt', nome: 'Documento di testo' },
 			{ ext: '.docx', nome: 'Documento di Microsoft Word' }
 		]);
-		expect(v.map((x) => x.azione)).toEqual(['nuovaCartella', 'nuovo:.txt', 'nuovo:.docx']);
-		expect(v[1].stacca).toBe(true);
+		expect(v.map((x) => x.azione)).toEqual(['nuovaCartella', 'nuovaCassaforte', 'nuovo:.txt', 'nuovo:.docx']);
+		expect(v[2].stacca).toBe(true);
 	});
 });
 

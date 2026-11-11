@@ -40,6 +40,7 @@
 	import { MediaStore } from '$lib/stores/media.svelte';
 	import { RulesStore } from '$lib/stores/rules.svelte';
 	import RulesDialog from '$lib/components/RulesDialog.svelte';
+	import VaultDialog from '$lib/components/VaultDialog.svelte';
 	import { samePath as stessaCartella } from '$lib/rules';
 	import { sortByMedia, type MediaKey } from '$lib/media';
 	import SommaControllo from '$lib/components/SommaControllo.svelte';
@@ -466,6 +467,151 @@
 		if (impostazioni.anteprima && voceAnteprima) void media.request([voceAnteprima]);
 	});
 
+	// ── Vaults ───────────────────────────────────────────────────────
+	let dialogoCassaforte = $state<{
+		mode: 'unlock' | 'create' | 'add';
+		path: string;
+		sources?: string[];
+		error: string | null;
+		busy: boolean;
+	} | null>(null);
+	/** Vaults deleting items: the confirmation shows them. */
+	let daEliminareCassaforte = $state<Entry[] | null>(null);
+	/** Open vaults (lowercase path) → when they lock themselves. */
+	let scadenze = $state<Record<string, number>>({});
+	let adesso = $state(Date.now());
+
+	const eCassaforte = (e: Entry) => e.kind === 'dir' && /\.cassaforte$/i.test(e.name);
+
+	/** Every use of a vault pushes its lock time back. */
+	function tocca(path: string) {
+		scadenze = { ...scadenze, [path.toLowerCase()]: Date.now() + impostazioni.chiusuraCassaforte * 60_000 };
+		adesso = Date.now();
+	}
+
+	$effect(() => {
+		if (Object.keys(scadenze).length === 0) return;
+		const timer = setInterval(() => {
+			adesso = Date.now();
+			for (const [k, t] of Object.entries(scadenze)) if (t <= adesso) void chiudiCassaforte(k);
+		}, 1000);
+		return () => clearInterval(timer);
+	});
+
+	let chiusuraQui = $derived.by(() => {
+		const arc = store.activeTab?.archivio;
+		const t = arc?.cassaforte ? scadenze[arc.file.toLowerCase()] : undefined;
+		if (t === undefined) return null;
+		const s = Math.max(0, Math.ceil((t - adesso) / 1000));
+		return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+	});
+
+	async function mostraCassaforte(path: string, dentro = '') {
+		const id = store.activeId;
+		if (id === null) return;
+		const voci = await tauriBackend.vaultList(path);
+		tocca(path);
+		await store.mostraArchivio(id, path, dentro, voci, true);
+	}
+
+	async function apriCassaforte(path: string) {
+		try {
+			if (await tauriBackend.vaultIsOpen(path)) await mostraCassaforte(path);
+			else dialogoCassaforte = { mode: 'unlock', path, error: null, busy: false };
+		} catch (err) {
+			erroreOp = descriviErrore(err);
+		}
+	}
+
+	async function sbloccaCassaforte(password: string) {
+		const d = dialogoCassaforte;
+		if (!d) return;
+		dialogoCassaforte = { ...d, busy: true, error: null };
+		try {
+			await tauriBackend.vaultUnlock(d.path, password);
+			dialogoCassaforte = null;
+			await mostraCassaforte(d.path);
+		} catch (err) {
+			dialogoCassaforte = { ...d, busy: false, error: descriviErrore(err) };
+		}
+	}
+
+	async function creaCassaforte(nome: string, password: string) {
+		const d = dialogoCassaforte;
+		if (!d) return;
+		dialogoCassaforte = { ...d, busy: true, error: null };
+		try {
+			const path = await tauriBackend.vaultCreate(d.path, nome, password);
+			dialogoCassaforte = null;
+			await store.aggiornaCartella(d.path);
+			await mostraCassaforte(path);
+		} catch (err) {
+			dialogoCassaforte = { ...d, busy: false, error: descriviErrore(err) };
+		}
+	}
+
+	/** Locks a vault: the key is forgotten and every tab showing it goes back to its folder. */
+	async function chiudiCassaforte(path: string) {
+		const key = path.toLowerCase();
+		const { [key]: _, ...resto } = scadenze;
+		scadenze = resto;
+		await tauriBackend.vaultLock(path).catch(() => {});
+		for (const t of store.tabs) {
+			if (t.archivio?.cassaforte && t.archivio.file.toLowerCase() === key) await store.fermaRicerca(t.id);
+		}
+	}
+
+	function aggiungiInCassaforte(paths: string[]) {
+		const arc = store.activeTab?.archivio;
+		if (!arc?.cassaforte || paths.length === 0) return;
+		if (paths.some((p) => eReteLocale(p))) {
+			erroreOp = 'Prima scarica i file dall’altro PC, poi mettili nella cassaforte.';
+			return;
+		}
+		dialogoCassaforte = { mode: 'add', path: arc.file, sources: paths, error: null, busy: false };
+	}
+
+	async function confermaAggiunta(cestinaOriginali: boolean) {
+		const d = dialogoCassaforte;
+		const arc = store.activeTab?.archivio;
+		if (!d?.sources || !arc?.cassaforte) return;
+		dialogoCassaforte = { ...d, busy: true, error: null };
+		try {
+			await tauriBackend.vaultAdd(d.path, d.sources, arc.dentro);
+			dialogoCassaforte = null;
+			if (cestinaOriginali) {
+				await tauriBackend.moveToTrash(d.sources);
+				annulla.registra({ tipo: 'cestino', originali: d.sources });
+			}
+			await mostraCassaforte(d.path, arc.dentro);
+		} catch (err) {
+			dialogoCassaforte = { ...d, busy: false, error: descriviErrore(err) };
+		}
+	}
+
+	async function incollaInCassaforte() {
+		const contenuto = await daIncollare();
+		if (contenuto) aggiungiInCassaforte(contenuto.paths);
+	}
+
+	function chiediEliminaDaCassaforte() {
+		const scelte = selezionate();
+		if (scelte.length > 0) daEliminareCassaforte = scelte;
+	}
+
+	async function eliminaDaCassaforte() {
+		const voci = daEliminareCassaforte;
+		const arc = store.activeTab?.archivio;
+		daEliminareCassaforte = null;
+		if (!voci || !arc?.cassaforte) return;
+		try {
+			await tauriBackend.vaultDelete(arc.file, voci.map((e) => internoDi(e.path)));
+			await mostraCassaforte(arc.file, arc.dentro);
+		} catch (err) {
+			erroreOp = descriviErrore(err);
+		}
+	}
+
 	// ── Automatic rules ──────────────────────────────────────────────
 	// The main window looks at the folders with rules every 30 s; the others
 	// would only do the same work twice.
@@ -833,7 +979,7 @@
 		if (!tab?.archivio || store.activeId === null) return false;
 		const su = sopra(tab.archivio.dentro);
 		if (su === null) void store.fermaRicerca(store.activeId);
-		else void store.mostraArchivio(store.activeId, tab.archivio.file, su, tab.archivio.voci);
+		else void store.mostraArchivio(store.activeId, tab.archivio.file, su, tab.archivio.voci, tab.archivio.cassaforte);
 		return true;
 	}
 
@@ -853,7 +999,10 @@
 		progresso = { transferred: 0, total: 0 };
 		erroreOp = null;
 		try {
-			await tauriBackend.archiveExtract({ opId, archive: file, items, dest, onProgress: (p) => (progresso = p) });
+			if (store.activeTab?.archivio?.cassaforte && store.activeTab.archivio.file === file) {
+				await tauriBackend.vaultExtract(file, items, dest);
+				tocca(file);
+			} else await tauriBackend.archiveExtract({ opId, archive: file, items, dest, onProgress: (p) => (progresso = p) });
 			avvisa(`Estratto in ${dest}.`);
 			void store.aggiornaCartella(dest);
 			aggiornamentoDischi++;
@@ -1766,6 +1915,7 @@
 	 */
 	async function rilascia(paths: string[], x: number, y: number) {
 		bersaglio = null;
+		if (store.activeTab?.archivio?.cassaforte) return aggiungiInCassaforte(paths);
 		const sopra = cartellaSotto(x, y);
 		if (sopra === NUOVA_SCHEDA) return apriInSchede(paths);
 		const dest = sopra ?? (modificabile ? (store.activeTab?.path ?? null) : null);
@@ -1954,6 +2104,10 @@
 
 		// Inside an archive nothing can be written, cut or deleted: its items are not real files.
 		const scrive = ['copia', 'taglia', 'incolla', 'rinomina', 'nuovaCartella', 'cestina', 'eliminaDefinitivo', 'copiaAltroPannello', 'spostaAltroPannello', 'preferito'];
+		if (store.activeTab?.archivio?.cassaforte) {
+			if (azione === 'incolla') return incollaInCassaforte();
+			if (azione === 'cestina' || azione === 'eliminaDefinitivo') return chiediEliminaDaCassaforte();
+		}
 		if (store.activeTab?.archivio && typeof azione === 'string' && scrive.includes(azione)) return;
 		if (store.activeTab?.archivio && (azione === 'su' || azione === 'indietro') && suNellArchivio()) return;
 
@@ -2249,12 +2403,16 @@
 		if (store.activeId === null || posizione === 'cestino') return;
 		const arc = store.activeTab?.archivio;
 		if (arc) {
-			if (e.kind === 'dir') void store.mostraArchivio(store.activeId, arc.file, internoDi(e.path), arc.voci);
+			if (arc.cassaforte) tocca(arc.file);
+			if (e.kind === 'dir') void store.mostraArchivio(store.activeId, arc.file, internoDi(e.path), arc.voci, arc.cassaforte);
 			else
-				tauriBackend
-					.archiveOpenItem(arc.file, internoDi(e.path))
+				(arc.cassaforte ? tauriBackend.vaultOpenItem(arc.file, internoDi(e.path)) : tauriBackend.archiveOpenItem(arc.file, internoDi(e.path)))
 					.then((p) => tauriBackend.openEntry(p))
 					.catch((err) => (erroreOp = descriviErrore(err)));
+			return;
+		}
+		if (posizione === 'normale' && eCassaforte(e)) {
+			void apriCassaforte(e.path);
 			return;
 		}
 		if (e.kind !== 'dir' && posizione === 'normale' && eArchivio(e.name)) {
@@ -2446,7 +2604,8 @@
 		const x = evento.clientX;
 		const y = evento.clientY;
 		const scelte = selezionate();
-		const pieni = modificabile ? (await daIncollare()) !== null : false;
+		const inCassaforte = !!store.activeTab?.archivio?.cassaforte;
+		const pieni = modificabile || inCassaforte ? (await daIncollare()) !== null : false;
 		menu = {
 			voci: vociMenu({
 				selezione: scelte,
@@ -2458,6 +2617,7 @@
 				ricerca: inRicerca,
 				annullabile: annulla.prossima(),
 				coloreAttuale: coloreComune(scelte),
+				cassaforte: inCassaforte,
 				labelName: (id) => colori.nameOf(id),
 				pari: destinatari,
 				condivisa: statoLan?.condivisa ?? null,
@@ -2777,6 +2937,18 @@
 				case 'regole':
 					regoleDi = cartellaDelMenu(scelte);
 					break;
+				case 'nuovaCassaforte':
+					if (tab && modificabile) dialogoCassaforte = { mode: 'create', path: tab.path, error: null, busy: false };
+					break;
+				case 'aggiungiInCassaforte':
+					await incollaInCassaforte();
+					break;
+				case 'eliminaDaCassaforte':
+					chiediEliminaDaCassaforte();
+					break;
+				case 'chiudiCassaforte':
+					if (tab?.archivio?.cassaforte) await chiudiCassaforte(tab.archivio.file);
+					break;
 				case 'confronta': {
 					const cartella = cartellaDelMenu(scelte);
 					if (cartella) await confrontaCon(cartella);
@@ -3064,6 +3236,11 @@
 				oncerca={apriRicerca}
 				{bersaglio}
 				ramo={gitQui}
+				chiusura={chiusuraQui}
+				onchiudi={() => {
+					const arc = store.activeTab?.archivio;
+					if (arc?.cassaforte) void chiudiCassaforte(arc.file);
+				}}
 			/>
 			<BarraComandi
 				haSelezione={selezione.length > 0}
@@ -3384,6 +3561,30 @@
 				conflitti = [];
 				inSospeso = null;
 			}}
+		/>
+	{/if}
+
+	{#if dialogoCassaforte}
+		{@const d = dialogoCassaforte}
+		<VaultDialog
+			mode={d.mode}
+			name={nomeDi(d.path).replace(/\.cassaforte$/i, '')}
+			count={d.sources?.length ?? 0}
+			error={d.error}
+			busy={d.busy}
+			onunlock={(pw) => void sbloccaCassaforte(pw)}
+			oncreate={(n, pw) => void creaCassaforte(n, pw)}
+			onadd={(t) => void confermaAggiunta(t)}
+			oncancel={() => (dialogoCassaforte = null)}
+		/>
+	{/if}
+
+	{#if daEliminareCassaforte}
+		<ConfermaCestino
+			voci={daEliminareCassaforte}
+			definitivo
+			onconfirm={() => void eliminaDaCassaforte()}
+			oncancel={() => (daEliminareCassaforte = null)}
 		/>
 	{/if}
 

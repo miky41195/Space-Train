@@ -188,6 +188,27 @@ export function backendFinto(over: Partial<Backend> = {}): Backend {
 			return true;
 		},
 		async imageRotate() {},
+		async vaultCreate() {
+			return '';
+		},
+		async vaultUnlock() {},
+		async vaultLock() {},
+		async vaultIsOpen() {
+			return false;
+		},
+		async vaultList() {
+			return [];
+		},
+		async vaultAdd() {
+			return 0;
+		},
+		async vaultExtract() {
+			return [];
+		},
+		async vaultOpenItem() {
+			return '';
+		},
+		async vaultDelete() {},
 		async gitStatus() {
 			return null;
 		},

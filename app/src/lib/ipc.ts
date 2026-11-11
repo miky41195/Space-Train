@@ -386,6 +386,17 @@ export interface Backend {
 	mediaProps(paths: string[]): Promise<Array<MediaProps | null>>;
 	/** Git status of a folder's items; null outside a repository or without git. */
 	gitStatus(folder: string): Promise<GitStatus | null>;
+	/** Vault: a folder `<name>.cassaforte` encrypted with a password. Create leaves it open. */
+	vaultCreate(parent: string, name: string, password: string): Promise<string>;
+	vaultUnlock(path: string, password: string): Promise<void>;
+	vaultLock(path: string): Promise<void>;
+	vaultIsOpen(path: string): Promise<boolean>;
+	vaultList(path: string): Promise<ArchiveItem[]>;
+	/** Encrypts files and folders into the vault under `inner` ('' = root); returns how many files. */
+	vaultAdd(path: string, sources: string[], inner: string): Promise<number>;
+	vaultExtract(path: string, items: string[], dest: string): Promise<string[]>;
+	vaultOpenItem(path: string, item: string): Promise<string>;
+	vaultDelete(path: string, items: string[]): Promise<void>;
 	imageConvert(opts: {
 		opId: number;
 		paths: string[];
@@ -510,6 +521,15 @@ export const tauriBackend: Backend = {
 	imageRotate: (paths, clockwise) => invoke('image_rotate', { paths, clockwise }),
 	mediaProps: (paths) => invoke('media_props', { paths }),
 	gitStatus: (folder) => invoke('git_status', { folder }),
+	vaultCreate: (parent, name, password) => invoke('vault_create', { parent, name, password }),
+	vaultUnlock: (path, password) => invoke('vault_unlock', { path, password }),
+	vaultLock: (path) => invoke('vault_lock', { path }),
+	vaultIsOpen: (path) => invoke('vault_is_open', { path }),
+	vaultList: (path) => invoke('vault_list', { path }),
+	vaultAdd: (path, sources, inner) => invoke('vault_add', { path, sources, inner }),
+	vaultExtract: (path, items, dest) => invoke('vault_extract', { path, items, dest }),
+	vaultOpenItem: (path, item) => invoke('vault_open_item', { path, item }),
+	vaultDelete: (path, items) => invoke('vault_delete', { path, items }),
 	imageConvert: ({ opId, paths, target, maxSide, quality, onProgress }) =>
 		invoke('image_convert', { opId, paths, target, maxSide, quality, onProgress: canale(onProgress) }),
 	deleteItems: ({ opId, mode, paths, onProgress }) =>

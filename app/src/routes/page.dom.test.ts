@@ -3117,6 +3117,59 @@ describe('media columns', () => {
 	});
 });
 
+describe('vault', () => {
+	it('asks the password, refuses a wrong one, lists the items, and locks back to the folder', async () => {
+		aggiungi('C:\\Privato.cassaforte\\');
+		disco.casseforti.set('C:\\Privato.cassaforte', {
+			password: 'giusta-123',
+			aperta: false,
+			voci: [
+				{ path: 'Banca', size: 0, dir: true, modified: 0 },
+				{ path: 'Banca/estratto.pdf', size: 10, dir: false, modified: 0 },
+				{ path: 'codici.txt', size: 5, dir: false, modified: 0 }
+			]
+		});
+		await monta();
+		await fireEvent.dblClick(riga('Privato.cassaforte'));
+		const dialog = await screen.findByRole('dialog', { name: 'Apri «Privato»' });
+		const campo = within(dialog).getByLabelText('Password');
+		await fireEvent.input(campo, { target: { value: 'sbagliata' } });
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Apri' }));
+		expect((await within(dialog).findByRole('alert')).textContent).toContain('Password sbagliata');
+
+		await fireEvent.input(campo, { target: { value: 'giusta-123' } });
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Apri' }));
+		await waitFor(() => expect(nomi()).toEqual(['Banca', 'codici.txt']));
+		expect(document.querySelector('.chiusura')?.textContent).toMatch(/si chiude fra \d+:\d\d/);
+
+		await fireEvent.dblClick(riga('Banca'));
+		await waitFor(() => expect(nomi()).toEqual(['estratto.pdf']));
+
+		await fireEvent.click(document.querySelector('.chiusura')!);
+		await waitFor(() => expect(nomi()).toContain('alfa.txt'));
+		expect(disco.casseforti.get('C:\\Privato.cassaforte')?.aperta).toBe(false);
+	});
+
+	it('«Nuovo → Cassaforte…» checks the two passwords, then opens the new vault', async () => {
+		await monta();
+		await fireEvent.click(screen.getByRole('button', { name: 'Nuovo' }));
+		await fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Cassaforte…' }));
+		const dialog = await screen.findByRole('dialog', { name: 'Nuova cassaforte' });
+		await fireEvent.input(within(dialog).getByLabelText('Nome'), { target: { value: 'Segreti' } });
+		await fireEvent.input(within(dialog).getByLabelText('Password'), { target: { value: 'una-password' } });
+		await fireEvent.input(within(dialog).getByLabelText('Ripeti la password'), { target: { value: 'un-altra' } });
+		const crea = within(dialog).getByRole('button', { name: 'Crea cassaforte' }) as HTMLButtonElement;
+		expect(crea.disabled).toBe(true);
+		expect(within(dialog).getByText('Le due password non sono uguali.')).toBeTruthy();
+
+		await fireEvent.input(within(dialog).getByLabelText('Ripeti la password'), { target: { value: 'una-password' } });
+		expect(crea.disabled).toBe(false);
+		await fireEvent.click(crea);
+		await waitFor(() => expect(document.querySelector('.chiusura')).not.toBeNull());
+		expect(disco.casseforti.get('C:\\Segreti.cassaforte')?.aperta).toBe(true);
+	});
+});
+
 describe('automatic rules', () => {
 	it('a folder gets a rule from its menu, the preview counts the matching files, and the folder shows a mark', async () => {
 		aggiungi('C:\\Dati\\fattura.pdf');

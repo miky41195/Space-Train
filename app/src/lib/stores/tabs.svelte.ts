@@ -53,7 +53,7 @@ export interface Tab {
 	/** Set when `risultati` lists the items carrying a colour label: the colour's name. */
 	etichetta: string | null;
 	/** An archive opened like a folder: its items, and the inner folder shown ('' = root). */
-	archivio: { file: string; dentro: string; voci: ArchiveItem[] } | null;
+	archivio: { file: string; dentro: string; voci: ArchiveItem[]; cassaforte?: boolean } | null;
 	/** «Analizza spazio»: the list is sorted by size with a bar; it stays on while browsing. */
 	spazio: boolean;
 }
@@ -339,11 +339,11 @@ export class TabsStore {
 	}
 
 	/** Shows one level of an archive in place of the folder. */
-	async mostraArchivio(id: number, file: string, dentro: string, voci: ArchiveItem[]): Promise<void> {
+	async mostraArchivio(id: number, file: string, dentro: string, voci: ArchiveItem[], cassaforte = false): Promise<void> {
 		const tab = this.#get(id);
 		if (!tab) return;
 		if (tab.archivio?.file !== file) await this.fermaRicerca(id);
-		tab.archivio = { file, dentro, voci };
+		tab.archivio = { file, dentro, voci, cassaforte };
 		tab.risultati = livello(voci, dentro, file);
 		tab.query = '';
 		tab.selection = [];

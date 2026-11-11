@@ -248,6 +248,15 @@
 					<span class="testo">Apri con un clic<small>Come l’opzione di Esplora. Ctrl e Maiusc selezionano.</small></span>
 					{@render interruttore(impostazioni.unClic, 'Apri con un clic', () => impostazioni.imposta('unClic', !impostazioni.unClic))}
 				</div>
+				<label class="voce">
+					<span class="testo">Chiudi le casseforti dopo<small>Minuti senza usarle; si chiudono anche uscendo da Space Train.</small></span>
+					<select
+						value={String(impostazioni.chiusuraCassaforte)}
+						onchange={(e) => impostazioni.imposta('chiusuraCassaforte', Number(e.currentTarget.value))}
+					>
+						{#each [1, 5, 15, 30, 60] as m (m)}<option value={String(m)}>{m === 1 ? '1 minuto' : `${m} minuti`}</option>{/each}
+					</select>
+				</label>
 				<div class="voce">
 					<span class="testo">Stato Git nelle cartelle dei progetti<small>Segna i file modificati e nuovi e mostra il ramo. Serve git installato.</small></span>
 					{@render interruttore(impostazioni.git, 'Stato Git nelle cartelle dei progetti', () => impostazioni.imposta('git', !impostazioni.git))}

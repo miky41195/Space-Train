@@ -64,6 +64,8 @@ interface Valori {
 	unClic: boolean;
 	/** Show git marks and branch in folders that are repositories. */
 	git: boolean;
+	/** Minutes without using an open vault before it locks itself. */
+	chiusuraCassaforte: number;
 	/** Custom shortcuts: action → key combinations, in place of its defaults. */
 	scorciatoie: Personalizzate;
 }
@@ -96,6 +98,7 @@ const PREDEFINITE: Valori = {
 	confermaCestino: true,
 	unClic: false,
 	git: true,
+	chiusuraCassaforte: 5,
 	scorciatoie: {}
 };
 
@@ -137,6 +140,7 @@ export class ImpostazioniStore {
 	confermaCestino = $state(PREDEFINITE.confermaCestino);
 	unClic = $state(PREDEFINITE.unClic);
 	git = $state(PREDEFINITE.git);
+	chiusuraCassaforte = $state(PREDEFINITE.chiusuraCassaforte);
 
 	constructor(private archivio: Archivio | null = archivioPredefinito()) {
 		this.#leggi(archivio?.getItem(CHIAVE) ?? null);
@@ -177,6 +181,9 @@ export class ImpostazioniStore {
 			if (typeof v.confermaCestino === 'boolean') this.confermaCestino = v.confermaCestino;
 			if (typeof v.unClic === 'boolean') this.unClic = v.unClic;
 			if (typeof v.git === 'boolean') this.git = v.git;
+			if (typeof v.chiusuraCassaforte === 'number' && v.chiusuraCassaforte >= 1 && v.chiusuraCassaforte <= 120) {
+				this.chiusuraCassaforte = v.chiusuraCassaforte;
+			}
 			if (v.scorciatoie && typeof v.scorciatoie === 'object') {
 				this.scorciatoie = Object.fromEntries(
 					Object.entries(v.scorciatoie).filter(([, t]) => Array.isArray(t) && t.every((k) => typeof k === 'string'))
@@ -252,6 +259,7 @@ export class ImpostazioniStore {
 			confermaCestino: this.confermaCestino,
 			unClic: this.unClic,
 			git: this.git,
+			chiusuraCassaforte: this.chiusuraCassaforte,
 			scorciatoie: this.scorciatoie
 		};
 		try {

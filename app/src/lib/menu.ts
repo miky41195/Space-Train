@@ -31,6 +31,10 @@ export type AzioneMenu =
 	| 'confronta'
 	| 'spazio'
 	| 'regole'
+	| 'nuovaCassaforte'
+	| 'aggiungiInCassaforte'
+	| 'eliminaDaCassaforte'
+	| 'chiudiCassaforte'
 	| 'checksum'
 	| 'ruotaDestra'
 	| 'ruotaSinistra'
@@ -134,6 +138,8 @@ export interface ContestoMenu {
 	ricerca?: boolean;
 	/** Cosa disferebbe Ctrl+Z, se c'è qualcosa da disfare. */
 	annullabile?: string | null;
+	/** The archive view is a vault: items can be added and deleted. */
+	cassaforte?: boolean;
 	/** Colore comune delle cartelle selezionate, se ne hanno uno. */
 	coloreAttuale?: IdColore | null;
 	/** Name the user gave each colour label. */
@@ -412,8 +418,9 @@ function vociCestino({ selezione }: ContestoMenu): VoceMenu[] {
 	];
 }
 
-/** Inside an archive opened like a folder: open and extract, nothing that writes into it. */
-function vociArchivio({ selezione }: ContestoMenu): VoceMenu[] {
+/** Inside an archive opened like a folder: open and extract, nothing that writes into it. A vault also takes files in. */
+function vociArchivio({ selezione, cassaforte = false, appuntiPieni = false }: ContestoMenu): VoceMenu[] {
+	if (cassaforte) return vociCassaforte(selezione, appuntiPieni);
 	const voci: VoceMenu[] = [];
 	if (selezione.length === 1) voci.push({ azione: 'apri', etichetta: 'Apri', scorciatoia: 'Invio' });
 	const cosa = selezione.length === 0 ? 'tutto' : selezione.length === 1 ? '' : `${selezione.length} elementi`;
@@ -444,6 +451,19 @@ function vociVirtuali({ selezione, iniziale = false }: ContestoMenu, posizione: 
 }
 
 /** La tavolozza «Colore cartella», con il colore attuale segnato. */
+function vociCassaforte(selezione: ContestoMenu['selezione'], appuntiPieni: boolean): VoceMenu[] {
+	const voci: VoceMenu[] = [];
+	if (selezione.length === 1) voci.push({ azione: 'apri', etichetta: 'Apri', scorciatoia: 'Invio' });
+	const cosa = selezione.length === 0 ? 'tutto' : selezione.length === 1 ? '' : `${selezione.length} elementi`;
+	voci.push({ azione: 'estraiIn', etichetta: `Estrai ${cosa} in…`.replace('  ', ' '), stacca: voci.length > 0 });
+	if (appuntiPieni) voci.push({ azione: 'aggiungiInCassaforte', etichetta: 'Metti qui i file copiati', scorciatoia: 'Ctrl+V' });
+	if (selezione.length > 0) {
+		voci.push({ azione: 'eliminaDaCassaforte', etichetta: 'Elimina dalla cassaforte', scorciatoia: 'Canc', pericolosa: true, stacca: true });
+	}
+	voci.push({ azione: 'chiudiCassaforte', etichetta: 'Chiudi la cassaforte', stacca: true });
+	return voci;
+}
+
 export function tavolozzaCartelle(
 	attuale: IdColore | null,
 	labelName: (id: IdColore) => string = (id) => COLORI_CARTELLA.find((c) => c.id === id)?.nome ?? id
@@ -471,6 +491,7 @@ export function tavolozzaCartelle(
 export function vociNuovo(tipi: ReadonlyArray<{ ext: string; nome: string }>): VoceMenu[] {
 	return [
 		{ azione: 'nuovaCartella', etichetta: 'Cartella', scorciatoia: 'Ctrl+Maiusc+N' },
+		{ azione: 'nuovaCassaforte', etichetta: 'Cassaforte…' },
 		...tipi.map((t, i) => ({
 			azione: `nuovo:${t.ext}` as AzioneMenu,
 			etichetta: t.nome,

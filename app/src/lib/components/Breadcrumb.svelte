@@ -11,7 +11,9 @@
 		onvai = undefined,
 		oncerca = undefined,
 		bersaglio = null,
-		ramo = null
+		ramo = null,
+		chiusura = null,
+		onchiudi = undefined
 	}: {
 		store: TabsStore;
 		/** La barra mostra il campo di testo invece delle stazioni. */
@@ -26,6 +28,10 @@
 		bersaglio?: string | null;
 		/** Git branch of the open folder, with commits to push and to pull. */
 		ramo?: { branch: string; ahead: number; behind: number } | null;
+		/** Time left before the open vault locks itself, as shown («4:52»). */
+		chiusura?: string | null;
+		/** Locks the open vault now. */
+		onchiudi?: () => void;
 	} = $props();
 
 	let titoloRamo = $derived(
@@ -171,6 +177,12 @@
 		</div>
 	{/if}
 
+	{#if chiusura && !inModifica}
+		<button class="chiusura" onclick={onchiudi} title="La cassaforte si chiude da sola. Premi per chiuderla adesso."
+			>si chiude fra {chiusura}</button
+		>
+	{/if}
+
 	{#if ramo && !inModifica}
 		<span class="ramo" title={titoloRamo}
 			><span class="ramo-nodo" aria-hidden="true"></span><span class="ramo-nome">{ramo.branch}</span
@@ -206,6 +218,22 @@
 		font-size: calc(11px * var(--scala-testo, 1));
 		letter-spacing: 0.04em;
 		font-variant-numeric: tabular-nums;
+	}
+	.chiusura {
+		flex: none;
+		height: 22px;
+		padding: 0 9px;
+		border: 1px solid color-mix(in srgb, var(--signal, #ffb454) 45%, transparent);
+		border-radius: 11px;
+		background: transparent;
+		color: var(--signal, #ffb454);
+		font-family: var(--font-display);
+		font-size: calc(11px * var(--scala-testo, 1));
+		font-variant-numeric: tabular-nums;
+		cursor: default;
+	}
+	.chiusura:hover {
+		background: var(--row-hover);
 	}
 	.ramo-nome {
 		overflow: hidden;

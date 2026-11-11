@@ -10,6 +10,7 @@ pub mod osserva;
 pub mod registry;
 pub mod shell;
 pub mod transfer;
+pub mod vault;
 
 /// System-wide hotkey that brings the window back to the front.
 ///
@@ -68,6 +69,7 @@ pub fn run() {
         .manage(finestre::Finestre::default())
         .on_window_event(finestre::evento)
         .manage(osserva::Osservatore::default())
+        .manage(std::sync::Arc::new(vault::Vaults::default()))
         .plugin(tauri_plugin_opener::init())
         // Aggiornamenti dalle release di GitHub, firmati: il frontend
         // controlla all'avvio e riavvia l'app dopo l'installazione.
@@ -77,6 +79,8 @@ pub fn run() {
         .setup(|app| {
             use tauri::Manager;
             registra_scorciatoia(app.handle());
+            // Files opened from a vault last at most until the next start.
+            let _ = std::fs::remove_dir_all(std::env::temp_dir().join("space-train-cassaforte"));
             // Without the Windows Shell the folder picker comes from the
             // desktop (GTK or the portal), through the dialog plugin.
             #[cfg(not(windows))]
@@ -187,6 +191,15 @@ pub fn run() {
             transfer::image_rotate,
             shell::media::media_props,
             crate::fs::git::git_status,
+            vault::vault_create,
+            vault::vault_unlock,
+            vault::vault_lock,
+            vault::vault_is_open,
+            vault::vault_list,
+            vault::vault_add,
+            vault::vault_extract,
+            vault::vault_open_item,
+            vault::vault_delete,
             transfer::image_convert,
             ipc::entries_for,
             ipc::shortcut_free,

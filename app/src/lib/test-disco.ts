@@ -62,6 +62,8 @@ export class DiscoFinto {
 	risposte: Array<{ id: number; accetta: boolean; cartella: string | null }> = [];
 	/** Cosa risponde il selettore di cartelle: null è «annullato». */
 	cartellaScelta: string | null = null;
+	/** Vaults by folder path: password, open or not, inner items. */
+	casseforti = new Map<string, { password: string; aperta: boolean; voci: Array<{ path: string; size: number; dir: boolean; modified: number | null }> }>();
 	/** Git status by folder, for git_status. */
 	git = new Map<string, import('./ipc').GitStatus>();
 	/** Photo/video/music details by path, for media_props. */
@@ -295,6 +297,54 @@ export class DiscoFinto {
 				return true;
 			case 'shortcut_free':
 				return !this.scorciatoieOccupate.has(args.accelerator as string);
+			case 'vault_create': {
+				const dir = unisci(args.parent as string, `${args.name as string}.cassaforte`);
+				if ((args.password as string).length < 8) throw { kind: 'io', message: 'La password deve avere almeno 8 caratteri.' };
+				this.nodi.set(dir, nodo('dir'));
+				this.casseforti.set(dir, { password: args.password as string, aperta: true, voci: [] });
+				return dir;
+			}
+			case 'vault_unlock': {
+				const v = this.casseforti.get(args.path as string);
+				if (!v) throw { kind: 'io', message: 'Questa cartella non è una cassaforte.' };
+				if (v.password !== args.password) throw { kind: 'io', message: 'Password sbagliata.' };
+				v.aperta = true;
+				return;
+			}
+			case 'vault_lock': {
+				const v = this.casseforti.get(args.path as string);
+				if (v) v.aperta = false;
+				return;
+			}
+			case 'vault_is_open':
+				return this.casseforti.get(args.path as string)?.aperta ?? false;
+			case 'vault_list':
+			case 'vault_add':
+			case 'vault_extract':
+			case 'vault_open_item':
+			case 'vault_delete': {
+				const v = this.casseforti.get(args.path as string);
+				if (!v?.aperta) throw { kind: 'io', message: 'La cassaforte è chiusa: aprila di nuovo con la password.' };
+				if (cmd === 'vault_list') return v.voci;
+				if (cmd === 'vault_add') {
+					for (const s of args.sources as string[]) {
+						const interno = [args.inner as string, nome(s)].filter(Boolean).join('/');
+						v.voci.push({ path: interno, size: this.nodi.get(s)?.size ?? 0, dir: this.nodi.get(s)?.kind === 'dir', modified: 0 });
+					}
+					return (args.sources as string[]).length;
+				}
+				if (cmd === 'vault_extract') {
+					return (args.items as string[]).map((i) => {
+						const p = unisci(args.dest as string, i.split('/').pop()!);
+						this.nodi.set(p, nodo('file'));
+						return p;
+					});
+				}
+				if (cmd === 'vault_open_item') return `C:\\Temp\\${(args.item as string).split('/').pop()}`;
+				const via = args.items as string[];
+				v.voci = v.voci.filter((x) => !via.some((w) => x.path === w || x.path.startsWith(`${w}/`)));
+				return;
+			}
 			case 'git_status':
 				return this.git.get(args.folder as string) ?? null;
 			case 'media_props':
