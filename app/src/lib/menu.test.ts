@@ -35,6 +35,7 @@ describe('vociMenu', () => {
 			'duplicati',
 			'confronta',
 			'spazio',
+			'regole',
 			'terminale',
 			'altreOpzioni',
 			'proprieta'

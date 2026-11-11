@@ -61,6 +61,7 @@
 		oncolonne = undefined,
 		mediaDi = undefined,
 		gitDi = undefined,
+		regoleDi = undefined,
 		mediaSort = null,
 		onsortmedia = undefined
 	}: {
@@ -124,6 +125,8 @@
 		mediaDi?: (e: Entry) => MediaProps | null | undefined;
 		/** Git mark of an entry, inside a repository. */
 		gitDi?: (e: Entry) => GitMark | undefined;
+		/** The folder has automatic rules. */
+		regoleDi?: (e: Entry) => boolean;
 		mediaSort?: { key: MediaKey; ascending: boolean } | null;
 		onsortmedia?: (key: MediaKey) => void;
 	} = $props();
@@ -247,6 +250,7 @@
 					quota={quotaDi?.(entry)}
 					media={mediaDi?.(entry)}
 					git={gitDi?.(entry)}
+					conRegole={entry.kind === 'dir' && (regoleDi?.(entry) ?? false)}
 					altezza={altezzaRiga}
 					bersaglio={entry.path === bersaglio}
 					{ontrascina}

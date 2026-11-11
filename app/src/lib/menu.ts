@@ -30,6 +30,7 @@ export type AzioneMenu =
 	| 'duplicati'
 	| 'confronta'
 	| 'spazio'
+	| 'regole'
 	| 'checksum'
 	| 'ruotaDestra'
 	| 'ruotaSinistra'
@@ -230,6 +231,7 @@ function vociSfondo({
 		voci.push({ azione: 'duplicati', etichetta: 'Trova duplicati qui', stacca: true });
 		voci.push(voceConfronta(altroPannello));
 		voci.push({ azione: 'spazio', etichetta: 'Analizza spazio' });
+		voci.push({ azione: 'regole', etichetta: 'Regole automatiche…' });
 		voci.push({ azione: 'terminale', etichetta: 'Apri nel terminale' });
 		voci.push({ azione: 'altreOpzioni', etichetta: 'Altre opzioni di Windows', stacca: true });
 		voci.push({ azione: 'proprieta', etichetta: 'Proprietà', scorciatoia: 'Alt+Invio' });
@@ -279,6 +281,7 @@ function vociElementi({
 			voci.push({ azione: 'duplicati', etichetta: 'Trova duplicati qui' });
 			voci.push(voceConfronta(altroPannello));
 			voci.push({ azione: 'spazio', etichetta: 'Analizza spazio' });
+			voci.push({ azione: 'regole', etichetta: 'Regole automatiche…' });
 		} else {
 			voci.push({ azione: 'apriCon', etichetta: 'Apri con…' });
 			voci.push({ azione: 'checksum', etichetta: 'Somma di controllo…' });

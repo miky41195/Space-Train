@@ -41,7 +41,8 @@
 		oncancelrename = undefined,
 		ontrascina = undefined,
 		media = undefined,
-		git = undefined
+		git = undefined,
+		conRegole = false
 	}: {
 		entry: Entry;
 		selected?: boolean;
@@ -85,6 +86,8 @@
 		media?: MediaProps | null;
 		/** How git sees this item, inside a repository. */
 		git?: GitMark;
+		/** The folder has automatic rules. */
+		conRegole?: boolean;
 	} = $props();
 
 	let nascosta = $derived(nascondiEstensione && entry.kind !== 'dir' && estensione(entry.name) !== '');
@@ -271,6 +274,18 @@
 			<span class="name" title={entry.name}
 				>{#each tratti as t, i (i)}{#if t.forte}<mark>{t.testo}</mark>{:else}{t.testo}{/if}{/each}</span
 			>
+			{#if conRegole}<span class="con-regole" title="Ha regole automatiche" aria-label="Ha regole automatiche"
+					><svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"
+						><path d="M13 6.5A5 5 0 0 0 3.6 5M3 9.5A5 5 0 0 0 12.4 11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /><path
+							d="M3.4 2.4 3.6 5l2.6-.3M12.6 13.6l-.2-2.6-2.6.3"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.5"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						/></svg
+					></span
+				>{/if}
 			{#if cartella}<span class="cartella" title={cartella}>{cartella}</span>{/if}
 			{#if frammento && entry.snippet}
 				<span class="frammento" title={entry.snippet.text}
@@ -352,6 +367,12 @@
 		gap: 10px;
 		min-width: 0;
 		position: relative;
+	}
+	.con-regole {
+		display: inline-flex;
+		flex: none;
+		align-self: center;
+		color: var(--text-dim);
 	}
 	/* Colour label on a file: a dot before the name, as on the sidebar stops. */
 	.etichetta-colore {

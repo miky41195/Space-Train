@@ -38,6 +38,9 @@
 	import NameDialog from '$lib/components/NameDialog.svelte';
 	import { WorkspacesStore, type Snapshot } from '$lib/stores/workspaces.svelte';
 	import { MediaStore } from '$lib/stores/media.svelte';
+	import { RulesStore } from '$lib/stores/rules.svelte';
+	import RulesDialog from '$lib/components/RulesDialog.svelte';
+	import { samePath as stessaCartella } from '$lib/rules';
 	import { sortByMedia, type MediaKey } from '$lib/media';
 	import SommaControllo from '$lib/components/SommaControllo.svelte';
 	import ConvertiImmagini from '$lib/components/ConvertiImmagini.svelte';
@@ -128,6 +131,14 @@
 	const colori = new ColoriStore();
 	const aree = new WorkspacesStore();
 	const media = new MediaStore((paths) => tauriBackend.mediaProps(paths));
+	const regole = new RulesStore({
+		backend: tauriBackend,
+		labelOf: (p) => colori.idDi(p),
+		setLabel: (paths, c) => colori.imposta(paths, c),
+		labelName: (id) => colori.nameOf(id)
+	});
+	/** Folder whose rules are being edited. */
+	let regoleDi = $state<string | null>(null);
 	const accessoRapido = new AccessoRapidoStore();
 	const ricerche = new RicercheStore();
 
@@ -454,6 +465,24 @@
 	$effect(() => {
 		if (impostazioni.anteprima && voceAnteprima) void media.request([voceAnteprima]);
 	});
+
+	// ── Automatic rules ──────────────────────────────────────────────
+	// The main window looks at the folders with rules every 30 s; the others
+	// would only do the same work twice.
+	$effect(() => {
+		if (!avviato || finestra !== 'main') return;
+		void regole.tick();
+		const timer = setInterval(() => void regole.tick(), 30_000);
+		return () => clearInterval(timer);
+	});
+
+	async function annullaRegola(id: number) {
+		try {
+			await regole.undo(id);
+		} catch (err) {
+			erroreOp = descriviErrore(err);
+		}
+	}
 
 	// ── Git ──────────────────────────────────────────────────────────
 	/** Git status of the open folder, asked again whenever its items change. */
@@ -2745,6 +2774,9 @@
 					if (cartella) await analizzaSpazio(cartella);
 					break;
 				}
+				case 'regole':
+					regoleDi = cartellaDelMenu(scelte);
+					break;
 				case 'confronta': {
 					const cartella = cartellaDelMenu(scelte);
 					if (cartella) await confrontaCon(cartella);
@@ -3233,6 +3265,7 @@
 						colonne={colonneVista}
 						mediaDi={(e) => media.of(e)}
 						gitDi={gitQui ? (e) => gitQui?.items[e.name] : undefined}
+						regoleDi={(e) => regole.hasRules(e.path)}
 						mediaSort={ordineMedia}
 						onsortmedia={ordinaPerMedia}
 						nascondiEstensione={!impostazioni.estensioni}
@@ -3351,6 +3384,23 @@
 				conflitti = [];
 				inSospeso = null;
 			}}
+		/>
+	{/if}
+
+	{#if regoleDi}
+		{@const cartella = regoleDi}
+		<RulesDialog
+			folder={cartella}
+			rules={regole.forFolder(cartella)}
+			log={regole.log.filter((l) => stessaCartella(l.folder, cartella))}
+			backend={tauriBackend}
+			labelName={(id) => colori.nameOf(id)}
+			onsave={(r) => {
+				regole.saveFolder(cartella, r);
+				regoleDi = null;
+			}}
+			onclose={() => (regoleDi = null)}
+			onundo={(id) => void annullaRegola(id)}
 		/>
 	{/if}
 

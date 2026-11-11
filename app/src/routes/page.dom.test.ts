@@ -3117,6 +3117,32 @@ describe('media columns', () => {
 	});
 });
 
+describe('automatic rules', () => {
+	it('a folder gets a rule from its menu, the preview counts the matching files, and the folder shows a mark', async () => {
+		aggiungi('C:\\Dati\\fattura.pdf');
+		aggiungi('C:\\Archivio\\');
+		disco.cartellaScelta = 'C:\\Archivio';
+		await monta();
+		await fireEvent.contextMenu(riga('Dati'));
+		await fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Regole automatiche…' }));
+		const dialog = await screen.findByRole('dialog', { name: 'Regole di Dati' });
+		await fireEvent.click(within(dialog).getByRole('button', { name: '+ Aggiungi regola' }));
+
+		// Without a destination it cannot be saved.
+		expect(within(dialog).getByRole('alert').textContent).toMatch(/destinazione/);
+		expect((within(dialog).getByRole('button', { name: 'Salva' }) as HTMLButtonElement).disabled).toBe(true);
+
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Scegli cartella…' }));
+		await within(dialog).findByRole('button', { name: 'Archivio' });
+		await waitFor(() => expect(within(dialog).getByText(/corrispondono/).textContent).toContain('1 file'));
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Salva' }));
+
+		await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Regole di Dati' })).toBeNull());
+		await waitFor(() => expect(riga('Dati').querySelector('.con-regole')).not.toBeNull());
+		expect(riga('Archivio').querySelector('.con-regole')).toBeNull();
+	});
+});
+
 describe('git status', () => {
 	it('marks modified and new items, greys ignored ones, shows the branch; the setting turns it off', async () => {
 		disco.git.set('C:\\', {
