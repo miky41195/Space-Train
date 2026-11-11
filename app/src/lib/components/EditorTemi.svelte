@@ -22,6 +22,7 @@
 		type Cornice
 	} from '../temi';
 	import { FIGURE, svgFigura } from '../figure';
+	import { ANIM_AVVIO, ANIM_CARTELLA, MOTI_AVVIO, animazioniDi, type Animazioni } from '../animazioni';
 	import type { FolderStyle } from '../icons';
 	import { nomeDi } from '../posizioni';
 	import { convertFileSrc } from '@tauri-apps/api/core';
@@ -132,6 +133,7 @@
 	/** Come si muove ogni immagine sul binario, nello stesso ordine di `immagini`. */
 	let movimenti = $state<Movimento[]>([]);
 	let motivo = $state('');
+	let animazioni = $state<Animazioni>(animazioniDi(undefined));
 	let caricando = $state(false);
 	let errore = $state<string | null>(null);
 
@@ -176,6 +178,7 @@
 		figure = voci.filter((v) => !mia(leggiMovimento(v).voce));
 		corteoTipo = immagini.length > 0 ? 'immagini' : figure.length > 0 ? 'figure' : 'treno';
 		motivo = t.motivo ?? '';
+		animazioni = animazioniDi(t.animazioni);
 	}
 
 	/** Cambia il movimento di un'immagine; scegliendo un tipo si riparte dai suoi valori. */
@@ -221,8 +224,14 @@
 				: corteoTipo === 'figure'
 					? figure
 					: immagini.map((v, i) => conMovimento(v, movimenti[i] ?? CAMMINA)),
-		motivo: motivo || undefined
+		motivo: motivo || undefined,
+		animazioni: { ...animazioni, figura: animazioni.figura || undefined }
 	});
+
+	/** The startup figure: the theme's own images first, then the built-in figures. */
+	function nomeImmagine(v: string): string {
+		return v.startsWith('img:') ? nomeDi(v.slice(4)) : nomeDi(decodifica(v)?.src ?? v);
+	}
 
 	// Anteprima dal vivo: l'app cambia mentre si sceglie.
 	$effect(() => {
@@ -926,6 +935,54 @@
 					{#if esitoSfondo}<p class="nota" role="status">{esitoSfondo}</p>{/if}
 					{#if errore}<p class="errore">{errore}</p>{/if}
 				{/if}
+			</section>
+
+			<section>
+				<h3>Animazioni</h3>
+				<label class="riga">
+					<span>All’avvio</span>
+					<select bind:value={animazioni.avvio} aria-label="Animazione all’avvio">
+						{#each ANIM_AVVIO as a (a.valore)}
+							<option value={a.valore}>{a.nome}</option>
+						{/each}
+					</select>
+				</label>
+				{#if animazioni.avvio === 'personalizzata'}
+					<label class="riga">
+						<span>Chi passa</span>
+						<select bind:value={animazioni.figura} aria-label="Chi passa all’avvio">
+							<option value={undefined}>Il treno</option>
+							{#each immagini as v (v)}
+								<option value={v}>{nomeImmagine(v)}</option>
+							{/each}
+							{#each Object.entries(FIGURE) as [fid, f] (fid)}
+								<option value={fid}>{f.nome}</option>
+							{/each}
+						</select>
+					</label>
+					<label class="riga">
+						<span>Movimento</span>
+						<select bind:value={animazioni.moto} aria-label="Movimento all’avvio">
+							{#each MOTI_AVVIO as m (m.valore)}
+								<option value={m.valore}>{m.nome}</option>
+							{/each}
+						</select>
+					</label>
+					<label class="riga">
+						<span>Durata</span>
+						<input type="range" min="0.5" max="3" step="0.25" bind:value={animazioni.durata} aria-label="Durata dell’animazione all’avvio" />
+						<output>{animazioni.durata.toLocaleString('it-IT')} s</output>
+					</label>
+				{/if}
+				<label class="riga">
+					<span>Aprendo una cartella</span>
+					<select bind:value={animazioni.cartella} aria-label="Animazione aprendo una cartella">
+						{#each ANIM_CARTELLA as a (a.valore)}
+							<option value={a.valore}>{a.nome}</option>
+						{/each}
+					</select>
+				</label>
+				<p class="nota">L’animazione all’avvio parte se è accesa in Impostazioni; con «riduci movimento» di Windows non parte nessuna.</p>
 			</section>
 
 			<section>

@@ -1,9 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import TrenoSvg from './TrenoSvg.svelte';
-	import { convertFileSrc } from '@tauri-apps/api/core';
-	import { FIGURE, svgFigura } from '../figure';
-	import { decodifica, misuraBinario, stile } from '../spritesheet';
+	import { aspettoDi } from '../aspetto';
 	import { fineInScena, giroContinuo, leggiMovimento } from '../movimento';
 
 	/**
@@ -35,16 +33,8 @@
 		(corteo ?? [])
 			.map((voce) => {
 				const { movimento, voce: v } = leggiMovimento(voce);
-				if (v.startsWith('img:')) return { tipo: 'immagine' as const, src: convertFileSrc(v.slice(4)), movimento };
-				const foglio = decodifica(v);
-				if (foglio)
-					return {
-						tipo: 'sprite' as const,
-						stile: stile(foglio, convertFileSrc(foglio.src)),
-						alto: misuraBinario(foglio).altezza,
-						movimento
-					};
-				return FIGURE[v] ? { tipo: 'figura' as const, svg: svgFigura(FIGURE[v]), movimento } : null;
+				const a = aspettoDi(v);
+				return a ? { ...a, movimento } : null;
 			})
 			.filter((x) => x !== null)
 	);

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { invoke } from '@tauri-apps/api/core';
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { listen } from '@tauri-apps/api/event';
 	import { getCurrentWindow } from '@tauri-apps/api/window';
 	import { getCurrentWebview } from '@tauri-apps/api/webview';
@@ -66,6 +66,9 @@
 	import FileGrid from '$lib/components/FileGrid.svelte';
 	import Avvio from '$lib/components/Avvio.svelte';
 	import { motoRidotto } from '$lib/moto';
+	import { animaCartella, animazioniDi } from '$lib/animazioni';
+	import { aspettoDi } from '$lib/aspetto';
+	import { leggiMovimento } from '$lib/movimento';
 	import {
 		vociMenu,
 		vociVista,
@@ -152,6 +155,7 @@
 	// The editor's preview counts too: the folders change while the user picks a style.
 	let folderStyle = $derived(folderStyleOf(anteprimaTema ?? temaCorrente));
 	let corteo = $derived(anteprimaTema?.corteo ?? temaCorrente.corteo);
+	let animazioni = $derived(animazioniDi((anteprimaTema ?? temaCorrente).animazioni));
 	/**
 	 * Spazio in più sopra il binario per i personaggi ingranditi: la linea
 	 * del treno è alta 40 px e sta in fondo alla testata; uno sprite più alto
@@ -2204,7 +2208,26 @@
 	 */
 	// Spenta di default: l'avvio deve essere istantaneo. Chi la vuole la
 	// riaccende dal menu Aspetto.
-	let apertura = $state(impostazioni.animazioneAvvio && !motoRidotto());
+	// svelte-ignore state_referenced_locally
+	let apertura = $state(impostazioni.animazioneAvvio && animazioni.avvio !== 'nessuna' && !motoRidotto());
+
+	// The folder animation plays when a folder has finished loading.
+	let contenuto = $state<HTMLElement | null>(null);
+	let ultimaAnimata: string | null = null;
+	$effect(() => {
+		const tab = store.activeTab;
+		if (!tab || tab.loading) return;
+		const chiave = `${store.activeId}:${tab.path}`;
+		if (chiave === ultimaAnimata) return;
+		const prima = ultimaAnimata;
+		ultimaAnimata = chiave;
+		// Not at startup, and not when the theme asks for none.
+		const tipo = untrack(() => animazioni.cartella);
+		if (prima === null || tipo === 'nessuna' || motoRidotto()) return;
+		void tick().then(() =>
+			animaCartella(tipo, contenuto?.querySelector('.pannello-attivo') ?? null, document.querySelector('.barra .linea'))
+		);
+	});
 
 	// ── Menu ─────────────────────────────────────────────────────────
 
@@ -2775,7 +2798,13 @@
 />
 
 {#if apertura}
-	<Avvio onfine={() => (apertura = false)} />
+	<Avvio
+		onfine={() => (apertura = false)}
+		tipo={animazioni.avvio === 'nessuna' ? 'treno' : animazioni.avvio}
+		figura={animazioni.figura ? aspettoDi(leggiMovimento(animazioni.figura).voce) : null}
+		moto={animazioni.moto}
+		durata={animazioni.durata}
+	/>
 {/if}
 
 <div class="app">
@@ -2978,7 +3007,7 @@
 				</div>
 			{/if}
 
-			<div class="contenuto">
+			<div class="contenuto" bind:this={contenuto}>
 				<div class="pannello-attivo" class:diviso={tabAltro} style:order={attivaADestra ? 2 : 0}>
 				{#if tabAltro && store.activeTab}<TestataPannello path={store.activeTab.path} attivo />{/if}
 				{#if statoVuoto}

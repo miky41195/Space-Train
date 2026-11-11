@@ -2295,6 +2295,27 @@ describe('editor dei temi', () => {
 		expect(voce.getAttribute('aria-pressed')).toBe('true');
 	});
 
+	it('a theme with «Vagoni» animates the rows of the folder that opens', async () => {
+		// Full motion here: the suite runs with «reduce motion» on.
+		window.matchMedia = ((q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
+		const animate = vi.fn(() => ({}) as Animation);
+		(HTMLElement.prototype as { animate?: unknown }).animate = animate;
+		try {
+			await monta();
+			const editor = await apriEditor();
+			await fireEvent.change(within(editor).getByLabelText('Animazione aprendo una cartella'), { target: { value: 'vagoni' } });
+			await fireEvent.click(within(editor).getByRole('button', { name: 'Salva tema' }));
+			await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+			expect(animate).not.toHaveBeenCalled();
+
+			await entraIn('Dati');
+			await waitFor(() => expect(animate).toHaveBeenCalled());
+			expect(animate.mock.contexts.every((el) => (el as HTMLElement).getAttribute('role') === 'row')).toBe(true);
+		} finally {
+			delete (HTMLElement.prototype as { animate?: unknown }).animate;
+		}
+	});
+
 	it('un tema proprio si riapre in modifica e si può eliminare', async () => {
 		await monta();
 		let editor = await apriEditor();

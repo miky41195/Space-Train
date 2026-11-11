@@ -1,5 +1,7 @@
 <script lang="ts">
 	import TrenoSvg from './TrenoSvg.svelte';
+	import type { Aspetto } from '../aspetto';
+	import type { AnimAvvio, MotoAvvio } from '../animazioni';
 
 	/**
 	 * Sequenza d'apertura: il convoglio attraversa lo schermo e si porta
@@ -13,9 +15,32 @@
 	 *   non intercetta il puntatore;
 	 * - con `prefers-reduced-motion` non parte affatto.
 	 */
-	let { onfine }: { onfine: () => void } = $props();
+	let {
+		onfine,
+		tipo = 'treno',
+		figura = null,
+		moto = 'attraversa',
+		durata = 1.25
+	}: {
+		onfine: () => void;
+		/** Which opening the theme asks for; «nessuna» is never mounted. */
+		tipo?: Exclude<AnimAvvio, 'nessuna'>;
+		/** For «personalizzata»: what crosses the screen. Missing = the train. */
+		figura?: Aspetto | null;
+		moto?: MotoAvvio;
+		/** Seconds, for «personalizzata». */
+		durata?: number;
+	} = $props();
 
-	const DURATA = 1250;
+	// svelte-ignore state_referenced_locally
+	const DURATA = tipo === 'personalizzata' ? durata * 1000 : tipo === 'stelle' ? 1300 : tipo === 'corrente' ? 1000 : 1250;
+
+	/** Falling stars: fixed places, so every start looks the same. */
+	const STELLE = Array.from({ length: 28 }, (_, i) => ({
+		x: (i * 37) % 100,
+		ritardo: ((i * 53) % 40) / 100,
+		lato: i % 3 === 0 ? 3 : 2
+	}));
 
 	let saltato = $state(false);
 
@@ -33,16 +58,35 @@
 
 <svelte:window onkeydown={chiudi} onpointerdown={chiudi} />
 
-<div class="sipario" aria-hidden="true">
-	<!-- Il binario si alimenta prima che arrivi il convoglio: la corrente
-	     precede sempre il treno. -->
-	<div class="binario">
-		<span class="corrente"></span>
-	</div>
+<div class="sipario {tipo}" aria-hidden="true" style:--durata="{DURATA}ms">
+	{#if tipo === 'stelle'}
+		{#each STELLE as st, i (i)}
+			<span class="stella" style:left="{st.x}%" style:animation-delay="{st.ritardo}s" style:width="{st.lato}px" style:height="{st.lato}px"
+			></span>
+		{/each}
+	{:else}
+		<!-- Il binario si alimenta prima che arrivi il convoglio: la corrente
+		     precede sempre il treno. -->
+		<div class="binario">
+			<span class="corrente"></span>
+		</div>
+	{/if}
 
-	<div class="convoglio">
-		<TrenoSvg scala={3} />
-	</div>
+	{#if tipo === 'treno' || (tipo === 'personalizzata' && !figura)}
+		<div class="convoglio {tipo === 'personalizzata' ? moto : ''}">
+			<TrenoSvg scala={3} />
+		</div>
+	{:else if tipo === 'personalizzata' && figura}
+		<div class="convoglio {moto}">
+			{#if figura.tipo === 'immagine'}
+				<img src={figura.src} alt="" draggable="false" />
+			{:else if figura.tipo === 'sprite'}
+				<span class="sprite" style={figura.stile}></span>
+			{:else}
+				<span class="figura">{@html figura.svg}</span>
+			{/if}
+		</div>
+	{/if}
 
 	<div class="targa">Space Train</div>
 </div>
@@ -56,7 +100,7 @@
 		background: var(--void);
 		/* L'app sotto è già viva: il velo non deve rubarle i clic. */
 		pointer-events: none;
-		animation: ritira 1.25s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+		animation: ritira var(--durata, 1.25s) cubic-bezier(0.65, 0, 0.35, 1) forwards;
 	}
 
 	/* Il sipario si ritira verso destra dietro al convoglio, invece di
@@ -135,6 +179,90 @@
 	@keyframes attraversa {
 		to {
 			transform: translateX(calc(100vw + 60px));
+		}
+	}
+
+	/* Corrente: only the current, longer and brighter, then the curtain. */
+	.sipario.corrente .corrente {
+		width: 45%;
+		animation-duration: 0.8s;
+	}
+
+	/* Stars: pixel squares falling through the curtain. */
+	.stella {
+		position: absolute;
+		top: 0;
+		background: var(--current);
+		box-shadow: 0 0 4px var(--current);
+		transform: translateY(-10px);
+		animation: cade 0.9s cubic-bezier(0.5, 0, 0.9, 0.6) forwards;
+	}
+	.stella:nth-child(even) {
+		background: var(--text);
+	}
+	@keyframes cade {
+		to {
+			transform: translateY(105vh);
+		}
+	}
+
+	/* Personalizzata: the chosen figure, big, with its movement. */
+	.convoglio img {
+		height: 90px;
+		width: auto;
+	}
+	.convoglio .figura :global(svg) {
+		height: 90px;
+		width: auto;
+	}
+	.convoglio .sprite {
+		display: block;
+		background-repeat: no-repeat;
+		transform: scale(3);
+		transform-origin: bottom left;
+		animation-name: fotogrammi;
+		animation-iteration-count: infinite;
+	}
+	@keyframes fotogrammi {
+		from {
+			background-position: var(--x) var(--y);
+		}
+		to {
+			background-position: var(--fine) var(--y);
+		}
+	}
+	.convoglio.attraversa,
+	.convoglio.entra,
+	.convoglio.centro {
+		margin-top: -64px;
+		animation-duration: calc(var(--durata) * 0.85);
+		animation-delay: 0s;
+	}
+	.convoglio.entra {
+		animation-name: entra;
+	}
+	.convoglio.centro {
+		left: 50%;
+		animation-name: compare;
+	}
+	@keyframes entra {
+		from {
+			transform: translateX(-120%);
+		}
+		60%,
+		to {
+			transform: translateX(calc(50vw - 50%));
+		}
+	}
+	@keyframes compare {
+		from {
+			opacity: 0;
+			transform: translateX(-50%) scale(0.6);
+		}
+		40%,
+		to {
+			opacity: 1;
+			transform: translateX(-50%) scale(1);
 		}
 	}
 

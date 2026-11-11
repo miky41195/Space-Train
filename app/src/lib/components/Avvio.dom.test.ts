@@ -61,3 +61,24 @@ describe('Avvio', () => {
 	// stili con ambito di componente, e un test che lo affermasse
 	// passerebbe o fallirebbe per motivi scollegati dal codice.
 });
+
+describe('Avvio chosen by the theme', () => {
+	it('«Pioggia di stelle» draws stars and no train', () => {
+		const { container } = render(Avvio, { props: { onfine: vi.fn(), tipo: 'stelle' } });
+		expect(container.querySelectorAll('.stella').length).toBeGreaterThan(10);
+		expect(container.querySelector('.convoglio')).toBeNull();
+	});
+
+	it('«Personalizzata» shows the chosen image and lasts the chosen time', () => {
+		vi.useFakeTimers();
+		const onfine = vi.fn();
+		const { container } = render(Avvio, {
+			props: { onfine, tipo: 'personalizzata', figura: { tipo: 'immagine', src: 'asset://gatto.png' }, moto: 'centro', durata: 2.5 }
+		});
+		expect(container.querySelector('.convoglio.centro img')?.getAttribute('src')).toBe('asset://gatto.png');
+		vi.advanceTimersByTime(2400);
+		expect(onfine).not.toHaveBeenCalled();
+		vi.advanceTimersByTime(200);
+		expect(onfine).toHaveBeenCalledTimes(1);
+	});
+});

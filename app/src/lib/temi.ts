@@ -1,3 +1,4 @@
+import type { Animazioni } from './animazioni';
 /**
  * Temi: colori, forme e personaggi.
  *
@@ -100,6 +101,8 @@ export interface Tema {
 	corteo?: string[];
 	/** Figura usata come sfondo decorativo della lista. */
 	motivo?: string;
+	/** Startup and folder-opening animations. Missing = the train, no folder animation. */
+	animazioni?: Partial<Animazioni>;
 }
 
 /** Le categorie della galleria dei temi, nell'ordine in cui compaiono. */
