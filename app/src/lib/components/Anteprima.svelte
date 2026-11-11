@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { convertFileSrc } from '@tauri-apps/api/core';
-	import type { Backend, Entry } from '../ipc';
+	import type { Backend, Entry, MediaProps } from '../ipc';
+	import { mediaLines } from '../media';
 	import { categoryFor } from '../icons';
 	import { descriviTipo } from '../colonne';
 	import { byte, eArchivio, estensione } from '../posizioni';
@@ -10,13 +11,16 @@
 	let {
 		voce,
 		quante,
-		backend
+		backend,
+		media = undefined
 	}: {
 		/** La voce da mostrare: l'ultima selezionata. */
 		voce: Entry | null;
 		/** Quante voci sono selezionate in tutto. */
 		quante: number;
 		backend: Backend;
+		/** Photo/video/music details of `voce`, when known. */
+		media?: MediaProps | null;
 	} = $props();
 
 	type Modo = 'immagine' | 'video' | 'audio' | 'pdf' | 'testo' | 'markdown' | 'codice' | 'csv' | 'archivio' | 'info';
@@ -192,6 +196,10 @@
 			{/if}
 			<dt>{voce.origine ? 'Eliminato' : 'Modificato'}</dt>
 			<dd>{data(voce.modified)}</dd>
+			{#each mediaLines(media) as [k, v] (k)}
+				<dt>{k}</dt>
+				<dd title={v}>{v}</dd>
+			{/each}
 			{#if voce.origine}
 				<dt>Posizione originale</dt>
 				<dd title={voce.origine}>{voce.origine}</dd>

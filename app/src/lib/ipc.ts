@@ -23,6 +23,24 @@ export interface Entry {
 	snippet?: Snippet;
 }
 
+/** Photo, video and music details Windows knows about a file. */
+export interface MediaProps {
+	/** Date taken, ms since the epoch. */
+	taken?: number;
+	/** Seconds. */
+	duration?: number;
+	width?: number;
+	height?: number;
+	artist?: string;
+	album?: string;
+	camera?: string;
+	year?: number;
+	/** Bits per second. */
+	bitrate?: number;
+	/** Hz. */
+	sampleRate?: number;
+}
+
 export interface Snippet {
 	/** 1-based line number. */
 	line: number;
@@ -353,6 +371,8 @@ export interface Backend {
 	/** Free system-wide (no other program holds it)? `null` = not a valid combination. */
 	shortcutFree(accelerator: string): Promise<boolean | null>;
 	imageRotate(paths: string[], clockwise: boolean): Promise<void>;
+	/** Details of each path, null where none could be read (at most 500 per call). */
+	mediaProps(paths: string[]): Promise<Array<MediaProps | null>>;
 	imageConvert(opts: {
 		opId: number;
 		paths: string[];
@@ -475,6 +495,7 @@ export const tauriBackend: Backend = {
 	pauseTransfer: (opId, paused) => invoke('pause_transfer', { opId, paused }),
 	shortcutFree: (accelerator) => invoke('shortcut_free', { accelerator }),
 	imageRotate: (paths, clockwise) => invoke('image_rotate', { paths, clockwise }),
+	mediaProps: (paths) => invoke('media_props', { paths }),
 	imageConvert: ({ opId, paths, target, maxSide, quality, onProgress }) =>
 		invoke('image_convert', { opId, paths, target, maxSide, quality, onProgress: canale(onProgress) }),
 	deleteItems: ({ opId, mode, paths, onProgress }) =>

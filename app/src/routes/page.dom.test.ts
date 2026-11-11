@@ -3093,6 +3093,30 @@ describe('colour labels', () => {
 	});
 });
 
+describe('media columns', () => {
+	it('a folder of photos shows date taken and size, sorts by them, and the columns can be switched off', async () => {
+		aggiungi('C:\\Foto\\');
+		aggiungi('C:\\Foto\\a.jpg');
+		aggiungi('C:\\Foto\\b.jpg');
+		aggiungi('C:\\Foto\\c.jpg');
+		disco.media.set('C:\\Foto\\a.jpg', { taken: Date.UTC(2024, 5, 1), width: 400, height: 300 });
+		disco.media.set('C:\\Foto\\b.jpg', { taken: Date.UTC(2025, 0, 1), width: 800, height: 600 });
+		await monta();
+		await fireEvent.dblClick(riga('Foto'));
+		await waitFor(() => expect(nomi()).toEqual(['a.jpg', 'b.jpg', 'c.jpg']));
+		await waitFor(() => expect(riga('b.jpg').textContent).toContain('800×600'));
+
+		// Newest first, the photo without a date last.
+		await fireEvent.click(screen.getByRole('button', { name: 'Ordina per scattata il' }));
+		await waitFor(() => expect(nomi()).toEqual(['b.jpg', 'a.jpg', 'c.jpg']));
+
+		await fireEvent.contextMenu(document.querySelector('.tabellone')!);
+		await fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitemcheckbox', { name: 'Scattata il' }));
+		await waitFor(() => expect(screen.queryByRole('button', { name: /scattata il/i })).toBeNull());
+		expect(nomi()).toEqual(['a.jpg', 'b.jpg', 'c.jpg']);
+	});
+});
+
 describe('workspaces', () => {
 	it('saves the open tabs as an area, switches to another and back', async () => {
 		await monta();

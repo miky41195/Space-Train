@@ -2,18 +2,26 @@
 	import type { SortKey, SortSpec } from '../ipc';
 	import type { Colonne } from '../stores/impostazioni.svelte';
 	import { grigliaColonne } from '../colonne';
+	import { MEDIA_COLUMNS, type MediaKey } from '../media';
 
 	let {
 		sort,
 		onsort,
 		colonne: visibili = { dimensione: true, data: true, tipo: false },
-		oncolonne = undefined
+		oncolonne = undefined,
+		mediaSort = null,
+		onsortmedia = undefined
 	}: {
 		sort: SortSpec;
 		onsort: (chiave: SortKey) => void;
 		colonne?: Colonne;
 		oncolonne?: (evento: MouseEvent) => void;
+		/** The list is sorted by a media column instead of `sort`. */
+		mediaSort?: { key: MediaKey; ascending: boolean } | null;
+		onsortmedia?: (key: MediaKey) => void;
 	} = $props();
+
+	let colonneMedia = $derived((visibili.media ?? []).map((k) => MEDIA_COLUMNS.find((m) => m.key === k)!).filter(Boolean));
 
 	let colonne = $derived(
 		[
@@ -50,13 +58,32 @@
 	{#each colonne as c (c.classe)}
 		<button
 			class="colonna {c.classe}"
-			class:attiva={sort.key === c.chiave}
+			class:attiva={!mediaSort && sort.key === c.chiave}
 			onclick={() => onsort(c.chiave)}
 			aria-label={descrizione(c.chiave, c.etichetta)}
 		>
 			<span class="testo">{c.etichetta}</span>
-			{#if sort.key === c.chiave}
+			{#if !mediaSort && sort.key === c.chiave}
 				<svg class="verso" class:giu={!sort.ascending} viewBox="0 0 6 4" aria-hidden="true">
+					<path d="M0 3 L3 0 L6 3 Z" fill="currentColor" />
+				</svg>
+			{/if}
+		</button>
+	{/each}
+	{#each colonneMedia as c (c.key)}
+		{@const attiva = mediaSort?.key === c.key}
+		<button
+			class="colonna media"
+			class:destra={c.right}
+			class:attiva
+			onclick={() => onsortmedia?.(c.key)}
+			aria-label={!attiva
+				? `Ordina per ${c.label.toLowerCase()}`
+				: `${c.label}, ordine ${mediaSort?.ascending ? 'crescente' : 'decrescente'}. Premi per invertire`}
+		>
+			<span class="testo">{c.label}</span>
+			{#if attiva}
+				<svg class="verso" class:giu={!mediaSort?.ascending} viewBox="0 0 6 4" aria-hidden="true">
 					<path d="M0 3 L3 0 L6 3 Z" fill="currentColor" />
 				</svg>
 			{/if}
@@ -108,8 +135,14 @@
 	}
 
 	.carico,
-	.orario {
+	.orario,
+	.media.destra {
 		justify-content: flex-end;
+	}
+	.media .testo {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	/* La prima colonna è larga quanto un'icona: l'etichetta non ci sta,

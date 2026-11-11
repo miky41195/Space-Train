@@ -9,8 +9,9 @@
 
 <script lang="ts">
 	import type { FolderStyle } from '../icons';
+	import type { MediaKey } from '../media';
 	import { selezioneRettangolo, type OpzioniRettangolo } from '../rettangolo';
-	import type { Entry, SortKey, SortSpec } from '../ipc';
+	import type { Entry, MediaProps, SortKey, SortSpec } from '../ipc';
 	import Intestazioni from './Intestazioni.svelte';
 	import {
 		impaginaZone,
@@ -57,7 +58,10 @@
 		oncancelrename = undefined,
 		ontrascina = undefined,
 		rettangolo = undefined,
-		oncolonne = undefined
+		oncolonne = undefined,
+		mediaDi = undefined,
+		mediaSort = null,
+		onsortmedia = undefined
 	}: {
 		entries: Entry[];
 		/**
@@ -115,6 +119,10 @@
 		rettangolo?: OpzioniRettangolo;
 		/** Clic destro sulle intestazioni: scelta delle colonne. */
 		oncolonne?: (evento: MouseEvent) => void;
+		/** Photo/video/music details of an entry, for the media columns. */
+		mediaDi?: (e: Entry) => MediaProps | null | undefined;
+		mediaSort?: { key: MediaKey; ascending: boolean } | null;
+		onsortmedia?: (key: MediaKey) => void;
 	} = $props();
 
 	const SENZA_RETTANGOLO: OpzioniRettangolo = { oncambia: () => {}, onvuoto: () => {} };
@@ -194,7 +202,7 @@
 
 <div class="lista">
 	{#if sort && onsort}
-		<Intestazioni {sort} {onsort} {colonne} {oncolonne} />
+		<Intestazioni {sort} {onsort} {colonne} {oncolonne} {mediaSort} {onsortmedia} />
 	{/if}
 
 	<div
@@ -234,6 +242,7 @@
 					cartella={cartellaDi?.(entry)}
 					colore={coloreDi?.(entry)}
 					quota={quotaDi?.(entry)}
+					media={mediaDi?.(entry)}
 					altezza={altezzaRiga}
 					bersaglio={entry.path === bersaglio}
 					{ontrascina}

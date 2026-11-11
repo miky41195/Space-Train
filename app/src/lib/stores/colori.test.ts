@@ -53,7 +53,7 @@ describe('ColoriStore label names', () => {
 	it('names a colour, keeps it after restart, and blank restores the default', () => {
 		const a = archivio();
 		const c = new ColoriStore(a);
-		c.imposta(['C:\Lavoro'], 'rosso');
+		c.imposta(['C:\\Lavoro'], 'rosso');
 		c.rename('rosso', '  Lavoro  ');
 		expect(c.nameOf('rosso')).toBe('Lavoro');
 		expect(c.usati[0].nome).toBe('Lavoro');

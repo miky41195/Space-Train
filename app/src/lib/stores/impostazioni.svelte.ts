@@ -15,6 +15,8 @@ export interface Colonne {
 	dimensione: boolean;
 	data: boolean;
 	tipo: boolean;
+	/** Photo/video/music columns of the open folder; never saved with the settings. */
+	media?: readonly import('../media').MediaKey[];
 }
 
 interface Valori {

@@ -5,6 +5,7 @@ import type { ModoGruppi } from './raggruppa';
 import { TAGLIE, type Vista } from './vista';
 import type { IdAccento } from './temi';
 import { COLORI_CARTELLA, type IdColore } from './stores/colori.svelte';
+import { MEDIA_COLUMNS, type MediaKey } from './media';
 
 export type AzioneMenu =
 	| 'apri'
@@ -67,6 +68,9 @@ export type AzioneMenu =
 	| `vista:${Vista}`
 	| `lato:${number}`
 	| 'compatta'
+	// Media columns
+	| `media:${MediaKey}`
+	| 'mediaAuto'
 	// Workspaces
 	| `area:${string}`
 	| 'areaNuova'
@@ -599,12 +603,27 @@ export function vociVista(s: StatoVista): VoceMenu[] {
 }
 
 /** Il menu delle colonne, aperto anche col clic destro sulle intestazioni. */
-export function vociColonne(c: StatoVista['colonne']): VoceMenu[] {
-	return [
+export function vociColonne(
+	c: StatoVista['colonne'],
+	media: { shown: readonly MediaKey[]; chosen: boolean } | null = null
+): VoceMenu[] {
+	const voci: VoceMenu[] = [
 		{ azione: 'colonnaTipo', etichetta: 'Tipo', spunta: c.tipo },
 		{ azione: 'colonnaDimensione', etichetta: 'Dimensione', spunta: c.dimensione },
 		{ azione: 'colonnaData', etichetta: 'Data di modifica', spunta: c.data }
 	];
+	if (!media) return voci;
+	MEDIA_COLUMNS.forEach((m, i) =>
+		voci.push({
+			azione: `media:${m.key}` as AzioneMenu,
+			etichetta: m.label,
+			spunta: media.shown.includes(m.key),
+			sezione: i === 0 ? 'Foto, video e musica' : undefined,
+			stacca: i === 0
+		})
+	);
+	if (media.chosen) voci.push({ azione: 'mediaAuto', etichetta: 'Colonne automatiche per questa cartella', stacca: true });
+	return voci;
 }
 
 /** Le pause fra un passaggio e l'altro che si possono scegliere, in secondi. */

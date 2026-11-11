@@ -4,6 +4,8 @@
 	import type { IconeStore } from '../stores/icone.svelte';
 	import type { Colonne } from '../stores/impostazioni.svelte';
 	import { grigliaColonne, descriviTipo } from '../colonne';
+	import { formatMedia, MEDIA_COLUMNS } from '../media';
+	import type { MediaProps } from '../ipc';
 	import { byte, senzaEstensione, estensione } from '../posizioni';
 	import { seTrascina, hoverSelect, cancelHoverSelect } from '../trascina';
 
@@ -30,7 +32,8 @@
 		oncontext = undefined,
 		onrename = undefined,
 		oncancelrename = undefined,
-		ontrascina = undefined
+		ontrascina = undefined,
+		media = undefined
 	}: {
 		entry: Entry;
 		selected?: boolean;
@@ -70,6 +73,8 @@
 		oncancelrename?: () => void;
 		/** Il puntatore è partito trascinando questa voce. */
 		ontrascina?: (e: Entry) => void;
+		/** Photo/video/music details for the media columns. */
+		media?: MediaProps | null;
 	} = $props();
 
 	let nascosta = $derived(nascondiEstensione && entry.kind !== 'dir' && estensione(entry.name) !== '');
@@ -293,6 +298,9 @@
 		</span>
 	{/if}
 	{#if colonne.data}<span class="date">{data(entry)}</span>{/if}
+	{#each colonne.media ?? [] as k (k)}
+		<span class="media" class:destra={MEDIA_COLUMNS.find((m) => m.key === k)?.right}>{formatMedia(k, media)}</span>
+	{/each}
 </div>
 
 <style>
@@ -429,6 +437,17 @@
 	}
 	/* Testo secondario: carattere del corpo, non quello dei titoli (che il
 	   tema può cambiare). Cifre tabellari perché le colonne restino in fila. */
+	.media {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		color: var(--text-dim);
+	}
+	.media.destra {
+		font-family: var(--font-display);
+		font-variant-numeric: tabular-nums;
+		text-align: right;
+	}
 	.size,
 	.date {
 		color: var(--text-dim);

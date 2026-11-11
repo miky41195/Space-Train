@@ -185,6 +185,7 @@ pub fn run() {
             transfer::archive_extract,
             transfer::archive_open_item,
             transfer::image_rotate,
+            shell::media::media_props,
             transfer::image_convert,
             ipc::entries_for,
             ipc::shortcut_free,

@@ -62,6 +62,8 @@ export class DiscoFinto {
 	risposte: Array<{ id: number; accetta: boolean; cartella: string | null }> = [];
 	/** Cosa risponde il selettore di cartelle: null è «annullato». */
 	cartellaScelta: string | null = null;
+	/** Photo/video/music details by path, for media_props. */
+	media = new Map<string, import('./ipc').MediaProps>();
 	/** Archive contents by archive path, for archive_list / archive_extract. */
 	archivi = new Map<string, Array<{ path: string; size: number; dir: boolean; modified: number | null }>>();
 	/** Key combinations another program holds (shortcut_free answers false). */
@@ -291,6 +293,8 @@ export class DiscoFinto {
 				return true;
 			case 'shortcut_free':
 				return !this.scorciatoieOccupate.has(args.accelerator as string);
+			case 'media_props':
+				return (args.paths as string[]).map((p) => this.media.get(p) ?? null);
 			case 'image_rotate':
 				for (const p of args.paths as string[]) this.ruotate.push({ path: p, clockwise: args.clockwise as boolean });
 				return;

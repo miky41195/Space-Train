@@ -36,6 +36,8 @@
 	import ConfermaCestino from '$lib/components/ConfermaCestino.svelte';
 	import NameDialog from '$lib/components/NameDialog.svelte';
 	import { WorkspacesStore, type Snapshot } from '$lib/stores/workspaces.svelte';
+	import { MediaStore } from '$lib/stores/media.svelte';
+	import { sortByMedia, type MediaKey } from '$lib/media';
 	import SommaControllo from '$lib/components/SommaControllo.svelte';
 	import ConvertiImmagini from '$lib/components/ConvertiImmagini.svelte';
 	import Palette from '$lib/components/Palette.svelte';
@@ -124,6 +126,7 @@
 	const preferiti = new PreferitiStore();
 	const colori = new ColoriStore();
 	const aree = new WorkspacesStore();
+	const media = new MediaStore((paths) => tauriBackend.mediaProps(paths));
 	const accessoRapido = new AccessoRapidoStore();
 	const ricerche = new RicercheStore();
 
@@ -424,6 +427,47 @@
 	});
 	let filtrate = $derived(risultati.map((r) => r.item));
 
+	// ── Photo, video and music columns ───────────────────────────────
+	/** Media columns of the open folder: picked by hand, or chosen from what it holds. */
+	let colonneMedia = $derived.by((): MediaKey[] => {
+		const tab = store.activeTab;
+		if (!tab || posizione !== 'normale' || tab.risultati) return [];
+		return media.columnsFor(tab.path, tab.entries);
+	});
+	let colonneVista = $derived({ ...impostazioni.colonne, media: colonneMedia });
+	/** Sorting by a media column, per tab; a click on another column ends it. */
+	let ordiniMedia = $state<Record<number, { key: MediaKey; ascending: boolean }>>({});
+	let ordineMedia = $derived.by(() => {
+		const o = store.activeId === null ? undefined : ordiniMedia[store.activeId];
+		return o && colonneMedia.includes(o.key) ? o : null;
+	});
+	let ordinate = $derived(
+		ordineMedia ? sortByMedia(filtrate, ordineMedia.key, ordineMedia.ascending, (e) => media.of(e)) : filtrate
+	);
+
+	$effect(() => {
+		const tab = store.activeTab;
+		if (tab && colonneMedia.length > 0) void media.request(tab.entries);
+	});
+	// The preview pane shows the details of the selected file too.
+	$effect(() => {
+		if (impostazioni.anteprima && voceAnteprima) void media.request([voceAnteprima]);
+	});
+
+	function ordinaPerMedia(key: MediaKey) {
+		const id = store.activeId;
+		if (id === null) return;
+		const ora = ordineMedia;
+		// Dates and sizes start newest/largest first, names A to Z.
+		const ascending = ora?.key === key ? !ora.ascending : key === 'artist' || key === 'album' || key === 'camera';
+		ordiniMedia = { ...ordiniMedia, [id]: { key, ascending } };
+	}
+
+	function alternaColonnaMedia(key: MediaKey) {
+		const tab = store.activeTab;
+		if (tab) media.toggle(tab.path, key, tab.entries);
+	}
+
 	/**
 	 * Preferiti in cima e gruppi scelti nel menu Visualizza. Con un filtro
 	 * attivo la divisione si sospende: lì conta il punteggio, e il match
@@ -444,7 +488,7 @@
 			impostazioni.recenti && (posizione === 'normale' || posizione === 'cestino')
 				? Date.now() - impostazioni.giorniRecenti * 24 * 60 * 60 * 1000
 				: null;
-		return impagina(filtrate, prefs, impostazioni.raggruppa, Date.now(), recentiDal);
+		return impagina(ordinate, prefs, impostazioni.raggruppa, Date.now(), recentiDal);
 	});
 	let vociVisibili = $derived(impaginato.voci);
 
@@ -1161,8 +1205,13 @@
 		const tab = store.activeTab;
 		if (!tab || store.activeId === null) return;
 
+		if (ordineMedia) {
+			// Back from a media column: the clicked one takes over in its usual direction.
+			const { [store.activeId]: _, ...resto } = ordiniMedia;
+			ordiniMedia = resto;
+		}
 		const ascendente =
-			tab.sort.key === chiave ? !tab.sort.ascending : chiave === 'name' || chiave === 'kind';
+			tab.sort.key === chiave && !ordineMedia ? !tab.sort.ascending : chiave === 'name' || chiave === 'kind';
 
 		store.setSort(store.activeId, { key: chiave, ascending: ascendente });
 	}
@@ -2510,7 +2559,16 @@
 	});
 
 	function apriMenuColonne(evento: MouseEvent) {
-		menu = { voci: vociColonne(impostazioni.colonne), x: evento.clientX, y: evento.clientY };
+		const tab = store.activeTab;
+		const conMedia = tab && posizione === 'normale' && !tab.risultati;
+		menu = {
+			voci: vociColonne(
+				impostazioni.colonne,
+				conMedia ? { shown: colonneMedia, chosen: media.isChosen(tab.path) } : null
+			),
+			x: evento.clientX,
+			y: evento.clientY
+		};
 	}
 
 	const COLONNE: Partial<Record<AzioneMenu, keyof Colonne>> = {
@@ -2547,7 +2605,11 @@
 
 		// Area names may hold ':', so they never go through the split below.
 		if (azione.startsWith('area:')) return apriArea(azione.slice('area:'.length));
+		if (azione.startsWith('media:')) return alternaColonnaMedia(azione.slice('media:'.length) as MediaKey);
 		switch (azione) {
+			case 'mediaAuto':
+				if (store.activeTab) media.automatic(store.activeTab.path);
+				return;
 			case 'areaNuova':
 				nomeArea = { mode: 'new', error: null };
 				return;
@@ -3140,7 +3202,10 @@
 							: undefined}
 						zone={impaginato.zone}
 						chiave={chiaveContenuto}
-						colonne={impostazioni.colonne}
+						colonne={colonneVista}
+						mediaDi={(e) => media.of(e)}
+						mediaSort={ordineMedia}
+						onsortmedia={ordinaPerMedia}
 						nascondiEstensione={!impostazioni.estensioni}
 						cartellaDi={cartellaVoce}
 						coloreDi={coloreVoce}
@@ -3188,7 +3253,12 @@
 				{/if}
 
 				{#if impostazioni.anteprima}
-					<Anteprima voce={voceAnteprima} quante={selezione.length} backend={tauriBackend} />
+					<Anteprima
+						voce={voceAnteprima}
+						quante={selezione.length}
+						backend={tauriBackend}
+						media={voceAnteprima ? media.of(voceAnteprima) : undefined}
+					/>
 				{/if}
 			</div>
 		</main>

@@ -2,13 +2,15 @@ import type { Entry } from './ipc';
 import type { Colonne } from './stores/impostazioni.svelte';
 import { categoryFor } from './icons';
 import { estensione } from './posizioni';
+import { MEDIA_COLUMNS } from './media';
 
 /**
  * Colonne della vista dettagli. Righe e intestazioni usano la stessa
  * funzione: è ciò che le tiene allineate quando l'utente ne nasconde una.
  */
 export function grigliaColonne(c: Colonne): string {
-	return ['28px', 'minmax(0, 1fr)', c.tipo && '130px', c.dimensione && '110px', c.data && '170px']
+	const media = (c.media ?? []).map((k) => MEDIA_COLUMNS.find((m) => m.key === k)?.width);
+	return ['28px', 'minmax(0, 1fr)', c.tipo && '130px', c.dimensione && '110px', c.data && '170px', ...media]
 		.filter(Boolean)
 		.join(' ');
 }
