@@ -67,6 +67,12 @@ export type AzioneMenu =
 	| `vista:${Vista}`
 	| `lato:${number}`
 	| 'compatta'
+	// Workspaces
+	| `area:${string}`
+	| 'areaNuova'
+	| 'areaRinomina'
+	| 'areaElimina'
+	| 'areaEsci'
 	// Aspetto
 	| `tema:${string}`
 	| 'accento'
@@ -633,4 +639,21 @@ export function posizionaMenu(
 		x: Math.max(margine, Math.min(x, maxX)),
 		y: Math.max(margine, Math.min(y, maxY))
 	};
+}
+
+/** The workspace menu: every area (the current one ticked), then save, rename, delete. */
+export function vociAree(areas: ReadonlyArray<{ name: string; tabs: readonly string[] }>, current: string | null): VoceMenu[] {
+	const voci: VoceMenu[] = areas.map((a) => ({
+		azione: `area:${a.name}` as AzioneMenu,
+		etichetta: a.name,
+		scorciatoia: a.tabs.length === 1 ? '1 scheda' : `${a.tabs.length} schede`,
+		spunta: a.name === current
+	}));
+	voci.push({ azione: 'areaNuova', etichetta: 'Salva come nuova area…', stacca: voci.length > 0 });
+	if (current !== null) {
+		voci.push({ azione: 'areaRinomina', etichetta: `Rinomina «${current}»…` });
+		voci.push({ azione: 'areaEsci', etichetta: 'Esci dall’area', nomeAccessibile: `Esci dall’area ${current}` });
+		voci.push({ azione: 'areaElimina', etichetta: `Elimina «${current}»`, pericolosa: true, stacca: true });
+	}
+	return voci;
 }

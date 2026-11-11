@@ -8,7 +8,9 @@
 		store,
 		bersaglio = null,
 		onnovita = undefined,
-		onimpostazioni = undefined
+		onimpostazioni = undefined,
+		area = null,
+		onaree = undefined
 	}: {
 		store: TabsStore;
 		/** Cartella sopra cui passa un trascinamento. */
@@ -16,6 +18,10 @@
 		/** Riapre le novità della versione installata. */
 		onnovita?: () => void;
 		onimpostazioni?: () => void;
+		/** Name of the current workspace, if any. */
+		area?: string | null;
+		/** Opens the workspace menu under the button. */
+		onaree?: (e: MouseEvent) => void;
 	} = $props();
 
 	const win = getCurrentWindow();
@@ -42,6 +48,20 @@
 	     proprio su un elemento marcato, quindi le schede restano cliccabili. -->
 	<!-- Una cartella rilasciata nello spazio libero fra le schede si apre in
 	     una scheda nuova: `data-nuova-scheda` lo distingue da una scheda. -->
+	{#if onaree}
+		<button
+			class="area"
+			class:vuota={area === null}
+			onclick={onaree}
+			title="Aree di lavoro"
+			aria-label={area === null ? 'Aree di lavoro' : `Area di lavoro: ${area}`}
+			aria-haspopup="menu"
+			><span class="nome-area">{area ?? 'Aree'}</span><svg viewBox="0 0 10 10" width="9" height="9" aria-hidden="true"
+				><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4" /></svg
+			></button
+		>
+	{/if}
+
 	<div class="tabs" data-tauri-drag-region data-nuova-scheda class:bersaglio={bersaglio === NUOVA_SCHEDA}>
 		{#each store.tabs as tab (tab.id)}
 			<button
@@ -138,6 +158,52 @@
 </header>
 
 <style>
+	/* Workspace switcher: a route sign before the tabs, outlined in rail metal. */
+	.area {
+		position: relative;
+		z-index: 4;
+		flex: none;
+		align-self: center;
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		max-width: 160px;
+		height: 24px;
+		margin-right: 6px;
+		padding: 0 8px;
+		border: 1px solid var(--rail-metal, var(--border));
+		border-radius: var(--radius-sm);
+		clip-path: var(--forma-sm, none);
+		mask: var(--maschera-sm, none);
+		background: transparent;
+		color: var(--text);
+		font-family: var(--font-display);
+		font-size: calc(11px * var(--scala-testo, 1));
+		font-weight: 600;
+		letter-spacing: 0.06em;
+		cursor: default;
+	}
+	.area.vuota {
+		color: var(--text-dim);
+	}
+	.area:hover {
+		background: var(--row-hover);
+		color: var(--text);
+	}
+	.area:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+	.area svg {
+		flex: none;
+		color: var(--text-dim);
+	}
+	.nome-area {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
 	/* Tre strati, perché il convoglio passi fra lo sfondo e il contenuto:
 	   il cielo sta in un ::before sotto il convoglio (z 3, nella linea
 	   principale), marchio, schede e lampade sopra (z 4). */

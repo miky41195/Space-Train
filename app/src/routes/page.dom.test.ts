@@ -3093,6 +3093,36 @@ describe('colour labels', () => {
 	});
 });
 
+describe('workspaces', () => {
+	it('saves the open tabs as an area, switches to another and back', async () => {
+		await monta();
+		await fireEvent.click(screen.getByRole('button', { name: 'Aree di lavoro' }));
+		await fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Salva come nuova area…' }));
+		const dialog = await screen.findByRole('dialog', { name: 'Nuova area di lavoro' });
+		await fireEvent.input(within(dialog).getByRole('textbox'), { target: { value: 'Uno' } });
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Salva area' }));
+		await screen.findByRole('button', { name: 'Area di lavoro: Uno' });
+
+		// A second area, then open a folder in it.
+		await fireEvent.click(screen.getByRole('button', { name: 'Area di lavoro: Uno' }));
+		await fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Salva come nuova area…' }));
+		const d2 = await screen.findByRole('dialog', { name: 'Nuova area di lavoro' });
+		await fireEvent.input(within(d2).getByRole('textbox'), { target: { value: 'Due' } });
+		await fireEvent.click(within(d2).getByRole('button', { name: 'Salva area' }));
+		await fireEvent.dblClick(riga('Dati'));
+		await waitFor(() => expect(nomi()).toContain('interno.txt'));
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Area di lavoro: Due' }));
+		await fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitemcheckbox', { name: /^Uno/ }));
+		await waitFor(() => expect(nomi()).toContain('alfa.txt'));
+		await waitFor(() => expect(document.querySelectorAll('.titlebar .tab')).toHaveLength(1));
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Area di lavoro: Uno' }));
+		await fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitemcheckbox', { name: /^Due/ }));
+		await waitFor(() => expect(nomi()).toContain('interno.txt'));
+	});
+});
+
 describe('command palette', () => {
 	it('Ctrl+Maiusc+P finds an action by typing and Enter runs it', async () => {
 		await monta();

@@ -34,6 +34,8 @@
 	import { RICERCHE_PRONTE, RicercheStore, type RicercaSalvata } from '$lib/stores/ricerche.svelte';
 	import SearchBar from '$lib/components/SearchBar.svelte';
 	import ConfermaCestino from '$lib/components/ConfermaCestino.svelte';
+	import NameDialog from '$lib/components/NameDialog.svelte';
+	import { WorkspacesStore, type Snapshot } from '$lib/stores/workspaces.svelte';
 	import SommaControllo from '$lib/components/SommaControllo.svelte';
 	import ConvertiImmagini from '$lib/components/ConvertiImmagini.svelte';
 	import Palette from '$lib/components/Palette.svelte';
@@ -72,6 +74,7 @@
 	import {
 		vociMenu,
 		vociVista,
+		vociAree,
 		vociOrdina,
 		vociNuovo,
 		vociAccessoRapido,
@@ -120,6 +123,7 @@
 	});
 	const preferiti = new PreferitiStore();
 	const colori = new ColoriStore();
+	const aree = new WorkspacesStore();
 	const accessoRapido = new AccessoRapidoStore();
 	const ricerche = new RicercheStore();
 
@@ -324,6 +328,56 @@
 		if (dopo !== prima) split = dopo;
 		ultimaAttiva = attiva;
 	});
+	// ── Workspaces ───────────────────────────────────────────────────
+	/** Name dialog for a workspace: saving the open tabs, or renaming the current one. */
+	let nomeArea = $state<{ mode: 'new' | 'rename'; error: string | null } | null>(null);
+	/** True while tabs are being swapped, so the half-open state is never saved. */
+	let cambiandoArea = false;
+
+	function fotoSchede(): Snapshot {
+		const ids = store.tabs.map((t) => t.id);
+		return {
+			tabs: store.tabs.map((t) => t.path),
+			active: Math.max(ids.indexOf(store.activeId ?? -1), 0),
+			split: split ? [ids.indexOf(split.left), ids.indexOf(split.right)] : null
+		};
+	}
+
+	// The current area follows the tab bar (main window only, like the session).
+	$effect(() => {
+		const foto = fotoSchede();
+		if (!avviato || finestra !== 'main' || cambiandoArea || foto.tabs.length === 0) return;
+		untrack(() => aree.update(foto));
+	});
+
+	async function apriArea(nome: string) {
+		const area = aree.get(nome);
+		if (!area || aree.current === nome || cambiandoArea) return;
+		cambiandoArea = true;
+		try {
+			const vecchie = store.tabs.map((t) => t.id);
+			split = null;
+			const ids = await Promise.all(area.tabs.map((p) => store.openTab(p)));
+			for (const id of vecchie) store.closeTab(id);
+			store.setActive(ids[area.active] ?? ids[0]);
+			if (area.split) split = { left: ids[area.split[0]], right: ids[area.split[1]] };
+			aree.setCurrent(nome);
+		} finally {
+			cambiandoArea = false;
+		}
+	}
+
+	function confermaNomeArea(nome: string) {
+		if (!nomeArea) return;
+		if (nomeArea.mode === 'new') {
+			aree.create(nome, fotoSchede());
+			nomeArea = null;
+		} else if (aree.current !== null) {
+			if (aree.rename(aree.current, nome)) nomeArea = null;
+			else nomeArea = { mode: 'rename', error: `Esiste già un'area «${nome}».` };
+		}
+	}
+
 	/** The tab shown in the passive half, when the dual pane is open. */
 	let tabAltro = $derived(store.tabs.find((t) => t.id === otherPane(split, store.activeId)));
 	/** The active pane sits on the right when its tab is the split's right one. */
@@ -2491,6 +2545,22 @@
 		const id = store.activeId;
 		const tab = store.activeTab;
 
+		// Area names may hold ':', so they never go through the split below.
+		if (azione.startsWith('area:')) return apriArea(azione.slice('area:'.length));
+		switch (azione) {
+			case 'areaNuova':
+				nomeArea = { mode: 'new', error: null };
+				return;
+			case 'areaRinomina':
+				nomeArea = { mode: 'rename', error: null };
+				return;
+			case 'areaEsci':
+				return aree.setCurrent(null);
+			case 'areaElimina':
+				if (aree.current !== null) aree.remove(aree.current);
+				return;
+		}
+
 		const colonna = COLONNE[azione];
 		if (colonna) return impostazioni.alternaColonna(colonna);
 		if (eseguiParametrica(azione, scelte)) return;
@@ -2809,7 +2879,14 @@
 {/if}
 
 <div class="app">
-	<TitleBar {store} {bersaglio} onnovita={riapriNovita} onimpostazioni={() => (impostazioniAperte = true)} />
+	<TitleBar
+		{store}
+		{bersaglio}
+		onnovita={riapriNovita}
+		onimpostazioni={() => (impostazioniAperte = true)}
+		area={aree.current}
+		onaree={finestra === 'main' ? (e) => sottoIlPulsante(e, vociAree(aree.areas, aree.current)) : undefined}
+	/>
 
 	<!-- La linea principale: corre per tutta la larghezza sotto la testata.
 	     Si accende quando il sistema muove davvero qualcosa, e ogni tanto
@@ -3175,6 +3252,18 @@
 				conflitti = [];
 				inSospeso = null;
 			}}
+		/>
+	{/if}
+
+	{#if nomeArea}
+		<NameDialog
+			title={nomeArea.mode === 'new' ? 'Nuova area di lavoro' : 'Rinomina l’area'}
+			label="Nome dell'area"
+			value={nomeArea.mode === 'rename' ? (aree.current ?? '') : (store.activeTab ? nomePosizione(store.activeTab.path) : '')}
+			confirm={nomeArea.mode === 'new' ? 'Salva area' : 'Rinomina'}
+			error={nomeArea.error}
+			onconfirm={confermaNomeArea}
+			oncancel={() => (nomeArea = null)}
 		/>
 	{/if}
 
