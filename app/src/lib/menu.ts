@@ -1,5 +1,5 @@
 import type { Entry, SortKey, SortSpec } from './ipc';
-import { eEseguibile, eZip, nomeDi, nomePosizione } from './posizioni';
+import { eArchivio, eEseguibile, nomeDi, nomePosizione } from './posizioni';
 import { RADICE_SISTEMA, SOLO_WINDOWS, SU_LINUX } from './sistema';
 import type { ModoGruppi } from './raggruppa';
 import { TAGLIE, type Vista } from './vista';
@@ -317,7 +317,7 @@ function vociElementi({
 				: { azione: 'condividi', etichetta: 'Condividi in rete locale', stacca: pari.length === 0 }
 		);
 	}
-	if (unica && eZip(unica.name)) {
+	if (unica && eArchivio(unica.name)) {
 		voci.push({ azione: 'estrai', etichetta: 'Estrai tutto', stacca: ricerca });
 	}
 

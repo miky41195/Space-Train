@@ -610,7 +610,7 @@ struct Posto(Arc<std::sync::atomic::AtomicUsize>);
 impl Posto {
     fn prendi(occupati: &Arc<std::sync::atomic::AtomicUsize>) -> Option<Posto> {
         occupati
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |n| (n < MASSIMO_CONNESSIONI).then_some(n + 1))
+            .try_update(Ordering::AcqRel, Ordering::Acquire, |n| (n < MASSIMO_CONNESSIONI).then_some(n + 1))
             .ok()
             .map(|_| Posto(occupati.clone()))
     }

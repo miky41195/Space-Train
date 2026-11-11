@@ -193,6 +193,11 @@ export function eZip(nome: string): boolean {
 	return estensione(nome) === 'zip';
 }
 
+/** Archives Space Train reads: ZIP, 7z, RAR, TAR and TAR.GZ. */
+export function eArchivio(nome: string): boolean {
+	return /\.(zip|7z|rar|tar|tgz|tar\.gz)$/i.test(nome);
+}
+
 const ESEGUIBILI = new Set(['exe', 'msi', 'bat', 'cmd', 'com']);
 
 /** Elementi che ha senso avviare come amministratore. */

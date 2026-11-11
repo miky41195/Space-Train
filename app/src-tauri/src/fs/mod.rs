@@ -1,6 +1,8 @@
+pub mod archive_formats;
 pub mod archivi;
 pub mod cerca;
 pub mod cestino;
+pub mod checksum;
 pub mod compare;
 pub mod copy;
 pub mod dimensione;

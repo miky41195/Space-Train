@@ -173,6 +173,20 @@ pub async fn find_duplicates(
     })
 }
 
+/// Checksum of one file (hex), `None` if cancelled with `cancel_transfer` and the same `op_id`.
+#[tauri::command]
+pub async fn file_checksum(
+    state: tauri::State<'_, Operazioni>,
+    op_id: u64,
+    path: String,
+    algorithm: crate::fs::checksum::Algorithm,
+) -> Result<Option<String>, FsError> {
+    let cancel = state.registra(op_id);
+    let work = tauri::async_runtime::spawn_blocking(move || crate::fs::checksum::checksum(&path, algorithm, &cancel)).await;
+    state.dimentica(op_id);
+    work.map_err(|e| FsError::Io { message: format!("Calcolo interrotto: {}", e) })?
+}
+
 /// Compares two folder trees. Cancelled with `cancel_transfer` and the same `op_id`.
 #[tauri::command]
 pub async fn compare_folders(
@@ -257,9 +271,12 @@ pub async fn extract(
     con_avanzamento(
         &state,
         op_id,
-        move || crate::fs::archivi::peso_archivio(&per_peso),
+        move || crate::fs::archive_formats::unpacked_size(&per_peso),
         on_progress,
-        move |annulla, avanza| crate::fs::archivi::estrai(&archive, annulla, avanza),
+        move |annulla, avanza| match crate::fs::archive_formats::format_of(&archive) {
+            Some(crate::fs::archive_formats::Format::Zip) | None => crate::fs::archivi::estrai(&archive, annulla, avanza),
+            Some(_) => crate::fs::archive_formats::extract_beside(&archive, annulla, avanza),
+        },
     )
     .await
 }

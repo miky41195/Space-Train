@@ -123,19 +123,6 @@ fn aggiungi(
     Ok(())
 }
 
-/// Byte non compressi dell'archivio, per la barra d'avanzamento.
-pub fn peso_archivio(archivio: &str) -> u64 {
-    let Ok(f) = std::fs::File::open(paths::extended(Path::new(archivio))) else {
-        return 0;
-    };
-    let Ok(mut z) = zip::ZipArchive::new(f) else {
-        return 0;
-    };
-    (0..z.len())
-        .filter_map(|i| z.by_index(i).ok().map(|e| e.size()))
-        .sum()
-}
-
 /// Estrae l'archivio in una nuova cartella accanto, col suo nome.
 /// Ritorna il path della cartella creata.
 pub fn estrai(

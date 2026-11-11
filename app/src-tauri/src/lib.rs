@@ -175,6 +175,7 @@ pub fn run() {
             transfer::search,
             transfer::find_duplicates,
             transfer::compare_folders,
+            transfer::file_checksum,
             ipc::entries_for,
             transfer::compress,
             transfer::extract,

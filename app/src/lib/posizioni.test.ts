@@ -123,3 +123,12 @@ describe('Linux paths', () => {
 		expect(dentroDi('C:\\Users\\X', 'c:\\users')).toBe(true);
 	});
 });
+
+describe('archives', () => {
+	it('recognises the formats Space Train reads', async () => {
+		const { eArchivio } = await import('./posizioni');
+		expect(['a.zip', 'b.7Z', 'c.rar', 'd.tar', 'e.tar.gz', 'f.tgz'].every(eArchivio)).toBe(true);
+		expect(eArchivio('note.txt')).toBe(false);
+		expect(eArchivio('tar')).toBe(false);
+	});
+});
