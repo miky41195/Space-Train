@@ -338,6 +338,34 @@ pub async fn archive_extract(
     .await
 }
 
+/// Rotates images a quarter turn, rewriting each file.
+#[tauri::command]
+pub async fn image_rotate(paths: Vec<String>, clockwise: bool) -> Result<(), FsError> {
+    tauri::async_runtime::spawn_blocking(move || {
+        paths.iter().try_for_each(|p| crate::fs::immagini::rotate(p, clockwise))
+    })
+    .await
+    .map_err(|e| FsError::Io { message: e.to_string() })?
+}
+
+/// Converts and resizes images into new files beside them. Progress counts files.
+#[tauri::command]
+pub async fn image_convert(
+    state: tauri::State<'_, Operazioni>,
+    op_id: u64,
+    paths: Vec<String>,
+    target: crate::fs::immagini::Target,
+    max_side: Option<u32>,
+    quality: u8,
+    on_progress: Channel<Progresso>,
+) -> Result<Vec<String>, FsError> {
+    let total = paths.len() as u64;
+    con_avanzamento(&state, op_id, move || total, on_progress, move |cancel, progress| {
+        crate::fs::immagini::convert(&paths, target, max_side, quality, cancel, progress)
+    })
+    .await
+}
+
 /// What a deletion with progress removes.
 #[derive(serde::Deserialize, Clone, Copy)]
 #[serde(rename_all = "camelCase")]

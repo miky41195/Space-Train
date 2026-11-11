@@ -168,22 +168,144 @@ mod win {
 #[cfg(windows)]
 pub use win::{leggi, scrivi, svuota};
 
-#[cfg(not(windows))]
-pub fn scrivi(_: &[String], _: bool) -> Result<(), FsError> {
-    Ok(())
+/// Linux file managers (Nautilus, Nemo, Caja, Thunar) share files on the
+/// clipboard as `x-special/gnome-copied-files`: «copy» or «cut», then one
+/// `file://` URI per line.
+#[cfg_attr(windows, allow(dead_code))]
+const GNOME_COPIED: &str = "x-special/gnome-copied-files";
+
+/// `file://` URI of a path, percent-encoding everything but unreserved bytes and `/`.
+#[cfg_attr(windows, allow(dead_code))]
+fn uri_of(path: &str) -> String {
+    let mut out = String::from("file://");
+    for b in path.bytes() {
+        if b.is_ascii_alphanumeric() || b"-._~/".contains(&b) {
+            out.push(b as char);
+        } else {
+            out.push_str(&format!("%{b:02X}"));
+        }
+    }
+    out
 }
-#[cfg(not(windows))]
-pub fn leggi() -> Option<ContenutoAppunti> {
-    None
+
+#[cfg_attr(windows, allow(dead_code))]
+fn path_of(uri: &str) -> Option<String> {
+    let rest = uri.strip_prefix("file://")?;
+    let bytes = rest.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            let hex = std::str::from_utf8(&bytes[i + 1..i + 3]).ok()?;
+            out.push(u8::from_str_radix(hex, 16).ok()?);
+            i += 3;
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8(out).ok()
 }
-#[cfg(not(windows))]
-pub fn svuota() -> Result<(), FsError> {
-    Ok(())
+
+#[cfg_attr(windows, allow(dead_code))]
+fn format_gnome(paths: &[String], cut: bool) -> String {
+    let mut s = String::from(if cut { "cut" } else { "copy" });
+    for p in paths {
+        s.push('\n');
+        s.push_str(&uri_of(p));
+    }
+    s
 }
+
+/// Reads both `x-special/gnome-copied-files` and a plain `text/uri-list`.
+#[cfg_attr(windows, allow(dead_code))]
+fn parse_gnome(text: &str) -> Option<ContenutoAppunti> {
+    let mut lines = text.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#'));
+    let first = lines.next()?;
+    let (taglia, rest): (bool, Vec<&str>) = match first {
+        "cut" => (true, lines.collect()),
+        "copy" => (false, lines.collect()),
+        uri => (false, std::iter::once(uri).chain(lines).collect()),
+    };
+    let paths: Vec<String> = rest.iter().filter_map(|u| path_of(u)).collect();
+    (!paths.is_empty()).then_some(ContenutoAppunti { paths, taglia })
+}
+
+#[cfg(not(windows))]
+mod linux {
+    use super::*;
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+
+    fn wayland() -> bool {
+        std::env::var_os("WAYLAND_DISPLAY").is_some()
+    }
+
+    fn write_type(mime: &str, data: &str) -> bool {
+        let mut cmd = if wayland() {
+            let mut c = Command::new("wl-copy");
+            c.args(["--type", mime]);
+            c
+        } else {
+            let mut c = Command::new("xclip");
+            c.args(["-selection", "clipboard", "-t", mime, "-i"]);
+            c
+        };
+        let Ok(mut child) = cmd.stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::null()).spawn() else {
+            return false;
+        };
+        let ok = child.stdin.take().map(|mut i| i.write_all(data.as_bytes()).is_ok()).unwrap_or(false);
+        // xclip stays alive to serve the selection: never wait for it.
+        ok
+    }
+
+    fn read_type(mime: &str) -> Option<String> {
+        let out = if wayland() {
+            Command::new("wl-paste").args(["--no-newline", "--type", mime]).output().ok()?
+        } else {
+            Command::new("xclip").args(["-selection", "clipboard", "-t", mime, "-o"]).output().ok()?
+        };
+        out.status.success().then(|| String::from_utf8_lossy(&out.stdout).into_owned())
+    }
+
+    /// Missing tools are not an error: the in-app clipboard still works.
+    pub fn scrivi(paths: &[String], cut: bool) -> Result<(), FsError> {
+        write_type(GNOME_COPIED, &format_gnome(paths, cut));
+        Ok(())
+    }
+
+    pub fn leggi() -> Option<ContenutoAppunti> {
+        read_type(GNOME_COPIED)
+            .and_then(|t| parse_gnome(&t))
+            .or_else(|| read_type("text/uri-list").and_then(|t| parse_gnome(&t)))
+    }
+
+    pub fn svuota() -> Result<(), FsError> {
+        write_type("text/plain", "");
+        Ok(())
+    }
+}
+
+#[cfg(not(windows))]
+pub use linux::{leggi, scrivi, svuota};
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn gnome_clipboard_format_round_trips_odd_names() {
+        let paths = vec!["/home/io/Foto 2024/città #1.jpg".to_string(), "/tmp/a%b".to_string()];
+        let text = format_gnome(&paths, true);
+        assert!(text.starts_with("cut\nfile:///home/io/Foto%202024/citt%C3%A0%20%231.jpg\n"));
+        assert_eq!(parse_gnome(&text), Some(ContenutoAppunti { paths: paths.clone(), taglia: true }));
+        // A plain text/uri-list from other file managers: a copy.
+        assert_eq!(
+            parse_gnome("file:///tmp/a%25b\r\n"),
+            Some(ContenutoAppunti { paths: vec!["/tmp/a%b".into()], taglia: false })
+        );
+        assert_eq!(parse_gnome("hello"), None);
+    }
 
     /// Un solo test tocca gli appunti veri: in parallelo si pesterebbero.
     #[cfg(windows)]
