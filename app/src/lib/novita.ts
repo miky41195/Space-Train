@@ -14,6 +14,18 @@ export interface Novita {
 
 export const NOVITA: Novita[] = [
 	{
+		versione: '0.8.0',
+		voci: [
+			'Server remoti: dalla barra laterale, «Aggiungi server» collega un server SFTP, FTP, FTPS o WebDAV, che si sfoglia come una cartella: si apre, si copia, si incolla o si trascina dentro, si rinomina e si eliminano file. La password può restare nel Gestore credenziali di Windows; al primo collegamento SFTP si conferma l’impronta del server, e se cambia Space Train si ferma.',
+			'Cassaforte: «Nuovo → Cassaforte…» crea una cartella cifrata con una password. Si apre come un archivio, ci si trascinano dentro i file e si richiude da sola dopo qualche minuto (il tempo si sceglie nelle impostazioni). Dentro sono cifrati anche i nomi. Senza la password i file non si possono recuperare.',
+			'Regole automatiche: dal menu di una cartella, «Regole automatiche…» mette in ordine da sola, per esempio spostando i PDF che arrivano in Download o mandando nel cestino i file più vecchi di 30 giorni. Prima di salvare si vede su quali file agirebbe; niente viene sovrascritto e ogni azione si può annullare.',
+			'Aree di lavoro: il pulsante prima delle schede salva le schede aperte (e il doppio pannello) con un nome, per tornarci con un clic.',
+			'Foto, video e musica: nelle cartelle che ne contengono soprattutto compaiono colonne come «Scattata il», «Durata», «Dimensioni», «Artista» e «Album», e si può ordinare per queste. Dal clic destro sulle intestazioni si scelgono a mano; l’anteprima mostra tutti i dettagli.',
+			'Stato Git: nelle cartelle dei progetti i file modificati e nuovi hanno una lettera accanto all’icona, quelli ignorati sono più chiari e il ramo compare dopo il percorso. Si spegne dalle impostazioni.',
+			'Le etichette colorate si possono rinominare: clic destro sull’etichetta nella barra laterale.'
+		]
+	},
+	{
 		versione: '0.7.0',
 		voci: [
 			'Coda dei trasferimenti: una copia lanciata mentre un’altra è in corso aspetta il suo turno. «+1 in coda» sulla barra apre l’elenco, dove si mette in pausa, si anticipa o si toglie un lavoro.',
