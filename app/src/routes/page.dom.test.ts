@@ -2970,6 +2970,30 @@ describe('colour labels', () => {
 	});
 });
 
+describe('command palette', () => {
+	it('Ctrl+Maiusc+P finds an action by typing and Enter runs it', async () => {
+		await monta();
+		tasto('P', { ctrl: true, shift: true });
+		const dialog = await screen.findByRole('dialog', { name: 'Palette dei comandi' });
+		const campo = within(dialog).getByRole('combobox');
+		await fireEvent.input(campo, { target: { value: 'doppio' } });
+		expect(within(dialog).getAllByRole('option')[0].textContent).toContain('doppio pannello');
+		await fireEvent.keyDown(campo, { key: 'Enter' });
+		await waitFor(() => expect(document.querySelector('.pannello.passivo')).not.toBeNull());
+		expect(screen.queryByRole('dialog', { name: 'Palette dei comandi' })).toBeNull();
+	});
+
+	it('lists folders and settings, Esc closes it', async () => {
+		await monta();
+		tasto('P', { ctrl: true, shift: true });
+		const dialog = await screen.findByRole('dialog', { name: 'Palette dei comandi' });
+		await fireEvent.input(within(dialog).getByRole('combobox'), { target: { value: 'compatta' } });
+		expect(within(dialog).getAllByRole('option')[0].textContent).toContain('Vista compatta');
+		await fireEvent.keyDown(within(dialog).getByRole('combobox'), { key: 'Escape' });
+		expect(screen.queryByRole('dialog', { name: 'Palette dei comandi' })).toBeNull();
+	});
+});
+
 describe('archive as a folder', () => {
 	it('opens a 7z like a folder, walks in and out, extracts a chosen item, Esc leaves', async () => {
 		aggiungi('C:\\p.7z');

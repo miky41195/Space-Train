@@ -33,6 +33,7 @@ export type AzioneTasto =
 	| 'altroPannello'
 	| 'copiaAltroPannello'
 	| 'spostaAltroPannello'
+	| 'palette'
 	| { scheda: number }
 	/** Ctrl+Maiusc+1…8: le otto viste di Esplora, dalle icone più grandi. */
 	| { vista: number };
@@ -60,6 +61,7 @@ export function azioneTasto(e: Tasto): AzioneTasto | null {
 		if (shift && k === 'd') return 'doppioPannello';
 		if (shift && k === 'c') return 'copiaAltroPannello';
 		if (shift && k === 'x') return 'spostaAltroPannello';
+		if (shift && k === 'p') return 'palette';
 		const cifra = /^Digit([1-8])$/.exec(e.code ?? '');
 		if (shift && cifra) return { vista: Number(cifra[1]) - 1 };
 		if (shift) return null;
@@ -184,6 +186,7 @@ export const SHORTCUT_GROUPS: { name: string; items: ShortcutItem[] }[] = [
 			{ label: 'Cartella superiore', keys: ['Alt+↑'], action: 'su' },
 			{ label: 'Barra dell’indirizzo', keys: ['Ctrl+L', 'Alt+D', 'F4'], action: 'indirizzo' },
 			{ label: 'Cerca', keys: ['Ctrl+F', 'F3'], action: 'cerca' },
+			{ label: 'Palette dei comandi', keys: ['Ctrl+Maiusc+P'], action: 'palette' },
 			{ label: 'Aggiorna', keys: ['F5', 'Ctrl+R'], action: 'ricarica' }
 		]
 	},

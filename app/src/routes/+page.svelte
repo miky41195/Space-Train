@@ -35,6 +35,10 @@
 	import SearchBar from '$lib/components/SearchBar.svelte';
 	import ConfermaCestino from '$lib/components/ConfermaCestino.svelte';
 	import SommaControllo from '$lib/components/SommaControllo.svelte';
+	import Palette from '$lib/components/Palette.svelte';
+	import type { Comando } from '$lib/palette';
+	import { SHORTCUT_GROUPS } from '$lib/scorciatoie';
+	import { TEMI } from '$lib/temi';
 	import BatchRename from '$lib/components/BatchRename.svelte';
 	import { renameSteps, type PlannedRename } from '$lib/batch-rename';
 	import ConfermaConflitti from '$lib/components/ConfermaConflitti.svelte';
@@ -251,6 +255,55 @@
 	let inRicerca = $derived(store.activeTab?.risultati != null);
 	/** The file whose checksum dialog is open. */
 	let sommaDi = $state<Entry | null>(null);
+
+	// ── Command palette ──────────────────────────────────────────────
+	let paletteAperta = $state(false);
+	let cartelleNote = $state<Array<{ label: string; path: string }>>([]);
+
+	async function apriPalette() {
+		paletteAperta = true;
+		if (cartelleNote.length === 0) cartelleNote = await tauriBackend.knownFolders().catch(() => []);
+	}
+
+	/** Everything the palette can do, actions first. Built when it opens. */
+	function comandiPalette(): Comando[] {
+		const out: Comando[] = [];
+		for (const g of SHORTCUT_GROUPS) {
+			for (const it of g.items) {
+				const a = it.action;
+				if (!a || typeof a === 'object' || a === 'palette') continue;
+				out.push({ tipo: 'azione', nome: it.label, tasti: it.keys[0], esegui: () => void eseguiTasto(a) });
+			}
+		}
+		const qui = store.activeTab && posizione === 'normale' ? store.activeTab.path : null;
+		if (qui) {
+			out.push({ tipo: 'azione', nome: 'Analizza spazio', dettaglio: nomePosizione(qui), esegui: () => void analizzaSpazio(qui) });
+			out.push({ tipo: 'azione', nome: 'Trova duplicati qui', dettaglio: nomePosizione(qui), esegui: () => store.activeId !== null && void store.trovaDuplicati(store.activeId, store.showHidden) });
+			out.push({ tipo: 'azione', nome: 'Confronta con un’altra cartella', esegui: () => void confrontaCon(qui) });
+		}
+		out.push({ tipo: 'azione', nome: 'Impostazioni', esegui: () => (impostazioniAperte = true) });
+		out.push({ tipo: 'azione', nome: 'Editor dei temi', esegui: () => void apriEditor() });
+		const vai = (path: string) => () => store.activeId !== null && void store.navigate(store.activeId, path);
+		for (const p of accessoRapido.cartelle) out.push({ tipo: 'cartella', nome: nomeDi(p), dettaglio: p, esegui: vai(p) });
+		for (const f of cartelleNote) out.push({ tipo: 'cartella', nome: f.label, dettaglio: f.path, esegui: vai(f.path) });
+		for (const r of [...RICERCHE_PRONTE, ...ricerche.voci]) out.push({ tipo: 'ricerca', nome: r.nome, esegui: () => void apriRicercaSalvata(r) });
+		for (const t of [...TEMI, ...impostazioni.temiPersonali]) {
+			out.push({ tipo: 'tema', nome: t.nome, dettaglio: t.id === impostazioni.tema ? 'in uso' : undefined, esegui: () => impostazioni.imposta('tema', t.id) });
+		}
+		const interruttori: Array<[string, 'estensioni' | 'compatta' | 'anteprima' | 'unClic' | 'confermaCestino' | 'animazioneAvvio']> = [
+			['Mostra le estensioni dei file', 'estensioni'],
+			['Vista compatta', 'compatta'],
+			['Riquadro di anteprima', 'anteprima'],
+			['Apri con un clic', 'unClic'],
+			['Conferma prima del Cestino', 'confermaCestino'],
+			['Animazione all’avvio', 'animazioneAvvio']
+		];
+		for (const [nome, chiave] of interruttori) {
+			out.push({ tipo: 'impostazione', nome, dettaglio: impostazioni[chiave] ? 'attivo' : 'spento', esegui: () => impostazioni.imposta(chiave, !impostazioni[chiave]) });
+		}
+		out.push({ tipo: 'impostazione', nome: 'Mostra i file nascosti', dettaglio: store.showHidden ? 'attivo' : 'spento', esegui: () => void store.setShowHidden(!store.showHidden) });
+		return out;
+	}
 
 	// ── Dual pane ────────────────────────────────────────────────────
 	let split = $state<Split | null>(null);
@@ -1481,7 +1534,7 @@
 
 		// Con una finestra modale aperta o un campo in modifica, le
 		// scorciatoie della lista non devono sparare.
-		if (daCestinare.length > 0 || daEliminare || rinominando !== null || conflitti.length > 0 || batchRename.length > 0 || sommaDi) return;
+		if (daCestinare.length > 0 || daEliminare || rinominando !== null || conflitti.length > 0 || batchRename.length > 0 || sommaDi || paletteAperta) return;
 
 		// Dentro un campo di testo i tasti servono a scrivere. Dal campo di
 		// ricerca passano solo quelli che muovono la selezione o la chiudono.
@@ -1621,6 +1674,8 @@
 				return impostazioni.imposta('anteprima', !impostazioni.anteprima);
 			case 'doppioPannello':
 				return alternaDoppio();
+			case 'palette':
+				return apriPalette();
 			case 'altroPannello': {
 				const altro = otherPane(split, id);
 				if (altro !== null) store.setActive(altro);
@@ -2891,6 +2946,9 @@
 
 	{#if daCestinare.length > 0}
 		<ConfermaCestino voci={daCestinare} onconfirm={() => cestina()} oncancel={() => (daCestinare = [])} />
+	{/if}
+	{#if paletteAperta}
+		<Palette comandi={comandiPalette()} onclose={() => (paletteAperta = false)} />
 	{/if}
 	{#if sommaDi}
 		<SommaControllo voce={sommaDi} backend={tauriBackend} onclose={() => (sommaDi = null)} />
