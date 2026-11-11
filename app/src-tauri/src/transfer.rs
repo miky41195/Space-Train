@@ -38,7 +38,23 @@ impl Operazioni {
 
     pub(crate) fn dimentica(&self, id: u64) {
         if let Ok(mut mappa) = self.0.lock() {
-            mappa.remove(&id);
+            if let Some(flag) = mappa.remove(&id) {
+                crate::fs::pausa::dimentica(&flag);
+            }
+        }
+    }
+
+    /// Pauses or resumes a running job. False if the id is unknown.
+    fn pausa(&self, id: u64, in_pausa: bool) -> bool {
+        match self.0.lock() {
+            Ok(mappa) => match mappa.get(&id) {
+                Some(flag) => {
+                    crate::fs::pausa::imposta(flag, in_pausa);
+                    true
+                }
+                None => false,
+            },
+            Err(_) => false,
         }
     }
 
@@ -393,6 +409,12 @@ pub async fn lan_scarica(
 #[tauri::command]
 pub fn cancel_transfer(state: tauri::State<'_, Operazioni>, op_id: u64) -> bool {
     state.annulla(op_id)
+}
+
+/// Pauses (or resumes) a job between one item and the next.
+#[tauri::command]
+pub fn pause_transfer(state: tauri::State<'_, Operazioni>, op_id: u64, paused: bool) -> bool {
+    state.pausa(op_id, paused)
 }
 
 #[cfg(test)]

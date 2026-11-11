@@ -10,7 +10,7 @@ use crate::fs::paths;
 use serde::Serialize;
 use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Format {
@@ -209,7 +209,7 @@ fn write_stream(reader: &mut dyn Read, to: &Path, cancel: &AtomicBool, done: &mu
     let mut out = std::fs::File::create(paths::extended(to)).map_err(io)?;
     let mut buf = vec![0u8; 256 * 1024];
     loop {
-        if cancel.load(Ordering::Relaxed) {
+        if crate::fs::pausa::fermo(cancel) {
             return Ok(());
         }
         let n = reader.read(&mut buf).map_err(io)?;
@@ -239,7 +239,7 @@ pub fn extract(
             let f = std::fs::File::open(&file_path).map_err(io)?;
             let mut z = zip::ZipArchive::new(f).map_err(unreadable)?;
             for i in 0..z.len() {
-                if cancel.load(Ordering::Relaxed) {
+                if crate::fs::pausa::fermo(cancel) {
                     break;
                 }
                 let mut e = z.by_index(i).map_err(unreadable)?;
@@ -255,7 +255,7 @@ pub fn extract(
             let mut r = sevenz_rust2::ArchiveReader::open(&file_path, sevenz_rust2::Password::empty()).map_err(unreadable)?;
             let mut failure: Option<FsError> = None;
             r.for_each_entries_with_decision(|e, reader| {
-                if cancel.load(Ordering::Relaxed) {
+                if crate::fs::pausa::fermo(cancel) {
                     return Ok(sevenz_rust2::EntryDecision::Stop);
                 }
                 if let Some(to) = target(dest, &normalise(e.name()), only) {
@@ -279,7 +279,7 @@ pub fn extract(
         Format::Rar => {
             let mut cursor = unrar_ng::Archive::new(&file_path).open_for_processing().map_err(unreadable)?;
             while let Some(header) = cursor.read_header().map_err(unreadable)? {
-                if cancel.load(Ordering::Relaxed) {
+                if crate::fs::pausa::fermo(cancel) {
                     break;
                 }
                 let entry = header.entry();
@@ -305,7 +305,7 @@ pub fn extract(
         }
         Format::Tar | Format::TarGz => {
             for_each_tar(&file_path, format, &mut |e| {
-                if cancel.load(Ordering::Relaxed) {
+                if crate::fs::pausa::fermo(cancel) {
                     return Ok(false);
                 }
                 let inner = normalise(&e.path().map_err(io)?.to_string_lossy());

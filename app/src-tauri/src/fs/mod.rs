@@ -14,5 +14,6 @@ pub mod listing;
 pub mod names;
 pub mod ops;
 pub mod paths;
+pub mod pausa;
 pub mod provenienza;
 pub mod sort;

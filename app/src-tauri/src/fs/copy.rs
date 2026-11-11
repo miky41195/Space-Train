@@ -2,7 +2,7 @@ use crate::fs::error::{from_io, FsError};
 use crate::fs::paths;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 
 /// Cosa fare quando a destinazione esiste già un elemento con lo stesso nome.
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq)]
@@ -115,7 +115,7 @@ pub fn copy_all(
     let mut fatti = 0u64;
 
     for sorgente in sorgenti {
-        if annulla.load(Ordering::Relaxed) {
+        if crate::fs::pausa::fermo(annulla) {
             esito.annullato = true;
             return Ok(esito);
         }
@@ -168,7 +168,7 @@ pub fn move_all(
     let mut fatti = 0u64;
 
     for sorgente in sorgenti {
-        if annulla.load(Ordering::Relaxed) {
+        if crate::fs::pausa::fermo(annulla) {
             esito.annullato = true;
             return Ok(esito);
         }
@@ -248,7 +248,7 @@ fn copia_ricorsiva(
     fatti: &mut u64,
     avanzamento: &mut dyn FnMut(u64),
 ) -> Result<(), FsError> {
-    if annulla.load(Ordering::Relaxed) {
+    if crate::fs::pausa::fermo(annulla) {
         return Ok(());
     }
 
@@ -266,7 +266,7 @@ fn copia_ricorsiva(
     let voci = std::fs::read_dir(paths::extended(origine)).map_err(|e| from_io(&e))?;
 
     for voce in voci.filter_map(|v| v.ok()) {
-        if annulla.load(Ordering::Relaxed) {
+        if crate::fs::pausa::fermo(annulla) {
             return Ok(());
         }
         let nome = voce.file_name();

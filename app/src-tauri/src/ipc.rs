@@ -23,6 +23,27 @@ async fn fuori_dalla_finestra<T: Send + 'static>(
         })?
 }
 
+/// Whether a key combination is free system-wide. Windows refuses to register
+/// a hotkey another program already holds, so a short register/unregister
+/// tells. `None` = the text is not a valid combination.
+#[tauri::command]
+pub fn shortcut_free(app: tauri::AppHandle, accelerator: String) -> Option<bool> {
+    use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+    let shortcut: Shortcut = accelerator.parse().ok()?;
+    let gs = app.global_shortcut();
+    // Our own global hotkey is not «another program».
+    if gs.is_registered(shortcut) {
+        return Some(true);
+    }
+    match gs.register(shortcut) {
+        Ok(()) => {
+            let _ = gs.unregister(shortcut);
+            Some(true)
+        }
+        Err(_) => Some(false),
+    }
+}
+
 /// Entries for paths gathered from anywhere (colour labels); paths that no longer exist are left out.
 #[tauri::command]
 pub async fn entries_for(paths: Vec<String>) -> Result<Vec<crate::fs::entry::Entry>, FsError> {

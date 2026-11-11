@@ -5,7 +5,7 @@ use crate::fs::error::{from_io, FsError};
 use crate::fs::paths;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 use zip::write::SimpleFileOptions;
 
 fn errore_zip(e: zip::result::ZipError) -> FsError {
@@ -68,7 +68,7 @@ pub fn comprimi(
     })();
 
     // Un archivio a metà non serve a nessuno: annullato o fallito, sparisce.
-    if esito.is_err() || annulla.load(Ordering::Relaxed) {
+    if esito.is_err() || crate::fs::pausa::fermo(annulla) {
         let _ = std::fs::remove_file(paths::extended(&arrivo));
         esito?;
         return Err(FsError::Io {
@@ -88,7 +88,7 @@ fn aggiungi(
     fatti: &mut u64,
     avanzamento: &mut dyn FnMut(u64),
 ) -> Result<(), FsError> {
-    if annulla.load(Ordering::Relaxed) {
+    if crate::fs::pausa::fermo(annulla) {
         return Ok(());
     }
     let esteso = paths::extended(origine);
@@ -109,7 +109,7 @@ fn aggiungi(
     let mut f = std::fs::File::open(&esteso).map_err(|e| from_io(&e))?;
     let mut buf = vec![0u8; 256 * 1024];
     loop {
-        if annulla.load(Ordering::Relaxed) {
+        if crate::fs::pausa::fermo(annulla) {
             return Ok(());
         }
         let n = f.read(&mut buf).map_err(|e| from_io(&e))?;
@@ -144,7 +144,7 @@ pub fn estrai(
 
     let mut fatti = 0u64;
     for i in 0..z.len() {
-        if annulla.load(Ordering::Relaxed) {
+        if crate::fs::pausa::fermo(annulla) {
             break;
         }
         let mut voce = z.by_index(i).map_err(errore_zip)?;

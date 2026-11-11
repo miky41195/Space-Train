@@ -9,7 +9,7 @@ use crate::fs::cestino;
 use crate::fs::error::{from_io, FsError};
 use crate::fs::paths;
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 
 /// How many items each call to the system takes at most. One call per item
 /// would let the bar move smoothly but on Windows every call is a whole
@@ -32,7 +32,7 @@ pub fn cestina(
 ) -> Result<Vec<String>, FsError> {
     let mut fatti = Vec::new();
     for gruppo in percorsi.chunks(lotto(percorsi.len())) {
-        if annulla.load(Ordering::Relaxed) {
+        if crate::fs::pausa::fermo(annulla) {
             break;
         }
         trash::delete_all(gruppo).map_err(errore_cestino)?;
@@ -79,7 +79,7 @@ fn rimuovi_albero(
     fatti: &mut u64,
     avanza: &mut dyn FnMut(u64),
 ) -> Result<bool, FsError> {
-    if annulla.load(Ordering::Relaxed) {
+    if crate::fs::pausa::fermo(annulla) {
         return Ok(false);
     }
     let esteso = paths::extended(path);
@@ -132,7 +132,7 @@ pub fn elimina_dal_cestino(
     let voci = cestino::voci(percorsi)?;
     let mut fatti = Vec::new();
     for gruppo in voci.chunks(lotto(voci.len())) {
-        if annulla.load(Ordering::Relaxed) {
+        if crate::fs::pausa::fermo(annulla) {
             break;
         }
         cestino::elimina_voci(gruppo.to_vec())?;
@@ -199,7 +199,7 @@ mod tests {
 
         let annulla = AtomicBool::new(false);
         let fatti = elimina_disco(&[s(&f), s(&g)], &annulla, &mut |_| {
-            annulla.store(true, Ordering::Relaxed)
+            annulla.store(true, std::sync::atomic::Ordering::Relaxed)
         })
         .unwrap();
 
