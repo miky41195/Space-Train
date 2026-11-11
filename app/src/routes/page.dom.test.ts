@@ -1228,6 +1228,39 @@ describe('riquadro di anteprima', () => {
 		expect(img.getAttribute('src')).toBe('asset://C:\\foto.jpg');
 	});
 
+	it('Markdown is formatted, CSV becomes a table, «Testo semplice» shows the raw text', async () => {
+		aggiungi('C:\\note.md', '# Trasloco\n\n- **scatoloni**\n- libri');
+		aggiungi('C:\\spese.csv', 'Data;Euro\n02/03;84,20');
+		await monta();
+		tasto('p', { alt: true });
+		await fireEvent.click(riga('note.md'));
+		const pannello = await screen.findByRole('complementary', { name: 'Anteprima' });
+		await waitFor(() => expect(pannello.querySelector('.md .titolo')?.textContent).toBe('Trasloco'));
+		expect(pannello.querySelector('.md strong')?.textContent).toBe('scatoloni');
+
+		await fireEvent.click(within(pannello).getByLabelText('Testo semplice'));
+		expect(pannello.querySelector('pre')?.textContent).toContain('# Trasloco');
+		await fireEvent.click(within(pannello).getByLabelText('Testo semplice'));
+
+		await fireEvent.click(riga('spese.csv'));
+		await waitFor(() => expect(pannello.querySelectorAll('th').length).toBe(2));
+		expect(pannello.querySelector('td.numero')?.textContent).toBe('84,20');
+	});
+
+	it('an archive shows what is inside without extracting it', async () => {
+		aggiungi('C:\\p.7z');
+		disco.archivi.set('C:\\p.7z', [
+			{ path: 'src/a.txt', size: 5, dir: false, modified: 1 },
+			{ path: 'README.md', size: 2048, dir: false, modified: 1 }
+		]);
+		await monta();
+		tasto('p', { alt: true });
+		await fireEvent.click(riga('p.7z'));
+		const pannello = await screen.findByRole('complementary', { name: 'Anteprima' });
+		expect(await within(pannello).findByText('2 file nell’archivio')).toBeTruthy();
+		expect(within(pannello).getByText('README.md')).toBeTruthy();
+	});
+
 	it('il riquadro resta aperto dopo un riavvio', async () => {
 		const { unmount } = await monta();
 		tasto('p', { alt: true });
