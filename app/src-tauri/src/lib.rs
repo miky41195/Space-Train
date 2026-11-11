@@ -1,5 +1,6 @@
 pub mod amici;
 pub mod avvio;
+pub mod backup;
 pub mod finestre;
 pub mod fs;
 pub mod ipc;
@@ -170,6 +171,9 @@ pub fn run() {
             ipc::amici_rimuovi,
             ipc::amici_condividi,
             ipc::amici_qr,
+            ipc::amici_backup,
+            ipc::amici_backup_ora,
+            ipc::amici_rispondi_backup,
             transfer::lan_invia,
             transfer::lan_scarica,
             transfer::search,

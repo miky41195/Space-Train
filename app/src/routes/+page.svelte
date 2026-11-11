@@ -1349,6 +1349,9 @@
 		void ascolta<{ id: string; nome: string }>('amici-richiesta', (r) =>
 			avvisa(`${r.nome} ti ha chiesto l’amicizia: rispondi da Amici nella barra laterale.`)
 		);
+		void ascolta<{ id: string; nome: string }>('amici-backup', (r) =>
+			avvisa(`${r.nome} vuole tenere un backup su questo PC: rispondi da Amici nella barra laterale.`)
+		);
 		void ascolta<RichiestaInvio>('lan-richiesta', (r) => (richiesteLan = [...richiesteLan, r]));
 		void ascolta<{ id: number; fatti: number; totale: number }>('lan-ricezione', (r) => {
 			if (opInCorso !== null && modoInCorso !== 'ricezione') return;

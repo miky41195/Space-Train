@@ -17,6 +17,7 @@
 //! Sopra il canale cifrato viaggiano le stesse richieste della rete locale
 //! (`lan::Richiesta`), servite dallo stesso codice.
 
+use crate::backup::{self, Backup, Consenso, Ospite};
 use crate::fs::entry::{Entry, EntryKind};
 use crate::fs::error::FsError;
 use crate::fs::paths;
@@ -56,6 +57,8 @@ const RICHIESTE_MASSIME: usize = 20;
 
 pub const EVENTO: &str = "amici";
 pub const EVENTO_RICHIESTA: &str = "amici-richiesta";
+/// A friend asks to keep a backup on this PC.
+pub const EVENTO_BACKUP: &str = "amici-backup";
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -82,6 +85,12 @@ pub struct Amico {
     /// L'altro sa già del nostro ultimo passo (richiesta o conferma).
     #[serde(default)]
     pub consegnata: bool,
+    /// Our folder kept aligned on their PC.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backup: Option<Backup>,
+    /// Their backup kept on our PC.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ospite: Option<Ospite>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -189,6 +198,8 @@ pub struct Amici {
     sentiti: Mutex<HashMap<String, Instant>>,
     lan: Arc<Lan>,
     avvisi: Avvisi,
+    /// Friends whose backup is running now: one at a time each.
+    allineando: Mutex<std::collections::HashSet<String>>,
 }
 
 fn errore(msg: impl Into<String>) -> FsError {
@@ -214,6 +225,7 @@ impl Amici {
             sentiti: Mutex::new(HashMap::new()),
             lan,
             avvisi,
+            allineando: Mutex::new(Default::default()),
         });
 
         let a = amici.clone();
@@ -376,6 +388,27 @@ impl Amici {
                 self.modifica(|l| l.retain(|a| a.id != chi));
                 scrivi_json(s, &Risposta { ok: true, ..Default::default() })
             }
+            Richiesta::BackupElenco { cartella } if confermato => match self.ospita(chi, &cartella, &[]) {
+                Ok(radice) => scrivi_json(
+                    s,
+                    &Risposta { ok: true, backup: backup::elenco(&radice.join(&cartella)), ..Default::default() },
+                ),
+                Err(no) => scrivi_json(s, &Risposta::errore(no)),
+            },
+            Richiesta::Backup { cartella, voci } if confermato => {
+                let radice = match self.ospita(chi, &cartella, &voci) {
+                    Ok(r) => r,
+                    Err(no) => return scrivi_json(s, &Risposta::errore(no)),
+                };
+                scrivi_json(s, &Risposta { ok: true, ..Default::default() })?;
+                backup::prendi(s, &radice, &voci, &AtomicBool::new(false))?;
+                self.modifica(|l| {
+                    if let Some(o) = l.iter_mut().find(|a| a.id == chi).and_then(|a| a.ospite.as_mut()) {
+                        o.ultimo = Some(backup::adesso());
+                    }
+                });
+                Ok(())
+            }
             altra => {
                 let Some(amico) = amico.filter(|_| confermato) else {
                     return scrivi_json(s, &Risposta::errore("Non siete amici su Space Train."));
@@ -417,12 +450,124 @@ impl Amici {
                         stato: Stato::Ricevuta,
                         condividi: false,
                         consegnata: true,
+                        backup: None,
+                        ospite: None,
                     })
                 });
                 avvisa(&self.avvisi, EVENTO_RICHIESTA, serde_json::json!({ "id": chi, "nome": nome }));
                 false
             }
         }
+    }
+
+    /// Where `chi`'s backup goes, if we keep it. The first time they ask,
+    /// the answer is «wait»: the user says yes or no from Friends.
+    fn ospita(&self, chi: &str, cartella: &str, voci: &[backup::VoceBackup]) -> Result<PathBuf, String> {
+        if !backup::voci_valide(cartella, voci) {
+            return Err("Richiesta non valida.".into());
+        }
+        let mio = self.lan.nome().to_string();
+        let ospite = self.amico(chi).and_then(|a| a.ospite);
+        match ospite.as_ref().map(|o| o.consenso) {
+            Some(Consenso::Si) => ospite
+                .and_then(|o| o.cartella)
+                .map(PathBuf::from)
+                .ok_or_else(|| "Cartella di backup non impostata.".into()),
+            Some(Consenso::No) => Err(format!("{mio} non tiene backup per te.")),
+            Some(Consenso::Chiesto) => Err(format!("In attesa che {mio} accetti il backup.")),
+            None => {
+                let nome = self.amico(chi).map(|a| a.nome).unwrap_or_default();
+                self.modifica(|l| {
+                    if let Some(a) = l.iter_mut().find(|a| a.id == chi) {
+                        a.ospite = Some(Ospite { consenso: Consenso::Chiesto, cartella: None, ultimo: None });
+                    }
+                });
+                avvisa(&self.avvisi, EVENTO_BACKUP, serde_json::json!({ "id": chi, "nome": nome }));
+                Err(format!("In attesa che {mio} accetti il backup."))
+            }
+        }
+    }
+
+    /// Yes or no to a friend who wants to keep a backup here. Without a
+    /// folder it goes to «Backup di <name>» in the received-files folder.
+    pub fn rispondi_backup(&self, id: &str, si: bool, cartella: Option<String>) {
+        let predefinita = self
+            .amico(id)
+            .map(|a| paths::display(&self.lan.cartella_ricevuti().join(format!("Backup di {}", a.nome))));
+        self.modifica(|l| {
+            if let Some(a) = l.iter_mut().find(|a| a.id == id) {
+                let ultimo = a.ospite.as_ref().and_then(|o| o.ultimo);
+                a.ospite = Some(if si {
+                    Ospite { consenso: Consenso::Si, cartella: cartella.or(predefinita), ultimo }
+                } else {
+                    Ospite { consenso: Consenso::No, cartella: None, ultimo }
+                });
+            }
+        });
+    }
+
+    /// Starts or stops keeping `cartella` aligned on the friend's PC.
+    pub fn imposta_backup(&self, id: &str, cartella: Option<String>) {
+        self.modifica(|l| {
+            if let Some(a) = l.iter_mut().find(|a| a.id == id) {
+                a.backup = cartella.map(|cartella| Backup { cartella, ultimo: None, tentato: None, esito: None });
+            }
+        });
+    }
+
+    /// Sends the friend what changed in our backup folder. What happened
+    /// also stays on the friend, for the Friends window.
+    pub fn allinea(&self, id: &str) -> Result<String, FsError> {
+        let Some(b) = self.amico(id).and_then(|a| a.backup) else {
+            return Err(errore("Nessun backup verso questo amico."));
+        };
+        if !self.allineando.lock().is_ok_and(|mut g| g.insert(id.to_string())) {
+            return Err(errore("Il backup è già in corso."));
+        }
+        let esito = self.allinea_ora(id, &b.cartella);
+        if let Ok(mut g) = self.allineando.lock() {
+            g.remove(id);
+        }
+        let ora = backup::adesso();
+        self.modifica(|l| {
+            if let Some(x) = l.iter_mut().find(|a| a.id == id).and_then(|a| a.backup.as_mut()) {
+                x.tentato = Some(ora);
+                match &esito {
+                    Ok(m) => {
+                        x.ultimo = Some(ora);
+                        x.esito = Some(m.clone());
+                    }
+                    Err(e) => x.esito = Some(backup::testo(e)),
+                }
+            }
+        });
+        esito
+    }
+
+    fn allinea_ora(&self, id: &str, cartella: &str) -> Result<String, FsError> {
+        let radice = PathBuf::from(cartella);
+        let nome = radice
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .ok_or_else(|| errore("Cartella di backup non valida."))?;
+        if !paths::extended(&radice).is_dir() {
+            return Err(errore(format!("La cartella «{nome}» non esiste più.")));
+        }
+        let remoti = self.con_flusso(id, |s| {
+            scrivi_json(s, &Richiesta::BackupElenco { cartella: nome.clone() }).map_err(errore_io)?;
+            controlla(leggi_json(s).map_err(errore_io)?).map(|r| r.backup)
+        })?;
+        let voci = backup::da_mandare(&backup::elenco(&radice), &remoti);
+        if voci.is_empty() {
+            return Ok("già allineata".into());
+        }
+        let base = radice.parent().unwrap_or(&radice).to_path_buf();
+        self.con_flusso(id, |s| {
+            scrivi_json(s, &Richiesta::Backup { cartella: nome.clone(), voci: voci.clone() }).map_err(errore_io)?;
+            controlla(leggi_json(s).map_err(errore_io)?)?;
+            manda_file(s, &base, &backup::come_voci(&voci), &AtomicBool::new(false), &mut |_| {}).map_err(errore_io)
+        })?;
+        Ok(if voci.len() == 1 { "1 file".into() } else { format!("{} file", voci.len()) })
     }
 
     // ── Noi che contattiamo gli altri ─────────────────────────────────
@@ -485,7 +630,15 @@ impl Amici {
         }
         let provvisorio = format!("Amico {}", &id[..6]);
         self.modifica(|l| {
-            l.push(Amico { id: id.clone(), nome: provvisorio, stato: Stato::Inviata, condividi: false, consegnata: false })
+            l.push(Amico {
+                id: id.clone(),
+                nome: provvisorio,
+                stato: Stato::Inviata,
+                condividi: false,
+                consegnata: false,
+                backup: None,
+                ospite: None,
+            })
         });
         let _ = self.consegna(&id);
         Ok(())
@@ -566,6 +719,10 @@ impl Amici {
                         }
                     }
                 });
+                // Online and still a friend: time for the daily backup?
+                if r.confermato && amico.backup.as_ref().is_some_and(|b| backup::dovuto(b, backup::adesso())) {
+                    let _ = a.allinea(&amico.id);
+                }
             }));
         }
         for l in lavori {
@@ -874,6 +1031,21 @@ mod tests {
             .invia(&codice_anna, &[file.to_string_lossy().into_owned()], &AtomicBool::new(false), &mut |_, _| {})
             .unwrap();
         assert_eq!(std::fs::read(ricevuti_anna.join("lettera.txt")).unwrap(), b"ciao Anna");
+
+        // Backup: Anna keeps «Foto» on Bruno's PC. The first time Bruno is
+        // asked; once he says yes, only what changed travels.
+        let foto = condivisa.join("Foto").to_string_lossy().into_owned();
+        anna.imposta_backup(&codice_bruno, Some(foto));
+        assert!(anna.allinea(&codice_bruno).unwrap_err() == errore("In attesa che Bruno accetti il backup."));
+        assert_eq!(bruno.amico(&codice_anna).unwrap().ospite.unwrap().consenso, Consenso::Chiesto);
+        let copia = d.path().join("backup di anna");
+        bruno.rispondi_backup(&codice_anna, true, Some(copia.to_string_lossy().into_owned()));
+        assert_eq!(anna.allinea(&codice_bruno).unwrap(), "1 file");
+        assert_eq!(std::fs::read(copia.join("Foto").join("mare.jpg")).unwrap().len(), 300_000);
+        assert_eq!(anna.allinea(&codice_bruno).unwrap(), "già allineata");
+        std::fs::write(condivisa.join("Foto").join("monti.jpg"), b"nuova").unwrap();
+        assert_eq!(anna.allinea(&codice_bruno).unwrap(), "1 file");
+        assert_eq!(anna.amico(&codice_bruno).unwrap().backup.unwrap().esito.as_deref(), Some("1 file"));
 
         // Bruno toglie Anna: lei lo sa subito, e lui non vede più niente.
         bruno.rimuovi(&codice_anna).unwrap();

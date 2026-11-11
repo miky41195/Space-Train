@@ -55,6 +55,8 @@ export class DiscoFinto {
 	/** Amici: il codice di questo PC e la lista, come la tiene il backend. */
 	codiceAmici = 'codice-di-questo-pc';
 	amici: Amico[] = [];
+	/** Friends a backup was run towards with «Allinea ora». */
+	backupFatti: string[] = [];
 	/** Invii verso altri PC e risposte alle richieste ricevute. */
 	inviati: Array<{ peer: string; paths: string[] }> = [];
 	risposte: Array<{ id: number; accetta: boolean; cartella: string | null }> = [];
@@ -365,6 +367,23 @@ export class DiscoFinto {
 				return null;
 			case 'amici_condividi':
 				this.amici = this.amici.map((a) => (a.id === args.id ? { ...a, condividi: args.si as boolean } : a));
+				return { codice: this.codiceAmici, pronto: true, amici: this.amici };
+			case 'amici_backup':
+				this.amici = this.amici.map((a) =>
+					a.id === args.id
+						? { ...a, backup: args.cartella ? { cartella: args.cartella as string, ultimo: null, tentato: null, esito: null } : undefined }
+						: a
+				);
+				return { codice: this.codiceAmici, pronto: true, amici: this.amici };
+			case 'amici_backup_ora':
+				this.backupFatti.push(args.id as string);
+				return '1 file';
+			case 'amici_rispondi_backup':
+				this.amici = this.amici.map((a) =>
+					a.id === args.id
+						? { ...a, ospite: { consenso: args.si ? 'si' : 'no', cartella: (args.cartella as string | null) ?? null, ultimo: null } }
+						: a
+				);
 				return { codice: this.codiceAmici, pronto: true, amici: this.amici };
 			case 'amici_qr':
 				return '<svg xmlns="http://www.w3.org/2000/svg"></svg>';

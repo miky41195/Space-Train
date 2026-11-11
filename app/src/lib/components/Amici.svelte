@@ -73,6 +73,44 @@
 		esegui(backend.amiciRimuovi(a.id));
 	}
 
+	/** Friends whose backup is running from «Allinea ora». */
+	let allineando = $state<string[]>([]);
+
+	async function scegliBackup(a: Amico) {
+		const cartella = await backend.scegliCartella(`Cartella da tenere allineata da ${a.nome}`, null).catch(() => null);
+		if (cartella) esegui(backend.amiciBackup(a.id, cartella));
+	}
+
+	async function allineaOra(a: Amico) {
+		allineando = [...allineando, a.id];
+		try {
+			await backend.amiciBackupOra(a.id);
+		} catch (e) {
+			onerrore?.(e);
+		} finally {
+			allineando = allineando.filter((x) => x !== a.id);
+		}
+	}
+
+	async function accettaBackupIn(a: Amico) {
+		const cartella = await backend.scegliCartella(`Dove tenere il backup di ${a.nome}`, null).catch(() => null);
+		if (cartella) esegui(backend.amiciRispondiBackup(a.id, true, cartella));
+	}
+
+	function quando(ms: number | null): string {
+		if (ms === null) return 'mai';
+		const d = new Date(ms);
+		const oggi = new Date().toDateString() === d.toDateString();
+		const ora = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+		return oggi ? `oggi ${ora}` : `${d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })} ${ora}`;
+	}
+
+	function statoBackup(b: NonNullable<Amico['backup']>): string {
+		if (b.ultimo === null) return b.esito ?? 'non ancora fatto';
+		const ok = b.tentato === b.ultimo;
+		return `ultimo: ${quando(b.ultimo)}${ok && b.esito ? `, ${b.esito}` : ''}${!ok && b.esito ? ` · poi: ${b.esito}` : ''}`;
+	}
+
 	function descrizione(a: Amico): string {
 		if (a.stato === 'inviata') return 'In attesa che accetti';
 		return a.inLinea ? 'In linea' : 'Non in linea';
@@ -127,6 +165,7 @@
 		<section class="lista">
 			<h3>I tuoi amici</h3>
 			{#each altri as a (a.id)}
+				<div class="voce">
 				<div class="amico">
 					<span class="pallino" class:acceso={a.stato === 'confermato' && a.inLinea}></span>
 					<div class="chi">
@@ -146,6 +185,39 @@
 					<button class="togli" onclick={() => togli(a)} onblur={() => daTogliere === a.id && (daTogliere = null)}>
 						{daTogliere === a.id ? 'Conferma' : 'Togli'}
 					</button>
+				</div>
+				{#if a.stato === 'confermato'}
+					<!-- Backup: ours kept on their PC, and theirs kept here. -->
+					<div class="backup">
+						{#if a.backup}
+							<span class="dim testo" title={a.backup.cartella}
+								>Backup di «{nomeDi(a.backup.cartella)}» ogni giorno · {statoBackup(a.backup)}</span
+							>
+							<button onclick={() => void allineaOra(a)} disabled={allineando.includes(a.id)}
+								>{allineando.includes(a.id) ? 'Backup in corso…' : 'Allinea ora'}</button
+							>
+							<button onclick={() => esegui(backend.amiciBackup(a.id, null))} aria-label={`Smetti il backup verso ${a.nome}`}>Smetti</button>
+						{:else}
+							<span class="dim testo">Nessun backup verso {a.nome}</span>
+							<button onclick={() => void scegliBackup(a)}>Tieni allineata una cartella…</button>
+						{/if}
+					</div>
+					{#if a.ospite?.consenso === 'chiesto'}
+						<div class="backup richiesta" role="group" aria-label={`Backup di ${a.nome}`}>
+							<span class="testo">{a.nome} vuole tenere un backup su questo PC</span>
+							<button class="primario" onclick={() => esegui(backend.amiciRispondiBackup(a.id, true, null))}>Accetta</button>
+							<button onclick={() => void accettaBackupIn(a)}>Accetta in…</button>
+							<button onclick={() => esegui(backend.amiciRispondiBackup(a.id, false, null))}>Rifiuta</button>
+						</div>
+					{:else if a.ospite?.consenso === 'si'}
+						<div class="backup">
+							<span class="dim testo" title={a.ospite.cartella ?? ''}
+								>Tiene qui il suo backup · ricevuto: {quando(a.ospite.ultimo)}</span
+							>
+							<button onclick={() => esegui(backend.amiciRispondiBackup(a.id, false, null))} aria-label={`Non tenere più il backup di ${a.nome}`}>Smetti</button>
+						</div>
+					{/if}
+				{/if}
 				</div>
 			{:else}
 				<div class="dim">Ancora nessuno: scambiatevi i codici e chiedete l’amicizia.</div>
@@ -262,12 +334,40 @@
 	input:not([type]):focus {
 		border-color: var(--accent);
 	}
+	.voce {
+		border-top: 1px solid var(--border);
+		padding-bottom: 6px;
+	}
 	.amico {
 		display: flex;
 		align-items: center;
 		gap: 8px;
 		padding: 6px 0;
-		border-top: 1px solid var(--border);
+	}
+	/* Under the name, aligned with it past the presence dot. */
+	.backup {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 2px 0 2px 16px;
+	}
+	.backup .testo {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.backup button {
+		height: 26px;
+		padding: 0 10px;
+	}
+	.backup.richiesta {
+		margin-top: 4px;
+		padding: 6px 8px;
+		border: 1px solid var(--accent);
+		border-radius: var(--radius-sm);
+		background: var(--accent-soft);
 	}
 	.chi {
 		flex: 1;

@@ -2791,6 +2791,38 @@ describe('amici', () => {
 		await waitFor(() => expect(disco.inviati).toEqual([{ peer: '@' + codice, paths: ['C:\\alfa.txt'] }]));
 	});
 
+	it('backup: a folder is chosen, runs on request, and stops', async () => {
+		conAnna();
+		await monta();
+		await fireEvent.click(await screen.findByRole('button', { name: 'Gestisci amici' }));
+		let pannello = await screen.findByRole('dialog', { name: 'Amici' });
+		disco.cartellaScelta = 'C:\\Dati';
+		await fireEvent.click(within(pannello).getByRole('button', { name: 'Tieni allineata una cartella…' }));
+		await waitFor(() => expect(disco.amici[0].backup?.cartella).toBe('C:\\Dati'));
+
+		// The window follows the «amici» event, as Rust sends it after a change.
+		ascoltatori.get('amici')?.({ payload: { codice: disco.codiceAmici, pronto: true, amici: disco.amici } });
+		pannello = await screen.findByRole('dialog', { name: 'Amici' });
+		expect(await within(pannello).findByText(/Backup di «Dati» ogni giorno · non ancora fatto/)).toBeTruthy();
+		await fireEvent.click(within(pannello).getByRole('button', { name: 'Allinea ora' }));
+		await waitFor(() => expect(disco.backupFatti).toEqual([codice]));
+		await fireEvent.click(within(pannello).getByRole('button', { name: 'Smetti il backup verso Anna' }));
+		await waitFor(() => expect(disco.amici[0].backup).toBeUndefined());
+	});
+
+	it('a friend asking to keep a backup here is told, and accepted from Friends', async () => {
+		conAnna();
+		disco.amici[0].ospite = { consenso: 'chiesto', cartella: null, ultimo: null };
+		await monta();
+		ascoltatori.get('amici-backup')?.({ payload: { id: codice, nome: 'Anna' } });
+		expect(await screen.findByText(/Anna vuole tenere un backup su questo PC/)).toBeTruthy();
+
+		await fireEvent.click(await screen.findByRole('button', { name: 'Gestisci amici' }));
+		const richiesta = within(await screen.findByRole('dialog', { name: 'Amici' })).getByRole('group', { name: 'Backup di Anna' });
+		await fireEvent.click(within(richiesta).getByRole('button', { name: 'Accetta' }));
+		await waitFor(() => expect(disco.amici[0].ospite).toEqual({ consenso: 'si', cartella: null, ultimo: null }));
+	});
+
 	it('togliere un amico chiede conferma', async () => {
 		conAnna();
 		await monta();

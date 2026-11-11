@@ -145,6 +145,10 @@ pub(crate) enum Richiesta {
     Amicizia { nome: String },
     /// Fra amici: chi la manda ci ha tolti dai suoi amici.
     Rimuovi,
+    /// Between friends: what of our backup folder `cartella` the friend holds.
+    BackupElenco { cartella: String },
+    /// Between friends: these files of the backup follow, replace older copies.
+    Backup { cartella: String, voci: Vec<crate::backup::VoceBackup> },
 }
 
 /// Un elemento in viaggio. `rel` usa `/` come separatore e parte dal nome
@@ -182,6 +186,9 @@ pub(crate) struct Risposta {
     /// Fra amici: l'amicizia è confermata da entrambe le parti.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub(crate) confermato: bool,
+    /// Between friends: the files of a backup the friend already holds.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) backup: Vec<crate::backup::VoceBackup>,
 }
 
 impl Risposta {
@@ -232,7 +239,7 @@ fn riservato(parte: &str) -> bool {
 
 /// Un path relativo arrivato dalla rete, solo se non può uscire dalla
 /// cartella a cui verrà attaccato: niente `..`, radici o lettere di unità.
-fn rel_sicuro(rel: &str) -> Option<PathBuf> {
+pub(crate) fn rel_sicuro(rel: &str) -> Option<PathBuf> {
     let mut out = PathBuf::new();
     for parte in rel.split(['/', '\\']).filter(|p| !p.is_empty()) {
         if parte == "." || parte == ".." || parte.contains(':') || riservato(parte) {
@@ -436,7 +443,7 @@ impl Lan {
             })
     }
 
-    fn cartella_ricevuti(&self) -> PathBuf {
+    pub(crate) fn cartella_ricevuti(&self) -> PathBuf {
         self.config()
             .ricevuti
             .map(PathBuf::from)
@@ -655,7 +662,11 @@ fn servi(avvisi: Avvisi, lan: Arc<Lan>, mut s: TcpStream) -> io::Result<()> {
     }
     let esito = match richiesta {
         // Le richieste degli amici non passano dalla rete di casa.
-        Richiesta::Ciao { .. } | Richiesta::Amicizia { .. } | Richiesta::Rimuovi => {
+        Richiesta::Ciao { .. }
+        | Richiesta::Amicizia { .. }
+        | Richiesta::Rimuovi
+        | Richiesta::BackupElenco { .. }
+        | Richiesta::Backup { .. } => {
             scrivi_json(&mut s, &Risposta::errore("Richiesta non valida."))
         }
         r => servi_richiesta(&avvisi, &lan, &mut s, r, &Permessi { condivisione: true, mittente: None }),
@@ -712,7 +723,11 @@ pub(crate) fn servi_richiesta<S: Read + Write>(
             let da = permessi.mittente.clone().unwrap_or(da);
             ricevi(avvisi.clone(), lan.clone(), s, da, voci, totale)
         }
-        Richiesta::Ciao { .. } | Richiesta::Amicizia { .. } | Richiesta::Rimuovi => {
+        Richiesta::Ciao { .. }
+        | Richiesta::Amicizia { .. }
+        | Richiesta::Rimuovi
+        | Richiesta::BackupElenco { .. }
+        | Richiesta::Backup { .. } => {
             scrivi_json(s, &Risposta::errore("Richiesta non valida."))
         }
     }

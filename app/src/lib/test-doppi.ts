@@ -118,6 +118,15 @@ export function backendFinto(over: Partial<Backend> = {}): Backend {
 		async amiciQr() {
 			return '';
 		},
+		async amiciBackup() {
+			return { codice: 'codice-di-questo-pc', pronto: true, amici: [] };
+		},
+		async amiciBackupOra() {
+			return '';
+		},
+		async amiciRispondiBackup() {
+			return { codice: 'codice-di-questo-pc', pronto: true, amici: [] };
+		},
 		async lanStato() {
 			return {
 				id: 'QUESTO-0000',

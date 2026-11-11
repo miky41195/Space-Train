@@ -174,6 +174,10 @@ export interface Amico {
 	/** Può sfogliare e scaricare la nostra cartella condivisa. */
 	condividi: boolean;
 	inLinea: boolean;
+	/** Our folder kept aligned on their PC, once a day. */
+	backup?: { cartella: string; ultimo: number | null; tentato: number | null; esito: string | null };
+	/** Their backup kept here: they asked, we said yes or no. */
+	ospite?: { consenso: 'chiesto' | 'si' | 'no'; cartella: string | null; ultimo: number | null };
 }
 
 export interface StatoAmici {
@@ -281,6 +285,12 @@ export interface Backend {
 	amiciCondividi(id: string, si: boolean): Promise<StatoAmici>;
 	/** Il QR code del nostro codice, in SVG. */
 	amiciQr(): Promise<string>;
+	/** Starts (with a folder) or stops the daily backup towards a friend. */
+	amiciBackup(id: string, cartella: string | null): Promise<StatoAmici>;
+	/** Runs the backup now; resolves with what was sent. */
+	amiciBackupOra(id: string): Promise<string>;
+	/** Yes or no to a friend's backup on this PC; `cartella` null = the default one. */
+	amiciRispondiBackup(id: string, si: boolean, cartella: string | null): Promise<StatoAmici>;
 	lanStato(): Promise<StatoLan>;
 	lanImposta(config: ConfigLan): Promise<StatoLan>;
 	lanPari(): Promise<Pari[]>;
@@ -432,6 +442,9 @@ export const tauriBackend: Backend = {
 	amiciRimuovi: (id) => invoke('amici_rimuovi', { id }),
 	amiciCondividi: (id, si) => invoke('amici_condividi', { id, si }),
 	amiciQr: () => invoke('amici_qr'),
+	amiciBackup: (id, cartella) => invoke('amici_backup', { id, cartella }),
+	amiciBackupOra: (id) => invoke('amici_backup_ora', { id }),
+	amiciRispondiBackup: (id, si, cartella) => invoke('amici_rispondi_backup', { id, si, cartella }),
 	lanStato: () => invoke('lan_stato'),
 	lanImposta: (config) => invoke('lan_imposta', { config }),
 	lanPari: () => invoke('lan_pari'),

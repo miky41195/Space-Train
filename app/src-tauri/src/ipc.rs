@@ -680,6 +680,32 @@ pub fn amici_condividi(amici: tauri::State<'_, Arc<Amici>>, id: String, si: bool
     amici.stato()
 }
 
+/// Starts (with a folder) or stops the daily backup towards a friend.
+#[tauri::command]
+pub fn amici_backup(amici: tauri::State<'_, Arc<Amici>>, id: String, cartella: Option<String>) -> crate::amici::StatoAmici {
+    amici.imposta_backup(&id, cartella);
+    amici.stato()
+}
+
+/// Runs the backup towards a friend now. Returns what was sent.
+#[tauri::command]
+pub async fn amici_backup_ora(amici: tauri::State<'_, Arc<Amici>>, id: String) -> Result<String, FsError> {
+    let amici = amici.inner().clone();
+    fuori_dalla_finestra(move || amici.allinea(&id)).await
+}
+
+/// Yes or no to a friend who wants to keep their backup on this PC.
+#[tauri::command]
+pub fn amici_rispondi_backup(
+    amici: tauri::State<'_, Arc<Amici>>,
+    id: String,
+    si: bool,
+    cartella: Option<String>,
+) -> crate::amici::StatoAmici {
+    amici.rispondi_backup(&id, si, cartella);
+    amici.stato()
+}
+
 /// Il QR code del nostro codice personale, in SVG.
 #[tauri::command]
 pub fn amici_qr(amici: tauri::State<'_, Arc<Amici>>) -> Result<String, FsError> {
