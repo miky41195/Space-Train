@@ -10,6 +10,7 @@
 <script lang="ts">
 	import type { FolderStyle } from '../icons';
 	import type { MediaKey } from '../media';
+	import type { Crescita } from '../crescita';
 	import { selezioneRettangolo, type OpzioniRettangolo } from '../rettangolo';
 	import type { Entry, GitMark, MediaProps, SortKey, SortSpec } from '../ipc';
 	import Intestazioni from './Intestazioni.svelte';
@@ -36,6 +37,7 @@
 		cartellaDi = undefined,
 		coloreDi = undefined,
 		quotaDi = undefined,
+		crescitaDi = undefined,
 		altezzaRiga = ROW_HEIGHT,
 		bersaglio = null,
 		selection = undefined,
@@ -84,6 +86,7 @@
 		coloreDi?: (e: Entry) => string | undefined;
 		/** Space view: share of the largest item, for the bar. */
 		quotaDi?: (e: Entry) => number | undefined;
+		crescitaDi?: (e: Entry) => Crescita | undefined;
 		/** Altezza delle righe: più bassa nella visualizzazione compatta. */
 		altezzaRiga?: number;
 		/** Cartella sopra cui passa un trascinamento. */
@@ -248,6 +251,7 @@
 					cartella={cartellaDi?.(entry)}
 					colore={coloreDi?.(entry)}
 					quota={quotaDi?.(entry)}
+					crescita={crescitaDi?.(entry)}
 					media={mediaDi?.(entry)}
 					git={gitDi?.(entry)}
 					conRegole={entry.kind === 'dir' && (regoleDi?.(entry) ?? false)}

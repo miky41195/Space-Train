@@ -1,12 +1,13 @@
 <script lang="ts">
-	import type { Entry } from '../ipc';
-	import { planRename, type RenameRule } from '../batch-rename';
+	import type { Entry, MediaProps } from '../ipc';
+	import { availablePlaceholders, planRename, type Placeholder, type RenameRule } from '../batch-rename';
 
 	let {
 		entries,
 		taken,
 		onconfirm,
-		oncancel
+		oncancel,
+		mediaDi = () => undefined
 	}: {
 		/** The selected items, in list order: the counter follows it. */
 		entries: Entry[];
@@ -14,6 +15,8 @@
 		taken: Set<string>;
 		onconfirm: (plan: ReturnType<typeof planRename>) => void;
 		oncancel: () => void;
+		/** Photo and music details, for the placeholders. */
+		mediaDi?: (e: Entry) => MediaProps | null | undefined;
 	} = $props();
 
 	let mode = $state<'pattern' | 'replace'>('pattern');
@@ -29,13 +32,25 @@
 			? { mode, pattern, start: Number.isFinite(start) ? start : 1, keepExtension }
 			: { mode, find, replace, matchCase, keepExtension }
 	);
-	let plan = $derived(
-		planRename(
-			entries.map((e) => ({ path: e.path, name: e.name, isDir: e.kind === 'dir' })),
-			rule,
-			taken
-		)
+	let items = $derived(
+		entries.map((e) => ({ path: e.path, name: e.name, isDir: e.kind === 'dir', media: mediaDi(e), modified: e.modified }))
 	);
+	let plan = $derived(planRename(items, rule, taken));
+	let segnaposti = $derived(availablePlaceholders(items));
+	/** The pattern cut into text and placeholders, drawn under the field so the placeholders show as labels. */
+	let parti = $derived(pattern.split(/(\[(?:Data|Ora|Anno|Fotocamera|Artista|Album|Titolo|Traccia|Nome)\])/).filter(Boolean));
+	let specchio = $state<HTMLSpanElement | null>(null);
+
+	/** Puts a placeholder where the cursor is, then the cursor after it. */
+	function inserisci(tag: Placeholder) {
+		const i = first?.selectionStart ?? pattern.length;
+		const j = first?.selectionEnd ?? i;
+		pattern = pattern.slice(0, i) + tag + pattern.slice(j);
+		requestAnimationFrame(() => {
+			first?.focus();
+			first?.setSelectionRange(i + tag.length, i + tag.length);
+		});
+	}
 	let problems = $derived(plan.filter((p) => p.problem).length);
 	let changes = $derived(plan.filter((p) => p.newName !== p.item.name).length);
 	// An empty pattern is not a rename: the counter alone would wipe every name.
@@ -94,7 +109,19 @@
 			<div class="campi">
 				<label class="largo">
 					<span>Nome</span>
-					<input bind:this={first} bind:value={pattern} placeholder="Vacanze_###" spellcheck="false" autocomplete="off" />
+					<span class="campo-segnaposti">
+						<span class="specchio" aria-hidden="true" bind:this={specchio}
+							>{#each parti as p, i (i)}{#if p.startsWith('[') && p.endsWith(']')}<mark>{p}</mark>{:else}{p}{/if}{/each}</span
+						>
+						<input
+							bind:this={first}
+							bind:value={pattern}
+							placeholder="Vacanze_###"
+							spellcheck="false"
+							autocomplete="off"
+							onscroll={(e) => specchio && (specchio.scrollLeft = e.currentTarget.scrollLeft)}
+						/>
+					</span>
 				</label>
 				<label>
 					<span>Parti da</span>
@@ -102,6 +129,11 @@
 				</label>
 			</div>
 			<p class="aiuto">Ogni <kbd>#</kbd> è una cifra del contatore: <b>###</b> diventa 001, 002, 003…</p>
+			<div class="segnaposti" aria-label="Dati dei file da inserire nel nome">
+				{#each segnaposti as t (t)}
+					<button type="button" onclick={() => inserisci(t)}>{t.slice(1, -1)}</button>
+				{/each}
+			</div>
 		{:else}
 			<div class="campi">
 				<label>
@@ -131,7 +163,7 @@
 						><path d="M2 8h11M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" /></svg
 					>
 					<span class="nuovo" title={p.newName}>
-						{#if p.problem}{p.newName} · {p.problem}{:else if p.newName === p.item.name}invariato{:else}{prima}<b>{nuovo}</b>{dopo}{/if}
+						{#if p.problem}{p.newName} · {p.problem}{:else if p.newName === p.item.name}{p.note ?? 'invariato'}{:else}{prima}<b>{nuovo}</b>{dopo}{#if p.note}<i>{` · ${p.note}`}</i>{/if}{/if}
 					</span>
 				</li>
 			{/each}
@@ -220,7 +252,7 @@
 	.campi:has(.largo) {
 		grid-template-columns: minmax(0, 1fr) 96px;
 	}
-	label > span {
+	label > span:not(.campo-segnaposti) {
 		display: block;
 		margin-bottom: 4px;
 		font-family: var(--font-display);
@@ -307,6 +339,75 @@
 	.vecchio,
 	.anteprima svg {
 		color: var(--text-dim);
+	}
+	.campo-segnaposti {
+		position: relative;
+		display: block;
+	}
+	/* Same box and font as the field: the text lines up under the transparent input text. */
+	.specchio {
+		position: absolute;
+		inset: 0;
+		display: block;
+		padding: 0 10px;
+		overflow: hidden;
+		border: 1px solid transparent;
+		font: inherit;
+		line-height: 28px;
+		white-space: pre;
+		color: var(--text);
+		pointer-events: none;
+		margin: 0;
+		letter-spacing: normal;
+		text-transform: none;
+	}
+	.specchio mark {
+		border-radius: 3px;
+		background: var(--accent-soft);
+		color: var(--text);
+		box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent);
+	}
+	.campo-segnaposti input {
+		position: relative;
+		background: transparent !important;
+		color: transparent !important;
+		caret-color: var(--text);
+	}
+	.campo-segnaposti input::placeholder {
+		color: var(--text-dim);
+	}
+	.campo-segnaposti input::selection {
+		background: color-mix(in srgb, var(--accent) 45%, transparent);
+		color: transparent;
+	}
+	.segnaposti {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		margin-top: -4px;
+	}
+	.segnaposti button {
+		height: 24px;
+		padding: 0 10px;
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		background: transparent;
+		color: var(--text);
+		font: inherit;
+		font-size: calc(12px * var(--scala-testo, 1));
+		cursor: default;
+	}
+	.segnaposti button:hover {
+		border-color: var(--accent);
+		background: var(--accent-soft);
+	}
+	.segnaposti button:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+	.nuovo i {
+		font-style: normal;
+		color: var(--signal, #ffb454);
 	}
 	.nuovo b {
 		color: var(--current);

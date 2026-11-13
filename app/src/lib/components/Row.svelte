@@ -14,6 +14,7 @@
 		ignored: { letter: '', label: 'Ignorato da git' }
 	};
 	import { byte, senzaEstensione, estensione } from '../posizioni';
+	import { testoCrescita, type Crescita } from '../crescita';
 	import { seTrascina, hoverSelect, cancelHoverSelect } from '../trascina';
 
 	let {
@@ -28,6 +29,7 @@
 		cartella = undefined,
 		colore = undefined,
 		quota = undefined,
+		crescita = undefined,
 		altezza = 32,
 		bersaglio = false,
 		peso = undefined,
@@ -63,6 +65,8 @@
 		colore?: string;
 		/** Space view: this item's share of the largest one (0–1), drawn as a bar. */
 		quota?: number;
+		/** Space view: how much the folder grew since an earlier day. */
+		crescita?: Crescita;
 		/** Altezza della riga in pixel: deve coincidere con quella della lista. */
 		altezza?: number;
 		/** Un trascinamento sta passando sopra questa cartella. */
@@ -274,6 +278,13 @@
 			<span class="name" title={entry.name}
 				>{#each tratti as t, i (i)}{#if t.forte}<mark>{t.testo}</mark>{:else}{t.testo}{/if}{/each}</span
 			>
+			{#if crescita}<span
+					class="crescita"
+					class:giu={crescita.delta < 0}
+					class:ferma={testoCrescita(crescita.delta, byte) === '='}
+					title="Dal {new Date(crescita.dal).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}"
+					>{testoCrescita(crescita.delta, byte)}</span
+				>{/if}
 			{#if conRegole}<span class="con-regole" title="Ha regole automatiche" aria-label="Ha regole automatiche"
 					><svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"
 						><path d="M13 6.5A5 5 0 0 0 3.6 5M3 9.5A5 5 0 0 0 12.4 11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /><path
@@ -296,7 +307,11 @@
 				>
 			{/if}
 			{#if quota !== undefined}
-				<span class="riempimento quota"><span style:width="{Math.max(1, Math.round(quota * 100))}%"></span></span>
+				<span class="riempimento quota"
+					><span style:width="{Math.max(1, Math.round(quota * 100))}%"
+						>{#if crescita && crescita.parte > 0 && testoCrescita(crescita.delta, byte) !== '='}<em style:width="{Math.round(crescita.parte * 100)}%"></em>{/if}</span
+					></span
+				>
 			{/if}
 			{#if occupato !== null}
 				<span class="riempimento" class:pieno={occupato > 0.9}
@@ -442,6 +457,31 @@
 	/* Space view: the same bar as the drives, in the current's plasma-to-cyan. */
 	.riempimento.quota span {
 		background: linear-gradient(90deg, var(--plasma, var(--accent)), var(--current));
+	}
+	/* The part that is new since the baseline, at the bar's end. */
+	.riempimento.quota span {
+		display: flex;
+		justify-content: flex-end;
+	}
+	.riempimento.quota em {
+		display: block;
+		height: 100%;
+		background: var(--signal, #ffb454);
+	}
+	.crescita {
+		order: 9;
+		margin-left: auto;
+		flex: none;
+		font-family: var(--font-ui);
+		font-size: calc(12px * var(--scala-testo, 1));
+		font-variant-numeric: tabular-nums;
+		color: var(--signal, #ffb454);
+	}
+	.crescita.giu {
+		color: var(--in-linea, #22c55e);
+	}
+	.crescita.ferma {
+		color: var(--text-dim);
 	}
 	.riempimento.pieno span {
 		background: #ff5f6e;

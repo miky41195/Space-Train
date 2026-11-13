@@ -50,6 +50,9 @@ export interface MediaProps {
 	bitrate?: number;
 	/** Hz. */
 	sampleRate?: number;
+	title?: string;
+	/** Track number on the album. */
+	track?: number;
 }
 
 export interface Snippet {

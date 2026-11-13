@@ -31,6 +31,8 @@ export type AzioneMenu =
 	| 'confronta'
 	| 'spazio'
 	| 'pulizia'
+	| 'confrontaFile'
+	| 'confrontaFileAltro'
 	| 'regole'
 	| 'nuovaCassaforte'
 	| 'aggiungiInCassaforte'
@@ -293,6 +295,7 @@ function vociElementi({
 		} else {
 			voci.push({ azione: 'apriCon', etichetta: 'Apri con…' });
 			voci.push({ azione: 'checksum', etichetta: 'Somma di controllo…' });
+			if (altroPannello) voci.push({ azione: 'confrontaFileAltro', etichetta: 'Confronta con lo stesso file nell’altro pannello' });
 			if (eEseguibile(unica.name)) {
 				voci.push({ azione: 'amministratore', etichetta: 'Esegui come amministratore' });
 			}
@@ -337,6 +340,9 @@ function vociElementi({
 
 	if (unica) {
 		voci.push({ azione: 'mostraInEsplora', etichetta: 'Mostra in Esplora risorse' });
+	}
+	if (quante === 2 && selezione.every((e) => e.kind === 'file')) {
+		voci.push({ azione: 'confrontaFile', etichetta: 'Confronta i due file' });
 	}
 
 	if (selezione.every((e) => e.kind === 'file' && eImmagineModificabile(e.name))) {

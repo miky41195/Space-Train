@@ -4,6 +4,7 @@
  * Pure: the dialog shows the plan as a live preview, the page executes it.
  */
 
+import type { MediaProps } from './ipc';
 import { senzaEstensione } from './posizioni';
 
 export type RenameRule =
@@ -26,6 +27,10 @@ export interface RenameItem {
 	path: string;
 	name: string;
 	isDir: boolean;
+	/** Photo and music details, for the placeholders. */
+	media?: MediaProps | null;
+	/** Last change, ms: the date when a photo has no date taken. */
+	modified?: number | null;
 }
 
 export interface PlannedRename {
@@ -34,10 +39,62 @@ export interface PlannedRename {
 	newName: string;
 	/** Why this name cannot be used; the plan is blocked while any is set. */
 	problem?: string;
+	/** Worth knowing, does not block: a stand-in value, or a file left as it is. */
+	note?: string;
+}
+
+/** Placeholders a pattern can hold, written as the user reads them. */
+export const PLACEHOLDERS = ['[Data]', '[Ora]', '[Anno]', '[Fotocamera]', '[Artista]', '[Album]', '[Titolo]', '[Traccia]', '[Nome]'] as const;
+export type Placeholder = (typeof PLACEHOLDERS)[number];
+const PLACEHOLDER_RE = /\[(Data|Ora|Anno|Fotocamera|Artista|Album|Titolo|Traccia|Nome)\]/g;
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+/** The value of a placeholder for one item; `fallback` = taken from the file date. */
+function placeholderValue(tag: string, item: RenameItem, base: string): { text: string; fallback?: boolean } | null {
+	const m = item.media ?? null;
+	const date = m?.taken ?? item.modified ?? null;
+	const fallback = m?.taken === undefined;
+	const d = date === null ? null : new Date(date);
+	switch (tag) {
+		case 'Data':
+			return d && { text: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`, fallback };
+		case 'Ora':
+			// No «:» in Windows names.
+			return d && { text: `${pad2(d.getHours())}.${pad2(d.getMinutes())}`, fallback };
+		case 'Anno':
+			if (m?.year) return { text: String(m.year) };
+			return d && { text: String(d.getFullYear()), fallback };
+		case 'Fotocamera':
+			return m?.camera ? { text: m.camera } : null;
+		case 'Artista':
+			return m?.artist ? { text: m.artist } : null;
+		case 'Album':
+			return m?.album ? { text: m.album } : null;
+		case 'Titolo':
+			return m?.title ? { text: m.title } : null;
+		case 'Traccia':
+			return m?.track ? { text: pad2(m.track) } : null;
+		default:
+			return { text: base };
+	}
+}
+
+/** Which placeholders mean something for these items: the ones at least one has. */
+export function availablePlaceholders(items: RenameItem[]): Placeholder[] {
+	return PLACEHOLDERS.filter((p) => {
+		const tag = p.slice(1, -1);
+		if (tag === 'Nome' || tag === 'Data' || tag === 'Ora') return true;
+		return items.some((i) => {
+			const v = placeholderValue(tag, i, i.name);
+			return v !== null && !v.fallback;
+		});
+	});
 }
 
 // Same rules as `validate_name` in src-tauri/src/fs/names.rs.
 const FORBIDDEN = /[<>:"/\\|?*\u0000-\u001f]/;
+const FORBIDDEN_GLOBAL = new RegExp(FORBIDDEN.source, 'g');
 const RESERVED = new Set([
 	'CON', 'PRN', 'AUX', 'NUL',
 	'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
@@ -63,17 +120,35 @@ function escapeRegExp(text: string): string {
 	return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function apply(rule: RenameRule, item: RenameItem, index: number): string {
+function apply(rule: RenameRule, item: RenameItem, index: number): { name: string; note?: string } {
 	// Folders have no extension: a dot in a folder name is part of the name.
 	const split = rule.keepExtension && !item.isDir;
 	const base = split ? senzaEstensione(item.name) : item.name;
 	// The original spelling of the extension: `.JPG` stays `.JPG`.
 	const tail = item.name.slice(base.length);
 
-	if (rule.mode === 'pattern') return counter(rule.pattern, rule.start + index) + tail;
-	if (rule.find === '') return item.name;
+	if (rule.mode === 'pattern') {
+		const tags = [...rule.pattern.matchAll(PLACEHOLDER_RE)].map((m) => m[1]);
+		// With placeholders the names already differ: no « (n)» unless asked with #.
+		const numbered = tags.length > 0 && !rule.pattern.includes('#') ? rule.pattern : counter(rule.pattern, rule.start + index);
+		let missing: string | undefined;
+		let fallback = false;
+		const name = numbered.replace(PLACEHOLDER_RE, (_, tag: string) => {
+			const v = placeholderValue(tag, item, base);
+			if (!v) {
+				missing ??= tag;
+				return '';
+			}
+			if (v.fallback) fallback = true;
+			// A slash in «AC/DC» would be a folder: it becomes a dash.
+			return v.text.replace(FORBIDDEN_GLOBAL, '-');
+		});
+		if (missing) return { name: item.name, note: `senza ${missing}, resta com’è` };
+		return { name: name + tail, note: fallback ? 'data di modifica' : undefined };
+	}
+	if (rule.find === '') return { name: item.name };
 	const re = new RegExp(escapeRegExp(rule.find), rule.matchCase ? 'g' : 'gi');
-	return base.replace(re, () => rule.replace) + tail;
+	return { name: base.replace(re, () => rule.replace) + tail };
 }
 
 /**
@@ -82,7 +157,10 @@ function apply(rule: RenameRule, item: RenameItem, index: number): string {
  */
 export function planRename(items: RenameItem[], rule: RenameRule, taken: Set<string>): PlannedRename[] {
 	const freed = new Set(items.map((i) => i.name.toLowerCase()));
-	const plan: PlannedRename[] = items.map((item, i) => ({ item, newName: apply(rule, item, i) }));
+	const plan: PlannedRename[] = items.map((item, i) => {
+		const r = apply(rule, item, i);
+		return { item, newName: r.name, note: r.note };
+	});
 
 	const seen = new Map<string, number>();
 	for (const p of plan) {

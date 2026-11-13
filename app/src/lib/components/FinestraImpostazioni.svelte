@@ -257,6 +257,12 @@
 						{#each [1, 5, 15, 30, 60] as m (m)}<option value={String(m)}>{m === 1 ? '1 minuto' : `${m} minuti`}</option>{/each}
 					</select>
 				</label>
+				<label class="voce">
+					<span class="testo">Avvisa quando un disco è quasi pieno<small>Una banda sopra l’elenco, al massimo una volta al giorno, con il collegamento alla Pulizia.</small></span>
+					<select value={String(impostazioni.sogliaDisco)} onchange={(e) => impostazioni.imposta('sogliaDisco', Number(e.currentTarget.value))}>
+						{#each [0, 5, 10, 15, 20] as p (p)}<option value={String(p)}>{p === 0 ? 'Mai' : `Sotto il ${p}% libero`}</option>{/each}
+					</select>
+				</label>
 				<div class="voce">
 					<span class="testo">Stato Git nelle cartelle dei progetti<small>Segna i file modificati e nuovi e mostra il ramo. Serve git installato.</small></span>
 					{@render interruttore(impostazioni.git, 'Stato Git nelle cartelle dei progetti', () => impostazioni.imposta('git', !impostazioni.git))}

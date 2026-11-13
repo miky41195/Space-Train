@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
+	import { onDestroy, untrack } from 'svelte';
 	import { tauriBackend, type CategoriaPulizia, type Programma, type Trovato } from '../ipc';
 	import { byte } from '../posizioni';
 	import { CATEGORIE, ETICHETTE, corto, eta, piano, preselezione, type Piano } from '../pulizia';
@@ -10,7 +10,8 @@
 		onradici,
 		onlibera,
 		onchiudi,
-		descriviErrore
+		descriviErrore,
+		ontrovati = undefined
 	}: {
 		/** Drive root, like `C:\`. */
 		drive: string;
@@ -22,6 +23,8 @@
 		onchiudi: () => void;
 		/** Backend errors in words. */
 		descriviErrore: (e: unknown) => string;
+		/** Total found once every category is weighed. */
+		ontrovati?: (byte: number) => void;
 	} = $props();
 
 	/** `undefined` while being weighed. */
@@ -83,6 +86,9 @@
 	let totale = $derived(CATEGORIE.reduce((n, c) => n + peso(trovati[c.id]), 0));
 	let daFare = $derived(piano(trovati, scelti));
 	let inCorso = $derived(CATEGORIE.filter((c) => !trovati[c.id]).length);
+	$effect(() => {
+		if (inCorso === 0) untrack(() => ontrovati?.(totale));
+	});
 
 	function alternaCategoria(id: CategoriaPulizia) {
 		const voci = trovati[id] ?? [];

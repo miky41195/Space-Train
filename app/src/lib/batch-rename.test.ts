@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { planRename, renameSteps, type RenameItem, type RenameRule } from './batch-rename';
+import { availablePlaceholders, planRename, renameSteps, type RenameItem, type RenameRule } from './batch-rename';
 
 const file = (name: string): RenameItem => ({ path: `C:\\F\\${name}`, name, isDir: false });
 const dir = (name: string): RenameItem => ({ path: `C:\\F\\${name}`, name, isDir: true });
@@ -58,5 +58,31 @@ describe('renameSteps', () => {
 	it('skips unchanged items', () => {
 		const plan = planRename([file('a.txt')], { mode: 'replace', find: 'z', replace: 'y', matchCase: false, keepExtension: true }, new Set());
 		expect(renameSteps(plan)).toEqual([]);
+	});
+});
+
+describe('placeholders', () => {
+	const taken = new Date(2026, 7, 14, 9, 5).getTime();
+	const photo = (name: string, t?: number): RenameItem => ({ ...file(name), media: t === undefined ? null : { taken: t }, modified: new Date(2026, 7, 20).getTime() });
+	const song = (name: string, track?: number): RenameItem => ({ ...file(name), media: { artist: 'AC/DC', title: 'Thunder', track } });
+	const plan = (items: RenameItem[], p: string) => planRename(items, pattern(p), new Set());
+
+	it('fills date and counter, and says when the date is the file date', () => {
+		const out = plan([photo('IMG_1.jpg', taken), photo('shot.png')], '[Data] Mare ###');
+		expect(out.map((p) => p.newName)).toEqual(['2026-08-14 Mare 001.jpg', '2026-08-20 Mare 002.png']);
+		expect(out.map((p) => p.note)).toEqual([undefined, 'data di modifica']);
+	});
+
+	it('adds no counter when placeholders already tell names apart', () => {
+		expect(plan([song('a.mp3', 1)], '[Traccia] - [Artista] - [Titolo]')[0].newName).toBe('01 - AC-DC - Thunder.mp3');
+	});
+
+	it('leaves a file without the detail as it is, with a note', () => {
+		const p = plan([song('bonus.mp3')], '[Traccia] [Titolo]')[0];
+		expect([p.newName, p.note, p.problem]).toEqual(['bonus.mp3', 'senza Traccia, resta com’è', undefined]);
+	});
+
+	it('offers only the details the files have', () => {
+		expect(availablePlaceholders([song('a.mp3', 2)])).toEqual(['[Data]', '[Ora]', '[Artista]', '[Titolo]', '[Traccia]', '[Nome]']);
 	});
 });

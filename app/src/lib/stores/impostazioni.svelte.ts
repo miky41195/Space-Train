@@ -58,6 +58,8 @@ interface Valori {
 	cartelleAvvio: string[];
 	/** Where disk cleanup looks for projects; `null` = never chosen (Desktop and Documents). */
 	cartelleProgetti: string[] | null;
+	/** Reminder when a fixed drive has less than this percent free; 0 = never. */
+	sogliaDisco: number;
 	/** Quando calcolare la dimensione delle cartelle nell'elenco. */
 	dimensioneCartelle: DimensioneCartelle;
 	/** Chiedere conferma prima di spostare nel cestino. */
@@ -97,6 +99,7 @@ const PREDEFINITE: Valori = {
 	sessione: false,
 	cartelleAvvio: [],
 	cartelleProgetti: null,
+	sogliaDisco: 10,
 	dimensioneCartelle: 'mai',
 	confermaCestino: true,
 	unClic: false,
@@ -139,6 +142,7 @@ export class ImpostazioniStore {
 	sessione = $state(PREDEFINITE.sessione);
 	cartelleAvvio = $state<string[]>([]);
 	cartelleProgetti = $state<string[] | null>(null);
+	sogliaDisco = $state(PREDEFINITE.sogliaDisco);
 	scorciatoie = $state<Personalizzate>({});
 	dimensioneCartelle = $state<DimensioneCartelle>(PREDEFINITE.dimensioneCartelle);
 	confermaCestino = $state(PREDEFINITE.confermaCestino);
@@ -181,6 +185,7 @@ export class ImpostazioniStore {
 			if (typeof v.paginaIniziale === 'string' && v.paginaIniziale) this.paginaIniziale = v.paginaIniziale;
 			if (typeof v.sessione === 'boolean') this.sessione = v.sessione;
 			if (Array.isArray(v.cartelleAvvio)) this.cartelleAvvio = v.cartelleAvvio.filter((c) => typeof c === 'string');
+			if (typeof v.sogliaDisco === 'number' && v.sogliaDisco >= 0 && v.sogliaDisco <= 50) this.sogliaDisco = v.sogliaDisco;
 			if (Array.isArray(v.cartelleProgetti)) this.cartelleProgetti = v.cartelleProgetti.filter((c) => typeof c === 'string');
 			if (DIMENSIONI_CARTELLE.includes(v.dimensioneCartelle as DimensioneCartelle)) this.dimensioneCartelle = v.dimensioneCartelle!;
 			if (typeof v.confermaCestino === 'boolean') this.confermaCestino = v.confermaCestino;
@@ -261,6 +266,7 @@ export class ImpostazioniStore {
 			sessione: this.sessione,
 			cartelleAvvio: this.cartelleAvvio,
 			cartelleProgetti: this.cartelleProgetti,
+			sogliaDisco: this.sogliaDisco,
 			dimensioneCartelle: this.dimensioneCartelle,
 			confermaCestino: this.confermaCestino,
 			unClic: this.unClic,

@@ -42,7 +42,10 @@
 	import { RulesStore } from '$lib/stores/rules.svelte';
 	import RulesDialog from '$lib/components/RulesDialog.svelte';
 	import Pulizia from '$lib/components/Pulizia.svelte';
+	import ConfrontoFile from '$lib/components/ConfrontoFile.svelte';
 	import type { Piano } from '$lib/pulizia';
+	import { registra, testoCrescita, type Crescita, type Misure } from '$lib/crescita';
+	import { daRicordare, SILENZIO, type Promemoria, type StatoPromemoria, type UltimaPulizia } from '$lib/promemoria';
 	import VaultDialog from '$lib/components/VaultDialog.svelte';
 	import ServerDialog from '$lib/components/ServerDialog.svelte';
 	import { samePath as stessaCartella } from '$lib/rules';
@@ -778,7 +781,10 @@
 		if (tab?.duplicati && tab.query === '') return { voci: filtrate, zone: duplicateZones(tab.duplicati.groups) };
 		if (tab?.confronto && tab.query === '') return { voci: filtrate, zone: compareZones(tab.confronto) };
 		if (tab?.spazio && !tab.risultati && posizione === 'normale') {
-			return { voci: [...filtrate].sort((a, b) => pesoVoce(b) - pesoVoce(a)), zone: [] };
+			const chiave = perCrescita
+				? (e: Entry) => crescite[e.path]?.delta ?? Number.NEGATIVE_INFINITY
+				: pesoVoce;
+			return { voci: [...filtrate].sort((a, b) => chiave(b) - chiave(a)), zone: [] };
 		}
 		if (!tab || tab.query !== '' || tab.risultati) return { voci: filtrate, zone: [] };
 		const prefs = posizione === 'normale' ? preferiti.di(tab.path) : NESSUNO;
@@ -838,6 +844,18 @@
 		if (puliziaDi && store.activeTab && !stessoPath(store.activeTab.path, puliziaDi)) puliziaDi = null;
 	});
 
+	// ── Two-file comparison ──────────────────────────────────────────
+	/** Two files shown side by side in place of the list; `cartella` = where it was opened. */
+	let confrontoFile = $state<{ a: Entry; b: Entry; cartella: string } | null>(null);
+	$effect(() => {
+		if (confrontoFile && store.activeTab && !stessoPath(store.activeTab.path, confrontoFile.cartella)) confrontoFile = null;
+	});
+	function confrontaFile(a: Entry, b: Entry) {
+		// The older one on the left, as «before» and «after»; same date: the shorter name (the original, not «(copia)»).
+		const [x, y] = [a, b].sort((p, q) => (p.modified ?? 0) - (q.modified ?? 0) || p.name.length - q.name.length);
+		if (store.activeTab) confrontoFile = { a: x, b: y, cartella: store.activeTab.path };
+	}
+
 	async function apriPulizia(drive: string) {
 		const id = store.activeId;
 		if (id === null) return;
@@ -847,6 +865,53 @@
 		}
 		if (!stessoPath(store.activeTab?.path ?? '', drive)) await store.navigate(id, drive);
 		puliziaDi = drive;
+	}
+
+	// ── Low-disk reminder ──
+	const CHIAVE_PROMEMORIA = 'space-train.promemoria-disco';
+	const CHIAVE_ULTIMA_PULIZIA = 'space-train.ultima-pulizia';
+	function leggiJson<T>(chiave: string): T {
+		try {
+			return JSON.parse(localStorage.getItem(chiave) ?? '{}') as T;
+		} catch {
+			return {} as T;
+		}
+	}
+	function scriviJson(chiave: string, valore: unknown) {
+		try {
+			localStorage.setItem(chiave, JSON.stringify(valore));
+		} catch {
+			// Storage blocked: the reminder may come back sooner, nothing worse.
+		}
+	}
+	let promemoria = $state<Promemoria | null>(null);
+	$effect(() => {
+		void aggiornamentoDischi;
+		const soglia = impostazioni.sogliaDisco;
+		if (promemoria || soglia === 0) return;
+		void tauriBackend
+			.drives()
+			.then((d) => {
+				const p = daRicordare(d, soglia, leggiJson(CHIAVE_PROMEMORIA), leggiJson(CHIAVE_ULTIMA_PULIZIA), Date.now());
+				if (!p || promemoria) return;
+				// Shown counts as reminded: other windows and the next refresh keep quiet today.
+				const stato = leggiJson<StatoPromemoria>(CHIAVE_PROMEMORIA);
+				const k = p.drive.path.toLowerCase();
+				scriviJson(CHIAVE_PROMEMORIA, { ...stato, [k]: { ...stato[k], visto: Date.now() } });
+				promemoria = p;
+			})
+			.catch(() => {});
+	});
+	function zittisciPromemoria() {
+		if (!promemoria) return;
+		const stato = leggiJson<StatoPromemoria>(CHIAVE_PROMEMORIA);
+		const k = promemoria.drive.path.toLowerCase();
+		scriviJson(CHIAVE_PROMEMORIA, { ...stato, [k]: { ...stato[k], zitto: Date.now() + SILENZIO } });
+		promemoria = null;
+	}
+	function ricordaPulizia(byte: number) {
+		if (!puliziaDi) return;
+		scriviJson(CHIAVE_ULTIMA_PULIZIA, { ...leggiJson<UltimaPulizia>(CHIAVE_ULTIMA_PULIZIA), [puliziaDi.toLowerCase()]: { byte, at: Date.now() } });
 	}
 
 	/** Free space of the cleanup drive, to tell what was really freed. */
@@ -874,16 +939,50 @@
 		if (prima !== null && dopo !== null) avvisa(`Liberati ${byte(Math.max(0, dopo - prima))} su ${nomePosizione(drive)}.`);
 	}
 
+	// ── Folder growth ──
+	// Every weighed folder is remembered on this PC; the space view shows the change since an earlier day.
+	const CHIAVE_MISURE = 'space-train.misure';
+	let misure: Misure = (() => {
+		try {
+			return JSON.parse(localStorage.getItem(CHIAVE_MISURE) ?? '{}') as Misure;
+		} catch {
+			return {};
+		}
+	})();
+	let crescite = $state<Record<string, Crescita>>({});
+	let perCrescita = $state(false);
+	function salvaMisure() {
+		try {
+			localStorage.setItem(CHIAVE_MISURE, JSON.stringify(misure));
+		} catch {
+			// Full or blocked storage: growth simply starts over next time.
+		}
+	}
+	let crescitaTotale = $derived.by(() => {
+		if (!inSpazio) return null;
+		const viste = vociVisibili.map((e) => crescite[e.path]).filter((c): c is Crescita => !!c);
+		if (viste.length === 0) return null;
+		return { delta: viste.reduce((n, c) => n + c.delta, 0), dal: Math.min(...viste.map((c) => c.dal)) };
+	});
+
 	async function pesa(cartelle: string[], turno = turnoPesi) {
+		let nuove = false;
 		for (const c of cartelle) {
-			if (turno !== turnoPesi) return;
+			if (turno !== turnoPesi) break;
 			if (dimensioni[c] !== undefined) continue;
 			dimensioni[c] = 'calcolo';
 			const n = await tauriBackend.dimensioneCartella(c, turno).catch(() => null);
-			if (turno !== turnoPesi) return;
+			if (turno !== turnoPesi) break;
 			if (n === null) delete dimensioni[c];
-			else dimensioni[c] = n;
+			else {
+				dimensioni[c] = n;
+				const r = registra(misure, c, n, Date.now());
+				misure = r.misure;
+				nuove = true;
+				if (r.crescita) crescite[c] = r.crescita;
+			}
 		}
+		if (nuove) salvaMisure();
 	}
 
 	$effect(() => {
@@ -1027,6 +1126,10 @@
 	let daCestinare = $state<Entry[]>([]);
 	/** Items in the batch rename dialog; empty when it is closed. */
 	let batchRename = $state<Entry[]>([]);
+	// Photo and music details for the rename placeholders, even with the media columns hidden.
+	$effect(() => {
+		if (batchRename.length > 0) void media.request(batchRename);
+	});
 	/** Eliminazione senza ritorno: dal disco, dal Cestino o svuotandolo. */
 	let daEliminare = $state<{ voci: Entry[]; tipo: 'disco' | 'cestino' | 'svuota' | 'server' } | null>(null);
 	let erroreOp = $state<string | null>(null);
@@ -2198,9 +2301,10 @@
 		}
 
 		// Esc leaves the duplicates or comparison view and goes back to the folder.
-		if (e.key === 'Escape' && puliziaDi) {
+		if (e.key === 'Escape' && (puliziaDi || confrontoFile)) {
 			e.preventDefault();
 			puliziaDi = null;
+			confrontoFile = null;
 			return;
 		}
 		if (e.key === 'Escape' && store.activeTab?.spazio && !store.activeTab.risultati) {
@@ -3092,6 +3196,15 @@
 				case 'pulizia':
 					if (scelte[0]) await apriPulizia(scelte[0].path);
 					break;
+				case 'confrontaFile':
+					if (scelte.length === 2) confrontaFile(scelte[0], scelte[1]);
+					break;
+				case 'confrontaFileAltro': {
+					const gemello = tabAltro?.entries.find((e) => e.kind === 'file' && e.name.toLowerCase() === scelte[0]?.name.toLowerCase());
+					if (scelte[0] && gemello) confrontaFile(scelte[0], gemello);
+					else if (scelte[0]) erroreOp = `Nell’altro pannello non c’è «${scelte[0].name}».`;
+					break;
+				}
 				case 'spazio': {
 					const cartella = cartellaDelMenu(scelte);
 					if (cartella) await analizzaSpazio(cartella);
@@ -3407,8 +3520,11 @@
 				{bersaglio}
 				ramo={gitQui}
 				chiusura={chiusuraQui}
-				fermata={puliziaDi ? 'Pulizia' : null}
-				onfermata={() => (puliziaDi = null)}
+				fermata={puliziaDi ? 'Pulizia' : confrontoFile ? 'Confronto' : null}
+				onfermata={() => {
+					puliziaDi = null;
+					confrontoFile = null;
+				}}
 				onchiudi={() => {
 					const arc = store.activeTab?.archivio;
 					if (arc?.cassaforte) void chiudiCassaforte(arc.file);
@@ -3486,6 +3602,17 @@
 			{#if inSpazio && store.activeTab}
 				<div class="riepilogo-duplicati" role="status">
 					<span><b>{byte(spazioTotale)}</b> in {nomePosizione(store.activeTab.path)}</span>
+					{#if crescitaTotale}
+						<span
+							><b class="crescita-totale">{testoCrescita(crescitaTotale.delta, byte)}</b> dal {new Date(crescitaTotale.dal).toLocaleDateString('it-IT', {
+								day: 'numeric',
+								month: 'long'
+							})}</span
+						>
+						<button class:on={perCrescita} aria-pressed={perCrescita} onclick={() => (perCrescita = !perCrescita)}
+							>{perCrescita ? 'Ordina per peso' : 'Ordina per crescita'}</button
+						>
+					{/if}
 					{#if spazioInCalcolo > 0}<span>pesando <b>{spazioInCalcolo}</b> {spazioInCalcolo === 1 ? 'cartella' : 'cartelle'}…</span>{/if}
 					<button onclick={() => store.activeId !== null && store.impostaSpazio(store.activeId, false)}>Chiudi l’analisi</button>
 				</div>
@@ -3548,6 +3675,22 @@
 				<div class="avviso" role="status">{avviso}</div>
 			{/if}
 
+			{#if promemoria}
+				{@const p = promemoria}
+				<div class="avviso aggiornamento promemoria" role="status">
+					<span
+						>{nomePosizione(p.drive.path)} ha <b>{byte(p.drive.libero ?? 0)}</b> liberi ({Math.round(p.quota * 100)}%).{#if p.trovati}{' '}La Pulizia ha trovato <b>{byte(p.trovati)}</b> da togliere.{/if}</span
+					>
+					<button onclick={zittisciPromemoria}>Non ora</button>
+					<button
+						class="primario"
+						onclick={() => {
+							promemoria = null;
+							void apriPulizia(p.drive.path);
+						}}>Apri la Pulizia</button
+					>
+				</div>
+			{/if}
 			{#if aggiornamenti.daMostrare}
 				<div class="avviso aggiornamento" role="status">
 					<span>
@@ -3573,7 +3716,10 @@
 						onlibera={liberaPulizia}
 						onchiudi={() => (puliziaDi = null)}
 						{descriviErrore}
+						ontrovati={ricordaPulizia}
 					/>
+				{:else if confrontoFile}
+					<ConfrontoFile a={confrontoFile.a} b={confrontoFile.b} onchiudi={() => (confrontoFile = null)} {descriviErrore} />
 				{:else if statoVuoto}
 					<StatoVuoto
 						variante={statoVuoto}
@@ -3631,6 +3777,7 @@
 						coloreDi={coloreVoce}
 						altezzaRiga={conFrammenti ? Math.round(altezzaRiga * 1.55) : altezzaRiga}
 						quotaDi={inSpazio ? quotaVoce : undefined}
+						crescitaDi={inSpazio ? (e: Entry) => crescite[e.path] : undefined}
 						{bersaglio}
 						selection={insiemeSelezione}
 						matches={store.activeTab.query === '' || inRicerca ? undefined : evidenziazioni}
@@ -3831,6 +3978,7 @@
 			taken={new Set((store.activeTab?.entries ?? []).map((e) => e.name.toLowerCase()))}
 			onconfirm={runBatchRename}
 			oncancel={() => (batchRename = [])}
+			mediaDi={(e) => media.of(e)}
 		/>
 	{/if}
 
@@ -4157,6 +4305,9 @@
 	.riepilogo-duplicati button:hover {
 		background: var(--row-hover);
 	}
+	.riepilogo-duplicati .crescita-totale {
+		color: var(--signal, #ffb454);
+	}
 	.riepilogo-duplicati button.primario {
 		background: var(--accent);
 		border-color: var(--accent);
@@ -4189,5 +4340,19 @@
 		background: var(--accent);
 		border-color: var(--accent);
 		color: #fff;
+	}
+	/* A full drive is a warning, not news: signal orange instead of the current's cyan. */
+	.promemoria {
+		background: color-mix(in srgb, var(--signal, #ffb454) 8%, transparent);
+		border-bottom-color: color-mix(in srgb, var(--signal, #ffb454) 30%, transparent);
+		color: var(--signal, #ffb454);
+	}
+	.promemoria b {
+		font-family: var(--font-display);
+		font-weight: 400;
+		font-variant-numeric: tabular-nums;
+	}
+	.promemoria button {
+		border-color: color-mix(in srgb, var(--signal, #ffb454) 40%, transparent);
 	}
 </style>

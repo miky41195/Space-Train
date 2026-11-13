@@ -31,6 +31,11 @@ pub struct MediaProps {
     /// Hz.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sample_rate: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// Track number on the album.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub track: Option<u32>,
 }
 
 /// Hard cap per call: the frontend asks in batches for what it shows.
@@ -131,6 +136,8 @@ mod imp {
             year: u32_of(&store, &PKEY_Media_Year),
             bitrate: u32_of(&store, &PKEY_Audio_EncodingBitrate),
             sample_rate: u32_of(&store, &PKEY_Audio_SampleRate),
+            title: text(&store, &PKEY_Title),
+            track: u32_of(&store, &PKEY_Music_TrackNumber),
         };
         (props != MediaProps::default()).then_some(props)
     }
