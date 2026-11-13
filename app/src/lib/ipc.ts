@@ -279,6 +279,14 @@ export interface Backend {
 	dimensioneCartella(path: string, turno: number): Promise<number | null>;
 	/** Comincia un turno di calcoli delle dimensioni e ferma il precedente. */
 	turnoDimensioni(turno: number): Promise<void>;
+	/** Starts a new cleanup scan; the previous one stops. */
+	cleanupRound(giro: number): Promise<void>;
+	/** What one cleanup category holds on a drive, biggest first; null if a newer scan started. */
+	cleanupScan(category: CategoriaPulizia, drive: string, roots: string[], giro: number): Promise<Trovato[] | null>;
+	/** The biggest programs installed on a drive (Windows only). */
+	programsList(drive: string): Promise<Programma[]>;
+	/** Starts a program's official uninstaller. */
+	programUninstall(id: string): Promise<void>;
 	navigate(path: string, direction: 'up'): Promise<string>;
 	drives(): Promise<Drive[]>;
 	knownFolders(): Promise<KnownFolder[]>;
@@ -467,6 +475,10 @@ export const tauriBackend: Backend = {
 	openEntry: (path) => invoke('open_entry', { path }),
 	dimensioneCartella: (path, turno) => invoke('dimensione_cartella', { path, turno }),
 	turnoDimensioni: (turno) => invoke('turno_dimensioni', { turno }),
+	cleanupRound: (giro) => invoke('cleanup_round', { giro }),
+	cleanupScan: (category, drive, roots, giro) => invoke('cleanup_scan', { category, drive, roots, giro }),
+	programsList: (drive) => invoke('programs_list', { drive }),
+	programUninstall: (id) => invoke('program_uninstall', { id }),
 	navigate: (path, direction) => invoke('navigate', { path, direction }),
 	drives: () => invoke('drives'),
 	knownFolders: () => invoke('known_folders'),
@@ -571,3 +583,17 @@ export const tauriBackend: Backend = {
 	deleteItems: ({ opId, mode, paths, onProgress }) =>
 		invoke('delete_items', { opId, mode, paths, onProgress: canale(onProgress) })
 };
+
+export type CategoriaPulizia = 'temp' | 'cache' | 'progetti' | 'modelli' | 'download' | 'cestino';
+/** Something disk cleanup found: size and last use (ms). */
+export interface Trovato {
+	path: string;
+	size: number;
+	used: number;
+}
+export interface Programma {
+	id: string;
+	name: string;
+	publisher: string | null;
+	size: number;
+}

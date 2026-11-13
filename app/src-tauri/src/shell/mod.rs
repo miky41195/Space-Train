@@ -7,6 +7,7 @@ pub mod icons;
 pub mod known;
 pub mod media;
 pub mod open;
+pub mod programmi;
 pub mod appunti;
 pub mod nativo;
 pub mod rete;

@@ -30,6 +30,7 @@ export type AzioneMenu =
 	| 'duplicati'
 	| 'confronta'
 	| 'spazio'
+	| 'pulizia'
 	| 'regole'
 	| 'nuovaCassaforte'
 	| 'aggiungiInCassaforte'
@@ -462,7 +463,11 @@ function vociVirtuali({ selezione, iniziale = false }: ContestoMenu, posizione: 
 		{ azione: 'copiaPercorso', etichetta: 'Copia percorso', stacca: true }
 	];
 	if (posizione === 'pc') {
-		if (selezione[0].kind === 'dir') voci.push({ azione: 'spazio', etichetta: 'Analizza spazio' });
+		if (selezione[0].kind === 'dir') {
+			voci.push({ azione: 'spazio', etichetta: 'Analizza spazio' });
+			// Only drives carry their size: a known folder in This PC is not a drive.
+			if (selezione[0].totale != null) voci.push({ azione: 'pulizia', etichetta: 'Pulizia disco…' });
+		}
 		voci.push({ azione: 'altreOpzioni', etichetta: 'Altre opzioni di Windows', stacca: true });
 		voci.push({ azione: 'proprieta', etichetta: 'Proprietà', scorciatoia: 'Alt+Invio' });
 	}

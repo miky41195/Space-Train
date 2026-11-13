@@ -18,4 +18,5 @@ pub mod ops;
 pub mod paths;
 pub mod pausa;
 pub mod provenienza;
+pub mod pulizia;
 pub mod sort;

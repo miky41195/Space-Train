@@ -135,6 +135,35 @@ pub fn turno_dimensioni(turno: u64) {
     crate::fs::dimensione::nuovo_turno(turno);
 }
 
+/// Starts a new cleanup scan; scans of the previous one stop.
+#[tauri::command]
+pub fn cleanup_round(giro: u64) {
+    crate::fs::pulizia::nuovo_giro(giro);
+}
+
+/// What one cleanup category holds on `drive`; `None` if a newer scan started.
+#[tauri::command]
+pub async fn cleanup_scan(
+    category: crate::fs::pulizia::Categoria,
+    drive: String,
+    roots: Vec<String>,
+    giro: u64,
+) -> Result<Option<Vec<crate::fs::pulizia::Trovato>>, FsError> {
+    fuori_dalla_finestra(move || Ok(crate::fs::pulizia::cerca(category, &drive, &roots, giro))).await
+}
+
+/// The biggest programs installed on `drive`.
+#[tauri::command]
+pub async fn programs_list(drive: String) -> Result<Vec<crate::shell::programmi::Programma>, FsError> {
+    fuori_dalla_finestra(move || Ok(crate::shell::programmi::elenca(&drive, 12))).await
+}
+
+/// Starts a program's official uninstaller.
+#[tauri::command]
+pub async fn program_uninstall(id: String) -> Result<(), FsError> {
+    fuori_dalla_finestra(move || crate::shell::programmi::disinstalla(&id)).await
+}
+
 #[tauri::command]
 pub fn open_entry(path: String) -> Result<(), FsError> {
     open::open_default(&path)

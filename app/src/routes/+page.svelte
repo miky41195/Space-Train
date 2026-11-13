@@ -41,6 +41,8 @@
 	import { MediaStore } from '$lib/stores/media.svelte';
 	import { RulesStore } from '$lib/stores/rules.svelte';
 	import RulesDialog from '$lib/components/RulesDialog.svelte';
+	import Pulizia from '$lib/components/Pulizia.svelte';
+	import type { Piano } from '$lib/pulizia';
 	import VaultDialog from '$lib/components/VaultDialog.svelte';
 	import ServerDialog from '$lib/components/ServerDialog.svelte';
 	import { samePath as stessaCartella } from '$lib/rules';
@@ -314,6 +316,8 @@
 			out.push({ tipo: 'azione', nome: 'Trova duplicati qui', dettaglio: nomePosizione(qui), esegui: () => store.activeId !== null && void store.trovaDuplicati(store.activeId, store.showHidden) });
 			out.push({ tipo: 'azione', nome: 'Confronta con un’altra cartella', esegui: () => void confrontaCon(qui) });
 		}
+		const disco = qui && /^[a-z]:\\/i.test(qui) ? qui.slice(0, 3) : RADICE_SISTEMA;
+		out.push({ tipo: 'azione', nome: 'Pulizia disco', dettaglio: disco, esegui: () => void apriPulizia(disco) });
 		out.push({ tipo: 'azione', nome: 'Impostazioni', esegui: () => (impostazioniAperte = true) });
 		out.push({ tipo: 'azione', nome: 'Editor dei temi', esegui: () => void apriEditor() });
 		const vai = (path: string) => () => store.activeId !== null && void store.navigate(store.activeId, path);
@@ -822,6 +826,52 @@
 		if (id === null) return;
 		if (cartella !== store.activeTab?.path) await store.navigate(id, cartella);
 		await store.impostaSpazio(id, true);
+	}
+
+	// ── Disk cleanup ─────────────────────────────────────────────────
+	/** Drive root the cleanup view is open on; it takes the list's place. */
+	let puliziaDi = $state<string | null>(null);
+	let radiciPredefinite = $state<string[]>([]);
+	let radiciProgetti = $derived(impostazioni.cartelleProgetti ?? radiciPredefinite);
+	// Going to another folder leaves the view.
+	$effect(() => {
+		if (puliziaDi && store.activeTab && !stessoPath(store.activeTab.path, puliziaDi)) puliziaDi = null;
+	});
+
+	async function apriPulizia(drive: string) {
+		const id = store.activeId;
+		if (id === null) return;
+		if (impostazioni.cartelleProgetti === null && radiciPredefinite.length === 0) {
+			const note = await tauriBackend.knownFolders().catch(() => []);
+			radiciPredefinite = note.filter((k) => k.icon === 'desktop' || k.icon === 'documents').map((k) => k.path);
+		}
+		if (!stessoPath(store.activeTab?.path ?? '', drive)) await store.navigate(id, drive);
+		puliziaDi = drive;
+	}
+
+	/** Free space of the cleanup drive, to tell what was really freed. */
+	async function liberoSu(drive: string): Promise<number | null> {
+		const d = await tauriBackend.drives().catch(() => []);
+		return d.find((x) => stessoPath(x.path, drive))?.libero ?? null;
+	}
+
+	async function liberaPulizia(p: Piano) {
+		const drive = puliziaDi;
+		if (!drive) return;
+		erroreOp = null;
+		const prima = await liberoSu(drive);
+		const falliti: Eliminati['failed'] = [];
+		if (p.disco.length > 0) falliti.push(...(await eliminaConBarra('disco', p.disco)).failed);
+		if (p.cestino.length > 0) {
+			const esito = await eliminaConBarra('cestino', p.cestino);
+			if (esito.done.length > 0) annulla.registra({ tipo: 'cestino', originali: esito.done });
+			falliti.push(...esito.failed);
+		}
+		if (p.svuota) falliti.push(...(await eliminaConBarra('svuota', [])).failed);
+		segnalaFalliti({ done: [], failed: falliti });
+		aggiornamentoDischi++;
+		const dopo = await liberoSu(drive);
+		if (prima !== null && dopo !== null) avvisa(`Liberati ${byte(Math.max(0, dopo - prima))} su ${nomePosizione(drive)}.`);
 	}
 
 	async function pesa(cartelle: string[], turno = turnoPesi) {
@@ -2148,6 +2198,11 @@
 		}
 
 		// Esc leaves the duplicates or comparison view and goes back to the folder.
+		if (e.key === 'Escape' && puliziaDi) {
+			e.preventDefault();
+			puliziaDi = null;
+			return;
+		}
 		if (e.key === 'Escape' && store.activeTab?.spazio && !store.activeTab.risultati) {
 			e.preventDefault();
 			void store.impostaSpazio(store.activeId, false);
@@ -3034,6 +3089,9 @@
 				case 'checksum':
 					if (scelte[0]) sommaDi = scelte[0];
 					break;
+				case 'pulizia':
+					if (scelte[0]) await apriPulizia(scelte[0].path);
+					break;
 				case 'spazio': {
 					const cartella = cartellaDelMenu(scelte);
 					if (cartella) await analizzaSpazio(cartella);
@@ -3349,6 +3407,8 @@
 				{bersaglio}
 				ramo={gitQui}
 				chiusura={chiusuraQui}
+				fermata={puliziaDi ? 'Pulizia' : null}
+				onfermata={() => (puliziaDi = null)}
 				onchiudi={() => {
 					const arc = store.activeTab?.archivio;
 					if (arc?.cassaforte) void chiudiCassaforte(arc.file);
@@ -3505,7 +3565,16 @@
 			<div class="contenuto" bind:this={contenuto}>
 				<div class="pannello-attivo" class:diviso={tabAltro} style:order={attivaADestra ? 2 : 0}>
 				{#if tabAltro && store.activeTab}<TestataPannello path={store.activeTab.path} attivo />{/if}
-				{#if statoVuoto}
+				{#if puliziaDi}
+					<Pulizia
+						drive={puliziaDi}
+						radici={radiciProgetti}
+						onradici={(r) => impostazioni.imposta('cartelleProgetti', r)}
+						onlibera={liberaPulizia}
+						onchiudi={() => (puliziaDi = null)}
+						{descriviErrore}
+					/>
+				{:else if statoVuoto}
 					<StatoVuoto
 						variante={statoVuoto}
 						azione={statoVuoto === 'cartellaVuota' && modificabile

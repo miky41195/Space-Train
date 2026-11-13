@@ -18,10 +18,31 @@ pub fn nuovo_turno(turno: u64) {
 /// I byte di tutti i file sotto `cartella`, o `None` se nel frattempo è
 /// cominciato un altro turno. Le cartelle illeggibili si saltano.
 pub fn dimensione(cartella: &Path, turno: u64) -> Option<u64> {
-    let mut totale: u64 = 0;
+    misura(cartella, &|| TURNO.load(Ordering::Relaxed) != turno).map(|m| m.bytes)
+}
+
+/// Size of a tree and its newest modification.
+pub struct Misura {
+    pub bytes: u64,
+    /// Newest modification of the folder itself or any file in it, in ms.
+    pub recente: u64,
+}
+
+pub fn ms(t: std::io::Result<std::time::SystemTime>) -> u64 {
+    t.ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map_or(0, |d| d.as_millis() as u64)
+}
+
+/// Walks the tree under `cartella`; `None` as soon as `fermo` says stop.
+pub fn misura(cartella: &Path, fermo: &dyn Fn() -> bool) -> Option<Misura> {
+    let mut totale = Misura { bytes: 0, recente: 0 };
+    if let Ok(md) = std::fs::metadata(cartella) {
+        totale.recente = ms(md.modified());
+    }
     let mut da_leggere = vec![cartella.to_path_buf()];
     while let Some(dir) = da_leggere.pop() {
-        if TURNO.load(Ordering::Relaxed) != turno {
+        if fermo() {
             return None;
         }
         let Ok(voci) = std::fs::read_dir(&dir) else {
@@ -39,7 +60,8 @@ pub fn dimensione(cartella: &Path, turno: u64) -> Option<u64> {
             if tipo.is_dir() {
                 da_leggere.push(voce.path());
             } else if let Ok(m) = voce.metadata() {
-                totale = totale.saturating_add(m.len());
+                totale.bytes = totale.bytes.saturating_add(m.len());
+                totale.recente = totale.recente.max(ms(m.modified()));
             }
         }
     }

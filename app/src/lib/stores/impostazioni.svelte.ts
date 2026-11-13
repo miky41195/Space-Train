@@ -56,6 +56,8 @@ interface Valori {
 	sessione: boolean;
 	/** Cartelle che si aprono sempre all'avvio, ognuna in una scheda. */
 	cartelleAvvio: string[];
+	/** Where disk cleanup looks for projects; `null` = never chosen (Desktop and Documents). */
+	cartelleProgetti: string[] | null;
 	/** Quando calcolare la dimensione delle cartelle nell'elenco. */
 	dimensioneCartelle: DimensioneCartelle;
 	/** Chiedere conferma prima di spostare nel cestino. */
@@ -94,6 +96,7 @@ const PREDEFINITE: Valori = {
 	paginaIniziale: RADICE_SISTEMA,
 	sessione: false,
 	cartelleAvvio: [],
+	cartelleProgetti: null,
 	dimensioneCartelle: 'mai',
 	confermaCestino: true,
 	unClic: false,
@@ -135,6 +138,7 @@ export class ImpostazioniStore {
 	paginaIniziale = $state(PREDEFINITE.paginaIniziale);
 	sessione = $state(PREDEFINITE.sessione);
 	cartelleAvvio = $state<string[]>([]);
+	cartelleProgetti = $state<string[] | null>(null);
 	scorciatoie = $state<Personalizzate>({});
 	dimensioneCartelle = $state<DimensioneCartelle>(PREDEFINITE.dimensioneCartelle);
 	confermaCestino = $state(PREDEFINITE.confermaCestino);
@@ -177,6 +181,7 @@ export class ImpostazioniStore {
 			if (typeof v.paginaIniziale === 'string' && v.paginaIniziale) this.paginaIniziale = v.paginaIniziale;
 			if (typeof v.sessione === 'boolean') this.sessione = v.sessione;
 			if (Array.isArray(v.cartelleAvvio)) this.cartelleAvvio = v.cartelleAvvio.filter((c) => typeof c === 'string');
+			if (Array.isArray(v.cartelleProgetti)) this.cartelleProgetti = v.cartelleProgetti.filter((c) => typeof c === 'string');
 			if (DIMENSIONI_CARTELLE.includes(v.dimensioneCartelle as DimensioneCartelle)) this.dimensioneCartelle = v.dimensioneCartelle!;
 			if (typeof v.confermaCestino === 'boolean') this.confermaCestino = v.confermaCestino;
 			if (typeof v.unClic === 'boolean') this.unClic = v.unClic;
@@ -255,6 +260,7 @@ export class ImpostazioniStore {
 			paginaIniziale: this.paginaIniziale,
 			sessione: this.sessione,
 			cartelleAvvio: this.cartelleAvvio,
+			cartelleProgetti: this.cartelleProgetti,
 			dimensioneCartelle: this.dimensioneCartelle,
 			confermaCestino: this.confermaCestino,
 			unClic: this.unClic,

@@ -13,7 +13,9 @@
 		bersaglio = null,
 		ramo = null,
 		chiusura = null,
-		onchiudi = undefined
+		onchiudi = undefined,
+		fermata = null,
+		onfermata = undefined
 	}: {
 		store: TabsStore;
 		/** La barra mostra il campo di testo invece delle stazioni. */
@@ -32,6 +34,9 @@
 		chiusura?: string | null;
 		/** Locks the open vault now. */
 		onchiudi?: () => void;
+		/** An extra last stop set by the page (disk cleanup), and how to leave it. */
+		fermata?: string | null;
+		onfermata?: () => void;
 	} = $props();
 
 	let titoloRamo = $derived(
@@ -49,7 +54,7 @@
 	let percorso = $derived(store.activeTab?.path ?? '');
 	// Duplicates and folder comparison are one more stop after their folder: clicking the folder goes back to it.
 	let fermataExtra = $derived(
-		store.activeTab?.duplicati
+		fermata ?? (store.activeTab?.duplicati
 			? 'Duplicati'
 			: store.activeTab?.confronto
 				? `Confronto con ${nomePosizione(store.activeTab.confronto.altro)}`
@@ -59,7 +64,7 @@
 					? `Etichetta ${store.activeTab.etichetta}`
 					: store.activeTab?.spazio
 						? 'Spazio'
-						: null
+						: null)
 	);
 	let stazioni = $derived(
 		fermataExtra ? [...briciole(percorso), { nome: fermataExtra, path: DUPLICATES_STOP }] : briciole(percorso)
@@ -104,7 +109,8 @@
 	function vaiA(path: string) {
 		if (id === null || path === DUPLICATES_STOP) return;
 		if (path === percorso) {
-			if (store.activeTab?.spazio) void store.impostaSpazio(id, false);
+			if (fermata) onfermata?.();
+			else if (store.activeTab?.spazio) void store.impostaSpazio(id, false);
 			else if (fermataExtra) void store.fermaRicerca(id);
 			return;
 		}

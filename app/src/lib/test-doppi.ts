@@ -16,6 +16,14 @@ export function backendFinto(over: Partial<Backend> = {}): Backend {
 			return 0;
 		},
 		async turnoDimensioni() {},
+		async cleanupRound() {},
+		async cleanupScan() {
+			return [];
+		},
+		async programsList() {
+			return [];
+		},
+		async programUninstall() {},
 		async navigate(path: string) {
 			return path;
 		},
