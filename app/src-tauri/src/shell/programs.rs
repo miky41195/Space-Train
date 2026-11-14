@@ -124,34 +124,68 @@ pub fn recycle_script(folders: &[String]) -> String {
 }
 
 /// Runs a PowerShell script with no window and waits for it; `admin` asks
-/// Windows for administrator rights first (the UAC prompt).
+/// Windows for administrator rights first (the UAC prompt), owned by the
+/// window `owner` so the prompt comes up in front instead of blinking in the taskbar.
 #[cfg(windows)]
-pub fn powershell(script: &str, admin: bool) -> Result<(), FsError> {
+pub fn powershell(script: &str, admin: bool, owner: isize) -> Result<(), FsError> {
     use base64::Engine;
     use std::os::windows::process::CommandExt;
     const NO_WINDOW: u32 = 0x0800_0000;
     let utf16: Vec<u8> = script.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
     let encoded = base64::engine::general_purpose::STANDARD.encode(utf16);
-    let mut command = std::process::Command::new("powershell");
-    command.args(["-NoProfile", "-NonInteractive"]).creation_flags(NO_WINDOW);
-    if admin {
-        command.args([
-            "-Command",
-            &format!(
-                "try {{ $p = Start-Process powershell -Verb RunAs -WindowStyle Hidden -Wait -PassThru -ArgumentList '-NoProfile','-NonInteractive','-EncodedCommand','{}'; exit $p.ExitCode }} catch {{ exit 1223 }}",
-                encoded
-            ),
-        ]);
+    let code = if admin {
+        elevated(&format!("-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand {}", encoded), owner)?
     } else {
-        command.args(["-EncodedCommand", &encoded]);
-    }
-    let status = command.status().map_err(|e| FsError::Io { message: e.to_string() })?;
-    match status.code() {
-        Some(0) => Ok(()),
-        // ERROR_CANCELLED: the UAC prompt was refused.
-        Some(1223) => Err(FsError::Io { message: "Serve il permesso di amministratore: richiesta annullata.".into() }),
+        std::process::Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-EncodedCommand", &encoded])
+            .creation_flags(NO_WINDOW)
+            .status()
+            .map_err(|e| FsError::Io { message: e.to_string() })?
+            .code()
+            .unwrap_or(1) as u32
+    };
+    match code {
+        0 => Ok(()),
         _ => Err(FsError::Io { message: "Non è stato possibile togliere tutto: qualche file è in uso o protetto.".into() }),
     }
+}
+
+/// Starts PowerShell as administrator and returns its exit code.
+#[cfg(windows)]
+fn elevated(parameters: &str, owner: isize) -> Result<u32, FsError> {
+    use windows::core::PCWSTR;
+    use windows::Win32::Foundation::{CloseHandle, HWND};
+    use windows::Win32::System::Threading::{GetExitCodeProcess, WaitForSingleObject, INFINITE};
+    use windows::Win32::UI::Shell::{ShellExecuteExW, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW};
+    use windows::Win32::UI::WindowsAndMessaging::SW_HIDE;
+    let wide = |s: &str| s.encode_utf16().chain(Some(0)).collect::<Vec<u16>>();
+    let (verb, file, params) = (wide("runas"), wide("powershell.exe"), wide(parameters));
+    let mut info = SHELLEXECUTEINFOW {
+        cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as u32,
+        fMask: SEE_MASK_NOCLOSEPROCESS,
+        hwnd: HWND(owner as *mut _),
+        lpVerb: PCWSTR(verb.as_ptr()),
+        lpFile: PCWSTR(file.as_ptr()),
+        lpParameters: PCWSTR(params.as_ptr()),
+        nShow: SW_HIDE.0,
+        ..Default::default()
+    };
+    if let Err(e) = unsafe { ShellExecuteExW(&mut info) } {
+        // ERROR_CANCELLED: «No» on the UAC prompt.
+        let message = if e.code() == windows::core::HRESULT::from_win32(1223) {
+            "Serve il permesso di amministratore: hai risposto «No» alla richiesta di Windows.".to_string()
+        } else {
+            format!("Avvio come amministratore non riuscito: {}", e.message())
+        };
+        return Err(FsError::Io { message });
+    }
+    let mut code = 1u32;
+    unsafe {
+        WaitForSingleObject(info.hProcess, INFINITE);
+        let _ = GetExitCodeProcess(info.hProcess, &mut code);
+        let _ = CloseHandle(info.hProcess);
+    }
+    Ok(code)
 }
 
 #[cfg(windows)]
@@ -292,7 +326,7 @@ mod windows_impl {
 
     /// For a broken program: its install folder to the Recycle Bin and its
     /// entry out of the list of installed programs.
-    pub fn remove_leftovers(id: &str) -> Result<(), FsError> {
+    pub fn remove_leftovers(id: &str, owner: isize) -> Result<(), FsError> {
         let (root, subkey) = parse_id(id).ok_or(FsError::NotFound)?;
         let k = key(id).ok_or(FsError::NotFound)?;
         let uninstaller: String = k.get_value("UninstallString").unwrap_or_default();
@@ -321,13 +355,13 @@ mod windows_impl {
             ps_quote(&format!(r"Registry::{}\{}\{}", hive, base, subkey))
         ));
         // The machine-wide list needs administrator rights, the user's own does not.
-        powershell(&script, root < 2)
+        powershell(&script, root < 2, owner)
     }
 
     /// Leftover folders found by disk cleanup to the Recycle Bin, as
     /// administrator. Each one is checked again here: directly below Program
     /// Files or ProgramData and belonging to no installed program.
-    pub fn recycle_leftovers(paths: &[String]) -> Result<(), FsError> {
+    pub fn recycle_leftovers(paths: &[String], owner: isize) -> Result<(), FsError> {
         let roots: Vec<String> = containers().into_iter().take(3).map(|r| norm(&r)).collect();
         let owners = owners();
         for p in paths {
@@ -338,7 +372,7 @@ mod windows_impl {
                 return Err(FsError::Io { message: format!("«{}» non è un resto di programma.", p) });
             }
         }
-        powershell(&recycle_script(paths), true)
+        powershell(&recycle_script(paths), true, owner)
     }
 
     /// Starts the official uninstaller of the program `id`.
@@ -386,12 +420,12 @@ pub fn uninstall(_id: &str) -> Result<(), FsError> {
 }
 
 #[cfg(not(windows))]
-pub fn remove_leftovers(_id: &str) -> Result<(), FsError> {
+pub fn remove_leftovers(_id: &str, _owner: isize) -> Result<(), FsError> {
     Err(FsError::NotFound)
 }
 
 #[cfg(not(windows))]
-pub fn recycle_leftovers(_paths: &[String]) -> Result<(), FsError> {
+pub fn recycle_leftovers(_paths: &[String], _owner: isize) -> Result<(), FsError> {
     Err(FsError::NotFound)
 }
 

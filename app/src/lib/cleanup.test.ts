@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { shortPath, age, plan, preselection } from './cleanup';
+import { shortPath, age, lastUse, plan, preselection } from './cleanup';
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = 1_000 * DAY;
@@ -7,8 +7,8 @@ const NOW = 1_000 * DAY;
 describe('cleanup', () => {
 	it('never preselects what needs a look, nor projects used this week', () => {
 		const items = [
-			{ path: 'a', size: 1, used: NOW - DAY },
-			{ path: 'b', size: 1, used: NOW - 30 * DAY }
+			{ path: 'a', size: 1, used: NOW - DAY, opened: 0 },
+			{ path: 'b', size: 1, used: NOW - 30 * DAY, opened: 0 }
 		];
 		expect(preselection('review', items, NOW)).toEqual([]);
 		expect(preselection('projects', items, NOW)).toEqual(['b']);
@@ -18,12 +18,12 @@ describe('cleanup', () => {
 	it('splits the plan: rebuilt for good, to look at into the Trash', () => {
 		const p = plan(
 			{
-				cache: [{ path: 'c', size: 10, used: 0 }],
+				cache: [{ path: 'c', size: 10, used: 0, opened: 0 }],
 				models: [
-					{ path: 'm', size: 100, used: 0 },
-					{ path: 'n', size: 5, used: 0 }
+					{ path: 'm', size: 100, used: 0, opened: 0 },
+					{ path: 'n', size: 5, used: 0, opened: 0 }
 				],
-				trash: [{ path: 't', size: 1, used: 0 }]
+				trash: [{ path: 't', size: 1, used: 0, opened: 0 }]
 			},
 			{ cache: ['c'], models: ['m'], trash: ['t'] }
 		);
@@ -31,12 +31,18 @@ describe('cleanup', () => {
 	});
 
 	it('program leftovers go to the Trash as administrator, never ticked by default', () => {
-		const items = [{ path: 'C:\\Program Files\\Old', size: 50, used: 0 }];
+		const items = [{ path: 'C:\\Program Files\\Old', size: 50, used: 0, opened: 0 }];
 		expect(preselection('review', items, NOW)).toEqual([]);
 		const p = plan({ leftovers: items }, { leftovers: ['C:\\Program Files\\Old'] });
 		expect(p.asAdmin).toEqual(['C:\\Program Files\\Old']);
 		expect(p.trash).toEqual([]);
 		expect(p.bytes).toBe(50);
+	});
+
+	it('shows the last access only when newer than the last change', () => {
+		expect(lastUse(NOW - 570 * DAY, NOW - 4 * DAY, NOW)).toBe('ultimo accesso 4 giorni fa · ultima modifica 19 mesi fa');
+		expect(lastUse(NOW - DAY, NOW - 9 * DAY, NOW)).toBe('ultima modifica ieri');
+		expect(lastUse(0, 0, NOW)).toBe('');
 	});
 
 	it('says ages in words', () => {

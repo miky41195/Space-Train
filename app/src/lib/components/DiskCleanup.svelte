@@ -2,7 +2,7 @@
 	import { onDestroy, untrack } from 'svelte';
 	import { tauriBackend, type CleanupCategory, type Program, type CleanupCandidate } from '../ipc';
 	import { formatBytes } from '../locations';
-	import { CATEGORIES, KIND_LABELS, shortPath, age, plan, preselection, type Plan } from '../cleanup';
+	import { CATEGORIES, KIND_LABELS, shortPath, lastUse, plan, preselection, type Plan } from '../cleanup';
 
 	let {
 		drive,
@@ -215,7 +215,7 @@
 						<input type="checkbox" checked={chosen[c.id]?.includes(v.path)} onchange={() => toggleItem(c.id, v.path)} />
 						<div class="text">
 							<div class="name ellipsis" title={v.path}>{c.id === 'projects' ? shortPath(v.path, roots) : v.path}</div>
-							{#if v.used > 0}<div class="detail">usata {age(v.used, Date.now())}</div>{/if}
+							{#if v.used > 0 || v.opened > 0}<div class="detail">{lastUse(v.used, v.opened, Date.now())}</div>{/if}
 						</div>
 						<span class="weight">{formatBytes(v.size)}</span>
 					</label>

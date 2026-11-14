@@ -14,6 +14,13 @@ export interface WhatsNew {
 
 export const WHATS_NEW: WhatsNew[] = [
 	{
+		version: '0.10.2',
+		items: [
+			'Pulizia disco: togliendo i «Resti di programmi» la richiesta di amministratore di Windows compare subito in primo piano, invece di restare nascosta e annullarsi. Se qualcosa non va, il messaggio dice il motivo vero.',
+			'Pulizia disco: ogni elemento mostra l’ultimo accesso (l’ultima volta che un programma l’ha aperto) oltre all’ultima modifica. I resti di programmi aperti nell’ultimo mese non vengono più proposti.'
+		]
+	},
+	{
 		version: '0.10.1',
 		items: [
 			'Aggiornamenti dentro l’app: lo scaricamento si vede in una barra in alto, e l’installazione non apre più la finestra dell’installer. Space Train si chiude e si riapre da solo già aggiornato (da questo aggiornamento in poi).',

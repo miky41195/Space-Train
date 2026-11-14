@@ -26,6 +26,9 @@ pub struct Measure {
     pub bytes: u64,
     /// Newest modification of the folder itself or any file in it, in ms.
     pub recent: u64,
+    /// Newest access to any file in it, in ms. Folders do not count: reading
+    /// them to measure would update their own access time.
+    pub opened: u64,
 }
 
 pub fn ms(t: std::io::Result<std::time::SystemTime>) -> u64 {
@@ -36,7 +39,7 @@ pub fn ms(t: std::io::Result<std::time::SystemTime>) -> u64 {
 
 /// Walks the tree under `folder`; `None` as soon as `stopped` says stop.
 pub fn measure(folder: &Path, stopped: &dyn Fn() -> bool) -> Option<Measure> {
-    let mut total = Measure { bytes: 0, recent: 0 };
+    let mut total = Measure { bytes: 0, recent: 0, opened: 0 };
     if let Ok(md) = std::fs::metadata(folder) {
         total.recent = ms(md.modified());
     }
@@ -62,6 +65,7 @@ pub fn measure(folder: &Path, stopped: &dyn Fn() -> bool) -> Option<Measure> {
             } else if let Ok(m) = item.metadata() {
                 total.bytes = total.bytes.saturating_add(m.len());
                 total.recent = total.recent.max(ms(m.modified()));
+                total.opened = total.opened.max(ms(m.accessed()));
             }
         }
     }

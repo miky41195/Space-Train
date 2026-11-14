@@ -83,6 +83,18 @@ export function age(used: number, now: number): string {
 	return `${Math.floor(days / 365)} anni`;
 }
 
+/** «ultimo accesso ieri · ultima modifica 3 mesi fa»; the access only when newer than the change. */
+export function lastUse(used: number, opened: number, now: number): string {
+	const ago = (t: number) => {
+		const a = age(t, now);
+		return a === 'oggi' || a === 'ieri' ? a : `${a} fa`;
+	};
+	const parts: string[] = [];
+	if (opened > used) parts.push(`ultimo accesso ${ago(opened)}`);
+	if (used > 0) parts.push(`ultima modifica ${ago(used)}`);
+	return parts.join(' · ');
+}
+
 /** The path below the folder it was found in, for a short row. */
 export function shortPath(path: string, roots: string[]): string {
 	const p = path.toLowerCase();

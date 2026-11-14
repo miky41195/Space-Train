@@ -204,14 +204,27 @@ pub fn terminal_close(id: u32) {
 
 /// A broken program: install folder to the Recycle Bin, entry out of the list.
 #[tauri::command]
-pub async fn program_remove_leftovers(id: String) -> Result<(), FsError> {
-    off_window(move || crate::shell::programs::remove_leftovers(&id)).await
+pub async fn program_remove_leftovers(window: tauri::WebviewWindow, id: String) -> Result<(), FsError> {
+    let owner = owner_of(&window);
+    off_window(move || crate::shell::programs::remove_leftovers(&id, owner)).await
 }
 
 /// Leftovers of uninstalled programs to the Recycle Bin, as administrator.
 #[tauri::command]
-pub async fn cleanup_recycle_leftovers(paths: Vec<String>) -> Result<(), FsError> {
-    off_window(move || crate::shell::programs::recycle_leftovers(&paths)).await
+pub async fn cleanup_recycle_leftovers(window: tauri::WebviewWindow, paths: Vec<String>) -> Result<(), FsError> {
+    let owner = owner_of(&window);
+    off_window(move || crate::shell::programs::recycle_leftovers(&paths, owner)).await
+}
+
+/// The native handle of `window`, owner of the UAC prompt (0 = none).
+fn owner_of(window: &tauri::WebviewWindow) -> isize {
+    #[cfg(windows)]
+    return window.hwnd().map(|h| h.0 as isize).unwrap_or(0);
+    #[cfg(not(windows))]
+    {
+        let _ = window;
+        0
+    }
 }
 
 #[tauri::command]

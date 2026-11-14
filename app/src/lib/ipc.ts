@@ -613,11 +613,12 @@ export const tauriBackend: Backend = {
 };
 
 export type CleanupCategory = 'temp' | 'cache' | 'projects' | 'models' | 'download' | 'trash' | 'leftovers';
-/** Something disk cleanup found: size and last use (ms). */
+/** Something disk cleanup found: size, last change and last access (ms, 0 = unknown). */
 export interface CleanupCandidate {
 	path: string;
 	size: number;
 	used: number;
+	opened: number;
 }
 /** A text file opened for quick editing: `
 ` line endings in `text`, the file's own kept apart. */

@@ -24,8 +24,11 @@ pub fn new_round(round: u64) {
 pub struct Candidate {
     pub path: String,
     pub size: u64,
-    /// Last time it was used (newest change inside), in ms.
+    /// Last change (newest modification inside), in ms.
     pub used: u64,
+    /// Last access (newest read of a file inside, by any program), in ms;
+    /// 0 when unknown.
+    pub opened: u64,
 }
 
 #[derive(Deserialize, Debug, Clone, Copy, PartialEq)]
@@ -151,7 +154,7 @@ pub fn scan(cat: Category, drive: &str, projects: &[String], round: u64) -> Opti
         Category::Trash => crate::fs::trash::list()
             .unwrap_or_default()
             .into_iter()
-            .map(|e| Candidate { path: e.path, size: e.size, used: e.modified.unwrap_or(0).max(0) as u64 })
+            .map(|e| Candidate { path: e.path, size: e.size, used: e.modified.unwrap_or(0).max(0) as u64, opened: 0 })
             .collect(),
         Category::Download => old_downloads(now),
         _ => {
@@ -182,8 +185,8 @@ pub fn scan(cat: Category, drive: &str, projects: &[String], round: u64) -> Opti
                 if cat == Category::Temp && t.used + DAY_MS > now {
                     continue;
                 }
-                // Something wrote there this month: a program is still using it.
-                if cat == Category::Leftovers && t.used + 30 * DAY_MS > now {
+                // Something wrote or read there this month: a program is still using it.
+                if cat == Category::Leftovers && t.used.max(t.opened) + 30 * DAY_MS > now {
                     continue;
                 }
                 out.push(t);
@@ -211,13 +214,13 @@ fn weigh(p: &Path, stopped: &dyn Fn() -> bool) -> Option<Option<Candidate>> {
     };
     let path = p.to_string_lossy().into_owned();
     if md.is_file() {
-        return Some(Some(Candidate { path, size: md.len(), used: ms(md.modified()) }));
+        return Some(Some(Candidate { path, size: md.len(), used: ms(md.modified()), opened: ms(md.accessed()) }));
     }
     if !md.is_dir() {
         return Some(None);
     }
     let m = measure(p, stopped)?;
-    Some(Some(Candidate { path, size: m.bytes, used: m.recent }))
+    Some(Some(Candidate { path, size: m.bytes, used: m.recent, opened: m.opened }))
 }
 
 fn on_drive(p: &Path, drive: &str) -> bool {
@@ -254,8 +257,9 @@ fn old_downloads(now: u64) -> Vec<Candidate> {
                 return None;
             }
             let md = std::fs::metadata(&p).ok().filter(|m| m.is_file())?;
-            let used = ms(md.modified()).max(ms(md.accessed()));
-            (used + OLD_MS < now).then(|| Candidate { path: p.to_string_lossy().into_owned(), size: md.len(), used })
+            let (used, opened) = (ms(md.modified()), ms(md.accessed()));
+            (used.max(opened) + OLD_MS < now)
+                .then(|| Candidate { path: p.to_string_lossy().into_owned(), size: md.len(), used, opened })
         })
         .collect()
 }
