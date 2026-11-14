@@ -18,6 +18,13 @@ describe('Intro', () => {
 		expect(onend).toHaveBeenCalledTimes(1);
 	});
 
+	it('only the train moves: the curtain never gets the moving element class', () => {
+		const { container } = render(Intro, { props: { onend: () => {}, kind: 'train' } });
+
+		expect(container.querySelectorAll('.vehicle')).toHaveLength(1);
+		expect(container.querySelector('.curtain.vehicle')).toBeNull();
+	});
+
 	it('a key skips it at once', () => {
 		const onend = vi.fn();
 		render(Intro, { props: { onend } });
@@ -66,7 +73,7 @@ describe('Intro chosen by the theme', () => {
 	it('«Pioggia di stelle» draws stars and no train', () => {
 		const { container } = render(Intro, { props: { onend: vi.fn(), kind: 'stars' } });
 		expect(container.querySelectorAll('.star').length).toBeGreaterThan(10);
-		expect(container.querySelector('.train')).toBeNull();
+		expect(container.querySelector('.vehicle')).toBeNull();
 	});
 
 	it('«Personalizzata» shows the chosen image and lasts the chosen time', () => {
@@ -75,7 +82,7 @@ describe('Intro chosen by the theme', () => {
 		const { container } = render(Intro, {
 			props: { onend, kind: 'custom', figure: { kind: 'image', src: 'asset://cat.png' }, motion: 'center', duration: 2.5 }
 		});
-		expect(container.querySelector('.train.center img')?.getAttribute('src')).toBe('asset://cat.png');
+		expect(container.querySelector('.vehicle.center img')?.getAttribute('src')).toBe('asset://cat.png');
 		vi.advanceTimersByTime(2400);
 		expect(onend).not.toHaveBeenCalled();
 		vi.advanceTimersByTime(200);

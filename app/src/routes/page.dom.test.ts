@@ -2727,6 +2727,28 @@ describe('what is new after an update', () => {
 		await waitFor(() => expect(localStorage.getItem('space-train.versione-vista')).toBe('0.2.2'));
 		expect(screen.queryByRole('dialog', { name: 'Novità di Space Train' })).toBeNull();
 	});
+
+	it('to whoever installs the app for the first time it offers the welcome guide, once and skippable', async () => {
+		disk.appVersion = '0.2.2';
+		const { unmount } = await mount();
+		const guide = await screen.findByRole('dialog', { name: 'Benvenuto in Space Train' });
+		await fireEvent.click(within(guide).getByRole('button', { name: 'Salta' }));
+		await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Benvenuto in Space Train' })).toBeNull());
+
+		unmount();
+		localStorage.removeItem('space-train.versione-vista');
+		await mount();
+		await new Promise((r) => setTimeout(r, 20));
+		expect(screen.queryByRole('dialog', { name: 'Benvenuto in Space Train' })).toBeNull();
+	});
+
+	it('who already used the app does not get the guide after an update', async () => {
+		disk.appVersion = '0.2.2';
+		localStorage.setItem('space-train.versione-vista', '0.2.1');
+		await mount();
+		await screen.findByRole('dialog', { name: 'Novità di Space Train' });
+		expect(screen.queryByRole('dialog', { name: 'Benvenuto in Space Train' })).toBeNull();
+	});
 });
 
 // ── PCs added by address ─────────────────────────────────────────────

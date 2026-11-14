@@ -5,7 +5,8 @@ import {
 	sortItems,
 	newItems,
 	quickAccessItems,
-	placeMenu
+	placeMenu,
+	isEditableText
 } from './menu';
 import type { Entry } from './ipc';
 
@@ -37,6 +38,7 @@ describe('menuItems', () => {
 			'space',
 			'rules',
 			'terminal',
+			'integratedTerminal',
 			'moreOptions',
 			'properties'
 		]);
@@ -358,5 +360,22 @@ describe('Quick access in the menu', () => {
 		expect(act(quickAccessItems(true, false))).not.toContain('quickAccessUp');
 		expect(act(quickAccessItems(false, true))).not.toContain('quickAccessDown');
 		expect(act(quickAccessItems(true, true))).toEqual(['openNewTab', 'openNewWindow', 'unpin']);
+	});
+});
+
+describe('quick text editing', () => {
+	const file = (name: string, path = 'C:\\Dati\\' + name, size = 100) => ({ name, path, size, kind: 'file' as const });
+
+	it('offers «Modifica» for text files on a disk, not for programs, documents or virtual places', () => {
+		expect(isEditableText(file('note.txt'))).toBe(true);
+		expect(isEditableText(file('config.json'))).toBe(true);
+		expect(isEditableText(file('.gitignore'))).toBe(true);
+		expect(isEditableText(file('a.md', '\\\\server\\share\\a.md'))).toBe(true);
+		expect(isEditableText(file('setup.exe'))).toBe(false);
+		expect(isEditableText(file('lettera.rtf'))).toBe(false);
+		expect(isEditableText(file('grande', 'C:\\Dati\\grande', 5_000_000))).toBe(false);
+		expect(isEditableText(file('a.txt', 'C:\\Dati\\x.zip::a.txt'))).toBe(false);
+		expect(isEditableText(file('a.txt', 'sftp://casa/a.txt'))).toBe(false);
+		expect(isEditableText({ ...file('cartella'), kind: 'dir' })).toBe(false);
 	});
 });

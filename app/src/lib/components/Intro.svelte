@@ -73,11 +73,11 @@
 	{/if}
 
 	{#if kind === 'train' || (kind === 'custom' && !figure)}
-		<div class="train {kind === 'custom' ? motion : ''}">
+		<div class="vehicle {kind === 'custom' ? motion : ''}">
 			<TrainSvg scale={3} />
 		</div>
 	{:else if kind === 'custom' && figure}
-		<div class="train {motion}">
+		<div class="vehicle {motion}">
 			{#if figure.kind === 'image'}
 				<img src={figure.src} alt="" draggable="false" />
 			{:else if figure.kind === 'sprite'}
@@ -168,7 +168,7 @@
 		}
 	}
 
-	.train {
+	.vehicle {
 		position: absolute;
 		top: 50%;
 		left: 0;
@@ -207,15 +207,15 @@
 	}
 
 	/* Personalizzata: the chosen figure, big, with its movement. */
-	.train img {
+	.vehicle img {
 		height: 90px;
 		width: auto;
 	}
-	.train .figure :global(svg) {
+	.vehicle .figure :global(svg) {
 		height: 90px;
 		width: auto;
 	}
-	.train .sprite {
+	.vehicle .sprite {
 		display: block;
 		background-repeat: no-repeat;
 		transform: scale(3);
@@ -231,17 +231,17 @@
 			background-position: var(--end) var(--y);
 		}
 	}
-	.train.cross,
-	.train.enter,
-	.train.center {
+	.vehicle.cross,
+	.vehicle.enter,
+	.vehicle.center {
 		margin-top: -64px;
 		animation-duration: calc(var(--duration) * 0.85);
 		animation-delay: 0s;
 	}
-	.train.enter {
+	.vehicle.enter {
 		animation-name: enter;
 	}
-	.train.center {
+	.vehicle.center {
 		left: 50%;
 		animation-name: appear;
 	}

@@ -14,6 +14,16 @@ export interface WhatsNew {
 
 export const WHATS_NEW: WhatsNew[] = [
 	{
+		version: '0.10.0',
+		items: [
+			'Modifica veloce dei testi: clic destro su un file di testo (txt, md, json, codice, configurazioni…) e «Modifica» lo apre in un editor. Ctrl+S salva mantenendo gli a capo del file; se nel frattempo un altro programma l’ha cambiato, Space Train chiede prima di sovrascrivere. Chiudendo con modifiche non salvate chiede cosa fare.',
+			'Terminale integrato: Ctrl+Maiusc+T (o «Apri nel terminale integrato» dal menu di una cartella) apre un terminale sotto la lista, già nella cartella in cui sei. Si allunga trascinando il bordo in alto; «Vai alla cartella aperta» lo porta dove sei arrivato.',
+			'Guida di benvenuto: alla prima apertura dopo l’installazione, poche schermate mostrano le cose principali. Si salta con un clic o con Esc, e si ritrova nella palette.',
+			'Pulizia disco: la nuova categoria «Resti di programmi» trova le cartelle in Programmi e ProgramData lasciate da programmi non più installati. Un programma rimosso a metà, il cui programma di disinstallazione non esiste più, compare come «già rimosso» con «Togli i resti». Tutto va nel Cestino, e Windows chiede il permesso di amministratore.',
+			'Corretta l’animazione all’avvio del treno, che muoveva tutto lo schermo invece del solo treno.'
+		]
+	},
+	{
 		version: '0.9.0',
 		items: [
 			'Pulizia disco: dal menu di un disco in Questo PC (o dalla palette) si vede cosa occupa spazio e si può togliere: file temporanei, cache dei programmi, cartelle di compilazione dei progetti, modelli di IA scaricati, vecchi download e Cestino. Ciò che si ricrea da solo si elimina, ciò che va guardato finisce nel Cestino e non è mai spuntato in partenza. In fondo, i programmi più grandi con il pulsante «Disinstalla».',

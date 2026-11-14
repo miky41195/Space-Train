@@ -24,6 +24,20 @@ export function fakeBackend(over: Partial<Backend> = {}): Backend {
 			return [];
 		},
 		async programUninstall() {},
+		async programRemoveLeftovers() {},
+		async cleanupRecycleLeftovers() {},
+		async textRead() {
+			return { text: '', crlf: false, bom: false, modified: 0 };
+		},
+		async textWrite() {
+			return 0;
+		},
+		async terminalOpen() {
+			return 1;
+		},
+		async terminalWrite() {},
+		async terminalResize() {},
+		async terminalClose() {},
 		async navigate(path: string) {
 			return path;
 		},

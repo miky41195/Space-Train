@@ -34,6 +34,7 @@ export type KeyAction =
 	| 'copyToOtherPane'
 	| 'moveToOtherPane'
 	| 'palette'
+	| 'toggleTerminal'
 	| { tab: number }
 	/** Ctrl+Shift+1…8: Explorer's eight views, from the largest icons. */
 	| { view: number };
@@ -62,6 +63,7 @@ export function keyAction(e: KeyInput): KeyAction | null {
 		if (shift && k === 'c') return 'copyToOtherPane';
 		if (shift && k === 'x') return 'moveToOtherPane';
 		if (shift && k === 'p') return 'palette';
+		if (shift && k === 't') return 'toggleTerminal';
 		const digit = /^Digit([1-8])$/.exec(e.code ?? '');
 		if (shift && digit) return { view: Number(digit[1]) - 1 };
 		if (shift) return null;
@@ -198,7 +200,8 @@ export const SHORTCUT_GROUPS: { name: string; items: ShortcutItem[] }[] = [
 			{ label: 'Scheda successiva', keys: ['Ctrl+Tab', 'Ctrl+PagGiù'], action: 'nextTab' },
 			{ label: 'Scheda precedente', keys: ['Ctrl+Maiusc+Tab', 'Ctrl+PagSu'], action: 'previousTab' },
 			{ label: 'Vai alla scheda 1–9', keys: ['Ctrl+1…9'] },
-			{ label: 'Nuova finestra', keys: ['Ctrl+N'], action: 'newWindow' }
+			{ label: 'Nuova finestra', keys: ['Ctrl+N'], action: 'newWindow' },
+			{ label: 'Apri o chiudi il terminale integrato', keys: ['Ctrl+Maiusc+T'], action: 'toggleTerminal' }
 		]
 	},
 	{

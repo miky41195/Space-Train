@@ -81,6 +81,10 @@
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import FileGrid from '$lib/components/FileGrid.svelte';
 	import Intro from '$lib/components/Intro.svelte';
+	import TextEditor from '$lib/components/TextEditor.svelte';
+	import TerminalPanel from '$lib/components/TerminalPanel.svelte';
+	import Welcome from '$lib/components/Welcome.svelte';
+	import { WELCOME_KEY } from '$lib/welcome';
 	import { reducedMotion } from '$lib/reduced-motion';
 	import { animateFolder, animationsOf } from '$lib/animations';
 	import { appearanceOf } from '$lib/appearance';
@@ -330,6 +334,7 @@
 		out.push({ kind: 'action', name: 'Pulizia disco', detail: drive, run: () => void openCleanup(drive) });
 		out.push({ kind: 'action', name: 'Impostazioni', run: () => (settingsOpen = true) });
 		out.push({ kind: 'action', name: 'Editor dei temi', run: () => void openEditor() });
+		out.push({ kind: 'action', name: 'Guida di benvenuto', run: () => (welcomeOpen = true) });
 		const go = (path: string) => () => store.activeId !== null && void store.navigate(store.activeId, path);
 		for (const p of quickAccess.folders) out.push({ kind: 'folder', name: nameOf(p), detail: p, run: go(p) });
 		for (const f of knownFolders) out.push({ kind: 'folder', name: f.label, detail: f.path, run: go(f.path) });
@@ -864,6 +869,16 @@
 		if (store.activeTab) fileComparison = { a: x, b: y, folder: store.activeTab.path };
 	}
 
+	// ── Quick text editing, integrated terminal ──────────────────────
+	/** The text file open in the editor, over the app. */
+	let editing = $state<{ path: string; name: string } | null>(null);
+	/** Where the integrated terminal was opened; null = closed. */
+	let terminalAt = $state<string | null>(null);
+	function toggleTerminal(at?: string) {
+		if (terminalAt !== null && at === undefined) terminalAt = null;
+		else terminalAt = at ?? (store.activeTab && location === 'normal' ? store.activeTab.path : '');
+	}
+
 	async function openCleanup(drive: string) {
 		const id = store.activeId;
 		if (id === null) return;
@@ -955,6 +970,7 @@
 		}
 		if (p.emptyTrash) failures.push(...(await deleteWithBar('emptyTrash', [])).failed);
 		reportFailed({ done: [], failed: failures });
+		if (p.asAdmin.length > 0) await tauriBackend.cleanupRecycleLeftovers(p.asAdmin).catch((e) => (opError = describeError(e)));
 		drivesRefresh++;
 		const after = await freeOn(drive);
 		if (before !== null && after !== null) notify(`Liberati ${formatBytes(Math.max(0, after - before))} su ${locationName(drive)}.`);
@@ -2320,7 +2336,7 @@
 
 		// With a modal dialog open or a field being edited, the list
 		// shortcuts must not fire.
-		if (toTrash.length > 0 || toDelete || renaming !== null || conflicts.length > 0 || batchRename.length > 0 || checksumOf || paletteOpen) return;
+		if (toTrash.length > 0 || toDelete || renaming !== null || conflicts.length > 0 || batchRename.length > 0 || checksumOf || paletteOpen || editing || welcomeOpen) return;
 
 		// Inside a text field the keys are for typing. From the search field
 		// only those that move the selection or close it get through.
@@ -2472,6 +2488,8 @@
 				return toggleSplit();
 			case 'palette':
 				return openPalette();
+			case 'toggleTerminal':
+				return toggleTerminal();
 			case 'otherPane': {
 				const other = otherPane(split, id);
 				if (other !== null) store.setActive(other);
@@ -2529,6 +2547,16 @@
 	 * request.
 	 */
 	let whatsNewFromMegaphone = $state(false);
+	/** The welcome guide: once, at the first start after a fresh install. */
+	let welcomeOpen = $state(false);
+	function closeWelcome() {
+		welcomeOpen = false;
+		try {
+			localStorage.setItem(WELCOME_KEY, '1');
+		} catch {
+			// Storage denied: it may show again, never mind.
+		}
+	}
 	function reopenWhatsNew() {
 		const i = Math.max(0, WHATS_NEW.findIndex((n) => n.version === currentVersion));
 		whatsNewFromMegaphone = true;
@@ -2569,9 +2597,10 @@
 					}
 					const from = whatsNewToShow(view, v, alreadyUsed);
 					if (from.length > 0) whatsNewOpen = from;
-					// At the first install there is nothing to tell: the
-					// version is remembered and that is all.
+					// At the first install there is nothing new to tell: the
+					// version is remembered, and the welcome guide shows instead.
 					else if (view !== v) localStorage.setItem(VERSION_KEY, v);
+					if (view === null && !alreadyUsed && localStorage.getItem(WELCOME_KEY) === null) welcomeOpen = true;
 				})
 				.catch(() => {});
 		});
@@ -3300,6 +3329,14 @@
 					if (folder) await tauriBackend.openTerminal(folder);
 					break;
 				}
+				case 'integratedTerminal': {
+					const folder = menuFolder(choices);
+					if (folder) toggleTerminal(folder);
+					break;
+				}
+				case 'edit':
+					if (choices[0]) editing = { path: choices[0].path, name: choices[0].name };
+					break;
 				case 'startupFolder': {
 					const folder = menuFolder(choices);
 					if (!folder) break;
@@ -3493,6 +3530,8 @@
 				return err.changed ? 'La chiave del server è cambiata: Space Train non si collega.' : 'Conferma la chiave del server per collegarti.';
 			case 'serverPassword':
 				return 'Il server chiede la password.';
+			case 'changed':
+				return 'Il file è cambiato su disco nel frattempo.';
 			default:
 				return '';
 		}
@@ -3896,6 +3935,15 @@
 					/>
 				{/if}
 			</div>
+			{#if terminalAt !== null}
+				{#key terminalAt}
+					<TerminalPanel
+						cwd={terminalAt}
+						folder={store.activeTab && location === 'normal' ? store.activeTab.path : null}
+						onclose={() => (terminalAt = null)}
+					/>
+				{/key}
+			{/if}
 		</main>
 	</div>
 
@@ -4058,6 +4106,20 @@
 			onclose={() => (friendsOpen = false)}
 			onerror={(e) => (opError = describeError(e))}
 		/>
+	{/if}
+
+	{#if editing}
+		<TextEditor
+			path={editing.path}
+			name={editing.name}
+			onclose={() => (editing = null)}
+			onsaved={() => void reload()}
+			{describeError}
+		/>
+	{/if}
+
+	{#if welcomeOpen}
+		<Welcome onclose={closeWelcome} />
 	{/if}
 
 	{#if whatsNewOpen.length > 0}

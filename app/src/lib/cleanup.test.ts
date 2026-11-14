@@ -27,7 +27,16 @@ describe('cleanup', () => {
 			},
 			{ cache: ['c'], models: ['m'], trash: ['t'] }
 		);
-		expect(p).toEqual({ permanent: ['c'], trash: ['m'], emptyTrash: true, bytes: 111 });
+		expect(p).toEqual({ permanent: ['c'], trash: ['m'], asAdmin: [], emptyTrash: true, bytes: 111 });
+	});
+
+	it('program leftovers go to the Trash as administrator, never ticked by default', () => {
+		const items = [{ path: 'C:\\Program Files\\Old', size: 50, used: 0 }];
+		expect(preselection('review', items, NOW)).toEqual([]);
+		const p = plan({ leftovers: items }, { leftovers: ['C:\\Program Files\\Old'] });
+		expect(p.asAdmin).toEqual(['C:\\Program Files\\Old']);
+		expect(p.trash).toEqual([]);
+		expect(p.bytes).toBe(50);
 	});
 
 	it('says ages in words', () => {

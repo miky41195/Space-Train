@@ -20,3 +20,4 @@ pub mod pause;
 pub mod origin;
 pub mod cleanup;
 pub mod sort;
+pub mod text_file;

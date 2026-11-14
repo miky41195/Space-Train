@@ -37,6 +37,63 @@ pub enum Category {
     Models,
     Download,
     Trash,
+    Leftovers,
+}
+
+/// Folders in Program Files and ProgramData that are Windows' own or shared
+/// by many programs: never leftovers, even with no program carrying the name.
+const SHARED: &[&str] = &[
+    "common files", "microsoft", "microsoft.net", "internet explorer", "reference assemblies", "msbuild",
+    "dotnet", "packagemanagement", "uninstall information", "package cache", "packages", "ssh", "usoprivate",
+    "usoshared", "softwaredistribution", "comms", "application data", "desktop", "documents", "start menu",
+    "templates", "favorites", "modifiablewindowsapps", "windowsapps", "regid.1991-06.com.microsoft", "space train",
+];
+
+/// Folders of programs no longer installed, below Program Files and
+/// ProgramData. A leftover below 1 MB is not worth a look.
+#[cfg(windows)]
+fn leftover_folders() -> Vec<PathBuf> {
+    let mut owners = crate::shell::programs::owners();
+    // Games and programs installed by a launcher are often missing from the
+    // registry but have a Start menu shortcut: its name counts as installed.
+    let start_menus = ["ProgramData", "APPDATA"]
+        .iter()
+        .filter_map(|v| std::env::var(v).ok())
+        .map(|b| Path::new(&b).join(r"Microsoft\Windows\Start Menu\Programs"));
+    for menu in start_menus {
+        let mut to_read = vec![menu];
+        while let Some(dir) = to_read.pop() {
+            for p in children(&dir) {
+                let name = p.file_stem().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                if p.is_dir() {
+                    to_read.push(p);
+                } else if !p.extension().is_some_and(|e| e.eq_ignore_ascii_case("lnk")) {
+                    continue;
+                }
+                owners.push(crate::shell::programs::Owner { name, ..Default::default() });
+            }
+        }
+    }
+    crate::shell::programs::containers()
+        .iter()
+        .take(3)
+        .flat_map(|root| children(Path::new(root)))
+        .filter(|p| {
+            let Some(name) = p.file_name().map(|n| n.to_string_lossy().into_owned()) else {
+                return false;
+            };
+            let lower = name.to_lowercase();
+            // Junctions like «Application Data» are not folders of their own.
+            std::fs::symlink_metadata(p).is_ok_and(|m| m.is_dir())
+                && !SHARED.contains(&lower.as_str())
+                && !lower.starts_with("windows")
+                && !crate::shell::programs::owned(&name, &p.to_string_lossy(), &owners)
+        })
+        .collect()
+}
+#[cfg(not(windows))]
+fn leftover_folders() -> Vec<PathBuf> {
+    Vec::new()
 }
 
 const DAY_MS: u64 = 24 * 60 * 60 * 1000;
@@ -102,6 +159,7 @@ pub fn scan(cat: Category, drive: &str, projects: &[String], round: u64) -> Opti
                 Category::Temp => children(&std::env::temp_dir()),
                 Category::Cache => home.iter().flat_map(|c| CACHE.iter().map(move |r| c.join(r))).collect(),
                 Category::Models => home.as_deref().map(models).unwrap_or_default(),
+                Category::Leftovers => leftover_folders(),
                 _ => {
                     let mut all = Vec::new();
                     for root in projects {
@@ -124,6 +182,10 @@ pub fn scan(cat: Category, drive: &str, projects: &[String], round: u64) -> Opti
                 if cat == Category::Temp && t.used + DAY_MS > now {
                     continue;
                 }
+                // Something wrote there this month: a program is still using it.
+                if cat == Category::Leftovers && t.used + 30 * DAY_MS > now {
+                    continue;
+                }
                 out.push(t);
             }
             out
@@ -132,7 +194,11 @@ pub fn scan(cat: Category, drive: &str, projects: &[String], round: u64) -> Opti
     if stopped() {
         return None;
     }
-    found.retain(|t| t.size > 0 && (cat == Category::Trash || on_drive(Path::new(&t.path), drive)));
+    found.retain(|t| {
+        t.size > 0
+            && (cat != Category::Leftovers || t.size >= 1_000_000)
+            && (cat == Category::Trash || on_drive(Path::new(&t.path), drive))
+    });
     found.sort_by(|a, b| b.size.cmp(&a.size));
     Some(found)
 }
@@ -286,18 +352,19 @@ mod test {
 fn real_disk() {
     let home = crate::fs::paths::home().unwrap();
     let projects = [format!(r"{}\Desktop\Progetti", home)];
-    for cat in [Category::Temp, Category::Cache, Category::Projects, Category::Models, Category::Download, Category::Trash] {
+    for cat in [Category::Temp, Category::Cache, Category::Projects, Category::Models, Category::Download, Category::Trash, Category::Leftovers] {
         let t = std::time::Instant::now();
         let v = scan(cat, "C:\\", &projects, 0).unwrap();
         let total_size: u64 = v.iter().map(|x| x.size).sum();
         println!("{:?}: {} items, {} MB, {:?}", cat, v.len(), total_size / 1_000_000, t.elapsed());
-        for x in v.iter().take(5) {
-            println!("    {} {} MB", x.path, x.size / 1_000_000);
+        let now = ms(Ok(std::time::SystemTime::now()));
+        for x in v.iter().take(if cat == Category::Leftovers { 30 } else { 5 }) {
+            println!("    {} {} MB, used {} days ago", x.path, x.size / 1_000_000, now.saturating_sub(x.used) / DAY_MS);
         }
     }
     let t = std::time::Instant::now();
     for p in crate::shell::programs::list("C:\\", 12) {
-        println!("  {} — {} MB", p.name, p.size / 1_000_000);
+        println!("  {} — {} MB{}", p.name, p.size / 1_000_000, if p.gone { " (già rimosso)" } else { "" });
     }
     println!("programs {:?}", t.elapsed());
 }

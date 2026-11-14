@@ -17,6 +17,8 @@ pub enum FsError {
     ServerKey { fingerprint: String, changed: bool },
     /// The remote server wants a password (none known, or the one known was refused).
     ServerPassword,
+    /// The file changed on disk after it was read: saving would overwrite someone else's work.
+    Changed,
 }
 
 pub fn from_io(e: &std::io::Error) -> FsError {

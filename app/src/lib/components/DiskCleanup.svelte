@@ -85,6 +85,7 @@
 	let max = $derived(Math.max(1, ...CATEGORIES.map((c) => weight(found[c.id]))));
 	let total = $derived(CATEGORIES.reduce((n, c) => n + weight(found[c.id]), 0));
 	let toDo = $derived(plan(found, chosen));
+	let listed = $derived([...toDo.permanent, ...toDo.trash, ...toDo.asAdmin]);
 	let running = $derived(CATEGORIES.filter((c) => !found[c.id]).length);
 	$effect(() => {
 		if (running === 0) untrack(() => onfound?.(total));
@@ -129,6 +130,21 @@
 			await tauriBackend.programUninstall(p.id);
 		} catch (e) {
 			error = `«${p.name}»: ${describeError(e)}`;
+		}
+	}
+
+	let removing = $state<string | null>(null);
+	async function removeLeftovers(p: Program) {
+		error = null;
+		removing = p.id;
+		try {
+			await tauriBackend.programRemoveLeftovers(p.id);
+			searchPrograms();
+			void search(['leftovers']);
+		} catch (e) {
+			error = `«${p.name}»: ${describeError(e)}`;
+		} finally {
+			removing = null;
 		}
 	}
 
@@ -209,15 +225,26 @@
 
 		{#if programs === null || programs.length > 0}
 			<div class="section sig">Programmi più grandi</div>
-			<p class="note">Space Train non li tocca: «Disinstalla» avvia il programma di disinstallazione ufficiale.</p>
+			<p class="note">
+				Space Train non li tocca: «Disinstalla» avvia il programma di disinstallazione ufficiale. Se un programma è già stato
+				rimosso a metà, «Togli i resti» manda la sua cartella nel Cestino e lo toglie dall’elenco.
+			</p>
 			{#if programs === null}
 				<div class="prog"><span class="detail">pesando…</span></div>
 			{:else}
 				{#each programs as p (p.id)}
 					<div class="prog">
-						<span class="ellipsis">{p.name}{#if p.publisher}<span class="detail">{` · ${p.publisher}`}</span>{/if}</span>
-						<span class="weight">{formatBytes(p.size)}</span>
-						<button onclick={() => void uninstall(p)}>Disinstalla</button>
+						<span class="ellipsis"
+							>{p.name}{#if p.gone}<span class="detail"> · già rimosso</span>{:else if p.publisher}<span class="detail"
+									>{` · ${p.publisher}`}</span
+								>{/if}</span
+						>
+						<span class="weight">{p.size > 0 ? formatBytes(p.size) : '—'}</span>
+						{#if p.gone}
+							<button disabled={removing !== null} onclick={() => void removeLeftovers(p)}>Togli i resti</button>
+						{:else}
+							<button onclick={() => void uninstall(p)}>Disinstalla</button>
+						{/if}
 					</div>
 				{/each}
 			{/if}
@@ -237,13 +264,15 @@
 			{#if toDo.permanent.length > 0}
 				<p><b>{toDo.permanent.length}</b> {toDo.permanent.length === 1 ? 'elemento si ricrea' : 'elementi si ricreano'} da soli: eliminati per sempre.</p>
 			{/if}
-			{#if toDo.trash.length > 0}
-				<p><b>{toDo.trash.length}</b> da guardare: {toDo.trash.length === 1 ? 'va' : 'vanno'} nel Cestino.</p>
+			{#if toDo.trash.length + toDo.asAdmin.length > 0}
+				{@const n = toDo.trash.length + toDo.asAdmin.length}
+				<p><b>{n}</b> da guardare: {n === 1 ? 'va' : 'vanno'} nel Cestino.</p>
 			{/if}
+			{#if toDo.asAdmin.length > 0}<p>Per i resti di programmi Windows chiederà il permesso di amministratore.</p>{/if}
 			{#if toDo.emptyTrash}<p>Il Cestino si svuota.</p>{/if}
 			<ul>
-				{#each [...toDo.permanent, ...toDo.trash].slice(0, 6) as p (p)}<li>{p}</li>{/each}
-				{#if toDo.permanent.length + toDo.trash.length > 6}<li class="rest">e altri {toDo.permanent.length + toDo.trash.length - 6}…</li>{/if}
+				{#each listed.slice(0, 6) as p (p)}<li>{p}</li>{/each}
+				{#if listed.length > 6}<li class="rest">e altri {listed.length - 6}…</li>{/if}
 			</ul>
 			<p class="note">I file in uso si saltano e te lo dico.</p>
 			<div class="actions">

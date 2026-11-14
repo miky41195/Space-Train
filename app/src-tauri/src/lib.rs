@@ -12,6 +12,7 @@ pub mod shell;
 pub mod transfer;
 pub mod vault;
 pub mod server;
+pub mod terminal;
 
 /// System-wide hotkey that brings the window back to the front.
 ///
@@ -128,6 +129,14 @@ pub fn run() {
             ipc::cleanup_scan,
             ipc::programs_list,
             ipc::program_uninstall,
+            ipc::program_remove_leftovers,
+            ipc::text_read,
+            ipc::text_write,
+            ipc::terminal_open,
+            ipc::terminal_write,
+            ipc::terminal_resize,
+            ipc::terminal_close,
+            ipc::cleanup_recycle_leftovers,
             ipc::size_turn,
             ipc::navigate,
             ipc::drives,

@@ -16,6 +16,12 @@ export const CATEGORIES: readonly Category[] = [
 	{ id: 'projects', name: 'Cartelle di compilazione', detail: 'node_modules, target, bin e obj dei progetti', kind: 'projects' },
 	{ id: 'models', name: 'Modelli di IA scaricati', detail: 'Hugging Face, Ollama, LM Studio', kind: 'review' },
 	{ id: 'download', name: 'Download vecchi', detail: 'Installer e archivi non aperti da 90 giorni', kind: 'review' },
+	{
+		id: 'leftovers',
+		name: 'Resti di programmi',
+		detail: 'Cartelle in Programmi e ProgramData di programmi non più installati: controlla prima di toglierle',
+		kind: 'review'
+	},
 	{ id: 'trash', name: 'Cestino', detail: 'Già eliminato: si svuota tutto', kind: 'trash' }
 ];
 
@@ -42,6 +48,8 @@ export interface Plan {
 	permanent: string[];
 	/** To the Trash: can come back. */
 	trash: string[];
+	/** To the Trash too, but in Program Files and ProgramData: Windows asks for administrator rights. */
+	asAdmin: string[];
 	/** Empty the Trash. */
 	emptyTrash: boolean;
 	bytes: number;
@@ -52,14 +60,14 @@ export function plan(
 	found: Partial<Record<CleanupCategory, CleanupCandidate[]>>,
 	chosen: Partial<Record<CleanupCategory, string[]>>
 ): Plan {
-	const p: Plan = { permanent: [], trash: [], emptyTrash: false, bytes: 0 };
+	const p: Plan = { permanent: [], trash: [], asAdmin: [], emptyTrash: false, bytes: 0 };
 	for (const c of CATEGORIES) {
 		const taken = new Set(chosen[c.id] ?? []);
 		const items = (found[c.id] ?? []).filter((v) => taken.has(v.path));
 		if (items.length === 0) continue;
 		p.bytes += items.reduce((n, v) => n + v.size, 0);
 		if (c.kind === 'trash') p.emptyTrash = true;
-		else (c.kind === 'review' ? p.trash : p.permanent).push(...items.map((v) => v.path));
+		else (c.id === 'leftovers' ? p.asAdmin : c.kind === 'review' ? p.trash : p.permanent).push(...items.map((v) => v.path));
 	}
 	return p;
 }

@@ -101,7 +101,9 @@ export type FsError =
 	/** A remote server's key to confirm (first time) or that changed (danger). */
 	| { kind: 'serverKey'; fingerprint: string; changed: boolean }
 	/** The remote server wants a password. */
-	| { kind: 'serverPassword' };
+	| { kind: 'serverPassword' }
+	/** The file changed on disk after it was read. */
+	| { kind: 'changed' };
 
 export type ServerProtocol = 'sftp' | 'ftp' | 'ftps' | 'webdav';
 
@@ -292,6 +294,19 @@ export interface Backend {
 	programsList(drive: string): Promise<Program[]>;
 	/** Starts a program's official uninstaller. */
 	programUninstall(id: string): Promise<void>;
+	/** A program whose uninstaller is gone: install folder to the Trash, entry out of the list. */
+	programRemoveLeftovers(id: string): Promise<void>;
+	/** Leftover folders of uninstalled programs to the Trash, as administrator. */
+	cleanupRecycleLeftovers(paths: string[]): Promise<void>;
+	/** A text file whole, for quick editing (UTF-8 only, at most 5 MB). */
+	textRead(path: string): Promise<TextFile>;
+	/** Saves an edited text file with its own line endings; refused with `changed` if it changed on disk, unless `force`. Returns the new modified time. */
+	textWrite(path: string, file: Omit<TextFile, 'modified'>, expected: number, force: boolean): Promise<number>;
+	/** Starts a shell in `cwd` for the integrated terminal; returns its id. */
+	terminalOpen(cwd: string, cols: number, rows: number, onEvent: (e: TerminalEvent) => void): Promise<number>;
+	terminalWrite(id: number, data: string): Promise<void>;
+	terminalResize(id: number, cols: number, rows: number): Promise<void>;
+	terminalClose(id: number): Promise<void>;
 	navigate(path: string, direction: 'up'): Promise<string>;
 	drives(): Promise<Drive[]>;
 	knownFolders(): Promise<KnownFolder[]>;
@@ -484,6 +499,14 @@ export const tauriBackend: Backend = {
 	cleanupScan: (category, drive, roots, round) => invoke('cleanup_scan', { category, drive, roots, round }),
 	programsList: (drive) => invoke('programs_list', { drive }),
 	programUninstall: (id) => invoke('program_uninstall', { id }),
+	programRemoveLeftovers: (id) => invoke('program_remove_leftovers', { id }),
+	cleanupRecycleLeftovers: (paths) => invoke('cleanup_recycle_leftovers', { paths }),
+	textRead: (path) => invoke('text_read', { path }),
+	textWrite: (path, f, expected, force) => invoke('text_write', { path, text: f.text, crlf: f.crlf, bom: f.bom, expected, force }),
+	terminalOpen: (cwd, cols, rows, onEvent) => invoke('terminal_open', { cwd, cols, rows, events: channel(onEvent) }),
+	terminalWrite: (id, data) => invoke('terminal_write', { id, data }),
+	terminalResize: (id, cols, rows) => invoke('terminal_resize', { id, cols, rows }),
+	terminalClose: (id) => invoke('terminal_close', { id }),
 	navigate: (path, direction) => invoke('navigate', { path, direction }),
 	drives: () => invoke('drives'),
 	knownFolders: () => invoke('known_folders'),
@@ -589,16 +612,27 @@ export const tauriBackend: Backend = {
 		invoke('delete_items', { opId, mode, paths, onProgress: channel(onProgress) })
 };
 
-export type CleanupCategory = 'temp' | 'cache' | 'projects' | 'models' | 'download' | 'trash';
+export type CleanupCategory = 'temp' | 'cache' | 'projects' | 'models' | 'download' | 'trash' | 'leftovers';
 /** Something disk cleanup found: size and last use (ms). */
 export interface CleanupCandidate {
 	path: string;
 	size: number;
 	used: number;
 }
+/** A text file opened for quick editing: `
+` line endings in `text`, the file's own kept apart. */
+export interface TextFile {
+	text: string;
+	crlf: boolean;
+	bom: boolean;
+	modified: number;
+}
+export type TerminalEvent = { kind: 'data'; text: string } | { kind: 'exit' };
 export interface Program {
 	id: string;
 	name: string;
 	publisher: string | null;
 	size: number;
+	/** Its uninstaller is no longer on disk: only its leftovers can go. */
+	gone: boolean;
 }

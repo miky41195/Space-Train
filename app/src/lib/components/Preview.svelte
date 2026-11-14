@@ -27,7 +27,7 @@
 	/** Text kinds with a richer reading: they can be switched back to plain text. */
 	const RICH = new Set<Mode>(['markdown', 'code', 'csv']);
 
-	const TEXTUAL = new Set(['code', 'markup', 'style', 'formatDate', 'text', 'config']);
+	const TEXTUAL = new Set(['code', 'markup', 'style', 'data', 'text', 'config']);
 
 	let mode = $derived.by((): Mode => {
 		if (!item || item.kind === 'dir' || item.path.includes('::')) return 'info';

@@ -39,7 +39,8 @@ const STORED_ACTION_IDS: Record<SimpleAction, string> = {
 	otherPane: 'altroPannello',
 	copyToOtherPane: 'copiaAltroPannello',
 	moveToOtherPane: 'spostaAltroPannello',
-	palette: 'palette'
+	palette: 'palette',
+	toggleTerminal: 'toggleTerminal'
 };
 const ACTION_FROM_STORED = Object.fromEntries(Object.entries(STORED_ACTION_IDS).map(([a, s]) => [s, a])) as Record<string, SimpleAction>;
 

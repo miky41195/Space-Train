@@ -164,6 +164,56 @@ pub async fn program_uninstall(id: String) -> Result<(), FsError> {
     off_window(move || crate::shell::programs::uninstall(&id)).await
 }
 
+/// A text file whole, for quick editing.
+#[tauri::command]
+pub async fn text_read(path: String) -> Result<crate::fs::text_file::TextFile, FsError> {
+    off_window(move || crate::fs::text_file::read(&path)).await
+}
+
+/// Saves an edited text file; refused if it changed on disk meanwhile, unless `force`.
+#[tauri::command]
+pub async fn text_write(path: String, text: String, crlf: bool, bom: bool, expected: u64, force: bool) -> Result<u64, FsError> {
+    off_window(move || crate::fs::text_file::write(&path, &text, crlf, bom, expected, force)).await
+}
+
+/// Starts a shell in `cwd`; its output arrives on `events`.
+#[tauri::command]
+pub fn terminal_open(
+    cwd: String,
+    cols: u16,
+    rows: u16,
+    events: tauri::ipc::Channel<crate::terminal::TerminalEvent>,
+) -> Result<u32, FsError> {
+    crate::terminal::open(&cwd, cols, rows, events)
+}
+
+#[tauri::command]
+pub fn terminal_write(id: u32, data: String) -> Result<(), FsError> {
+    crate::terminal::write(id, &data)
+}
+
+#[tauri::command]
+pub fn terminal_resize(id: u32, cols: u16, rows: u16) -> Result<(), FsError> {
+    crate::terminal::resize(id, cols, rows)
+}
+
+#[tauri::command]
+pub fn terminal_close(id: u32) {
+    crate::terminal::close(id)
+}
+
+/// A broken program: install folder to the Recycle Bin, entry out of the list.
+#[tauri::command]
+pub async fn program_remove_leftovers(id: String) -> Result<(), FsError> {
+    off_window(move || crate::shell::programs::remove_leftovers(&id)).await
+}
+
+/// Leftovers of uninstalled programs to the Recycle Bin, as administrator.
+#[tauri::command]
+pub async fn cleanup_recycle_leftovers(paths: Vec<String>) -> Result<(), FsError> {
+    off_window(move || crate::shell::programs::recycle_leftovers(&paths)).await
+}
+
 #[tauri::command]
 pub fn open_entry(path: String) -> Result<(), FsError> {
     open::open_default(&path)

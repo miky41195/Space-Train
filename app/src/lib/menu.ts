@@ -6,6 +6,7 @@ import { SIZES, type View } from './view';
 import type { AccentId } from './themes';
 import { FOLDER_COLORS, type ColorId } from './stores/colors.svelte';
 import { MEDIA_COLUMNS, type MediaKey } from './media';
+import { categoryFor } from './icons';
 
 export type MenuAction =
 	| 'open'
@@ -27,6 +28,8 @@ export type MenuAction =
 	| 'copyPath'
 	| 'revealInExplorer'
 	| 'terminal'
+	| 'integratedTerminal'
+	| 'edit'
 	| 'duplicates'
 	| 'compare'
 	| 'space'
@@ -242,10 +245,22 @@ function backgroundItems({
 		items.push({ action: 'space', label: 'Analizza spazio' });
 		items.push({ action: 'rules', label: 'Regole automatiche…' });
 		items.push({ action: 'terminal', label: 'Apri nel terminale' });
+		items.push({ action: 'integratedTerminal', label: 'Apri nel terminale integrato' });
 		items.push({ action: 'moreOptions', label: 'Altre opzioni di Windows', separator: true });
 		items.push({ action: 'properties', label: 'Proprietà', shortcut: 'Alt+Invio' });
 	}
 	return items;
+}
+
+/** Text kinds quick editing opens; a small file with no known extension is tried too (Rust refuses what is not UTF-8 text). */
+const TEXT_CATEGORIES = ['code', 'markup', 'style', 'data', 'text', 'config'];
+const NOT_TEXT = ['rtf', 'db'];
+export function isEditableText(e: Pick<Entry, 'name' | 'size' | 'path' | 'kind'>): boolean {
+	// Only files on a disk or a network share: not inside archives, servers or other PCs.
+	if (e.kind !== 'file' || e.path.includes('::') || !/^([a-z]:[\\/]|\\\\|\/)/i.test(e.path)) return false;
+	const cat = categoryFor(e.name);
+	if (cat === 'plain') return e.size < 1024 * 1024;
+	return TEXT_CATEGORIES.includes(cat) && !NOT_TEXT.includes(e.name.split('.').pop()!.toLowerCase());
 }
 
 /** Formats the Rust image tools can read and write back. */
@@ -283,11 +298,13 @@ function selectionItems({
 			if (!isStartPage) items.push({ action: 'setStartPage', label: 'Imposta come pagina iniziale' });
 			items.push(startupItem(atStartup));
 			items.push({ action: 'terminal', label: 'Apri nel terminale' });
+			items.push({ action: 'integratedTerminal', label: 'Apri nel terminale integrato' });
 			items.push({ action: 'duplicates', label: 'Trova duplicati qui' });
 			items.push(compareItem(otherPane));
 			items.push({ action: 'space', label: 'Analizza spazio' });
 			items.push({ action: 'rules', label: 'Regole automatiche…' });
 		} else {
+			if (isEditableText(single)) items.push({ action: 'edit', label: 'Modifica' });
 			items.push({ action: 'openWith', label: 'Apri con…' });
 			items.push({ action: 'checksum', label: 'Somma di controllo…' });
 			if (otherPane) items.push({ action: 'compareFileOtherPane', label: 'Confronta con lo stesso file nell’altro pannello' });
