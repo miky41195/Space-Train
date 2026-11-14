@@ -1,70 +1,68 @@
 import { describe, it, expect } from 'vitest';
-import { categoryFor, chiaveIcona, vuoleMiniatura, drawnFolder } from './icons';
+import { categoryFor, iconKey, wantsThumbnail, drawnFolder } from './icons';
 import type { Entry } from './ipc';
 
-function voce(name: string, kind: Entry['kind'] = 'file'): Entry {
+function item(name: string, kind: Entry['kind'] = 'file'): Entry {
 	return { name, path: `C:\\${name}`, kind, size: 1, modified: 1, hidden: false };
 }
 
 describe('categoryFor', () => {
-	it('riconosce le categorie note', () => {
+	it('recognises the known categories', () => {
 		expect(categoryFor('main.rs')).toBe('code');
 		expect(categoryFor('foto.JPG')).toBe('image');
 		expect(categoryFor('archivio.zip')).toBe('archive');
 	});
 
-	it('i nomi senza estensione sono generici', () => {
+	it('names without an extension are generic', () => {
 		expect(categoryFor('LICENSE')).toBe('plain');
 	});
 
-	it('un file nascosto unix non conta il punto iniziale come estensione', () => {
+	it('a unix hidden file does not count the leading dot as an extension', () => {
 		expect(categoryFor('.gitignore')).toBe('plain');
 	});
 });
 
-describe('chiaveIcona', () => {
-	it('due file dello stesso tipo condividono la chiave', () => {
-		expect(chiaveIcona(voce('uno.txt'))).toBe(chiaveIcona(voce('due.txt')));
+describe('iconKey', () => {
+	it('two files of the same type share the key', () => {
+		expect(iconKey(item('uno.txt'))).toBe(iconKey(item('due.txt')));
 	});
 
-	it('tipi diversi hanno chiavi diverse', () => {
-		expect(chiaveIcona(voce('a.txt'))).not.toBe(chiaveIcona(voce('a.pdf')));
+	it('different types have different keys', () => {
+		expect(iconKey(item('a.txt'))).not.toBe(iconKey(item('a.pdf')));
 	});
 
-	it('ignora le maiuscole nell estensione', () => {
-		expect(chiaveIcona(voce('a.TXT'))).toBe(chiaveIcona(voce('b.txt')));
+	it('ignores case in the extension', () => {
+		expect(iconKey(item('a.TXT'))).toBe(iconKey(item('b.txt')));
 	});
 
-	it('tutte le cartelle condividono una chiave sola', () => {
-		expect(chiaveIcona(voce('progetti', 'dir'))).toBe(chiaveIcona(voce('musica', 'dir')));
+	it('all folders share a single key', () => {
+		expect(iconKey(item('progetti', 'dir'))).toBe(iconKey(item('musica', 'dir')));
 	});
 
-	it('la dimensione fa parte della chiave', () => {
-		expect(chiaveIcona(voce('a.txt'), true)).not.toBe(chiaveIcona(voce('a.txt'), false));
-	});
-});
-
-describe('vuoleMiniatura', () => {
-	it('immagini e video sì', () => {
-		expect(vuoleMiniatura(voce('foto.png'))).toBe(true);
-		expect(vuoleMiniatura(voce('clip.mp4'))).toBe(true);
-	});
-
-	it('codice e archivi no', () => {
-		expect(vuoleMiniatura(voce('main.rs'))).toBe(false);
-		expect(vuoleMiniatura(voce('roba.zip'))).toBe(false);
-	});
-
-	it('le cartelle mai', () => {
-		expect(vuoleMiniatura(voce('immagini', 'dir'))).toBe(false);
+	it('the size is part of the key', () => {
+		expect(iconKey(item('a.txt'), true)).not.toBe(iconKey(item('a.txt'), false));
 	});
 });
 
-describe('vuoleMiniatura', () => {
-	it('chi ha un icona propria la chiede al file, anche se è una cartella', () => {
-		expect(vuoleMiniatura({ ...voce('Gioco.exe'), iconaPropria: true })).toBe(true);
-		expect(vuoleMiniatura({ ...voce('Steam', 'dir'), iconaPropria: true })).toBe(true);
-		expect(vuoleMiniatura(voce('Steam', 'dir'))).toBe(false);
+describe('wantsThumbnail', () => {
+	it('images and videos yes', () => {
+		expect(wantsThumbnail(item('foto.png'))).toBe(true);
+		expect(wantsThumbnail(item('clip.mp4'))).toBe(true);
+	});
+
+	it('code and archives no', () => {
+		expect(wantsThumbnail(item('main.rs'))).toBe(false);
+		expect(wantsThumbnail(item('roba.zip'))).toBe(false);
+	});
+
+	it('folders never', () => {
+		expect(wantsThumbnail(item('immagini', 'dir'))).toBe(false);
+	});
+
+	it('whoever has an icon of their own asks the file for it, even a folder', () => {
+		expect(wantsThumbnail({ ...item('Gioco.exe'), ownIcon: true })).toBe(true);
+		expect(wantsThumbnail({ ...item('Steam', 'dir'), ownIcon: true })).toBe(true);
+		expect(wantsThumbnail(item('Steam', 'dir'))).toBe(false);
 	});
 });
 
@@ -80,7 +78,7 @@ describe('drawnFolder', () => {
 
 	it('leaves files, drives and folders with their own icon to Windows', () => {
 		expect(drawnFolder({ ...dir, kind: 'file' }, undefined, 'pixel')).toBeNull();
-		expect(drawnFolder({ ...dir, libero: 5 }, undefined, 'pixel')).toBeNull();
-		expect(drawnFolder({ ...dir, iconaPropria: true }, undefined, 'pixel')).toBeNull();
+		expect(drawnFolder({ ...dir, free: 5 }, undefined, 'pixel')).toBeNull();
+		expect(drawnFolder({ ...dir, ownIcon: true }, undefined, 'pixel')).toBeNull();
 	});
 });

@@ -4,70 +4,70 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 
-/// Cosa fare quando a destinazione esiste già un elemento con lo stesso nome.
+/// What to do when an item with the same name already exists at the destination.
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub enum Politica {
-    Sovrascrivi,
-    Rinomina,
-    Salta,
+pub enum ConflictPolicy {
+    Overwrite,
+    Rename,
+    Skip,
 }
 
 #[derive(Serialize, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct Esito {
-    pub copiati: u64,
-    pub saltati: u64,
-    pub annullato: bool,
-    /// Sorgente e path d'arrivo effettivo di ogni elemento trasferito.
-    /// Serve ad annullare: con la politica «rinomina» l'arrivo può avere
-    /// un nome diverso da quello di partenza.
-    pub coppie: Vec<[String; 2]>,
+pub struct CopyOutcome {
+    pub copied: u64,
+    pub skipped: u64,
+    pub cancelled: bool,
+    /// Source and actual arrival path of every transferred item.
+    /// Used for undo: with the «rename» policy the arrival can have a
+    /// different name from the starting one.
+    pub pairs: Vec<[String; 2]>,
 }
 
-/// Nome libero dentro `dir`, numerando come fa Windows: `nota (2).txt`.
+/// A free name inside `dir`, numbering as Windows does: `nota (2).txt`.
 ///
-/// L'estensione resta in coda al numero: rinominare non deve cambiare il
-/// tipo del file.
-pub fn unique_name(dir: &Path, nome: &str) -> String {
-    if !paths::extended(&dir.join(nome)).exists() {
-        return nome.to_string();
+/// The extension stays after the number: renaming must not change the
+/// file's type.
+pub fn unique_name(dir: &Path, name: &str) -> String {
+    if !paths::extended(&dir.join(name)).exists() {
+        return name.to_string();
     }
 
-    let punto = nome.rfind('.').filter(|i| *i > 0);
-    let (base, estensione) = match punto {
-        Some(i) => (&nome[..i], &nome[i..]),
-        None => (nome, ""),
+    let dot = name.rfind('.').filter(|i| *i > 0);
+    let (base, extension) = match dot {
+        Some(i) => (&name[..i], &name[i..]),
+        None => (name, ""),
     };
 
     for n in 2..10_000 {
-        let candidato = format!("{} ({}){}", base, n, estensione);
-        if !paths::extended(&dir.join(&candidato)).exists() {
-            return candidato;
+        let candidate = format!("{} ({}){}", base, n, extension);
+        if !paths::extended(&dir.join(&candidate)).exists() {
+            return candidate;
         }
     }
 
-    format!("{} ({}){}", base, uuid_semplice(), estensione)
+    format!("{} ({}){}", base, simple_uuid(), extension)
 }
 
-/// Ultima spiaggia quando 10.000 nomi numerati sono tutti occupati.
-fn uuid_semplice() -> u128 {
+/// Last resort when 10,000 numbered names are all taken.
+fn simple_uuid() -> u128 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0)
 }
 
-/// Nomi che esistono già a destinazione. Vuoto = nessuna domanda da fare.
-pub fn scan_conflicts(sorgenti: &[String], destinazione: &str) -> Vec<String> {
-    let dest = Path::new(destinazione);
+/// Names that already exist at the destination. Empty = no question to ask.
+pub fn scan_conflicts(sources: &[String], destination: &str) -> Vec<String> {
+    let dest = Path::new(destination);
 
-    sorgenti
+    sources
         .iter()
         .filter_map(|s| {
-            let nome = Path::new(s).file_name()?.to_string_lossy().into_owned();
-            if paths::extended(&dest.join(&nome)).exists() {
-                Some(nome)
+            let name = Path::new(s).file_name()?.to_string_lossy().into_owned();
+            if paths::extended(&dest.join(&name)).exists() {
+                Some(name)
             } else {
                 None
             }
@@ -75,202 +75,202 @@ pub fn scan_conflicts(sorgenti: &[String], destinazione: &str) -> Vec<String> {
         .collect()
 }
 
-/// Byte totali da trasferire, per dare una barra di avanzamento onesta.
-pub fn total_bytes(sorgenti: &[String]) -> u64 {
-    sorgenti.iter().map(|s| peso(Path::new(s))).sum()
+/// Total bytes to transfer, to give an honest progress bar.
+pub fn total_bytes(sources: &[String]) -> u64 {
+    sources.iter().map(|s| weight(Path::new(s))).sum()
 }
 
-fn peso(path: &Path) -> u64 {
-    let esteso = paths::extended(path);
+fn weight(path: &Path) -> u64 {
+    let extended = paths::extended(path);
 
-    let Ok(meta) = std::fs::symlink_metadata(&esteso) else {
+    let Ok(meta) = std::fs::symlink_metadata(&extended) else {
         return 0;
     };
 
     if meta.is_dir() {
-        let Ok(voci) = std::fs::read_dir(&esteso) else {
+        let Ok(items) = std::fs::read_dir(&extended) else {
             return 0;
         };
-        return voci.filter_map(|v| v.ok()).map(|v| peso(&v.path())).sum();
+        return items.filter_map(|v| v.ok()).map(|v| weight(&v.path())).sum();
     }
 
     meta.len()
 }
 
-/// Copia sorgenti dentro `destinazione`.
+/// Copies sources into `destination`.
 ///
-/// `avanzamento` riceve i byte trasferiti finora; `annulla` viene consultato
-/// fra un file e l'altro. L'interruzione lascia sul disco i file già copiati:
-/// non è una transazione, e fingere il contrario richiederebbe un'area di
-/// staging grande quanto i dati.
+/// `progress` receives the bytes transferred so far; `cancel` is checked
+/// between one file and the next. Stopping leaves the files already copied on
+/// disk: it is not a transaction, and pretending otherwise would need a
+/// staging area as big as the data.
 pub fn copy_all(
-    sorgenti: &[String],
-    destinazione: &str,
-    politica: Politica,
-    annulla: &AtomicBool,
-    avanzamento: &mut dyn FnMut(u64),
-) -> Result<Esito, FsError> {
-    let dest = Path::new(destinazione);
-    let mut esito = Esito::default();
-    let mut fatti = 0u64;
+    sources: &[String],
+    destination: &str,
+    policy: ConflictPolicy,
+    cancel: &AtomicBool,
+    progress: &mut dyn FnMut(u64),
+) -> Result<CopyOutcome, FsError> {
+    let dest = Path::new(destination);
+    let mut outcome = CopyOutcome::default();
+    let mut done = 0u64;
 
-    for sorgente in sorgenti {
-        if crate::fs::pausa::fermo(annulla) {
-            esito.annullato = true;
-            return Ok(esito);
+    for source in sources {
+        if crate::fs::pause::stopped(cancel) {
+            outcome.cancelled = true;
+            return Ok(outcome);
         }
 
-        let origine = Path::new(sorgente);
-        let Some(nome) = origine.file_name().map(|n| n.to_string_lossy().into_owned()) else {
+        let origin = Path::new(source);
+        let Some(name) = origin.file_name().map(|n| n.to_string_lossy().into_owned()) else {
             continue;
         };
 
-        // Copiare una cartella dentro sé stessa genererebbe ricorsione
-        // infinita: il controllo va fatto prima di aprire qualsiasi handle.
-        if dest.starts_with(origine) {
+        // Copying a folder into itself would cause infinite recursion: the
+        // check must be done before opening any handle.
+        if dest.starts_with(origin) {
             return Err(FsError::Io {
                 message: format!(
                     "Non puoi copiare «{}» dentro sé stessa.",
-                    nome
+                    name
                 ),
             });
         }
 
-        let arrivo = match risolvi_destinazione(dest, &nome, politica) {
+        let arrival = match resolve_destination(dest, &name, policy) {
             Some(p) => p,
             None => {
-                esito.saltati += 1;
+                outcome.skipped += 1;
                 continue;
             }
         };
 
-        copia_ricorsiva(origine, &arrivo, annulla, &mut fatti, avanzamento)?;
-        esito.copiati += 1;
-        esito.coppie.push([sorgente.clone(), paths::display(&arrivo)]);
+        copy_recursive(origin, &arrival, cancel, &mut done, progress)?;
+        outcome.copied += 1;
+        outcome.pairs.push([source.clone(), paths::display(&arrival)]);
     }
 
-    Ok(esito)
+    Ok(outcome)
 }
 
-/// Sposta sorgenti dentro `destinazione`.
+/// Moves sources into `destination`.
 ///
-/// Prova prima `rename`, istantaneo sullo stesso volume. Se fallisce perché
-/// la destinazione è su un altro disco, ricade su copia più eliminazione.
+/// Tries `rename` first, instant on the same volume. If it fails because
+/// the destination is on another disk, it falls back to copy plus delete.
 pub fn move_all(
-    sorgenti: &[String],
-    destinazione: &str,
-    politica: Politica,
-    annulla: &AtomicBool,
-    avanzamento: &mut dyn FnMut(u64),
-) -> Result<Esito, FsError> {
-    let dest = Path::new(destinazione);
-    let mut esito = Esito::default();
-    let mut fatti = 0u64;
+    sources: &[String],
+    destination: &str,
+    policy: ConflictPolicy,
+    cancel: &AtomicBool,
+    progress: &mut dyn FnMut(u64),
+) -> Result<CopyOutcome, FsError> {
+    let dest = Path::new(destination);
+    let mut outcome = CopyOutcome::default();
+    let mut done = 0u64;
 
-    for sorgente in sorgenti {
-        if crate::fs::pausa::fermo(annulla) {
-            esito.annullato = true;
-            return Ok(esito);
+    for source in sources {
+        if crate::fs::pause::stopped(cancel) {
+            outcome.cancelled = true;
+            return Ok(outcome);
         }
 
-        let origine = Path::new(sorgente);
-        let Some(nome) = origine.file_name().map(|n| n.to_string_lossy().into_owned()) else {
+        let origin = Path::new(source);
+        let Some(name) = origin.file_name().map(|n| n.to_string_lossy().into_owned()) else {
             continue;
         };
 
-        if dest.starts_with(origine) {
+        if dest.starts_with(origin) {
             return Err(FsError::Io {
-                message: format!("Non puoi spostare «{}» dentro sé stessa.", nome),
+                message: format!("Non puoi spostare «{}» dentro sé stessa.", name),
             });
         }
 
-        let arrivo = match risolvi_destinazione(dest, &nome, politica) {
+        let arrival = match resolve_destination(dest, &name, policy) {
             Some(p) => p,
             None => {
-                esito.saltati += 1;
+                outcome.skipped += 1;
                 continue;
             }
         };
 
-        if politica == Politica::Sovrascrivi && paths::extended(&arrivo).exists() {
-            rimuovi(&arrivo)?;
+        if policy == ConflictPolicy::Overwrite && paths::extended(&arrival).exists() {
+            remove(&arrival)?;
         }
 
-        match std::fs::rename(paths::extended(origine), paths::extended(&arrivo)) {
+        match std::fs::rename(paths::extended(origin), paths::extended(&arrival)) {
             Ok(()) => {
-                fatti += peso(&arrivo);
-                avanzamento(fatti);
+                done += weight(&arrival);
+                progress(done);
             }
             Err(_) => {
-                // Volumi diversi: rename non può attraversarli.
-                copia_ricorsiva(origine, &arrivo, annulla, &mut fatti, avanzamento)?;
-                rimuovi(origine)?;
+                // Different volumes: rename cannot cross them.
+                copy_recursive(origin, &arrival, cancel, &mut done, progress)?;
+                remove(origin)?;
             }
         }
 
-        esito.copiati += 1;
-        esito.coppie.push([sorgente.clone(), paths::display(&arrivo)]);
+        outcome.copied += 1;
+        outcome.pairs.push([source.clone(), paths::display(&arrival)]);
     }
 
-    Ok(esito)
+    Ok(outcome)
 }
 
-/// Path di arrivo secondo la politica. `None` significa "salta questo".
-fn risolvi_destinazione(dest: &Path, nome: &str, politica: Politica) -> Option<PathBuf> {
-    let diretto = dest.join(nome);
+/// Arrival path according to the policy. `None` means "skip this one".
+fn resolve_destination(dest: &Path, name: &str, policy: ConflictPolicy) -> Option<PathBuf> {
+    let direct = dest.join(name);
 
-    if !paths::extended(&diretto).exists() {
-        return Some(diretto);
+    if !paths::extended(&direct).exists() {
+        return Some(direct);
     }
 
-    match politica {
-        Politica::Sovrascrivi => Some(diretto),
-        Politica::Rinomina => Some(dest.join(unique_name(dest, nome))),
-        Politica::Salta => None,
+    match policy {
+        ConflictPolicy::Overwrite => Some(direct),
+        ConflictPolicy::Rename => Some(dest.join(unique_name(dest, name))),
+        ConflictPolicy::Skip => None,
     }
 }
 
-pub fn rimuovi(path: &Path) -> Result<(), FsError> {
-    let esteso = paths::extended(path);
-    let meta = std::fs::symlink_metadata(&esteso).map_err(|e| from_io(&e))?;
+pub fn remove(path: &Path) -> Result<(), FsError> {
+    let extended = paths::extended(path);
+    let meta = std::fs::symlink_metadata(&extended).map_err(|e| from_io(&e))?;
 
     if meta.is_dir() {
-        std::fs::remove_dir_all(&esteso).map_err(|e| from_io(&e))
+        std::fs::remove_dir_all(&extended).map_err(|e| from_io(&e))
     } else {
-        std::fs::remove_file(&esteso).map_err(|e| from_io(&e))
+        std::fs::remove_file(&extended).map_err(|e| from_io(&e))
     }
 }
 
-fn copia_ricorsiva(
-    origine: &Path,
-    arrivo: &Path,
-    annulla: &AtomicBool,
-    fatti: &mut u64,
-    avanzamento: &mut dyn FnMut(u64),
+fn copy_recursive(
+    origin: &Path,
+    arrival: &Path,
+    cancel: &AtomicBool,
+    done: &mut u64,
+    progress: &mut dyn FnMut(u64),
 ) -> Result<(), FsError> {
-    if crate::fs::pausa::fermo(annulla) {
+    if crate::fs::pause::stopped(cancel) {
         return Ok(());
     }
 
-    let meta = std::fs::symlink_metadata(paths::extended(origine)).map_err(|e| from_io(&e))?;
+    let meta = std::fs::symlink_metadata(paths::extended(origin)).map_err(|e| from_io(&e))?;
 
     if !meta.is_dir() {
-        std::fs::copy(paths::extended(origine), paths::extended(arrivo)).map_err(|e| from_io(&e))?;
-        *fatti += meta.len();
-        avanzamento(*fatti);
+        std::fs::copy(paths::extended(origin), paths::extended(arrival)).map_err(|e| from_io(&e))?;
+        *done += meta.len();
+        progress(*done);
         return Ok(());
     }
 
-    std::fs::create_dir_all(paths::extended(arrivo)).map_err(|e| from_io(&e))?;
+    std::fs::create_dir_all(paths::extended(arrival)).map_err(|e| from_io(&e))?;
 
-    let voci = std::fs::read_dir(paths::extended(origine)).map_err(|e| from_io(&e))?;
+    let items = std::fs::read_dir(paths::extended(origin)).map_err(|e| from_io(&e))?;
 
-    for voce in voci.filter_map(|v| v.ok()) {
-        if crate::fs::pausa::fermo(annulla) {
+    for item in items.filter_map(|v| v.ok()) {
+        if crate::fs::pause::stopped(cancel) {
             return Ok(());
         }
-        let nome = voce.file_name();
-        copia_ricorsiva(&voce.path(), &arrivo.join(nome), annulla, fatti, avanzamento)?;
+        let name = item.file_name();
+        copy_recursive(&item.path(), &arrival.join(name), cancel, done, progress)?;
     }
 
     Ok(())
@@ -282,22 +282,22 @@ mod tests {
     use std::fs;
     use tempfile::tempdir;
 
-    fn mai() -> AtomicBool {
+    fn never() -> AtomicBool {
         AtomicBool::new(false)
     }
 
-    fn zitto() -> impl FnMut(u64) {
+    fn silent() -> impl FnMut(u64) {
         |_| {}
     }
 
     #[test]
-    fn unique_name_lascia_stare_i_nomi_liberi() {
+    fn unique_name_leaves_free_names_alone() {
         let dir = tempdir().unwrap();
         assert_eq!(unique_name(dir.path(), "nuovo.txt"), "nuovo.txt");
     }
 
     #[test]
-    fn unique_name_numera_conservando_l_estensione() {
+    fn unique_name_numbers_keeping_the_extension() {
         let dir = tempdir().unwrap();
         fs::write(dir.path().join("nota.txt"), b"x").unwrap();
 
@@ -305,7 +305,7 @@ mod tests {
     }
 
     #[test]
-    fn unique_name_salta_i_numeri_gia_occupati() {
+    fn unique_name_skips_numbers_already_taken() {
         let dir = tempdir().unwrap();
         fs::write(dir.path().join("nota.txt"), b"x").unwrap();
         fs::write(dir.path().join("nota (2).txt"), b"x").unwrap();
@@ -314,7 +314,7 @@ mod tests {
     }
 
     #[test]
-    fn unique_name_funziona_senza_estensione() {
+    fn unique_name_works_without_extension() {
         let dir = tempdir().unwrap();
         fs::create_dir(dir.path().join("cartella")).unwrap();
 
@@ -322,65 +322,65 @@ mod tests {
     }
 
     #[test]
-    fn scan_conflicts_trova_solo_i_nomi_occupati() {
-        let origine = tempdir().unwrap();
+    fn scan_conflicts_finds_only_taken_names() {
+        let origin = tempdir().unwrap();
         let dest = tempdir().unwrap();
 
-        fs::write(origine.path().join("a.txt"), b"x").unwrap();
-        fs::write(origine.path().join("b.txt"), b"x").unwrap();
+        fs::write(origin.path().join("a.txt"), b"x").unwrap();
+        fs::write(origin.path().join("b.txt"), b"x").unwrap();
         fs::write(dest.path().join("a.txt"), b"gia qui").unwrap();
 
-        let sorgenti = vec![
-            origine.path().join("a.txt").to_string_lossy().into_owned(),
-            origine.path().join("b.txt").to_string_lossy().into_owned(),
+        let sources = vec![
+            origin.path().join("a.txt").to_string_lossy().into_owned(),
+            origin.path().join("b.txt").to_string_lossy().into_owned(),
         ];
 
-        let conflitti = scan_conflicts(&sorgenti, &dest.path().to_string_lossy());
-        assert_eq!(conflitti, vec!["a.txt"]);
+        let conflicts = scan_conflicts(&sources, &dest.path().to_string_lossy());
+        assert_eq!(conflicts, vec!["a.txt"]);
     }
 
     #[test]
-    fn copia_un_file() {
-        let origine = tempdir().unwrap();
+    fn copies_a_file() {
+        let origin = tempdir().unwrap();
         let dest = tempdir().unwrap();
-        fs::write(origine.path().join("a.txt"), b"contenuto").unwrap();
+        fs::write(origin.path().join("a.txt"), b"contenuto").unwrap();
 
-        let sorgenti = vec![origine.path().join("a.txt").to_string_lossy().into_owned()];
-        let esito = copy_all(
-            &sorgenti,
+        let sources = vec![origin.path().join("a.txt").to_string_lossy().into_owned()];
+        let outcome = copy_all(
+            &sources,
             &dest.path().to_string_lossy(),
-            Politica::Rinomina,
-            &mai(),
-            &mut zitto(),
+            ConflictPolicy::Rename,
+            &never(),
+            &mut silent(),
         )
         .unwrap();
 
-        assert_eq!(esito.copiati, 1);
+        assert_eq!(outcome.copied, 1);
         assert_eq!(
             fs::read_to_string(dest.path().join("a.txt")).unwrap(),
             "contenuto"
         );
         // L'originale resta dov'era.
-        assert!(origine.path().join("a.txt").exists());
+        assert!(origin.path().join("a.txt").exists());
     }
 
     #[test]
-    fn copia_una_cartella_con_tutto_il_contenuto() {
-        let origine = tempdir().unwrap();
+    fn copies_a_folder_with_all_its_content() {
+        let origin = tempdir().unwrap();
         let dest = tempdir().unwrap();
 
-        let sub = origine.path().join("cartella");
+        let sub = origin.path().join("cartella");
         fs::create_dir_all(sub.join("dentro")).unwrap();
         fs::write(sub.join("uno.txt"), b"1").unwrap();
         fs::write(sub.join("dentro").join("due.txt"), b"2").unwrap();
 
-        let sorgenti = vec![sub.to_string_lossy().into_owned()];
+        let sources = vec![sub.to_string_lossy().into_owned()];
         copy_all(
-            &sorgenti,
+            &sources,
             &dest.path().to_string_lossy(),
-            Politica::Rinomina,
-            &mai(),
-            &mut zitto(),
+            ConflictPolicy::Rename,
+            &never(),
+            &mut silent(),
         )
         .unwrap();
 
@@ -401,19 +401,19 @@ mod tests {
     }
 
     #[test]
-    fn la_politica_rinomina_non_tocca_l_esistente() {
-        let origine = tempdir().unwrap();
+    fn the_rename_policy_does_not_touch_the_existing() {
+        let origin = tempdir().unwrap();
         let dest = tempdir().unwrap();
-        fs::write(origine.path().join("a.txt"), b"nuovo").unwrap();
+        fs::write(origin.path().join("a.txt"), b"nuovo").unwrap();
         fs::write(dest.path().join("a.txt"), b"vecchio").unwrap();
 
-        let sorgenti = vec![origine.path().join("a.txt").to_string_lossy().into_owned()];
+        let sources = vec![origin.path().join("a.txt").to_string_lossy().into_owned()];
         copy_all(
-            &sorgenti,
+            &sources,
             &dest.path().to_string_lossy(),
-            Politica::Rinomina,
-            &mai(),
-            &mut zitto(),
+            ConflictPolicy::Rename,
+            &never(),
+            &mut silent(),
         )
         .unwrap();
 
@@ -428,19 +428,19 @@ mod tests {
     }
 
     #[test]
-    fn la_politica_sovrascrivi_rimpiazza() {
-        let origine = tempdir().unwrap();
+    fn the_overwrite_policy_replaces() {
+        let origin = tempdir().unwrap();
         let dest = tempdir().unwrap();
-        fs::write(origine.path().join("a.txt"), b"nuovo").unwrap();
+        fs::write(origin.path().join("a.txt"), b"nuovo").unwrap();
         fs::write(dest.path().join("a.txt"), b"vecchio").unwrap();
 
-        let sorgenti = vec![origine.path().join("a.txt").to_string_lossy().into_owned()];
+        let sources = vec![origin.path().join("a.txt").to_string_lossy().into_owned()];
         copy_all(
-            &sorgenti,
+            &sources,
             &dest.path().to_string_lossy(),
-            Politica::Sovrascrivi,
-            &mai(),
-            &mut zitto(),
+            ConflictPolicy::Overwrite,
+            &never(),
+            &mut silent(),
         )
         .unwrap();
 
@@ -448,24 +448,24 @@ mod tests {
     }
 
     #[test]
-    fn la_politica_salta_lascia_tutto_com_e() {
-        let origine = tempdir().unwrap();
+    fn the_skip_policy_leaves_everything_as_is() {
+        let origin = tempdir().unwrap();
         let dest = tempdir().unwrap();
-        fs::write(origine.path().join("a.txt"), b"nuovo").unwrap();
+        fs::write(origin.path().join("a.txt"), b"nuovo").unwrap();
         fs::write(dest.path().join("a.txt"), b"vecchio").unwrap();
 
-        let sorgenti = vec![origine.path().join("a.txt").to_string_lossy().into_owned()];
-        let esito = copy_all(
-            &sorgenti,
+        let sources = vec![origin.path().join("a.txt").to_string_lossy().into_owned()];
+        let outcome = copy_all(
+            &sources,
             &dest.path().to_string_lossy(),
-            Politica::Salta,
-            &mai(),
-            &mut zitto(),
+            ConflictPolicy::Skip,
+            &never(),
+            &mut silent(),
         )
         .unwrap();
 
-        assert_eq!(esito.saltati, 1);
-        assert_eq!(esito.copiati, 0);
+        assert_eq!(outcome.skipped, 1);
+        assert_eq!(outcome.copied, 0);
         assert_eq!(
             fs::read_to_string(dest.path().join("a.txt")).unwrap(),
             "vecchio"
@@ -473,22 +473,22 @@ mod tests {
     }
 
     #[test]
-    fn spostare_toglie_l_originale() {
-        let origine = tempdir().unwrap();
+    fn moving_removes_the_original() {
+        let origin = tempdir().unwrap();
         let dest = tempdir().unwrap();
-        fs::write(origine.path().join("a.txt"), b"contenuto").unwrap();
+        fs::write(origin.path().join("a.txt"), b"contenuto").unwrap();
 
-        let sorgenti = vec![origine.path().join("a.txt").to_string_lossy().into_owned()];
+        let sources = vec![origin.path().join("a.txt").to_string_lossy().into_owned()];
         move_all(
-            &sorgenti,
+            &sources,
             &dest.path().to_string_lossy(),
-            Politica::Rinomina,
-            &mai(),
-            &mut zitto(),
+            ConflictPolicy::Rename,
+            &never(),
+            &mut silent(),
         )
         .unwrap();
 
-        assert!(!origine.path().join("a.txt").exists());
+        assert!(!origin.path().join("a.txt").exists());
         assert_eq!(
             fs::read_to_string(dest.path().join("a.txt")).unwrap(),
             "contenuto"
@@ -496,85 +496,85 @@ mod tests {
     }
 
     #[test]
-    fn rifiuta_di_copiare_una_cartella_dentro_se_stessa() {
+    fn refuses_to_copy_a_folder_into_itself() {
         let dir = tempdir().unwrap();
-        let padre = dir.path().join("padre");
-        let figlia = padre.join("figlia");
-        fs::create_dir_all(&figlia).unwrap();
+        let parent = dir.path().join("padre");
+        let child = parent.join("figlia");
+        fs::create_dir_all(&child).unwrap();
 
-        let sorgenti = vec![padre.to_string_lossy().into_owned()];
+        let sources = vec![parent.to_string_lossy().into_owned()];
         let err = copy_all(
-            &sorgenti,
-            &figlia.to_string_lossy(),
-            Politica::Rinomina,
-            &mai(),
-            &mut zitto(),
+            &sources,
+            &child.to_string_lossy(),
+            ConflictPolicy::Rename,
+            &never(),
+            &mut silent(),
         )
         .unwrap_err();
 
         match err {
             FsError::Io { message } => assert!(message.contains("dentro sé stessa")),
-            altro => panic!("errore inatteso: {:?}", altro),
+            other => panic!("unexpected error: {:?}", other),
         }
     }
 
     #[test]
-    fn annullare_prima_di_iniziare_non_copia_niente() {
-        let origine = tempdir().unwrap();
+    fn cancelling_before_starting_copies_nothing() {
+        let origin = tempdir().unwrap();
         let dest = tempdir().unwrap();
-        fs::write(origine.path().join("a.txt"), b"x").unwrap();
+        fs::write(origin.path().join("a.txt"), b"x").unwrap();
 
-        let sorgenti = vec![origine.path().join("a.txt").to_string_lossy().into_owned()];
-        let esito = copy_all(
-            &sorgenti,
+        let sources = vec![origin.path().join("a.txt").to_string_lossy().into_owned()];
+        let outcome = copy_all(
+            &sources,
             &dest.path().to_string_lossy(),
-            Politica::Rinomina,
+            ConflictPolicy::Rename,
             &AtomicBool::new(true),
-            &mut zitto(),
+            &mut silent(),
         )
         .unwrap();
 
-        assert!(esito.annullato);
-        assert_eq!(esito.copiati, 0);
+        assert!(outcome.cancelled);
+        assert_eq!(outcome.copied, 0);
         assert!(!dest.path().join("a.txt").exists());
     }
 
     #[test]
-    fn l_avanzamento_riporta_i_byte_trasferiti() {
-        let origine = tempdir().unwrap();
+    fn progress_reports_the_transferred_bytes() {
+        let origin = tempdir().unwrap();
         let dest = tempdir().unwrap();
-        fs::write(origine.path().join("a.txt"), vec![0u8; 100]).unwrap();
-        fs::write(origine.path().join("b.txt"), vec![0u8; 50]).unwrap();
+        fs::write(origin.path().join("a.txt"), vec![0u8; 100]).unwrap();
+        fs::write(origin.path().join("b.txt"), vec![0u8; 50]).unwrap();
 
-        let sorgenti = vec![
-            origine.path().join("a.txt").to_string_lossy().into_owned(),
-            origine.path().join("b.txt").to_string_lossy().into_owned(),
+        let sources = vec![
+            origin.path().join("a.txt").to_string_lossy().into_owned(),
+            origin.path().join("b.txt").to_string_lossy().into_owned(),
         ];
 
-        assert_eq!(total_bytes(&sorgenti), 150);
+        assert_eq!(total_bytes(&sources), 150);
 
-        let mut letture = Vec::new();
+        let mut reads = Vec::new();
         copy_all(
-            &sorgenti,
+            &sources,
             &dest.path().to_string_lossy(),
-            Politica::Rinomina,
-            &mai(),
-            &mut |b| letture.push(b),
+            ConflictPolicy::Rename,
+            &never(),
+            &mut |b| reads.push(b),
         )
         .unwrap();
 
-        assert_eq!(letture.last(), Some(&150));
+        assert_eq!(reads.last(), Some(&150));
     }
 
     #[test]
-    fn total_bytes_somma_anche_le_sottocartelle() {
+    fn total_bytes_also_sums_subfolders() {
         let dir = tempdir().unwrap();
         let sub = dir.path().join("cartella");
         fs::create_dir_all(sub.join("dentro")).unwrap();
         fs::write(sub.join("uno.bin"), vec![0u8; 30]).unwrap();
         fs::write(sub.join("dentro").join("due.bin"), vec![0u8; 70]).unwrap();
 
-        let sorgenti = vec![sub.to_string_lossy().into_owned()];
-        assert_eq!(total_bytes(&sorgenti), 100);
+        let sources = vec![sub.to_string_lossy().into_owned()];
+        assert_eq!(total_bytes(&sources), 100);
     }
 }

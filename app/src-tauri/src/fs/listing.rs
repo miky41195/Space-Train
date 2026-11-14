@@ -8,7 +8,7 @@ use std::path::Path;
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Listing {
-    /// Path normalizzato per la visualizzazione, senza prefisso `\\?\`.
+    /// Path normalized for display, without the `\\?\` prefix.
     pub path: String,
     pub entries: Vec<Entry>,
 }
@@ -16,8 +16,8 @@ pub struct Listing {
 pub fn list_dir(path: &str, spec: &SortSpec, show_hidden: bool) -> Result<Listing, FsError> {
     let raw = Path::new(path);
 
-    // Distinzione esplicita: senza questo controllo un file passato come
-    // directory darebbe un Io generico invece di NotADirectory.
+    // Explicit distinction: without this check a file passed as a
+    // directory would give a generic Io instead of NotADirectory.
     let meta = std::fs::metadata(paths::extended(raw)).map_err(|e| from_io(&e))?;
     if !meta.is_dir() {
         return Err(FsError::NotADirectory);
@@ -25,7 +25,7 @@ pub fn list_dir(path: &str, spec: &SortSpec, show_hidden: bool) -> Result<Listin
 
     let read = std::fs::read_dir(paths::extended(raw)).map_err(|e| from_io(&e))?;
 
-    // Una voce illeggibile viene saltata senza far fallire l'intero listing.
+    // An unreadable entry is skipped without failing the whole listing.
     let mut entries: Vec<Entry> = read
         .filter_map(|res| res.ok())
         .filter_map(|de| entry_from_dir_entry(&de))
@@ -59,14 +59,14 @@ mod tests {
     }
 
     #[test]
-    fn una_cartella_vuota_da_zero_voci() {
+    fn an_empty_folder_gives_zero_entries() {
         let dir = tempdir().unwrap();
         let r = list_dir(&dir.path().to_string_lossy(), &spec(), false).unwrap();
         assert_eq!(r.entries.len(), 0);
     }
 
     #[test]
-    fn elenca_e_ordina_le_voci() {
+    fn lists_and_sorts_entries() {
         let dir = tempdir().unwrap();
         fs::write(dir.path().join("b.txt"), b"x").unwrap();
         fs::write(dir.path().join("a.txt"), b"x").unwrap();
@@ -74,18 +74,18 @@ mod tests {
 
         let r = list_dir(&dir.path().to_string_lossy(), &spec(), false).unwrap();
 
-        let nomi: Vec<&str> = r.entries.iter().map(|e| e.name.as_str()).collect();
-        assert_eq!(nomi, vec!["zsub", "a.txt", "b.txt"]);
+        let names: Vec<&str> = r.entries.iter().map(|e| e.name.as_str()).collect();
+        assert_eq!(names, vec!["zsub", "a.txt", "b.txt"]);
     }
 
     #[test]
-    fn un_path_inesistente_da_not_found() {
+    fn a_missing_path_gives_not_found() {
         let err = list_dir(r"C:\questo\non\esiste\davvero", &spec(), false).unwrap_err();
         assert_eq!(err, FsError::NotFound);
     }
 
     #[test]
-    fn un_file_al_posto_di_una_cartella_da_not_a_directory() {
+    fn a_file_instead_of_a_folder_gives_not_a_directory() {
         let dir = tempdir().unwrap();
         let file = dir.path().join("f.txt");
         fs::write(&file, b"x").unwrap();
@@ -95,20 +95,20 @@ mod tests {
     }
 
     #[test]
-    fn gestisce_path_oltre_260_caratteri() {
+    fn handles_paths_over_260_characters() {
         let dir = tempdir().unwrap();
         let mut p = dir.path().to_path_buf();
         for _ in 0..12 {
             p = p.join("cartella_con_nome_abbastanza_lungo_da_sforare");
         }
-        // Il prefisso esteso serve anche al setup: senza, create_dir_all
-        // fallirebbe prima ancora di arrivare al codice sotto test.
+        // The extended prefix is needed for the setup too: without it,
+        // create_dir_all would fail before even reaching the code under test.
         fs::create_dir_all(paths::extended(&p)).unwrap();
         fs::write(paths::extended(&p).join("dentro.txt"), b"x").unwrap();
 
         assert!(
             p.to_string_lossy().len() > 260,
-            "il path di test deve superare i 260 caratteri"
+            "the test path must exceed 260 characters"
         );
 
         let r = list_dir(&p.to_string_lossy(), &spec(), false).unwrap();
@@ -117,7 +117,7 @@ mod tests {
     }
 
     #[test]
-    fn il_path_restituito_non_ha_il_prefisso_esteso() {
+    fn the_returned_path_has_no_extended_prefix() {
         let dir = tempdir().unwrap();
         let r = list_dir(&dir.path().to_string_lossy(), &spec(), false).unwrap();
         assert!(!r.path.starts_with(r"\\?\"));

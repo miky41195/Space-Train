@@ -61,7 +61,7 @@ async function until(what, check, ms = 20000) {
 	throw new Error(`Timed out waiting for: ${what} (last: ${JSON.stringify(last)})`);
 }
 
-const names = () => run(`return [...document.querySelectorAll('.row .name, .cella .nome')].map(n => n.textContent.trim())`);
+const names = () => run(`return [...document.querySelectorAll('.row .name, .cell .name')].map(n => n.textContent.trim())`);
 
 async function click(what, script, ...args) {
 	const el = await until(what, () => run(script, ...args));
@@ -87,7 +87,7 @@ const clickDialogButton = (label) =>
 const clickSidebar = (label) =>
 	click(
 		`sidebar ${label}`,
-		`return [...document.querySelectorAll('.sidebar .voce')].find(b => b.textContent.trim() === arguments[0]) ?? null`,
+		`return [...document.querySelectorAll('.sidebar .item')].find(b => b.textContent.trim() === arguments[0]) ?? null`,
 		label
 	);
 
@@ -138,9 +138,9 @@ try {
 	});
 
 	await step('sidebar has no Windows network entry', async () => {
-		const voci = await run(`return [...document.querySelectorAll('.sidebar .voce')].map(b => b.textContent.trim())`);
-		if (voci.includes('Rete')) throw new Error(`«Rete» shown: ${voci}`);
-		for (const x of ['Questo PC', 'Cestino']) if (!voci.includes(x)) throw new Error(`missing ${x}: ${voci}`);
+		const items = await run(`return [...document.querySelectorAll('.sidebar .item')].map(b => b.textContent.trim())`);
+		if (items.includes('Rete')) throw new Error(`«Rete» shown: ${items}`);
+		for (const x of ['Questo PC', 'Cestino']) if (!items.includes(x)) throw new Error(`missing ${x}: ${items}`);
 	});
 
 	await step('Delete moves a file to the Trash', async () => {

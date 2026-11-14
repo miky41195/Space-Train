@@ -75,56 +75,56 @@
 	}
 </script>
 
-<div class="sfondo" role="presentation" onclick={(e) => e.target === e.currentTarget && !busy && oncancel()} onkeydown={(e) => e.key === 'Escape' && !busy && oncancel()}>
-	<div class="finestra" role="dialog" aria-modal="true" aria-label={title}>
+<div class="backdrop" role="presentation" onclick={(e) => e.target === e.currentTarget && !busy && oncancel()} onkeydown={(e) => e.key === 'Escape' && !busy && oncancel()}>
+	<div class="dialog" role="dialog" aria-modal="true" aria-label={title}>
 		<form onsubmit={submit}>
 			<h2>{title}</h2>
 
 			{#if mode.kind === 'edit'}
-				<div class="protocolli" role="radiogroup" aria-label="Protocollo">
+				<div class="protocols" role="radiogroup" aria-label="Protocollo">
 					{#each PROTOCOLS as p (p.id)}
 						<button type="button" role="radio" aria-checked={config.protocol === p.id} class:on={config.protocol === p.id} onclick={() => setProtocol(p.id)}
 							>{p.name}</button
 						>
 					{/each}
 				</div>
-				<div class="due">
+				<div class="two">
 					<label>
-						<span class="etichetta">Indirizzo</span>
+						<span class="label">Indirizzo</span>
 						<input bind:this={first} bind:value={config.host} placeholder={config.protocol === 'webdav' ? 'https://nas.example.it/dav' : 'server.example.it'} spellcheck="false" />
 					</label>
-					<label class="porta">
-						<span class="etichetta">Porta</span>
+					<label class="port">
+						<span class="label">Porta</span>
 						<input type="number" min="0" max="65535" bind:value={config.port} />
 					</label>
 				</div>
-				<div class="due pari">
+				<div class="two even">
 					<label>
-						<span class="etichetta">Utente</span>
+						<span class="label">Utente</span>
 						<input bind:value={config.user} spellcheck="false" autocomplete="username" />
 					</label>
 					<label>
-						<span class="etichetta">Password</span>
+						<span class="label">Password</span>
 						<input type="password" bind:value={password} autocomplete="current-password" placeholder={mode.server ? 'lascia vuota per non cambiarla' : ''} />
 					</label>
 				</div>
-				<div class="due pari">
+				<div class="two even">
 					<label>
-						<span class="etichetta">Nome</span>
+						<span class="label">Nome</span>
 						<input bind:value={config.name} placeholder={config.host || 'Il mio server'} />
 					</label>
 					<label>
-						<span class="etichetta">Cartella iniziale</span>
+						<span class="label">Cartella iniziale</span>
 						<input bind:value={config.path} spellcheck="false" />
 					</label>
 				</div>
-				<label class="scelta"><input type="checkbox" bind:checked={remember} /> Ricorda la password (Gestore credenziali di Windows)</label>
+				<label class="choice"><input type="checkbox" bind:checked={remember} /> Ricorda la password (Gestore credenziali di Windows)</label>
 				{#if config.protocol === 'ftp' || config.host.startsWith('http://')}
-					<p class="avviso">Questo collegamento non è cifrato: password e file viaggiano in chiaro. Usalo solo nella rete di casa.</p>
+					<p class="notice">Questo collegamento non è cifrato: password e file viaggiano in chiaro. Usalo solo nella rete di casa.</p>
 				{/if}
 			{:else if mode.kind === 'key'}
 				{#if mode.changed}
-					<p class="avviso">
+					<p class="notice">
 						Il server risponde con una chiave diversa da quella che avevi confermato. Può essere un aggiornamento del server, ma
 						anche qualcuno che si mette in mezzo. Space Train non si collega. Se sei sicuro che il server è stato reinstallato,
 						rimuovilo e aggiungilo di nuovo.
@@ -132,29 +132,29 @@
 				{:else}
 					<p>Controlla che l'impronta sia quella del tuo server. Se un giorno cambia, Space Train si ferma e ti avvisa.</p>
 				{/if}
-				<code class="impronta">{mode.fingerprint}</code>
+				<code class="fingerprint">{mode.fingerprint}</code>
 			{:else}
 				<label>
-					<span class="etichetta">Password{mode.server.user ? ` di ${mode.server.user}` : ''}</span>
+					<span class="label">Password{mode.server.user ? ` di ${mode.server.user}` : ''}</span>
 					<input bind:this={first} type="password" bind:value={password} autocomplete="current-password" />
 				</label>
-				<label class="scelta"><input type="checkbox" bind:checked={remember} /> Ricorda la password</label>
+				<label class="choice"><input type="checkbox" bind:checked={remember} /> Ricorda la password</label>
 			{/if}
 
-			{#if error}<p class="errore" role="alert">{error}</p>{/if}
+			{#if error}<p class="error" role="alert">{error}</p>{/if}
 
-			<div class="azioni">
+			<div class="actions">
 				{#if mode.kind === 'edit' && mode.server && onremove}
 					{@const id = mode.server.id}
-					<button type="button" class="via" onclick={() => onremove(id)} disabled={busy}>Rimuovi</button>
+					<button type="button" class="route" onclick={() => onremove(id)} disabled={busy}>Rimuovi</button>
 				{/if}
 				<button type="button" onclick={oncancel} disabled={busy}>{mode.kind === 'key' && mode.changed ? 'Chiudi' : 'Annulla'}</button>
 				{#if mode.kind === 'edit'}
-					<button type="submit" class="primario" disabled={busy || !config.host.trim()}>{busy ? 'Un momento…' : mode.server ? 'Salva' : 'Aggiungi'}</button>
+					<button type="submit" class="primary" disabled={busy || !config.host.trim()}>{busy ? 'Un momento…' : mode.server ? 'Salva' : 'Aggiungi'}</button>
 				{:else if mode.kind === 'key' && !mode.changed}
-					<button bind:this={first} type="submit" class="primario" disabled={busy}>È il mio server</button>
+					<button bind:this={first} type="submit" class="primary" disabled={busy}>È il mio server</button>
 				{:else if mode.kind === 'password'}
-					<button type="submit" class="primario" disabled={busy || !password}>{busy ? 'Un momento…' : 'Collegati'}</button>
+					<button type="submit" class="primary" disabled={busy || !password}>{busy ? 'Un momento…' : 'Collegati'}</button>
 				{/if}
 			</div>
 		</form>
@@ -162,7 +162,7 @@
 </div>
 
 <style>
-	.sfondo {
+	.backdrop {
 		position: fixed;
 		inset: 0;
 		display: flex;
@@ -171,14 +171,14 @@
 		background: color-mix(in srgb, var(--bg) 72%, transparent);
 		z-index: 10;
 	}
-	.finestra {
+	.dialog {
 		width: min(460px, 92vw);
 		padding: 20px;
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: var(--radius);
-		clip-path: var(--forma, none);
-		mask: var(--maschera, none);
+		clip-path: var(--shape, none);
+		mask: var(--mask, none);
 		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
 	}
 	form {
@@ -187,7 +187,7 @@
 	}
 	h2 {
 		margin: 0;
-		font-size: calc(15px * var(--scala-testo, 1));
+		font-size: calc(15px * var(--text-scale, 1));
 		font-weight: 600;
 		overflow-wrap: anywhere;
 	}
@@ -195,7 +195,7 @@
 		margin: 0;
 		line-height: 1.5;
 	}
-	.protocolli {
+	.protocols {
 		display: flex;
 		gap: 2px;
 		width: fit-content;
@@ -203,7 +203,7 @@
 		border-radius: var(--radius-sm);
 		background: var(--bg);
 	}
-	.protocolli button {
+	.protocols button {
 		height: 26px;
 		padding: 0 12px;
 		border: none;
@@ -213,16 +213,16 @@
 		font: inherit;
 		cursor: default;
 	}
-	.protocolli button.on {
+	.protocols button.on {
 		background: var(--accent-soft);
 		color: var(--text);
 	}
-	.due {
+	.two {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) 90px;
 		gap: 8px;
 	}
-	.due.pari {
+	.two.even {
 		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 	}
 	label {
@@ -230,9 +230,9 @@
 		gap: 6px;
 		min-width: 0;
 	}
-	.etichetta {
+	.label {
 		font-family: var(--font-display);
-		font-size: calc(11px * var(--scala-testo, 1));
+		font-size: calc(11px * var(--text-scale, 1));
 		font-weight: 600;
 		letter-spacing: 0.12em;
 		text-transform: uppercase;
@@ -256,58 +256,58 @@
 		border-color: var(--accent);
 		outline: none;
 	}
-	.scelta {
+	.choice {
 		display: flex;
 		align-items: center;
 		gap: 8px;
 	}
-	.impronta {
+	.fingerprint {
 		display: block;
 		padding: 8px 10px;
 		border-radius: var(--radius-sm);
 		background: var(--bg);
 		font-family: var(--font-display);
-		font-size: calc(12px * var(--scala-testo, 1));
+		font-size: calc(12px * var(--text-scale, 1));
 		overflow-wrap: anywhere;
 		user-select: all;
 	}
-	.avviso,
-	.errore {
+	.notice,
+	.error {
 		padding: 8px 10px;
 		border-radius: var(--radius-sm);
 		background: rgba(196, 43, 28, 0.12);
-		color: var(--errore-testo, #ffb4ab);
-		font-size: calc(12px * var(--scala-testo, 1));
+		color: var(--error-text, #ffb4ab);
+		font-size: calc(12px * var(--text-scale, 1));
 	}
-	.azioni {
+	.actions {
 		display: flex;
 		justify-content: flex-end;
 		gap: 8px;
 		margin-top: 4px;
 	}
-	.azioni button {
+	.actions button {
 		height: 30px;
 		padding: 0 14px;
 		border: 1px solid var(--border);
 		border-radius: var(--radius-sm);
-		clip-path: var(--forma-sm, none);
-		mask: var(--maschera-sm, none);
+		clip-path: var(--shape-sm, none);
+		mask: var(--mask-sm, none);
 		background: transparent;
 		color: var(--text);
 		font: inherit;
 		cursor: default;
 	}
-	.azioni button:hover:not(:disabled) {
+	.actions button:hover:not(:disabled) {
 		background: var(--row-hover);
 	}
-	.azioni button:disabled {
+	.actions button:disabled {
 		opacity: 0.5;
 	}
-	.azioni .via {
+	.actions .route {
 		margin-right: auto;
-		color: var(--errore-testo, #ffb4ab);
+		color: var(--error-text, #ffb4ab);
 	}
-	.primario {
+	.primary {
 		border-color: transparent !important;
 		background: var(--accent) !important;
 		color: #fff !important;

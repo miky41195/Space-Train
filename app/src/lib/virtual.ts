@@ -1,7 +1,7 @@
-/** Altezza riga fissa: l'indice visibile è aritmetica, non misurazione. */
+/** Fixed row height: the visible index is arithmetic, not measurement. */
 export const ROW_HEIGHT = 32;
 
-/** Righe extra sopra e sotto la finestra, per coprire lo scroll rapido. */
+/** Extra rows above and below the window, to cover fast scrolling. */
 export const OVERSCAN = 8;
 
 export interface Range {
@@ -11,66 +11,57 @@ export interface Range {
 	totalHeight: number;
 }
 
-/** Lato della cella nella vista a griglia, miniatura più didascalia. */
+/** Side of the cell in the grid view, thumbnail plus caption. */
 export const CELL_WIDTH = 116;
 export const CELL_HEIGHT = 124;
 
 export interface GridRange extends Range {
-	/** Celle per riga: dipende dalla larghezza disponibile. */
+	/** Cells per row: depends on the available width. */
 	columns: number;
 }
 
 /**
- * Come `visibleRange`, ma per una griglia.
+ * Like `visibleRange`, but for a grid.
  *
- * Restituisce indici di **elementi**, non di righe: chi disegna affetta la
- * lista come nella vista a colonna e non deve sapere nulla della griglia.
+ * It returns indices of **items**, not of rows: whoever draws slices the
+ * list as in the column view and needs to know nothing of the grid.
  */
-export function visibleGridRange(
-	scrollTop: number,
-	viewportHeight: number,
-	viewportWidth: number,
-	total: number
-): GridRange {
+export function visibleGridRange(scrollTop: number, viewportHeight: number, viewportWidth: number, total: number): GridRange {
 	const columns = Math.max(1, Math.floor(viewportWidth / CELL_WIDTH));
 
 	if (total === 0) {
 		return { start: 0, count: 0, padTop: 0, totalHeight: 0, columns };
 	}
 
-	const righeTotali = Math.ceil(total / columns);
-	const primaRiga = Math.floor(scrollTop / CELL_HEIGHT);
-	const rigaInizio = Math.max(0, primaRiga - OVERSCAN_GRIGLIA);
-	const righeVisibili = Math.ceil(viewportHeight / CELL_HEIGHT) + OVERSCAN_GRIGLIA * 2;
+	const totalRows = Math.ceil(total / columns);
+	const firstRow = Math.floor(scrollTop / CELL_HEIGHT);
+	const startRow = Math.max(0, firstRow - GRID_OVERSCAN);
+	const visibleRows = Math.ceil(viewportHeight / CELL_HEIGHT) + GRID_OVERSCAN * 2;
 
-	const start = rigaInizio * columns;
-	const count = Math.min(righeVisibili * columns, total - start);
+	const start = startRow * columns;
+	const count = Math.min(visibleRows * columns, total - start);
 
 	return {
 		start,
 		count,
-		padTop: rigaInizio * CELL_HEIGHT,
-		totalHeight: righeTotali * CELL_HEIGHT,
+		padTop: startRow * CELL_HEIGHT,
+		totalHeight: totalRows * CELL_HEIGHT,
 		columns
 	};
 }
 
-/** Le celle sono più alte delle righe: bastano meno file di margine. */
-const OVERSCAN_GRIGLIA = 2;
+/** Cells are taller than rows: fewer rows of margin are enough. */
+const GRID_OVERSCAN = 2;
 
-export function visibleRange(
-	scrollTop: number,
-	viewportHeight: number,
-	total: number
-): Range {
+export function visibleRange(scrollTop: number, viewportHeight: number, total: number): Range {
 	if (total === 0) {
 		return { start: 0, count: 0, padTop: 0, totalHeight: 0 };
 	}
 
-	const primaVisibile = Math.floor(scrollTop / ROW_HEIGHT);
-	const start = Math.max(0, primaVisibile - OVERSCAN);
-	const finestra = Math.ceil(viewportHeight / ROW_HEIGHT) + OVERSCAN * 2;
-	const count = Math.min(finestra, total - start);
+	const firstVisible = Math.floor(scrollTop / ROW_HEIGHT);
+	const start = Math.max(0, firstVisible - OVERSCAN);
+	const window = Math.ceil(viewportHeight / ROW_HEIGHT) + OVERSCAN * 2;
+	const count = Math.min(window, total - start);
 
 	return {
 		start,
@@ -80,96 +71,86 @@ export function visibleRange(
 	};
 }
 
-/** Altezza della testata che apre ogni zona quando la cartella è divisa. */
-export const ZONA_TESTATA = 28;
+/** Height of the header that opens each zone when the folder is divided. */
+export const ZONE_HEADER = 28;
 
-export interface Zona {
-	/** Indice globale della prima voce della zona. */
-	inizio: number;
-	quante: number;
-	/** Distanza in pixel della testata dalla cima dello spaziatore. */
-	alto: number;
-	/** Distanza in pixel della prima riga di voci. */
-	corpo: number;
-	righe: number;
+export interface VirtualZone {
+	/** Global index of the zone's first item. */
+	start: number;
+	count: number;
+	/** Distance in pixels of the header from the top of the spacer. */
+	top: number;
+	/** Distance in pixels of the first row of items. */
+	body: number;
+	rows: number;
 }
 
-export interface Impaginato {
-	zone: Zona[];
-	altezzaTotale: number;
+export interface ZoneLayout {
+	zones: VirtualZone[];
+	totalHeight: number;
 }
 
 /**
- * Impila le zone una sotto l'altra, ognuna con la sua testata.
+ * Stacks the zones one below the other, each with its header.
  *
- * Le righe restano a passo fisso dentro ogni zona: la posizione di una
- * voce è ancora aritmetica, solo con uno scarto per zona. Con una zona
- * sola e testata zero il risultato coincide con la lista non divisa.
+ * Rows stay at a fixed pitch within each zone: an item's position is still
+ * arithmetic, only with an offset per zone. With a single zone and a zero
+ * header the result matches the undivided list.
  */
-export function impaginaZone(
-	conteggi: readonly number[],
-	colonne: number,
-	altezzaRiga: number,
-	testata: number
-): Impaginato {
+export function layoutZones(counts: readonly number[], columns: number, rowHeight: number, header: number): ZoneLayout {
 	let y = 0;
-	let inizio = 0;
+	let start = 0;
 
-	const zone = conteggi.map((quante) => {
-		const righe = Math.ceil(quante / colonne);
-		const zona = { inizio, quante, alto: y, corpo: y + testata, righe };
-		y += testata + righe * altezzaRiga;
-		inizio += quante;
-		return zona;
+	const zones = counts.map((count) => {
+		const rows = Math.ceil(count / columns);
+		const zone = { start, count, top: y, body: y + header, rows };
+		y += header + rows * rowHeight;
+		start += count;
+		return zone;
 	});
 
-	return { zone, altezzaTotale: y };
+	return { zones, totalHeight: y };
 }
 
-export interface FinestraZona {
-	/** Indice globale della prima voce da disegnare. */
+export interface ZoneWindow {
+	/** Global index of the first item to draw. */
 	start: number;
 	count: number;
-	/** Dove va posata la prima riga disegnata, dalla cima dello spaziatore. */
+	/** Where the first drawn row goes, from the top of the spacer. */
 	top: number;
 }
 
-/** Le voci di una zona che cadono nella finestra visibile, più il margine. */
-export function finestraZona(
-	zona: Zona,
+/** The items of a zone that fall in the visible window, plus the margin. */
+export function zoneWindow(
+	zone: VirtualZone,
 	scrollTop: number,
-	altezzaVista: number,
-	colonne: number,
-	altezzaRiga: number,
-	margine: number
-): FinestraZona {
-	const relativo = scrollTop - zona.corpo;
-	const prima = Math.max(0, Math.floor(relativo / altezzaRiga) - margine);
-	const ultima = Math.min(zona.righe, Math.ceil((relativo + altezzaVista) / altezzaRiga) + margine);
+	viewHeight: number,
+	columns: number,
+	rowHeight: number,
+	margin: number
+): ZoneWindow {
+	const relative = scrollTop - zone.body;
+	const first = Math.max(0, Math.floor(relative / rowHeight) - margin);
+	const last = Math.min(zone.rows, Math.ceil((relative + viewHeight) / rowHeight) + margin);
 
-	if (ultima <= prima) return { start: zona.inizio, count: 0, top: zona.corpo };
+	if (last <= first) return { start: zone.start, count: 0, top: zone.body };
 
-	const start = prima * colonne;
+	const start = first * columns;
 	return {
-		start: zona.inizio + start,
-		count: Math.min((ultima - prima) * colonne, zona.quante - start),
-		top: zona.corpo + prima * altezzaRiga
+		start: zone.start + start,
+		count: Math.min((last - first) * columns, zone.count - start),
+		top: zone.body + first * rowHeight
 	};
 }
 
-/** Cima in pixel della riga che contiene la voce di indice globale `i`. */
-export function cimaVoce(
-	zone: readonly Zona[],
-	i: number,
-	colonne: number,
-	altezzaRiga: number
-): number {
-	const zona = zone.find((z) => i < z.inizio + z.quante) ?? zone[zone.length - 1];
-	if (!zona) return 0;
-	return zona.corpo + Math.floor((i - zona.inizio) / colonne) * altezzaRiga;
+/** Top in pixels of the row holding the item of global index `i`. */
+export function itemTop(zones: readonly VirtualZone[], i: number, columns: number, rowHeight: number): number {
+	const zone = zones.find((z) => i < z.start + z.count) ?? zones[zones.length - 1];
+	if (!zone) return 0;
+	return zone.body + Math.floor((i - zone.start) / columns) * rowHeight;
 }
 
-/** Celle per riga nella griglia, mai meno di una. */
-export function colonneGriglia(larghezza: number, cella = CELL_WIDTH): number {
-	return Math.max(1, Math.floor(larghezza / cella));
+/** Cells per row in the grid, never fewer than one. */
+export function gridColumns(width: number, cell = CELL_WIDTH): number {
+	return Math.max(1, Math.floor(width / cell));
 }

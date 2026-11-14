@@ -8,11 +8,11 @@
 		tauriBackend,
 		type Entry,
 		type FsError,
-		type TipoNuovo,
-		type StatoLan,
-		type Pari,
-		type RichiestaInvio,
-		type StatoAmici,
+		type NewFileType,
+		type LanStatus,
+		type Peer,
+		type SendRequest,
+		type FriendsStatus,
 		type GitStatus,
 		type ServerConfig
 	} from '$lib/ipc';
@@ -20,143 +20,143 @@
 	import TitleBar from '$lib/components/TitleBar.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import Breadcrumb from '$lib/components/Breadcrumb.svelte';
-	import BarraComandi from '$lib/components/BarraComandi.svelte';
-	import BarraRecenti from '$lib/components/BarraRecenti.svelte';
-	import RichiestaLan from '$lib/components/RichiestaLan.svelte';
-	import NovitaFinestra from '$lib/components/Novita.svelte';
-	import AmiciFinestra from '$lib/components/Amici.svelte';
-	import { NOVITA, novitaDaMostrare, type Novita } from '$lib/novita';
+	import CommandBar from '$lib/components/CommandBar.svelte';
+	import RecentBar from '$lib/components/RecentBar.svelte';
+	import IncomingFiles from '$lib/components/IncomingFiles.svelte';
+	import WhatsNewDialog from '$lib/components/WhatsNew.svelte';
+	import FriendsDialog from '$lib/components/Friends.svelte';
+	import { WHATS_NEW, whatsNewToShow, type WhatsNew } from '$lib/whats-new';
 	import FileList from '$lib/components/FileList.svelte';
-	import PannelloPassivo from '$lib/components/PannelloPassivo.svelte';
-	import TestataPannello from '$lib/components/TestataPannello.svelte';
+	import PassivePane from '$lib/components/PassivePane.svelte';
+	import PaneHeader from '$lib/components/PaneHeader.svelte';
 	import { followActive, otherPane, type Split } from '$lib/split';
-	import { alignPlan, compareZones } from '$lib/confronto';
-	import { internoDi, sopra } from '$lib/archivio';
-	import { NESSUN_FILTRO, criteriFiltri, descriviRicerca, filtriAttivi, type Filtri } from '$lib/filtri';
-	import { RICERCHE_PRONTE, RicercheStore, type RicercaSalvata } from '$lib/stores/ricerche.svelte';
+	import { alignPlan, compareZones } from '$lib/comparison';
+	import { innerOf, above } from '$lib/archive';
+	import { NO_FILTERS, filterCriteria, describeSearch, filtersActive, type Filters } from '$lib/filters';
+	import { READY_SEARCHES, SearchesStore, type SavedSearch } from '$lib/stores/searches.svelte';
 	import SearchBar from '$lib/components/SearchBar.svelte';
-	import ConfermaCestino from '$lib/components/ConfermaCestino.svelte';
+	import ConfirmTrash from '$lib/components/ConfirmTrash.svelte';
 	import NameDialog from '$lib/components/NameDialog.svelte';
 	import { WorkspacesStore, type Snapshot } from '$lib/stores/workspaces.svelte';
 	import { MediaStore } from '$lib/stores/media.svelte';
 	import { RulesStore } from '$lib/stores/rules.svelte';
 	import RulesDialog from '$lib/components/RulesDialog.svelte';
-	import Pulizia from '$lib/components/Pulizia.svelte';
-	import ConfrontoFile from '$lib/components/ConfrontoFile.svelte';
-	import type { Piano } from '$lib/pulizia';
-	import { registra, testoCrescita, type Crescita, type Misure } from '$lib/crescita';
-	import { daRicordare, SILENZIO, type Promemoria, type StatoPromemoria, type UltimaPulizia } from '$lib/promemoria';
+	import DiskCleanup from '$lib/components/DiskCleanup.svelte';
+	import FileCompare from '$lib/components/FileCompare.svelte';
+	import type { Plan } from '$lib/cleanup';
+	import { record, growthText, type Growth, type Measures } from '$lib/growth';
+	import { dueReminder, QUIET, type Reminder, type ReminderState, type LastCleanup } from '$lib/disk-reminder';
 	import VaultDialog from '$lib/components/VaultDialog.svelte';
 	import ServerDialog from '$lib/components/ServerDialog.svelte';
-	import { samePath as stessaCartella } from '$lib/rules';
+	import { samePath as sameFolder } from '$lib/rules';
 	import { sortByMedia, type MediaKey } from '$lib/media';
-	import SommaControllo from '$lib/components/SommaControllo.svelte';
-	import ConvertiImmagini from '$lib/components/ConvertiImmagini.svelte';
+	import ChecksumDialog from '$lib/components/ChecksumDialog.svelte';
+	import ImageConvert from '$lib/components/ImageConvert.svelte';
 	import Palette from '$lib/components/Palette.svelte';
-	import CodaLavori from '$lib/components/CodaLavori.svelte';
-	import type { Comando } from '$lib/palette';
-	import { SHORTCUT_GROUPS, type AzioneTasto } from '$lib/scorciatoie';
-	import { TEMI } from '$lib/temi';
+	import JobQueue from '$lib/components/JobQueue.svelte';
+	import type { Command } from '$lib/palette';
+	import { SHORTCUT_GROUPS, type KeyAction } from '$lib/shortcuts';
+	import { THEMES } from '$lib/themes';
 	import BatchRename from '$lib/components/BatchRename.svelte';
 	import { renameSteps, type PlannedRename } from '$lib/batch-rename';
-	import ConfermaConflitti from '$lib/components/ConfermaConflitti.svelte';
-	import BarraProgresso from '$lib/components/BarraProgresso.svelte';
-	import type { ModoBarra } from '$lib/progresso';
+	import ConfirmConflicts from '$lib/components/ConfirmConflicts.svelte';
+	import ProgressBar from '$lib/components/ProgressBar.svelte';
+	import type { ProgressMode } from '$lib/progress-mode';
 	import Rail from '$lib/components/Rail.svelte';
-	import Icona from '$lib/components/Icona.svelte';
-	import Treno from '$lib/components/Treno.svelte';
-	import { decodifica as leggiSprite, misuraBinario } from '$lib/spritesheet';
-	import Anteprima from '$lib/components/Anteprima.svelte';
+	import Icon from '$lib/components/Icon.svelte';
+	import Parade from '$lib/components/Parade.svelte';
+	import { decode as decodeSprite, railSize } from '$lib/spritesheet';
+	import Preview from '$lib/components/Preview.svelte';
 	import { ClipboardStore } from '$lib/stores/clipboard.svelte';
-	import { IconeStore } from '$lib/stores/icone.svelte';
-	import { AggiornamentiStore, fonteTauri, INTERVALLO_CONTROLLO } from '$lib/stores/aggiornamenti.svelte';
-	import { PreferitiStore } from '$lib/stores/preferiti.svelte';
-	import { AccessoRapidoStore } from '$lib/stores/accessoRapido.svelte';
-	import { ImpostazioniStore, type Colonne } from '$lib/stores/impostazioni.svelte';
-	import { AnnullaStore } from '$lib/stores/annulla.svelte';
-	import type { Eliminati, ImageTarget, ModoElimina, Politica, Progresso, SortKey } from '$lib/ipc';
-	import MenuContestuale from '$lib/components/MenuContestuale.svelte';
-	import GalleriaTemi from '$lib/components/GalleriaTemi.svelte';
-	import FinestraImpostazioni from '$lib/components/FinestraImpostazioni.svelte';
-	import StatoVuoto from '$lib/components/StatoVuoto.svelte';
+	import { IconsStore } from '$lib/stores/icons.svelte';
+	import { UpdatesStore, tauriSource, CHECK_INTERVAL } from '$lib/stores/updates.svelte';
+	import { FavoritesStore } from '$lib/stores/favorites.svelte';
+	import { QuickAccessStore } from '$lib/stores/quickAccess.svelte';
+	import { SettingsStore, type Columns } from '$lib/stores/settings.svelte';
+	import { UndoStore } from '$lib/stores/undo.svelte';
+	import type { Deleted, ImageTarget, DeleteMode, ConflictPolicy, Progress, SortKey } from '$lib/ipc';
+	import ContextMenu from '$lib/components/ContextMenu.svelte';
+	import ThemeGallery from '$lib/components/ThemeGallery.svelte';
+	import SettingsWindow from '$lib/components/SettingsWindow.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
 	import FileGrid from '$lib/components/FileGrid.svelte';
-	import Avvio from '$lib/components/Avvio.svelte';
-	import { motoRidotto } from '$lib/moto';
-	import { animaCartella, animazioniDi } from '$lib/animazioni';
-	import { aspettoDi } from '$lib/aspetto';
-	import { leggiMovimento } from '$lib/movimento';
+	import Intro from '$lib/components/Intro.svelte';
+	import { reducedMotion } from '$lib/reduced-motion';
+	import { animateFolder, animationsOf } from '$lib/animations';
+	import { appearanceOf } from '$lib/appearance';
+	import { readMotion } from '$lib/motion';
 	import {
-		vociMenu,
-		vociVista,
-		vociAree,
-		vociOrdina,
-		vociNuovo,
-		vociAccessoRapido,
-		vociColonne,
-		INIZIALE_PREDEFINITA,
-		INIZIALE_ULTIMA,
-		type AzioneMenu,
-		type Posizione,
-		type VoceMenu
+		menuItems,
+		viewItems,
+		workspaceItems,
+		sortItems,
+		newItems,
+		quickAccessItems,
+		columnItems,
+		DEFAULT_START_PAGE,
+		LAST_FOLDER_START_PAGE,
+		type MenuAction,
+		type MenuLocation,
+		type MenuItem
 	} from '$lib/menu';
 	import { historyActionFor } from '$lib/mouse';
 	import { filterEntries } from '$lib/fuzzy';
-	import { impagina, duplicateZones, type ModoGruppi } from '$lib/raggruppa';
-	import { misuraCella, zoom, LATO_MIN, LATO_MAX, type Vista } from '$lib/vista';
-	import { applicaTema, coloreAccento, folderStyleOf, scalaTesto, temaDa, type IdAccento, type TemaPersonale } from '$lib/temi';
-	import EditorTemi from '$lib/components/EditorTemi.svelte';
-	import { EVENTO_EDITOR, type MessaggioEditor } from '$lib/editor-finestra';
-	import { COLORI_CARTELLA, ColoriStore, type IdColore } from '$lib/stores/colori.svelte';
-	import { azioneConPersonalizzate, tastiDi } from '$lib/scorciatoie-personali';
+	import { layout, duplicateZones, type GroupMode } from '$lib/grouping';
+	import { cellSize, zoom, SIDE_MIN, SIDE_MAX, type View } from '$lib/view';
+	import { applyTheme, accentColor, folderStyleOf, textScale, themeById, CUSTOM_ACCENT, type AccentId, type PersonalTheme } from '$lib/themes';
+	import ThemeEditor from '$lib/components/ThemeEditor.svelte';
+	import { EDITOR_EVENT, type EditorMessage } from '$lib/editor-window';
+	import { FOLDER_COLORS, ColorsStore, type ColorId } from '$lib/stores/colors.svelte';
+	import { actionWithCustom, keysOf } from '$lib/custom-shortcuts';
 	import {
-		CESTINO,
-		QUESTO_PC,
-		RETE,
-		RETE_LOCALE,
-		AMICI,
-		NUOVA_SCHEDA,
-		impostaNomiAmici,
-		impostaNomiServer,
-		eServer,
-		cartellaDi,
-		eArchivio,
-		eReteLocale,
-		eVirtuale,
-		dentroDi,
-		nomePosizione,
-		nomeDi,
-		byte,
-		stessoPath,
-		stessoVolume
-	} from '$lib/posizioni';
-	import { RADICE_SISTEMA, SU_LINUX } from '$lib/sistema';
+		TRASH,
+		THIS_PC,
+		NETWORK,
+		LAN,
+		FRIENDS,
+		NEW_TAB,
+		setFriendNames,
+		setServerNames,
+		isServer,
+		folderOf,
+		isArchive,
+		isLan,
+		isVirtual,
+		isInside,
+		locationName,
+		nameOf,
+		formatBytes,
+		samePath,
+		sameVolume
+	} from '$lib/locations';
+	import { SYSTEM_ROOT, ON_LINUX } from '$lib/platform';
 
-	const impostazioni = new ImpostazioniStore();
-	// Come Esplora, ogni cartella ricorda come l'utente l'ha ordinata.
+	const settings = new SettingsStore();
+	// Like Explorer, every folder remembers how the user sorted it.
 	const store = new TabsStore(tauriBackend, {
-		leggi: (cartella) => impostazioni.ordinamentoDi(cartella),
-		scrivi: (cartella, spec) => impostazioni.ricordaOrdinamento(cartella, spec)
+		read: (folder) => settings.sortFor(folder),
+		write: (folder, spec) => settings.rememberSort(folder, spec)
 	});
-	const preferiti = new PreferitiStore();
-	const colori = new ColoriStore();
-	const aree = new WorkspacesStore();
+	const favorites = new FavoritesStore();
+	const colors = new ColorsStore();
+	const workspaces = new WorkspacesStore();
 	const media = new MediaStore((paths) => tauriBackend.mediaProps(paths));
-	const regole = new RulesStore({
+	const rules = new RulesStore({
 		backend: tauriBackend,
-		labelOf: (p) => colori.idDi(p),
-		setLabel: (paths, c) => colori.imposta(paths, c),
-		labelName: (id) => colori.nameOf(id)
+		labelOf: (p) => colors.idOf(p),
+		setLabel: (paths, c) => colors.set(paths, c),
+		labelName: (id) => colors.nameOf(id)
 	});
 	/** Folder whose rules are being edited. */
-	let regoleDi = $state<string | null>(null);
-	const accessoRapido = new AccessoRapidoStore();
-	const ricerche = new RicercheStore();
+	let rulesOf = $state<string | null>(null);
+	const quickAccess = new QuickAccessStore();
+	const searches = new SearchesStore();
 
 	/**
-	 * Quale finestra è questa. «main» è quella aperta all'avvio; le altre
-	 * nascono con Ctrl+N e ricevono la cartella da aprire da Rust.
+	 * Which window this is. «main» is the one opened at startup; the
+	 * others are born with Ctrl+N and get the folder to open from Rust.
 	 */
-	const finestra = (() => {
+	const windowLabel = (() => {
 		try {
 			return getCurrentWindow().label;
 		} catch {
@@ -164,205 +164,212 @@
 		}
 	})();
 
-	/** Ascolta un evento solo se è rivolto a questa finestra. */
-	function soloQui<T>(nome: string, f: (payload: T) => void) {
-		return listen<T>(nome, (e) => f(e.payload), { target: { kind: 'WebviewWindow', label: finestra } });
+	/** Listens to an event only if it is addressed to this window. */
+	function onlyHere<T>(name: string, f: (payload: T) => void) {
+		return listen<T>(name, (e) => f(e.payload), { target: { kind: 'WebviewWindow', label: windowLabel } });
 	}
 
-	async function nuovaFinestra(path: string | null) {
+	async function newWindow(path: string | null) {
 		try {
 			await tauriBackend.newWindow(path);
 		} catch (e) {
-			erroreOp = descriviErrore(e);
+			opError = describeError(e);
 		}
 	}
 
-	/** Il tema scelto, fra quelli inclusi e quelli creati con l'editor. */
-	let temaCorrente = $derived(temaDa(impostazioni.tema, impostazioni.temiPersonali));
-	/** Il tema che l'editor sta mostrando dal vivo, prima di salvarlo. */
-	let anteprimaTema = $state<TemaPersonale | null>(null);
-	// The editor's preview counts too: the folders change while the user picks a style.
-	let folderStyle = $derived(folderStyleOf(anteprimaTema ?? temaCorrente));
-	let corteo = $derived(anteprimaTema?.corteo ?? temaCorrente.corteo);
-	let animazioni = $derived(animazioniDi((anteprimaTema ?? temaCorrente).animazioni));
 	/**
-	 * Spazio in più sopra il binario per i personaggi ingranditi: la linea
-	 * del treno è alta 40 px e sta in fondo alla testata; uno sprite più alto
-	 * uscirebbe dalla finestra. Con i personaggi normali non cambia niente.
+	 * The chosen theme, among the built-in ones and those made with the
+	 * editor.
 	 */
-	let spazioCorteo = $derived(
-		Math.max(0, ...(corteo ?? []).map((v) => {
-			const foglio = leggiSprite(v);
-			return foglio ? misuraBinario(foglio).altezza + 10 - 40 : 0;
+	let activeTheme = $derived(themeById(settings.theme, settings.personalThemes));
+	/** The theme the editor is showing live, before saving it. */
+	let themePreview = $state<PersonalTheme | null>(null);
+	// The editor's preview counts too: the folders change while the user picks a style.
+	let folderStyle = $derived(folderStyleOf(themePreview ?? activeTheme));
+	let parade = $derived(themePreview?.parade ?? activeTheme.parade);
+	let animations = $derived(animationsOf((themePreview ?? activeTheme).animations));
+	/**
+	 * Extra space above the rail for enlarged characters: the train line is
+	 * 40 px tall and sits at the bottom of the header; a taller sprite would
+	 * stick out of the window. With normal characters nothing changes.
+	 */
+	let paradeSpace = $derived(
+		Math.max(0, ...(parade ?? []).map((v) => {
+			const sheet = decodeSprite(v);
+			return sheet ? railSize(sheet).height + 10 - 40 : 0;
 		}))
 	);
-	/** Col testo più grande le righe si alzano, perché non si taglino. */
-	let altezzaRiga = $derived(
-		Math.round((impostazioni.compatta ? 26 : 32) * Math.max(1, scalaTesto(anteprimaTema ?? temaCorrente)))
+	/** With larger text the rows get taller, so they are not cut off. */
+	let rowHeight = $derived(
+		Math.round((settings.compact ? 26 : 32) * Math.max(1, textScale(themePreview ?? activeTheme)))
 	);
-	/** L'editor dentro la pagina: solo se non si è potuta aprire la sua finestra. */
-	let editorAperto = $state(false);
+	/** The editor inside the page: only if its own window could not be opened. */
+	let editorOpen = $state(false);
 
 	/**
-	 * L'editor dei temi in una finestra sua, che si sposta anche fuori
-	 * dall'app. Se non si apre (anteprima nel browser) resta dentro la pagina.
+	 * The theme editor in a window of its own, which can also be moved outside
+	 * the app. If it does not open (preview in the browser) it stays inside
+	 * the page.
 	 */
-	async function apriEditor() {
+	async function openEditor() {
 		try {
-			await tauriBackend.apriEditorTemi();
+			await tauriBackend.openThemeEditor();
 		} catch {
-			editorAperto = true;
+			editorOpen = true;
 		}
 	}
 
-	/** Cosa fa l'editor, dalla sua finestra o da dentro la pagina. */
-	function daEditor(m: MessaggioEditor) {
-		if (m.tipo === 'anteprima') {
-			anteprimaTema = m.tema;
+	/** What the editor does, from its window or from inside the page. */
+	function fromEditor(m: EditorMessage) {
+		if (m.kind === 'preview') {
+			themePreview = m.theme;
 			return;
 		}
-		if (m.tipo === 'salva') {
-			impostazioni.salvaTema(m.tema);
-			impostazioni.imposta('tema', m.tema.id);
-			avvisa(`Tema «${m.tema.nome}» salvato.`);
-		} else if (m.tipo === 'elimina') {
-			impostazioni.eliminaTema(m.id);
+		if (m.kind === 'save') {
+			settings.saveTheme(m.theme);
+			settings.set('theme', m.theme.id);
+			notify(`Tema «${m.theme.name}» salvato.`);
+		} else if (m.kind === 'delete') {
+			settings.deleteTheme(m.id);
 		}
-		anteprimaTema = null;
-		editorAperto = false;
+		themePreview = null;
+		editorOpen = false;
 	}
-	let selettoreColore = $state<HTMLInputElement | null>(null);
+	let colorPicker = $state<HTMLInputElement | null>(null);
 
 	$effect(() => {
-		if (anteprimaTema) {
-			applicaTema(anteprimaTema, anteprimaTema.variabili['--plasma']);
+		if (themePreview) {
+			applyTheme(themePreview, themePreview.variables['--plasma']);
 			return;
 		}
-		applicaTema(temaCorrente, coloreAccento(temaCorrente, impostazioni.accento, impostazioni.coloreAccento));
+		applyTheme(activeTheme, accentColor(activeTheme, settings.accent, settings.accentColor));
 	});
 
-	/** Il colore che l'utente ha dato a una cartella, se gliene ha dato uno. */
-	function coloreVoce(e: Entry): string | undefined {
-		return colori.di(e.path);
+	/** The colour the user gave a folder, if they gave it one. */
+	function itemColor(e: Entry): string | undefined {
+		return colors.of(e.path);
 	}
-	const annulla = new AnnullaStore(tauriBackend);
-	const appunti = new ClipboardStore();
-	const icone = new IconeStore(tauriBackend);
-	const aggiornamenti = new AggiornamentiStore(fonteTauri);
+	const undo = new UndoStore(tauriBackend);
+	const clipboard = new ClipboardStore();
+	const icons = new IconsStore(tauriBackend);
+	const updates = new UpdatesStore(tauriSource);
 
-	// Solo la finestra principale controlla: con più finestre aperte non
-	// servono più download dello stesso aggiornamento. In sviluppo no:
-	// non c'è una release da confrontare.
+	// Only the main window checks: with several windows open there is no
+	// need for several downloads of the same update. Not in development:
+	// there is no release to compare with.
 	$effect(() => {
-		if (finestra !== 'main' || import.meta.env.DEV) return;
-		const primo = setTimeout(() => void aggiornamenti.controlla(), 5000);
-		const ciclo = setInterval(() => void aggiornamenti.controlla(), INTERVALLO_CONTROLLO);
+		if (windowLabel !== 'main' || import.meta.env.DEV) return;
+		const first = setTimeout(() => void updates.check(), 5000);
+		const cycle = setInterval(() => void updates.check(), CHECK_INTERVAL);
 		return () => {
-			clearTimeout(primo);
-			clearInterval(ciclo);
+			clearTimeout(first);
+			clearInterval(cycle);
 		};
 	});
 
-	async function installaAggiornamento() {
+	async function installUpdate() {
 		try {
-			await aggiornamenti.installa();
+			await updates.install();
 		} catch (e) {
-			avvisa(e instanceof Error ? e.message : String(e));
+			notify(e instanceof Error ? e.message : String(e));
 		}
 	}
 
-	const NESSUNO = new Set<string>();
+	const NONE = new Set<string>();
 
-	// ── Posizione e contenuto ────────────────────────────────────────
+	// ── Location and content ────────────────────────────────────────
 
-	/** Che genere di posizione mostra il tab: decide menu e operazioni. */
-	let posizione = $derived.by((): Posizione => {
-		if (store.activeTab?.archivio) return 'archivio';
+	/**
+	 * What kind of location the tab shows: it decides menus and
+	 * operations.
+	 */
+	let location = $derived.by((): MenuLocation => {
+		if (store.activeTab?.archive) return 'archive';
 		const p = store.activeTab?.path ?? '';
-		if (p === CESTINO) return 'cestino';
-		if (p === QUESTO_PC) return 'pc';
-		if (p === RETE || /^\\\\[^\\]+\\?$/.test(p)) return 'rete';
-		if (eServer(p)) return 'server';
-		if (eReteLocale(p)) return 'lan';
-		return 'normale';
+		if (p === TRASH) return 'trash';
+		if (p === THIS_PC) return 'pc';
+		if (p === NETWORK || /^\\\\[^\\]+\\?$/.test(p)) return 'network';
+		if (isServer(p)) return 'server';
+		if (isLan(p)) return 'lan';
+		return 'normal';
 	});
 
-	/** Vero se il tab mostra i risultati di una ricerca nelle sottocartelle. */
-	let inRicerca = $derived(store.activeTab?.risultati != null);
+	/** True if the tab shows the results of a search in the subfolders. */
+	let inSearch = $derived(store.activeTab?.results != null);
 	/** The file whose checksum dialog is open. */
-	let sommaDi = $state<Entry | null>(null);
+	let checksumOf = $state<Entry | null>(null);
 	/** Images waiting in the «Converti e ridimensiona» dialog. */
-	let daConvertire = $state<Entry[] | null>(null);
+	let toConvert = $state<Entry[] | null>(null);
 
 	// ── Command palette ──────────────────────────────────────────────
-	let paletteAperta = $state(false);
-	let cartelleNote = $state<Array<{ label: string; path: string }>>([]);
+	let paletteOpen = $state(false);
+	let knownFolders = $state<Array<{ label: string; path: string }>>([]);
 
-	async function apriPalette() {
-		paletteAperta = true;
-		if (cartelleNote.length === 0) cartelleNote = await tauriBackend.knownFolders().catch(() => []);
+	async function openPalette() {
+		paletteOpen = true;
+		if (knownFolders.length === 0) knownFolders = await tauriBackend.knownFolders().catch(() => []);
 	}
 
 	/** Everything the palette can do, actions first. Built when it opens. */
-	function comandiPalette(): Comando[] {
-		const out: Comando[] = [];
+	function paletteCommands(): Command[] {
+		const out: Command[] = [];
 		for (const g of SHORTCUT_GROUPS) {
 			for (const it of g.items) {
 				const a = it.action;
 				if (!a || typeof a === 'object' || a === 'palette') continue;
-				out.push({ tipo: 'azione', nome: it.label, tasti: tastiDi(a, impostazioni.scorciatoie)[0], esegui: () => void eseguiTasto(a) });
+				out.push({ kind: 'action', name: it.label, keys: keysOf(a, settings.shortcuts)[0], run: () => void runKey(a) });
 			}
 		}
-		const qui = store.activeTab && posizione === 'normale' ? store.activeTab.path : null;
-		if (qui) {
-			out.push({ tipo: 'azione', nome: 'Analizza spazio', dettaglio: nomePosizione(qui), esegui: () => void analizzaSpazio(qui) });
-			out.push({ tipo: 'azione', nome: 'Trova duplicati qui', dettaglio: nomePosizione(qui), esegui: () => store.activeId !== null && void store.trovaDuplicati(store.activeId, store.showHidden) });
-			out.push({ tipo: 'azione', nome: 'Confronta con un’altra cartella', esegui: () => void confrontaCon(qui) });
+		const here = store.activeTab && location === 'normal' ? store.activeTab.path : null;
+		if (here) {
+			out.push({ kind: 'action', name: 'Analizza spazio', detail: locationName(here), run: () => void analyzeSpace(here) });
+			out.push({ kind: 'action', name: 'Trova duplicati qui', detail: locationName(here), run: () => store.activeId !== null && void store.findDuplicates(store.activeId, store.showHidden) });
+			out.push({ kind: 'action', name: 'Confronta con un’altra cartella', run: () => void compareWith(here) });
 		}
-		const disco = qui && /^[a-z]:\\/i.test(qui) ? qui.slice(0, 3) : RADICE_SISTEMA;
-		out.push({ tipo: 'azione', nome: 'Pulizia disco', dettaglio: disco, esegui: () => void apriPulizia(disco) });
-		out.push({ tipo: 'azione', nome: 'Impostazioni', esegui: () => (impostazioniAperte = true) });
-		out.push({ tipo: 'azione', nome: 'Editor dei temi', esegui: () => void apriEditor() });
-		const vai = (path: string) => () => store.activeId !== null && void store.navigate(store.activeId, path);
-		for (const p of accessoRapido.cartelle) out.push({ tipo: 'cartella', nome: nomeDi(p), dettaglio: p, esegui: vai(p) });
-		for (const f of cartelleNote) out.push({ tipo: 'cartella', nome: f.label, dettaglio: f.path, esegui: vai(f.path) });
-		for (const r of [...RICERCHE_PRONTE, ...ricerche.voci]) out.push({ tipo: 'ricerca', nome: r.nome, esegui: () => void apriRicercaSalvata(r) });
-		for (const t of [...TEMI, ...impostazioni.temiPersonali]) {
-			out.push({ tipo: 'tema', nome: t.nome, dettaglio: t.id === impostazioni.tema ? 'in uso' : undefined, esegui: () => impostazioni.imposta('tema', t.id) });
+		const drive = here && /^[a-z]:\\/i.test(here) ? here.slice(0, 3) : SYSTEM_ROOT;
+		out.push({ kind: 'action', name: 'Pulizia disco', detail: drive, run: () => void openCleanup(drive) });
+		out.push({ kind: 'action', name: 'Impostazioni', run: () => (settingsOpen = true) });
+		out.push({ kind: 'action', name: 'Editor dei temi', run: () => void openEditor() });
+		const go = (path: string) => () => store.activeId !== null && void store.navigate(store.activeId, path);
+		for (const p of quickAccess.folders) out.push({ kind: 'folder', name: nameOf(p), detail: p, run: go(p) });
+		for (const f of knownFolders) out.push({ kind: 'folder', name: f.label, detail: f.path, run: go(f.path) });
+		for (const r of [...READY_SEARCHES, ...searches.items]) out.push({ kind: 'search', name: r.name, run: () => void openSavedSearch(r) });
+		for (const t of [...THEMES, ...settings.personalThemes]) {
+			out.push({ kind: 'theme', name: t.name, detail: t.id === settings.theme ? 'in uso' : undefined, run: () => settings.set('theme', t.id) });
 		}
-		const interruttori: Array<[string, 'estensioni' | 'compatta' | 'anteprima' | 'unClic' | 'confermaCestino' | 'animazioneAvvio']> = [
-			['Mostra le estensioni dei file', 'estensioni'],
-			['Vista compatta', 'compatta'],
-			['Riquadro di anteprima', 'anteprima'],
-			['Apri con un clic', 'unClic'],
-			['Conferma prima del Cestino', 'confermaCestino'],
-			['Animazione all’avvio', 'animazioneAvvio']
+		const toggles: Array<[string, 'extensions' | 'compact' | 'preview' | 'singleClick' | 'confirmTrash' | 'introAnimation']> = [
+			['Mostra le estensioni dei file', 'extensions'],
+			['Vista compatta', 'compact'],
+			['Riquadro di anteprima', 'preview'],
+			['Apri con un clic', 'singleClick'],
+			['Conferma prima del Cestino', 'confirmTrash'],
+			['Animazione all’avvio', 'introAnimation']
 		];
-		for (const [nome, chiave] of interruttori) {
-			out.push({ tipo: 'impostazione', nome, dettaglio: impostazioni[chiave] ? 'attivo' : 'spento', esegui: () => impostazioni.imposta(chiave, !impostazioni[chiave]) });
+		for (const [name, key] of toggles) {
+			out.push({ kind: 'setting', name, detail: settings[key] ? 'attivo' : 'spento', run: () => settings.set(key, !settings[key]) });
 		}
-		out.push({ tipo: 'impostazione', nome: 'Mostra i file nascosti', dettaglio: store.showHidden ? 'attivo' : 'spento', esegui: () => void store.setShowHidden(!store.showHidden) });
+		out.push({ kind: 'setting', name: 'Mostra i file nascosti', detail: store.showHidden ? 'attivo' : 'spento', run: () => void store.setShowHidden(!store.showHidden) });
 		return out;
 	}
 
 	// ── Dual pane ────────────────────────────────────────────────────
 	let split = $state<Split | null>(null);
-	let ultimaAttiva: number | null = null;
+	let lastActive: number | null = null;
 	$effect(() => {
-		const attiva = store.activeId;
+		const active = store.activeId;
 		const ids = store.tabs.map((t) => t.id);
-		const prima = untrack(() => split);
-		const dopo = followActive(prima, attiva, ultimaAttiva, ids);
-		if (dopo !== prima) split = dopo;
-		ultimaAttiva = attiva;
+		const before = untrack(() => split);
+		const after = followActive(before, active, lastActive, ids);
+		if (after !== before) split = after;
+		lastActive = active;
 	});
 	// ── Workspaces ───────────────────────────────────────────────────
 	/** Name dialog for a workspace: saving the open tabs, or renaming the current one. */
-	let nomeArea = $state<{ mode: 'new' | 'rename'; error: string | null } | null>(null);
+	let workspaceName = $state<{ mode: 'new' | 'rename'; error: string | null } | null>(null);
 	/** True while tabs are being swapped, so the half-open state is never saved. */
-	let cambiandoArea = false;
+	let switchingWorkspace = false;
 
-	function fotoSchede(): Snapshot {
+	function tabsSnapshot(): Snapshot {
 		const ids = store.tabs.map((t) => t.id);
 		return {
 			tabs: store.tabs.map((t) => t.path),
@@ -373,117 +380,117 @@
 
 	// The current area follows the tab bar (main window only, like the session).
 	$effect(() => {
-		const foto = fotoSchede();
-		if (!avviato || finestra !== 'main' || cambiandoArea || foto.tabs.length === 0) return;
-		untrack(() => aree.update(foto));
+		const snapshot = tabsSnapshot();
+		if (!started || windowLabel !== 'main' || switchingWorkspace || snapshot.tabs.length === 0) return;
+		untrack(() => workspaces.update(snapshot));
 	});
 
-	async function apriArea(nome: string) {
-		const area = aree.get(nome);
-		if (!area || aree.current === nome || cambiandoArea) return;
-		cambiandoArea = true;
+	async function openWorkspace(name: string) {
+		const area = workspaces.get(name);
+		if (!area || workspaces.current === name || switchingWorkspace) return;
+		switchingWorkspace = true;
 		try {
-			const vecchie = store.tabs.map((t) => t.id);
+			const oldIds = store.tabs.map((t) => t.id);
 			split = null;
 			const ids = await Promise.all(area.tabs.map((p) => store.openTab(p)));
-			for (const id of vecchie) store.closeTab(id);
+			for (const id of oldIds) store.closeTab(id);
 			store.setActive(ids[area.active] ?? ids[0]);
 			if (area.split) split = { left: ids[area.split[0]], right: ids[area.split[1]] };
-			aree.setCurrent(nome);
+			workspaces.setCurrent(name);
 		} finally {
-			cambiandoArea = false;
+			switchingWorkspace = false;
 		}
 	}
 
-	function confermaNomeArea(nome: string) {
-		if (!nomeArea) return;
-		if (nomeArea.mode === 'new') {
-			aree.create(nome, fotoSchede());
-			nomeArea = null;
-		} else if (aree.current !== null) {
-			if (aree.rename(aree.current, nome)) nomeArea = null;
-			else nomeArea = { mode: 'rename', error: `Esiste già un'area «${nome}».` };
+	function confirmWorkspaceName(name: string) {
+		if (!workspaceName) return;
+		if (workspaceName.mode === 'new') {
+			workspaces.create(name, tabsSnapshot());
+			workspaceName = null;
+		} else if (workspaces.current !== null) {
+			if (workspaces.rename(workspaces.current, name)) workspaceName = null;
+			else workspaceName = { mode: 'rename', error: `Esiste già un'area «${name}».` };
 		}
 	}
 
 	/** The tab shown in the passive half, when the dual pane is open. */
-	let tabAltro = $derived(store.tabs.find((t) => t.id === otherPane(split, store.activeId)));
+	let otherTab = $derived(store.tabs.find((t) => t.id === otherPane(split, store.activeId)));
 	/** The active pane sits on the right when its tab is the split's right one. */
-	let attivaADestra = $derived(split !== null && store.activeId === split.right);
+	let activeOnRight = $derived(split !== null && store.activeId === split.right);
 
-	async function alternaDoppio() {
+	async function toggleSplit() {
 		const id = store.activeId;
 		if (split || id === null) {
 			split = null;
 			return;
 		}
-		const nuovo = await store.openTab(store.activeTab?.path ?? RADICE_SISTEMA);
+		const created = await store.openTab(store.activeTab?.path ?? SYSTEM_ROOT);
 		store.setActive(id);
-		split = { left: id, right: nuovo };
+		split = { left: id, right: created };
 	}
 
 	/** Copies or moves the selection into the folder of the other pane. */
-	async function versoAltro(mode: 'copy' | 'move') {
-		const dest = tabAltro?.path;
+	async function toOther(mode: 'copy' | 'move') {
+		const dest = otherTab?.path;
 		const sel = store.activeTab?.selection ?? [];
-		if (!dest || eVirtuale(dest) || sel.length === 0) return;
-		await trasferisci([...sel], dest, mode);
+		if (!dest || isVirtual(dest) || sel.length === 0) return;
+		await runTransfer([...sel], dest, mode);
 	}
 
 	/** Content search found text inside files: rows grow to show the found line. */
-	let conFrammenti = $derived(store.activeTab?.risultati?.some((e) => e.snippet) ?? false);
+	let withSnippets = $derived(store.activeTab?.results?.some((e) => e.snippet) ?? false);
 
-	/** Si può creare, incollare, rinominare: una cartella vera, non risultati. */
-	let modificabile = $derived(posizione === 'normale' && !inRicerca);
+	/** You can create, paste, rename: a real folder, not results. */
+	let editable = $derived(location === 'normal' && !inSearch);
 	/** Paste, new folder, rename and drop also work on a remote server. */
-	let scrivibile = $derived(modificabile || (posizione === 'server' && store.activeTab?.path !== '::server' && !inRicerca));
+	let writable = $derived(editable || (location === 'server' && store.activeTab?.path !== '::server' && !inSearch));
 
-	let ricercaAperta = $state(false);
-	let ricercaRicorsiva = $state(false);
-	let ricercaContenuto = $state(false);
+	let searchOpen = $state(false);
+	let recursiveSearch = $state(false);
+	let contentSearch = $state(false);
 	/** Smart folder filters of the subfolder search. */
-	let filtri = $state<Filtri>(NESSUN_FILTRO);
+	let filters = $state<Filters>(NO_FILTERS);
 
-	let risultati = $derived.by(() => {
+	let results = $derived.by(() => {
 		const tab = store.activeTab;
 		if (!tab) return [];
-		// I risultati ricorsivi sono già filtrati da Rust: niente secondo
-		// filtro fuzzy, che scarterebbe le corrispondenze nel contenuto.
-		if (tab.risultati) return tab.risultati.map((item) => ({ item, positions: [] as number[] }));
+		// Recursive results are already filtered by Rust: no second fuzzy
+		// filter, which would drop the matches in the content.
+		if (tab.results) return tab.results.map((item) => ({ item, positions: [] as number[] }));
 		return filterEntries(tab.entries, tab.query);
 	});
-	let filtrate = $derived(risultati.map((r) => r.item));
+	let filtered = $derived(results.map((r) => r.item));
 
 	// ── Photo, video and music columns ───────────────────────────────
 	/** Media columns of the open folder: picked by hand, or chosen from what it holds. */
-	let colonneMedia = $derived.by((): MediaKey[] => {
+	let mediaColumns = $derived.by((): MediaKey[] => {
 		const tab = store.activeTab;
-		if (!tab || posizione !== 'normale' || tab.risultati) return [];
+		if (!tab || location !== 'normal' || tab.results) return [];
 		return media.columnsFor(tab.path, tab.entries);
 	});
-	let colonneVista = $derived({ ...impostazioni.colonne, media: colonneMedia });
+	let viewColumns = $derived({ ...settings.columns, media: mediaColumns });
 	/** Sorting by a media column, per tab; a click on another column ends it. */
-	let ordiniMedia = $state<Record<number, { key: MediaKey; ascending: boolean }>>({});
-	let ordineMedia = $derived.by(() => {
-		const o = store.activeId === null ? undefined : ordiniMedia[store.activeId];
-		return o && colonneMedia.includes(o.key) ? o : null;
+	let mediaSorts = $state<Record<number, { key: MediaKey; ascending: boolean }>>({});
+	let mediaSort = $derived.by(() => {
+		const o = store.activeId === null ? undefined : mediaSorts[store.activeId];
+		return o && mediaColumns.includes(o.key) ? o : null;
 	});
-	let ordinate = $derived(
-		ordineMedia ? sortByMedia(filtrate, ordineMedia.key, ordineMedia.ascending, (e) => media.of(e)) : filtrate
+	let sorted = $derived(
+		mediaSort ? sortByMedia(filtered, mediaSort.key, mediaSort.ascending, (e) => media.of(e)) : filtered
 	);
 
 	$effect(() => {
 		const tab = store.activeTab;
-		if (tab && colonneMedia.length > 0) void media.request(tab.entries);
+		if (tab && mediaColumns.length > 0) void media.request(tab.entries);
 	});
 	// The preview pane shows the details of the selected file too.
 	$effect(() => {
-		if (impostazioni.anteprima && voceAnteprima) void media.request([voceAnteprima]);
+		if (settings.preview && previewItem) void media.request([previewItem]);
 	});
 
 	// ── Remote servers ───────────────────────────────────────────────
-	let serverSalvati = $state<ServerConfig[]>([]);
-	let dialogoServer = $state<{
+	let savedServers = $state<ServerConfig[]>([]);
+	let serverDialog = $state<{
 		mode:
 			| { kind: 'edit'; server: ServerConfig | null }
 			| { kind: 'key'; server: ServerConfig; fingerprint: string; changed: boolean }
@@ -492,84 +499,84 @@
 		busy: boolean;
 	} | null>(null);
 
-	async function caricaServer() {
-		serverSalvati = await tauriBackend.serverList().catch(() => []);
-		impostaNomiServer(Object.fromEntries(serverSalvati.map((s) => [s.id, s.name])));
+	async function loadServers() {
+		savedServers = await tauriBackend.serverList().catch(() => []);
+		setServerNames(Object.fromEntries(savedServers.map((s) => [s.id, s.name])));
 	}
 	$effect(() => {
-		void caricaServer();
+		void loadServers();
 	});
 
-	const serverDi = (path: string) => serverSalvati.find((s) => path === `::server\\${s.id}` || path.startsWith(`::server\\${s.id}\\`));
+	const serverOf = (path: string) => savedServers.find((s) => path === `::server\\${s.id}` || path.startsWith(`::server\\${s.id}\\`));
 
 	// A server folder that needs a key confirmation or a password asks for it.
 	$effect(() => {
 		const tab = store.activeTab;
 		const err = tab?.error;
-		if (!tab || !err || dialogoServer || (err.kind !== 'serverKey' && err.kind !== 'serverPassword')) return;
-		const server = untrack(() => serverDi(tab.failedPath ?? tab.path));
+		if (!tab || !err || serverDialog || (err.kind !== 'serverKey' && err.kind !== 'serverPassword')) return;
+		const server = untrack(() => serverOf(tab.failedPath ?? tab.path));
 		if (!server) return;
-		dialogoServer =
+		serverDialog =
 			err.kind === 'serverKey'
 				? { mode: { kind: 'key', server, fingerprint: err.fingerprint, changed: err.changed }, error: null, busy: false }
 				: { mode: { kind: 'password', server }, error: null, busy: false };
 	});
 
-	async function salvaServer(config: ServerConfig, password: string | null) {
-		const d = dialogoServer;
+	async function saveServer(config: ServerConfig, password: string | null) {
+		const d = serverDialog;
 		if (!d) return;
-		dialogoServer = { ...d, busy: true, error: null };
+		serverDialog = { ...d, busy: true, error: null };
 		try {
 			const saved = await tauriBackend.serverPut(config, password);
-			await caricaServer();
-			dialogoServer = null;
+			await loadServers();
+			serverDialog = null;
 			if (store.activeId !== null) await store.navigate(store.activeId, `::server\\${saved.id}`);
 		} catch (err) {
-			dialogoServer = { ...d, busy: false, error: descriviErrore(err) };
+			serverDialog = { ...d, busy: false, error: describeError(err) };
 		}
 	}
 
 	/** Opens again the server folder that asked for a key or a password. */
-	async function riprovaServer() {
+	async function retryServer() {
 		const tab = store.activeTab;
 		if (!tab || store.activeId === null) return;
 		if (tab.failedPath) await store.navigate(store.activeId, tab.failedPath);
-		else await ricarica();
+		else await reload();
 	}
 
-	async function rimuoviServer(id: string) {
-		await tauriBackend.serverRemove(id).catch((err) => (erroreOp = descriviErrore(err)));
-		dialogoServer = null;
-		await caricaServer();
-		for (const t of store.tabs) if (t.path === `::server\\${id}` || t.path.startsWith(`::server\\${id}\\`)) await store.navigate(t.id, QUESTO_PC);
+	async function removeServer(id: string) {
+		await tauriBackend.serverRemove(id).catch((err) => (opError = describeError(err)));
+		serverDialog = null;
+		await loadServers();
+		for (const t of store.tabs) if (t.path === `::server\\${id}` || t.path.startsWith(`::server\\${id}\\`)) await store.navigate(t.id, THIS_PC);
 	}
 
-	async function confermaChiaveServer() {
-		const d = dialogoServer;
+	async function confirmServerKey() {
+		const d = serverDialog;
 		if (d?.mode.kind !== 'key') return;
 		await tauriBackend.serverTrust(d.mode.server.id, d.mode.fingerprint);
-		dialogoServer = null;
-		await caricaServer();
-		await riprovaServer();
+		serverDialog = null;
+		await loadServers();
+		await retryServer();
 	}
 
-	async function passwordServer(password: string, remember: boolean) {
-		const d = dialogoServer;
+	async function submitServerPassword(password: string, remember: boolean) {
+		const d = serverDialog;
 		if (d?.mode.kind !== 'password') return;
-		dialogoServer = { ...d, busy: true, error: null };
+		serverDialog = { ...d, busy: true, error: null };
 		try {
 			await tauriBackend.serverPassword(d.mode.server.id, password, remember);
 			await tauriBackend.serverTest(d.mode.server.id);
-			dialogoServer = null;
-			await riprovaServer();
+			serverDialog = null;
+			await retryServer();
 		} catch (err) {
 			const e = err as FsError;
-			dialogoServer = { ...d, busy: false, error: e?.kind === 'serverPassword' ? 'Password sbagliata.' : descriviErrore(err) };
+			serverDialog = { ...d, busy: false, error: e?.kind === 'serverPassword' ? 'Password sbagliata.' : describeError(err) };
 		}
 	}
 
 	// ── Vaults ───────────────────────────────────────────────────────
-	let dialogoCassaforte = $state<{
+	let vaultDialog = $state<{
 		mode: 'unlock' | 'create' | 'add';
 		path: string;
 		sources?: string[];
@@ -577,139 +584,139 @@
 		busy: boolean;
 	} | null>(null);
 	/** Vaults deleting items: the confirmation shows them. */
-	let daEliminareCassaforte = $state<Entry[] | null>(null);
+	let vaultToDelete = $state<Entry[] | null>(null);
 	/** Open vaults (lowercase path) → when they lock themselves. */
-	let scadenze = $state<Record<string, number>>({});
-	let adesso = $state(Date.now());
+	let deadlines = $state<Record<string, number>>({});
+	let now = $state(Date.now());
 
-	const eCassaforte = (e: Entry) => e.kind === 'dir' && /\.cassaforte$/i.test(e.name);
+	const isVault = (e: Entry) => e.kind === 'dir' && /\.cassaforte$/i.test(e.name);
 
 	/** Every use of a vault pushes its lock time back. */
-	function tocca(path: string) {
-		scadenze = { ...scadenze, [path.toLowerCase()]: Date.now() + impostazioni.chiusuraCassaforte * 60_000 };
-		adesso = Date.now();
+	function touch(path: string) {
+		deadlines = { ...deadlines, [path.toLowerCase()]: Date.now() + settings.vaultAutoLock * 60_000 };
+		now = Date.now();
 	}
 
 	$effect(() => {
-		if (Object.keys(scadenze).length === 0) return;
+		if (Object.keys(deadlines).length === 0) return;
 		const timer = setInterval(() => {
-			adesso = Date.now();
-			for (const [k, t] of Object.entries(scadenze)) if (t <= adesso) void chiudiCassaforte(k);
+			now = Date.now();
+			for (const [k, t] of Object.entries(deadlines)) if (t <= now) void lockVault(k);
 		}, 1000);
 		return () => clearInterval(timer);
 	});
 
-	let chiusuraQui = $derived.by(() => {
-		const arc = store.activeTab?.archivio;
-		const t = arc?.cassaforte ? scadenze[arc.file.toLowerCase()] : undefined;
+	let lockInHere = $derived.by(() => {
+		const arc = store.activeTab?.archive;
+		const t = arc?.vault ? deadlines[arc.file.toLowerCase()] : undefined;
 		if (t === undefined) return null;
-		const s = Math.max(0, Math.ceil((t - adesso) / 1000));
+		const s = Math.max(0, Math.ceil((t - now) / 1000));
 		return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 	});
 
-	async function mostraCassaforte(path: string, dentro = '') {
+	async function showVault(path: string, inner = '') {
 		const id = store.activeId;
 		if (id === null) return;
-		const voci = await tauriBackend.vaultList(path);
-		tocca(path);
-		await store.mostraArchivio(id, path, dentro, voci, true);
+		const items = await tauriBackend.vaultList(path);
+		touch(path);
+		await store.showArchive(id, path, inner, items, true);
 	}
 
-	async function apriCassaforte(path: string) {
+	async function openVault(path: string) {
 		try {
-			if (await tauriBackend.vaultIsOpen(path)) await mostraCassaforte(path);
-			else dialogoCassaforte = { mode: 'unlock', path, error: null, busy: false };
+			if (await tauriBackend.vaultIsOpen(path)) await showVault(path);
+			else vaultDialog = { mode: 'unlock', path, error: null, busy: false };
 		} catch (err) {
-			erroreOp = descriviErrore(err);
+			opError = describeError(err);
 		}
 	}
 
-	async function sbloccaCassaforte(password: string) {
-		const d = dialogoCassaforte;
+	async function unlockVault(password: string) {
+		const d = vaultDialog;
 		if (!d) return;
-		dialogoCassaforte = { ...d, busy: true, error: null };
+		vaultDialog = { ...d, busy: true, error: null };
 		try {
 			await tauriBackend.vaultUnlock(d.path, password);
-			dialogoCassaforte = null;
-			await mostraCassaforte(d.path);
+			vaultDialog = null;
+			await showVault(d.path);
 		} catch (err) {
-			dialogoCassaforte = { ...d, busy: false, error: descriviErrore(err) };
+			vaultDialog = { ...d, busy: false, error: describeError(err) };
 		}
 	}
 
-	async function creaCassaforte(nome: string, password: string) {
-		const d = dialogoCassaforte;
+	async function createVault(name: string, password: string) {
+		const d = vaultDialog;
 		if (!d) return;
-		dialogoCassaforte = { ...d, busy: true, error: null };
+		vaultDialog = { ...d, busy: true, error: null };
 		try {
-			const path = await tauriBackend.vaultCreate(d.path, nome, password);
-			dialogoCassaforte = null;
-			await store.aggiornaCartella(d.path);
-			await mostraCassaforte(path);
+			const path = await tauriBackend.vaultCreate(d.path, name, password);
+			vaultDialog = null;
+			await store.refreshFolder(d.path);
+			await showVault(path);
 		} catch (err) {
-			dialogoCassaforte = { ...d, busy: false, error: descriviErrore(err) };
+			vaultDialog = { ...d, busy: false, error: describeError(err) };
 		}
 	}
 
 	/** Locks a vault: the key is forgotten and every tab showing it goes back to its folder. */
-	async function chiudiCassaforte(path: string) {
+	async function lockVault(path: string) {
 		const key = path.toLowerCase();
-		const { [key]: _, ...resto } = scadenze;
-		scadenze = resto;
+		const { [key]: _, ...rest } = deadlines;
+		deadlines = rest;
 		await tauriBackend.vaultLock(path).catch(() => {});
 		for (const t of store.tabs) {
-			if (t.archivio?.cassaforte && t.archivio.file.toLowerCase() === key) await store.fermaRicerca(t.id);
+			if (t.archive?.vault && t.archive.file.toLowerCase() === key) await store.stopSearch(t.id);
 		}
 	}
 
-	function aggiungiInCassaforte(paths: string[]) {
-		const arc = store.activeTab?.archivio;
-		if (!arc?.cassaforte || paths.length === 0) return;
-		if (paths.some((p) => eReteLocale(p))) {
-			erroreOp = 'Prima scarica i file dall’altro PC, poi mettili nella cassaforte.';
+	function addToVault(paths: string[]) {
+		const arc = store.activeTab?.archive;
+		if (!arc?.vault || paths.length === 0) return;
+		if (paths.some((p) => isLan(p))) {
+			opError = 'Prima scarica i file dall’altro PC, poi mettili nella cassaforte.';
 			return;
 		}
-		dialogoCassaforte = { mode: 'add', path: arc.file, sources: paths, error: null, busy: false };
+		vaultDialog = { mode: 'add', path: arc.file, sources: paths, error: null, busy: false };
 	}
 
-	async function confermaAggiunta(cestinaOriginali: boolean) {
-		const d = dialogoCassaforte;
-		const arc = store.activeTab?.archivio;
-		if (!d?.sources || !arc?.cassaforte) return;
-		dialogoCassaforte = { ...d, busy: true, error: null };
+	async function confirmAdd(trashOriginals: boolean) {
+		const d = vaultDialog;
+		const arc = store.activeTab?.archive;
+		if (!d?.sources || !arc?.vault) return;
+		vaultDialog = { ...d, busy: true, error: null };
 		try {
-			await tauriBackend.vaultAdd(d.path, d.sources, arc.dentro);
-			dialogoCassaforte = null;
-			if (cestinaOriginali) {
+			await tauriBackend.vaultAdd(d.path, d.sources, arc.inner);
+			vaultDialog = null;
+			if (trashOriginals) {
 				await tauriBackend.moveToTrash(d.sources);
-				annulla.registra({ tipo: 'cestino', originali: d.sources });
+				undo.record({ kind: 'trash', originals: d.sources });
 			}
-			await mostraCassaforte(d.path, arc.dentro);
+			await showVault(d.path, arc.inner);
 		} catch (err) {
-			dialogoCassaforte = { ...d, busy: false, error: descriviErrore(err) };
+			vaultDialog = { ...d, busy: false, error: describeError(err) };
 		}
 	}
 
-	async function incollaInCassaforte() {
-		const contenuto = await daIncollare();
-		if (contenuto) aggiungiInCassaforte(contenuto.paths);
+	async function pasteIntoVault() {
+		const content = await toPaste();
+		if (content) addToVault(content.paths);
 	}
 
-	function chiediEliminaDaCassaforte() {
-		const scelte = selezionate();
-		if (scelte.length > 0) daEliminareCassaforte = scelte;
+	function askDeleteFromVault() {
+		const choices = selectedEntries();
+		if (choices.length > 0) vaultToDelete = choices;
 	}
 
-	async function eliminaDaCassaforte() {
-		const voci = daEliminareCassaforte;
-		const arc = store.activeTab?.archivio;
-		daEliminareCassaforte = null;
-		if (!voci || !arc?.cassaforte) return;
+	async function deleteFromVault() {
+		const items = vaultToDelete;
+		const arc = store.activeTab?.archive;
+		vaultToDelete = null;
+		if (!items || !arc?.vault) return;
 		try {
-			await tauriBackend.vaultDelete(arc.file, voci.map((e) => internoDi(e.path)));
-			await mostraCassaforte(arc.file, arc.dentro);
+			await tauriBackend.vaultDelete(arc.file, items.map((e) => innerOf(e.path)));
+			await showVault(arc.file, arc.inner);
 		} catch (err) {
-			erroreOp = descriviErrore(err);
+			opError = describeError(err);
 		}
 	}
 
@@ -717,609 +724,629 @@
 	// The main window looks at the folders with rules every 30 s; the others
 	// would only do the same work twice.
 	$effect(() => {
-		if (!avviato || finestra !== 'main') return;
-		void regole.tick();
-		const timer = setInterval(() => void regole.tick(), 30_000);
+		if (!started || windowLabel !== 'main') return;
+		void rules.tick();
+		const timer = setInterval(() => void rules.tick(), 30_000);
 		return () => clearInterval(timer);
 	});
 
-	async function annullaRegola(id: number) {
+	async function undoRule(id: number) {
 		try {
-			await regole.undo(id);
+			await rules.undo(id);
 		} catch (err) {
-			erroreOp = descriviErrore(err);
+			opError = describeError(err);
 		}
 	}
 
 	// ── Git ──────────────────────────────────────────────────────────
 	/** Git status of the open folder, asked again whenever its items change. */
-	let statoGit = $state<{ path: string; status: GitStatus } | null>(null);
-	let richiestaGit = 0;
+	let gitState = $state<{ path: string; status: GitStatus } | null>(null);
+	let gitRequest = 0;
 	$effect(() => {
 		const tab = store.activeTab;
 		const path = tab?.path;
 		void tab?.entries;
-		const n = ++richiestaGit;
-		if (!path || !impostazioni.git || posizione !== 'normale') {
-			statoGit = null;
+		const n = ++gitRequest;
+		if (!path || !settings.git || location !== 'normal') {
+			gitState = null;
 			return;
 		}
 		tauriBackend
 			.gitStatus(path)
 			.catch(() => null)
 			.then((status) => {
-				if (n === richiestaGit) statoGit = status ? { path, status } : null;
+				if (n === gitRequest) gitState = status ? { path, status } : null;
 			});
 	});
-	let gitQui = $derived(
-		statoGit && store.activeTab && stessoPath(statoGit.path, store.activeTab.path) && !store.activeTab.risultati
-			? statoGit.status
+	let gitHere = $derived(
+		gitState && store.activeTab && samePath(gitState.path, store.activeTab.path) && !store.activeTab.results
+			? gitState.status
 			: null
 	);
 
-	function ordinaPerMedia(key: MediaKey) {
+	function sortByMediaKey(key: MediaKey) {
 		const id = store.activeId;
 		if (id === null) return;
-		const ora = ordineMedia;
+		const now = mediaSort;
 		// Dates and sizes start newest/largest first, names A to Z.
-		const ascending = ora?.key === key ? !ora.ascending : key === 'artist' || key === 'album' || key === 'camera';
-		ordiniMedia = { ...ordiniMedia, [id]: { key, ascending } };
+		const ascending = now?.key === key ? !now.ascending : key === 'artist' || key === 'album' || key === 'camera';
+		mediaSorts = { ...mediaSorts, [id]: { key, ascending } };
 	}
 
-	function alternaColonnaMedia(key: MediaKey) {
+	function toggleMediaColumn(key: MediaKey) {
 		const tab = store.activeTab;
 		if (tab) media.toggle(tab.path, key, tab.entries);
 	}
 
 	/**
-	 * Preferiti in cima e gruppi scelti nel menu Visualizza. Con un filtro
-	 * attivo la divisione si sospende: lì conta il punteggio, e il match
-	 * migliore deve restare primo anche se non è un preferito.
+	 * Favourites on top and the groups chosen in the View menu. With an
+	 * active filter the split is suspended: there the score counts, and
+	 * the best match must stay first even if it is not a favourite.
 	 */
-	let impaginato = $derived.by(() => {
+	let laidOut = $derived.by(() => {
 		const tab = store.activeTab;
-		if (tab?.duplicati && tab.query === '') return { voci: filtrate, zone: duplicateZones(tab.duplicati.groups) };
-		if (tab?.confronto && tab.query === '') return { voci: filtrate, zone: compareZones(tab.confronto) };
-		if (tab?.spazio && !tab.risultati && posizione === 'normale') {
-			const chiave = perCrescita
-				? (e: Entry) => crescite[e.path]?.delta ?? Number.NEGATIVE_INFINITY
-				: pesoVoce;
-			return { voci: [...filtrate].sort((a, b) => chiave(b) - chiave(a)), zone: [] };
+		if (tab?.duplicates && tab.query === '') return { items: filtered, zones: duplicateZones(tab.duplicates.groups) };
+		if (tab?.comparison && tab.query === '') return { items: filtered, zones: compareZones(tab.comparison) };
+		if (tab?.space && !tab.results && location === 'normal') {
+			const key = byGrowth
+				? (e: Entry) => growths[e.path]?.delta ?? Number.NEGATIVE_INFINITY
+				: itemSize;
+			return { items: [...filtered].sort((a, b) => key(b) - key(a)), zones: [] };
 		}
-		if (!tab || tab.query !== '' || tab.risultati) return { voci: filtrate, zone: [] };
-		const prefs = posizione === 'normale' ? preferiti.di(tab.path) : NESSUNO;
-		// I recenti valgono dove le voci hanno una data vera: non in Questo
-		// PC o nella Rete, dove la data non dice niente.
-		const recentiDal =
-			impostazioni.recenti && (posizione === 'normale' || posizione === 'cestino')
-				? Date.now() - impostazioni.giorniRecenti * 24 * 60 * 60 * 1000
+		if (!tab || tab.query !== '' || tab.results) return { items: filtered, zones: [] };
+		const prefs = location === 'normal' ? favorites.of(tab.path) : NONE;
+		// Recent items apply where the items have a real date: not in This
+		// PC or in the Network, where the date says nothing.
+		const recentSince =
+			settings.recent && (location === 'normal' || location === 'trash')
+				? Date.now() - settings.recentDays * 24 * 60 * 60 * 1000
 				: null;
-		return impagina(ordinate, prefs, impostazioni.raggruppa, Date.now(), recentiDal);
+		return layout(sorted, prefs, settings.grouping, Date.now(), recentSince);
 	});
-	let vociVisibili = $derived(impaginato.voci);
+	let visibleItems = $derived(laidOut.items);
 
-	// ── Dimensione delle cartelle ──
-	// Si pesa una cartella alla volta, in sottofondo. Cambiando cartella parte
-	// un turno nuovo: il backend ferma i calcoli del turno vecchio.
-	let dimensioni = $state<Record<string, number | 'calcolo'>>({});
-	let turnoPesi = 0;
-	let cartellaPesata: string | undefined;
+	// ── Folder size ──
+	//
+	// One folder at a time is weighed, in the background. Changing folder
+	// starts a new round: the backend stops the computations of the old round.
+	let sizes = $state<Record<string, number | 'computing'>>({});
+	let sizeRound = 0;
+	let sizedFolder: string | undefined;
 
-	function nuovoTurnoPesi() {
-		turnoPesi++;
-		dimensioni = {};
-		void tauriBackend.turnoDimensioni(turnoPesi).catch(() => {});
+	function newSizeRound() {
+		sizeRound++;
+		sizes = {};
+		void tauriBackend.sizeTurn(sizeRound).catch(() => {});
 	}
 
 	// ── Space view ───────────────────────────────────────────────────
-	let inSpazio = $derived(!!store.activeTab?.spazio && !store.activeTab.risultati && posizione === 'normale');
+	let inSpace = $derived(!!store.activeTab?.space && !store.activeTab.results && location === 'normal');
 	/** Size used by the space view: folders once weighed (-1 while unknown), files as they are. */
-	function pesoVoce(e: Entry): number {
+	function itemSize(e: Entry): number {
 		if (e.kind !== 'dir') return e.size;
-		const d = dimensioni[e.path];
+		const d = sizes[e.path];
 		return typeof d === 'number' ? d : -1;
 	}
-	let spazioMassimo = $derived(inSpazio ? Math.max(1, ...vociVisibili.map(pesoVoce)) : 1);
-	let spazioTotale = $derived(inSpazio ? vociVisibili.reduce((n, e) => n + Math.max(0, pesoVoce(e)), 0) : 0);
-	let spazioInCalcolo = $derived(inSpazio ? vociVisibili.filter((e) => dimensioni[e.path] === 'calcolo').length : 0);
-	function quotaVoce(e: Entry): number | undefined {
-		const p = pesoVoce(e);
-		return p < 0 ? undefined : p / spazioMassimo;
+	let maxSpace = $derived(inSpace ? Math.max(1, ...visibleItems.map(itemSize)) : 1);
+	let totalSpace = $derived(inSpace ? visibleItems.reduce((n, e) => n + Math.max(0, itemSize(e)), 0) : 0);
+	let spaceComputing = $derived(inSpace ? visibleItems.filter((e) => sizes[e.path] === 'computing').length : 0);
+	function itemShare(e: Entry): number | undefined {
+		const p = itemSize(e);
+		return p < 0 ? undefined : p / maxSpace;
 	}
 
-	async function analizzaSpazio(cartella: string) {
+	async function analyzeSpace(folder: string) {
 		const id = store.activeId;
 		if (id === null) return;
-		if (cartella !== store.activeTab?.path) await store.navigate(id, cartella);
-		await store.impostaSpazio(id, true);
+		if (folder !== store.activeTab?.path) await store.navigate(id, folder);
+		await store.setSpace(id, true);
 	}
 
 	// ── Disk cleanup ─────────────────────────────────────────────────
 	/** Drive root the cleanup view is open on; it takes the list's place. */
-	let puliziaDi = $state<string | null>(null);
-	let radiciPredefinite = $state<string[]>([]);
-	let radiciProgetti = $derived(impostazioni.cartelleProgetti ?? radiciPredefinite);
+	let cleanupOf = $state<string | null>(null);
+	let defaultRoots = $state<string[]>([]);
+	let projectRoots = $derived(settings.projectFolders ?? defaultRoots);
 	// Going to another folder leaves the view.
 	$effect(() => {
-		if (puliziaDi && store.activeTab && !stessoPath(store.activeTab.path, puliziaDi)) puliziaDi = null;
+		if (cleanupOf && store.activeTab && !samePath(store.activeTab.path, cleanupOf)) cleanupOf = null;
 	});
 
 	// ── Two-file comparison ──────────────────────────────────────────
-	/** Two files shown side by side in place of the list; `cartella` = where it was opened. */
-	let confrontoFile = $state<{ a: Entry; b: Entry; cartella: string } | null>(null);
+	/** Two files shown side by side in place of the list; `folder` = where it was opened. */
+	let fileComparison = $state<{ a: Entry; b: Entry; folder: string } | null>(null);
 	$effect(() => {
-		if (confrontoFile && store.activeTab && !stessoPath(store.activeTab.path, confrontoFile.cartella)) confrontoFile = null;
+		if (fileComparison && store.activeTab && !samePath(store.activeTab.path, fileComparison.folder)) fileComparison = null;
 	});
-	function confrontaFile(a: Entry, b: Entry) {
+	function compareFiles(a: Entry, b: Entry) {
 		// The older one on the left, as «before» and «after»; same date: the shorter name (the original, not «(copia)»).
 		const [x, y] = [a, b].sort((p, q) => (p.modified ?? 0) - (q.modified ?? 0) || p.name.length - q.name.length);
-		if (store.activeTab) confrontoFile = { a: x, b: y, cartella: store.activeTab.path };
+		if (store.activeTab) fileComparison = { a: x, b: y, folder: store.activeTab.path };
 	}
 
-	async function apriPulizia(drive: string) {
+	async function openCleanup(drive: string) {
 		const id = store.activeId;
 		if (id === null) return;
-		if (impostazioni.cartelleProgetti === null && radiciPredefinite.length === 0) {
+		if (settings.projectFolders === null && defaultRoots.length === 0) {
 			const note = await tauriBackend.knownFolders().catch(() => []);
-			radiciPredefinite = note.filter((k) => k.icon === 'desktop' || k.icon === 'documents').map((k) => k.path);
+			defaultRoots = note.filter((k) => k.icon === 'desktop' || k.icon === 'documents').map((k) => k.path);
 		}
-		if (!stessoPath(store.activeTab?.path ?? '', drive)) await store.navigate(id, drive);
-		puliziaDi = drive;
+		if (!samePath(store.activeTab?.path ?? '', drive)) await store.navigate(id, drive);
+		cleanupOf = drive;
 	}
 
 	// ── Low-disk reminder ──
-	const CHIAVE_PROMEMORIA = 'space-train.promemoria-disco';
-	const CHIAVE_ULTIMA_PULIZIA = 'space-train.ultima-pulizia';
-	function leggiJson<T>(chiave: string): T {
+	const REMINDER_KEY = 'space-train.promemoria-disco';
+	const LAST_CLEANUP_KEY = 'space-train.ultima-pulizia';
+	/**
+	 * Saved JSON keeps the field names it was first written with: renames the
+	 * fields of every record, one way when reading and the other when writing.
+	 */
+	function renameFields<T>(records: Record<string, object>, names: Record<string, string>): T {
+		return Object.fromEntries(
+			Object.entries(records).map(([k, v]) => [k, Object.fromEntries(Object.entries(v).map(([f, x]) => [names[f] ?? f, x]))])
+		) as T;
+	}
+	const readReminderState = () => renameFields<ReminderState>(readJson(REMINDER_KEY), { visto: 'shown', zitto: 'quietUntil' });
+	const writeReminderState = (s: ReminderState) => writeJson(REMINDER_KEY, renameFields(s, { shown: 'visto', quietUntil: 'zitto' }));
+	const readLastCleanup = () => renameFields<LastCleanup>(readJson(LAST_CLEANUP_KEY), { byte: 'bytes' });
+	function readJson<T>(key: string): T {
 		try {
-			return JSON.parse(localStorage.getItem(chiave) ?? '{}') as T;
+			return JSON.parse(localStorage.getItem(key) ?? '{}') as T;
 		} catch {
 			return {} as T;
 		}
 	}
-	function scriviJson(chiave: string, valore: unknown) {
+	function writeJson(key: string, value: unknown) {
 		try {
-			localStorage.setItem(chiave, JSON.stringify(valore));
+			localStorage.setItem(key, JSON.stringify(value));
 		} catch {
 			// Storage blocked: the reminder may come back sooner, nothing worse.
 		}
 	}
-	let promemoria = $state<Promemoria | null>(null);
+	let reminder = $state<Reminder | null>(null);
 	$effect(() => {
-		void aggiornamentoDischi;
-		const soglia = impostazioni.sogliaDisco;
-		if (promemoria || soglia === 0) return;
+		void drivesRefresh;
+		const threshold = settings.diskThreshold;
+		if (reminder || threshold === 0) return;
 		void tauriBackend
 			.drives()
 			.then((d) => {
-				const p = daRicordare(d, soglia, leggiJson(CHIAVE_PROMEMORIA), leggiJson(CHIAVE_ULTIMA_PULIZIA), Date.now());
-				if (!p || promemoria) return;
+				const p = dueReminder(d, threshold, readReminderState(), readLastCleanup(), Date.now());
+				if (!p || reminder) return;
 				// Shown counts as reminded: other windows and the next refresh keep quiet today.
-				const stato = leggiJson<StatoPromemoria>(CHIAVE_PROMEMORIA);
+				const state = readReminderState();
 				const k = p.drive.path.toLowerCase();
-				scriviJson(CHIAVE_PROMEMORIA, { ...stato, [k]: { ...stato[k], visto: Date.now() } });
-				promemoria = p;
+				writeReminderState({ ...state, [k]: { ...state[k], shown: Date.now() } });
+				reminder = p;
 			})
 			.catch(() => {});
 	});
-	function zittisciPromemoria() {
-		if (!promemoria) return;
-		const stato = leggiJson<StatoPromemoria>(CHIAVE_PROMEMORIA);
-		const k = promemoria.drive.path.toLowerCase();
-		scriviJson(CHIAVE_PROMEMORIA, { ...stato, [k]: { ...stato[k], zitto: Date.now() + SILENZIO } });
-		promemoria = null;
+	function snoozeReminder() {
+		if (!reminder) return;
+		const state = readReminderState();
+		const k = reminder.drive.path.toLowerCase();
+		writeReminderState({ ...state, [k]: { ...state[k], quietUntil: Date.now() + QUIET } });
+		reminder = null;
 	}
-	function ricordaPulizia(byte: number) {
-		if (!puliziaDi) return;
-		scriviJson(CHIAVE_ULTIMA_PULIZIA, { ...leggiJson<UltimaPulizia>(CHIAVE_ULTIMA_PULIZIA), [puliziaDi.toLowerCase()]: { byte, at: Date.now() } });
+	function rememberCleanup(bytes: number) {
+		if (!cleanupOf) return;
+		const next: LastCleanup = { ...readLastCleanup(), [cleanupOf.toLowerCase()]: { bytes, at: Date.now() } };
+		writeJson(LAST_CLEANUP_KEY, renameFields(next, { bytes: 'byte' }));
 	}
 
 	/** Free space of the cleanup drive, to tell what was really freed. */
-	async function liberoSu(drive: string): Promise<number | null> {
+	async function freeOn(drive: string): Promise<number | null> {
 		const d = await tauriBackend.drives().catch(() => []);
-		return d.find((x) => stessoPath(x.path, drive))?.libero ?? null;
+		return d.find((x) => samePath(x.path, drive))?.free ?? null;
 	}
 
-	async function liberaPulizia(p: Piano) {
-		const drive = puliziaDi;
+	async function runCleanup(p: Plan) {
+		const drive = cleanupOf;
 		if (!drive) return;
-		erroreOp = null;
-		const prima = await liberoSu(drive);
-		const falliti: Eliminati['failed'] = [];
-		if (p.disco.length > 0) falliti.push(...(await eliminaConBarra('disco', p.disco)).failed);
-		if (p.cestino.length > 0) {
-			const esito = await eliminaConBarra('cestino', p.cestino);
-			if (esito.done.length > 0) annulla.registra({ tipo: 'cestino', originali: esito.done });
-			falliti.push(...esito.failed);
+		opError = null;
+		const before = await freeOn(drive);
+		const failures: Deleted['failed'] = [];
+		if (p.permanent.length > 0) failures.push(...(await deleteWithBar('permanent', p.permanent)).failed);
+		if (p.trash.length > 0) {
+			const outcome = await deleteWithBar('trash', p.trash);
+			if (outcome.done.length > 0) undo.record({ kind: 'trash', originals: outcome.done });
+			failures.push(...outcome.failed);
 		}
-		if (p.svuota) falliti.push(...(await eliminaConBarra('svuota', [])).failed);
-		segnalaFalliti({ done: [], failed: falliti });
-		aggiornamentoDischi++;
-		const dopo = await liberoSu(drive);
-		if (prima !== null && dopo !== null) avvisa(`Liberati ${byte(Math.max(0, dopo - prima))} su ${nomePosizione(drive)}.`);
+		if (p.emptyTrash) failures.push(...(await deleteWithBar('emptyTrash', [])).failed);
+		reportFailed({ done: [], failed: failures });
+		drivesRefresh++;
+		const after = await freeOn(drive);
+		if (before !== null && after !== null) notify(`Liberati ${formatBytes(Math.max(0, after - before))} su ${locationName(drive)}.`);
 	}
 
 	// ── Folder growth ──
 	// Every weighed folder is remembered on this PC; the space view shows the change since an earlier day.
-	const CHIAVE_MISURE = 'space-train.misure';
-	let misure: Misure = (() => {
+	const MEASURES_KEY = 'space-train.misure';
+	let measures: Measures = (() => {
 		try {
-			return JSON.parse(localStorage.getItem(CHIAVE_MISURE) ?? '{}') as Misure;
+			return renameFields<Measures>(JSON.parse(localStorage.getItem(MEASURES_KEY) ?? '{}'), { ultima: 'last' });
 		} catch {
 			return {};
 		}
 	})();
-	let crescite = $state<Record<string, Crescita>>({});
-	let perCrescita = $state(false);
-	function salvaMisure() {
+	let growths = $state<Record<string, Growth>>({});
+	let byGrowth = $state(false);
+	function saveMeasures() {
 		try {
-			localStorage.setItem(CHIAVE_MISURE, JSON.stringify(misure));
+			localStorage.setItem(MEASURES_KEY, JSON.stringify(renameFields(measures, { last: 'ultima' })));
 		} catch {
 			// Full or blocked storage: growth simply starts over next time.
 		}
 	}
-	let crescitaTotale = $derived.by(() => {
-		if (!inSpazio) return null;
-		const viste = vociVisibili.map((e) => crescite[e.path]).filter((c): c is Crescita => !!c);
-		if (viste.length === 0) return null;
-		return { delta: viste.reduce((n, c) => n + c.delta, 0), dal: Math.min(...viste.map((c) => c.dal)) };
+	let totalGrowth = $derived.by(() => {
+		if (!inSpace) return null;
+		const seenPaths = visibleItems.map((e) => growths[e.path]).filter((c): c is Growth => !!c);
+		if (seenPaths.length === 0) return null;
+		return { delta: seenPaths.reduce((n, c) => n + c.delta, 0), since: Math.min(...seenPaths.map((c) => c.since)) };
 	});
 
-	async function pesa(cartelle: string[], turno = turnoPesi) {
-		let nuove = false;
-		for (const c of cartelle) {
-			if (turno !== turnoPesi) break;
-			if (dimensioni[c] !== undefined) continue;
-			dimensioni[c] = 'calcolo';
-			const n = await tauriBackend.dimensioneCartella(c, turno).catch(() => null);
-			if (turno !== turnoPesi) break;
-			if (n === null) delete dimensioni[c];
+	async function weigh(folders: string[], turn = sizeRound) {
+		let incoming = false;
+		for (const c of folders) {
+			if (turn !== sizeRound) break;
+			if (sizes[c] !== undefined) continue;
+			sizes[c] = 'computing';
+			const n = await tauriBackend.folderSize(c, turn).catch(() => null);
+			if (turn !== sizeRound) break;
+			if (n === null) delete sizes[c];
 			else {
-				dimensioni[c] = n;
-				const r = registra(misure, c, n, Date.now());
-				misure = r.misure;
-				nuove = true;
-				if (r.crescita) crescite[c] = r.crescita;
+				sizes[c] = n;
+				const r = record(measures, c, n, Date.now());
+				measures = r.measures;
+				incoming = true;
+				if (r.growth) growths[c] = r.growth;
 			}
 		}
-		if (nuove) salvaMisure();
+		if (incoming) saveMeasures();
 	}
 
 	$effect(() => {
-		const modo = impostazioni.dimensioneCartelle;
-		const percorso = store.activeTab?.path;
-		const spazio = inSpazio;
-		const cartelle =
-			posizione === 'normale' ? vociVisibili.filter((e) => e.kind === 'dir').map((e) => e.path) : [];
+		const mode = settings.folderSizes;
+		const path = store.activeTab?.path;
+		const space = inSpace;
+		const folders =
+			location === 'normal' ? visibleItems.filter((e) => e.kind === 'dir').map((e) => e.path) : [];
 		untrack(() => {
-			if (percorso !== cartellaPesata || (modo === 'mai' && !spazio && Object.keys(dimensioni).length > 0)) {
-				cartellaPesata = percorso;
-				nuovoTurnoPesi();
+			if (path !== sizedFolder || (mode === 'never' && !space && Object.keys(sizes).length > 0)) {
+				sizedFolder = path;
+				newSizeRound();
 			}
 			// The space view weighs every folder whatever the setting says.
-			if (modo === 'aperta' || spazio) void pesa(cartelle.filter((c) => dimensioni[c] === undefined));
+			if (mode === 'open' || space) void weigh(folders.filter((c) => sizes[c] === undefined));
 		});
 	});
-	let evidenziazioni = $derived(new Map(risultati.map((r) => [r.item.path, r.positions])));
+	let highlights = $derived(new Map(results.map((r) => [r.item.path, r.positions])));
 
-	let selezione = $derived(store.activeTab?.selection ?? []);
-	let insiemeSelezione = $derived(new Set(selezione));
+	let selection = $derived(store.activeTab?.selection ?? []);
+	let selectionSet = $derived(new Set(selection));
 
 	/**
-	 * Posizione della voce che fa da cursore: l'ultima toccata, non la
-	 * prima selezionata. È da lì che ripartono le frecce.
+	 * Position of the item acting as the cursor: the last one touched, not
+	 * the first one selected. That is where the arrows start again from.
 	 */
-	let indice = $derived(
-		selezione.length === 0
+	let index = $derived(
+		selection.length === 0
 			? -1
-			: vociVisibili.findIndex((e) => e.path === selezione[selezione.length - 1])
+			: visibleItems.findIndex((e) => e.path === selection[selection.length - 1])
 	);
 
-	/** Accanto al nome: la cartella dei risultati di ricerca, l'origine nel Cestino. */
-	function cartellaVoce(e: Entry): string | undefined {
-		if (posizione === 'cestino') return e.origine;
-		const c = store.activeTab?.confronto;
+	/**
+	 * Next to the name: the folder of the search results, the origin in the Recycle
+	 * Bin.
+	 */
+	function itemFolder(e: Entry): string | undefined {
+		if (location === 'trash') return e.origin;
+		const c = store.activeTab?.comparison;
 		if (c && store.activeTab) {
 			// Comparison: only the subfolder below the compared folder, which is the same on both sides.
-			const radice = dentroDi(e.path, store.activeTab.path) ? store.activeTab.path : c.altro;
-			const taglia = (p: string) => p.replace(/[\\/]+$/, '');
-			return taglia(cartellaDi(e.path)).slice(taglia(radice).length + 1) || undefined;
+			const root = isInside(e.path, store.activeTab.path) ? store.activeTab.path : c.other;
+			const cut = (p: string) => p.replace(/[\\/]+$/, '');
+			return cut(folderOf(e.path)).slice(cut(root).length + 1) || undefined;
 		}
-		if (inRicerca) return cartellaDi(e.path);
+		if (inSearch) return folderOf(e.path);
 		return undefined;
 	}
 
-	// Con la ricerca aperta, ogni battuta rimescola i risultati: la selezione
-	// segue la prima voce, così Invio apre sempre il match migliore.
+	// With the search open, every keystroke reshuffles the results: the
+	// selection follows the first item, so Enter always opens the best match.
 	$effect(() => {
-		if (!ricercaAperta || store.activeId === null) return;
-		vociVisibili;
-		if (indice === -1 && vociVisibili.length > 0) {
-			store.seleziona(store.activeId, vociVisibili[0].path, vociVisibili);
+		if (!searchOpen || store.activeId === null) return;
+		visibleItems;
+		if (index === -1 && visibleItems.length > 0) {
+			store.select(store.activeId, visibleItems[0].path, visibleItems);
 		}
 	});
 
-	function spostaSelezione(delta: number, estendi = false) {
-		if (store.activeId === null || vociVisibili.length === 0) return;
-		const corrente = indice === -1 ? 0 : indice;
-		const prossimo = Math.min(vociVisibili.length - 1, Math.max(0, corrente + delta));
-		store.seleziona(store.activeId, vociVisibili[prossimo].path, vociVisibili, {
-			shift: estendi
+	function moveSelection(delta: number, extend = false) {
+		if (store.activeId === null || visibleItems.length === 0) return;
+		const current = index === -1 ? 0 : index;
+		const next = Math.min(visibleItems.length - 1, Math.max(0, current + delta));
+		store.select(store.activeId, visibleItems[next].path, visibleItems, {
+			shift: extend
 		});
 	}
 
-	// ── Ricerca ──────────────────────────────────────────────────────
+	// ── Search ──────────────────────────────────────────────────────
 
-	function apriRicerca() {
-		if (store.activeId !== null) ricercaAperta = true;
+	function openSearch() {
+		if (store.activeId !== null) searchOpen = true;
 	}
 
-	function chiudiRicerca() {
-		ricercaAperta = false;
-		filtri = NESSUN_FILTRO;
+	function closeSearch() {
+		searchOpen = false;
+		filters = NO_FILTERS;
 		if (store.activeId === null) return;
 		store.clearQuery(store.activeId);
-		void store.fermaRicerca(store.activeId);
+		void store.stopSearch(store.activeId);
 	}
 
 	/**
-	 * Nelle sottocartelle la ricerca parte da sola dopo una breve pausa
-	 * nella digitazione: lanciarla a ogni tasto rifarebbe la visita del
-	 * disco per ogni lettera.
+	 * In the subfolders the search starts by itself after a short pause in
+	 * typing: launching it at every key would redo the walk of the disk
+	 * for each letter.
 	 */
 	$effect(() => {
 		const tab = store.activeTab;
-		if (!ricercaAperta || !ricercaRicorsiva || !tab) return;
+		if (!searchOpen || !recursiveSearch || !tab) return;
 		const id = tab.id;
-		const testo = tab.query.trim();
-		const contenuto = ricercaContenuto;
-		const nascosti = store.showHidden;
-		const f = filtri;
+		const text = tab.query.trim();
+		const content = contentSearch;
+		const hidden = store.showHidden;
+		const f = filters;
 
-		if (testo === '' && !filtriAttivi(f)) {
-			void store.fermaRicerca(id);
+		if (text === '' && !filtersActive(f)) {
+			void store.stopSearch(id);
 			return;
 		}
-		const attesa = setTimeout(() => {
-			void store.cercaRicorsivo(id, { testo, contenuto, nascosti, ...criteriFiltri(f) }).catch((e) => {
-				erroreOp = descriviErrore(e);
+		const wait = setTimeout(() => {
+			void store.searchRecursive(id, { text, content, hidden, ...filterCriteria(f) }).catch((e) => {
+				opError = describeError(e);
 			});
 		}, 350);
-		return () => clearTimeout(attesa);
+		return () => clearTimeout(wait);
 	});
 
 	/** Opens a smart folder: its folder (or the one open), subfolder search with its text and filters. */
-	async function apriRicercaSalvata(r: RicercaSalvata) {
+	async function openSavedSearch(r: SavedSearch) {
 		const id = store.activeId;
 		if (id === null) return;
-		if (r.cartella && r.cartella !== store.activeTab?.path) await store.navigate(id, r.cartella);
-		if (store.activeTab && eVirtuale(store.activeTab.path)) return;
-		ricercaAperta = true;
-		ricercaRicorsiva = true;
-		ricercaContenuto = r.contenuto;
-		filtri = { ...r.filtri };
-		store.setQuery(id, r.testo);
+		if (r.folder && r.folder !== store.activeTab?.path) await store.navigate(id, r.folder);
+		if (store.activeTab && isVirtual(store.activeTab.path)) return;
+		searchOpen = true;
+		recursiveSearch = true;
+		contentSearch = r.content;
+		filters = { ...r.filters };
+		store.setQuery(id, r.text);
 	}
 
-	function salvaRicerca() {
+	function saveSearch() {
 		const tab = store.activeTab;
 		if (!tab) return;
-		const testo = tab.query.trim();
-		ricerche.salva({
-			nome: `${descriviRicerca(testo, filtri)} in ${nomePosizione(tab.path)}`,
-			cartella: tab.path,
-			testo,
-			contenuto: ricercaContenuto,
-			filtri: { ...filtri }
+		const text = tab.query.trim();
+		searches.save({
+			name: `${describeSearch(text, filters)} in ${locationName(tab.path)}`,
+			folder: tab.path,
+			text,
+			content: contentSearch,
+			filters: { ...filters }
 		});
-		avvisa('Ricerca salvata nella barra laterale.');
+		notify('Ricerca salvata nella barra laterale.');
 	}
 
-	function alternaRicorsiva() {
-		ricercaRicorsiva = !ricercaRicorsiva;
-		if (!ricercaRicorsiva && store.activeId !== null) void store.fermaRicerca(store.activeId);
+	function toggleRecursive() {
+		recursiveSearch = !recursiveSearch;
+		if (!recursiveSearch && store.activeId !== null) void store.stopSearch(store.activeId);
 	}
 
-	// ── Stato delle operazioni ───────────────────────────────────────
+	// ── State of the operations ──────────────────────────────────────
 
-	let rinominando = $state<string | null>(null);
-	let daCestinare = $state<Entry[]>([]);
+	let renaming = $state<string | null>(null);
+	let toTrash = $state<Entry[]>([]);
 	/** Items in the batch rename dialog; empty when it is closed. */
 	let batchRename = $state<Entry[]>([]);
 	// Photo and music details for the rename placeholders, even with the media columns hidden.
 	$effect(() => {
 		if (batchRename.length > 0) void media.request(batchRename);
 	});
-	/** Eliminazione senza ritorno: dal disco, dal Cestino o svuotandolo. */
-	let daEliminare = $state<{ voci: Entry[]; tipo: 'disco' | 'cestino' | 'svuota' | 'server' } | null>(null);
-	let erroreOp = $state<string | null>(null);
-	/** Messaggio informativo che sparisce da solo. */
-	let avviso = $state<string | null>(null);
-	let timerAvviso: ReturnType<typeof setTimeout> | undefined;
+	/**
+	 * Deletion with no way back: from the disk, from the Recycle Bin or by
+	 * emptying it.
+	 */
+	let toDelete = $state<{ items: Entry[]; kind: 'permanent' | 'trash' | 'emptyTrash' | 'server' } | null>(null);
+	let opError = $state<string | null>(null);
+	/** Informational message that goes away by itself. */
+	let notice = $state<string | null>(null);
+	let noticeTimer: ReturnType<typeof setTimeout> | undefined;
 
-	function avvisa(testo: string) {
-		avviso = testo;
-		clearTimeout(timerAvviso);
-		timerAvviso = setTimeout(() => (avviso = null), 4000);
+	function notify(text: string) {
+		notice = text;
+		clearTimeout(noticeTimer);
+		noticeTimer = setTimeout(() => (notice = null), 4000);
 	}
 
-	/** Le voci selezionate, nell'ordine in cui compaiono nella lista. */
-	function selezionate(): Entry[] {
-		return vociVisibili.filter((e) => insiemeSelezione.has(e.path));
+	/** The selected items, in the order they appear in the list. */
+	function selectedEntries(): Entry[] {
+		return visibleItems.filter((e) => selectionSet.has(e.path));
 	}
 
-	/** La voce singola su cui agiscono rinomina, apertura e anteprima. */
-	function selezionata(): Entry | null {
-		const scelte = selezionate();
-		const cursore = selezione[selezione.length - 1];
-		return scelte.find((e) => e.path === cursore) ?? scelte[scelte.length - 1] ?? null;
+	/** The single item that rename, open and preview act on. */
+	function selectedEntry(): Entry | null {
+		const choices = selectedEntries();
+		const cursor = selection[selection.length - 1];
+		return choices.find((e) => e.path === cursor) ?? choices[choices.length - 1] ?? null;
 	}
 
-	let voceAnteprima = $derived.by(() => {
-		insiemeSelezione;
-		vociVisibili;
-		return selezionata();
+	let previewItem = $derived.by(() => {
+		selectionSet;
+		visibleItems;
+		return selectedEntry();
 	});
 
-	/** Gli errori del backend arrivano come FsError, non come Error. */
-	function descriviErrore(e: unknown): string {
+	/** Backend errors arrive as FsError, not as Error. */
+	function describeError(e: unknown): string {
 		const err = e as FsError;
 		if (err?.kind === 'io') return err.message;
-		return messaggioErrore(err ?? null) || 'Operazione non riuscita.';
+		return errorMessage(err ?? null) || 'Operazione non riuscita.';
 	}
 
 	/**
-	 * Lo spazio sui dischi va riletto dopo ogni operazione che lo cambia.
-	 * Lo cambiano anche gli altri programmi (download, aggiornamenti): per
-	 * quelli si rilegge quando la finestra torna in primo piano e una volta
-	 * al minuto mentre è visibile.
+	 * The space on the drives must be read again after every operation that
+	 * changes it. Other programs change it too (downloads, updates): for
+	 * those it is read again when the window comes back to the foreground
+	 * and once a minute while it is visible.
 	 */
-	let aggiornamentoDischi = $state(0);
+	let drivesRefresh = $state(0);
 	$effect(() => {
-		const giro = setInterval(() => {
-			if (document.visibilityState === 'visible') aggiornamentoDischi++;
+		const round = setInterval(() => {
+			if (document.visibilityState === 'visible') drivesRefresh++;
 		}, 60_000);
-		return () => clearInterval(giro);
+		return () => clearInterval(round);
 	});
 
-	async function ricarica() {
-		if (store.activeId !== null) await store.aggiorna(store.activeId);
-		aggiornamentoDischi++;
+	async function reload() {
+		if (store.activeId !== null) await store.refresh(store.activeId);
+		drivesRefresh++;
 	}
 
-	// ── Rinomina, cartelle, cestino ──────────────────────────────────
+	// ── Rename, folders, recycle bin ─────────────────────────────────
 
 	/** Groups found so far and the space their extra copies take. */
 	let duplicateSummary = $derived.by(() => {
-		const groups = store.activeTab?.duplicati?.groups ?? [];
+		const groups = store.activeTab?.duplicates?.groups ?? [];
 		return { groups: groups.length, recoverable: groups.reduce((n, g) => n + g.size * (g.count - 1), 0) };
 	});
 
 	/** Every copy but the first of each group: the oldest, which Rust puts first. */
 	function selectExtraCopies() {
 		const tab = store.activeTab;
-		if (!tab?.duplicati || !tab.risultati || store.activeId === null) return;
+		if (!tab?.duplicates || !tab.results || store.activeId === null) return;
 		const extra: string[] = [];
 		let i = 0;
-		for (const g of tab.duplicati.groups) {
-			extra.push(...tab.risultati.slice(i + 1, i + g.count).map((e) => e.path));
+		for (const g of tab.duplicates.groups) {
+			extra.push(...tab.results.slice(i + 1, i + g.count).map((e) => e.path));
 			i += g.count;
 		}
-		store.selezionaPercorsi(store.activeId, extra);
+		store.selectPaths(store.activeId, extra);
 	}
 
 	// ── Archives opened like folders ─────────────────────────────────
-	async function apriArchivio(file: string) {
+	async function openArchive(file: string) {
 		const id = store.activeId;
 		if (id === null) return;
 		try {
-			const voci = await tauriBackend.archiveList(file);
-			await store.mostraArchivio(id, file, '', voci);
+			const items = await tauriBackend.archiveList(file);
+			await store.showArchive(id, file, '', items);
 		} catch (err) {
-			erroreOp = descriviErrore(err);
+			opError = describeError(err);
 		}
 	}
 
 	/** One level up inside the archive; above its root, back to the folder. */
-	function suNellArchivio(): boolean {
+	function upInArchive(): boolean {
 		const tab = store.activeTab;
-		if (!tab?.archivio || store.activeId === null) return false;
-		const su = sopra(tab.archivio.dentro);
-		if (su === null) void store.fermaRicerca(store.activeId);
-		else void store.mostraArchivio(store.activeId, tab.archivio.file, su, tab.archivio.voci, tab.archivio.cassaforte);
+		if (!tab?.archive || store.activeId === null) return false;
+		const up = above(tab.archive.inner);
+		if (up === null) void store.stopSearch(store.activeId);
+		else void store.showArchive(store.activeId, tab.archive.file, up, tab.archive.items, tab.archive.vault);
 		return true;
 	}
 
 	/** Extracts the selection (or everything) from the open archive into `dest`. */
-	function estraiDaArchivio(dest: string) {
-		const arc = store.activeTab?.archivio;
+	function extractFromArchive(dest: string) {
+		const arc = store.activeTab?.archive;
 		if (!arc) return;
-		const scelte = selezionate();
-		const items = scelte.length > 0 ? scelte.map((e) => internoDi(e.path)) : (store.activeTab?.risultati ?? []).map((e) => internoDi(e.path));
-		return accoda(`Estrai da «${nomeDi(arc.file)}» → ${nomePosizione(dest)}`, () => estraiDaArchivioOra(arc.file, items, dest));
+		const choices = selectedEntries();
+		const items = choices.length > 0 ? choices.map((e) => innerOf(e.path)) : (store.activeTab?.results ?? []).map((e) => innerOf(e.path));
+		return enqueue(`Estrai da «${nameOf(arc.file)}» → ${locationName(dest)}`, () => extractFromArchiveNow(arc.file, items, dest));
 	}
 
-	async function estraiDaArchivioOra(file: string, items: string[], dest: string) {
-		const opId = prossimoOpId++;
-		modoInCorso = 'estrai';
-		opInCorso = opId;
-		progresso = { transferred: 0, total: 0 };
-		erroreOp = null;
+	async function extractFromArchiveNow(file: string, items: string[], dest: string) {
+		const opId = nextOpId++;
+		runningMode = 'extract';
+		runningOp = opId;
+		progress = { transferred: 0, total: 0 };
+		opError = null;
 		try {
-			if (store.activeTab?.archivio?.cassaforte && store.activeTab.archivio.file === file) {
+			if (store.activeTab?.archive?.vault && store.activeTab.archive.file === file) {
 				await tauriBackend.vaultExtract(file, items, dest);
-				tocca(file);
-			} else await tauriBackend.archiveExtract({ opId, archive: file, items, dest, onProgress: (p) => (progresso = p) });
-			avvisa(`Estratto in ${dest}.`);
-			void store.aggiornaCartella(dest);
-			aggiornamentoDischi++;
+				touch(file);
+			} else await tauriBackend.archiveExtract({ opId, archive: file, items, dest, onProgress: (p) => (progress = p) });
+			notify(`Estratto in ${dest}.`);
+			void store.refreshFolder(dest);
+			drivesRefresh++;
 		} catch (err) {
-			erroreOp = descriviErrore(err);
+			opError = describeError(err);
 		} finally {
-			opInCorso = null;
-			progresso = null;
+			runningOp = null;
+			progress = null;
 		}
 	}
 
 	/** Every item carrying a colour label, wherever it is, in place of the folder. */
-	async function mostraEtichetta(id: IdColore) {
-		const c = COLORI_CARTELLA.find((x) => x.id === id);
+	async function showLabel(id: ColorId) {
+		const c = FOLDER_COLORS.find((x) => x.id === id);
 		if (!c || store.activeId === null) return;
-		const voci = await tauriBackend.entriesFor(colori.percorsiDi(id)).catch(() => []);
-		await store.mostraVoci(store.activeId, voci, colori.nameOf(id));
+		const items = await tauriBackend.entriesFor(colors.pathsOf(id)).catch(() => []);
+		await store.showItems(store.activeId, items, colors.nameOf(id));
 	}
 
 	/** Folder comparison: starts it against the other pane, or a folder the user picks. */
-	async function confrontaCon(cartella: string) {
+	async function compareWith(folder: string) {
 		const id = store.activeId;
 		if (id === null) return;
-		const altro =
-			tabAltro && !eVirtuale(tabAltro.path)
-				? tabAltro.path
-				: await tauriBackend.scegliCartella('Confronta con…', cartella);
-		if (!altro) return;
+		const other =
+			otherTab && !isVirtual(otherTab.path)
+				? otherTab.path
+				: await tauriBackend.pickFolder('Confronta con…', folder);
+		if (!other) return;
 		// One inside the other, «Allinea» would copy a folder into itself.
-		if (dentroDi(altro, cartella) || dentroDi(cartella, altro)) {
-			erroreOp = 'Una cartella sta dentro l’altra: scegli due cartelle separate.';
+		if (isInside(other, folder) || isInside(folder, other)) {
+			opError = 'Una cartella sta dentro l’altra: scegli due cartelle separate.';
 			return;
 		}
-		if (cartella !== store.activeTab?.path) await store.navigate(id, cartella);
-		await store.confronta(id, altro, false, store.showHidden).catch((e) => (erroreOp = descriviErrore(e)));
+		if (folder !== store.activeTab?.path) await store.navigate(id, folder);
+		await store.compare(id, other, false, store.showHidden).catch((e) => (opError = describeError(e)));
 	}
 
 	/** Copies what is missing or older on one side, then compares again. */
-	async function allinea(verso: 'la' | 'qui') {
+	async function align(direction: 'there' | 'here') {
 		const tab = store.activeTab;
-		const c = tab?.confronto;
-		if (!tab || !c || !tab.risultati || store.activeId === null) return;
+		const c = tab?.comparison;
+		if (!tab || !c || !tab.results || store.activeId === null) return;
 		const id = store.activeId;
-		for (const g of alignPlan(c, tab.risultati, tab.path, verso)) {
-			await esegui('sovrascrivi', { sources: g.sources, dest: g.dest, mode: 'copy' });
+		for (const g of alignPlan(c, tab.results, tab.path, direction)) {
+			await run('overwrite', { sources: g.sources, dest: g.dest, mode: 'copy' });
 		}
-		await store.confronta(id, c.altro, c.contenuto, store.showHidden).catch((e) => (erroreOp = descriviErrore(e)));
+		await store.compare(id, c.other, c.content, store.showHidden).catch((e) => (opError = describeError(e)));
 	}
 
 	/** Same comparison, reading the files instead of trusting size and date. */
-	function confrontaContenuto() {
-		const c = store.activeTab?.confronto;
+	function compareContent() {
+		const c = store.activeTab?.comparison;
 		if (!c || store.activeId === null) return;
-		void store.confronta(store.activeId, c.altro, true, store.showHidden).catch((e) => (erroreOp = descriviErrore(e)));
+		void store.compare(store.activeId, c.other, true, store.showHidden).catch((e) => (opError = describeError(e)));
 	}
 
 	/** F2, the menu and the command bar: one item renames in place, several open the batch dialog. */
 	function startRename() {
-		if (!scrivibile) return;
-		const scelte = selezionate();
-		if (scelte.length > 1) batchRename = scelte;
+		if (!writable) return;
+		const choices = selectedEntries();
+		if (choices.length > 1) batchRename = choices;
 		else {
-			const voce = selezionata();
-			if (voce) rinominando = voce.path;
+			const item = selectedEntry();
+			if (item) renaming = item.path;
 		}
 	}
 
 	async function runBatchRename(plan: PlannedRename[]) {
 		batchRename = [];
-		erroreOp = null;
+		opError = null;
 		const tabPath = store.activeTab?.path;
 		// Original path → where it is now; a failure halfway still records what moved.
 		const where = new Map(plan.map((p) => [p.item.path, p.item.path]));
@@ -1331,118 +1358,119 @@
 				for (const [origin, now] of where) if (now === step.from) where.set(origin, arrived);
 			}
 		} catch (e) {
-			erroreOp = descriviErrore(e);
+			opError = describeError(e);
 		}
 		for (const [origin, now] of where) {
 			if (origin === now) continue;
-			if (tabPath) preferiti.rinomina(tabPath, nomeDi(origin), nomeDi(now));
-			colori.sposta(origin, now);
-			accessoRapido.sposta(origin, now);
+			if (tabPath) favorites.rename(tabPath, nameOf(origin), nameOf(now));
+			colors.move(origin, now);
+			quickAccess.move(origin, now);
 		}
-		annulla.registra({ tipo: 'batchRename', steps });
+		undo.record({ kind: 'batchRename', steps });
 		if (store.activeId !== null) {
 			await store.reload(store.activeId);
 			if (store.activeTab) store.activeTab.selection = [...where.values()];
 		}
 	}
 
-	async function confermaRinomina(voce: Entry, nuovoNome: string) {
-		rinominando = null;
-		erroreOp = null;
+	async function confirmRename(item: Entry, newName: string) {
+		renaming = null;
+		opError = null;
 		try {
-			const nuovo = await tauriBackend.renameEntry(voce.path, nuovoNome);
-			if (store.activeTab) preferiti.rinomina(store.activeTab.path, voce.name, nuovoNome);
-			colori.sposta(voce.path, nuovo);
-			accessoRapido.sposta(voce.path, nuovo);
-			annulla.registra({ tipo: 'rinomina', da: voce.path, a: nuovo });
+			const created = await tauriBackend.renameEntry(item.path, newName);
+			if (store.activeTab) favorites.rename(store.activeTab.path, item.name, newName);
+			colors.move(item.path, created);
+			quickAccess.move(item.path, created);
+			undo.record({ kind: 'rename', from: item.path, to: created });
 			if (store.activeId !== null) {
 				await store.reload(store.activeId);
-				if (store.activeTab) store.activeTab.selection = [nuovo];
+				if (store.activeTab) store.activeTab.selection = [created];
 			}
 		} catch (e) {
-			erroreOp = descriviErrore(e);
+			opError = describeError(e);
 		}
 	}
 
 	/**
-	 * Crea "Nuova cartella", numerando se il nome è occupato. La numerazione
-	 * sta qui perché riguarda il nome, non il path: la composizione del path
-	 * resta in Rust.
+	 * Creates "Nuova cartella", numbering it if the name is taken. The
+	 * numbering lives here because it concerns the name, not the path:
+	 * building the path stays in Rust.
 	 */
-	async function nuovaCartella() {
-		if (!store.activeTab || store.activeId === null || !scrivibile) return;
-		erroreOp = null;
+	async function newFolder() {
+		if (!store.activeTab || store.activeId === null || !writable) return;
+		opError = null;
 
 		const parent = store.activeTab.path;
 
 		for (let n = 1; n <= 100; n++) {
-			const nome = n === 1 ? 'Nuova cartella' : `Nuova cartella (${n})`;
+			const name = n === 1 ? 'Nuova cartella' : `Nuova cartella (${n})`;
 			try {
-				const creata = await tauriBackend.createFolder(parent, nome);
-				annulla.registra({ tipo: 'crea', paths: [creata], descrizione: `creazione di «${nome}»` });
+				const createdFolder = await tauriBackend.createFolder(parent, name);
+				undo.record({ kind: 'create', paths: [createdFolder], description: `creazione di «${name}»` });
 				await store.reload(store.activeId);
-				if (store.activeTab) store.activeTab.selection = [creata];
-				rinominando = creata;
+				if (store.activeTab) store.activeTab.selection = [createdFolder];
+				renaming = createdFolder;
 				return;
 			} catch (e) {
 				const err = e as FsError;
-				// Nome occupato: prova il successivo. Qualsiasi altro errore
-				// (permessi, disco pieno) va mostrato subito.
+				// Name taken: try the next one. Any other error
+				// (permissions, disk full) must be shown right away.
 				if (err?.kind === 'io' && err.message.includes('Esiste già')) continue;
-				erroreOp = descriviErrore(e);
+				opError = describeError(e);
 				return;
 			}
 		}
 
-		erroreOp = 'Troppe cartelle con lo stesso nome.';
+		opError = 'Troppe cartelle con lo stesso nome.';
 	}
 
-	/** I tipi del menu «Nuovo»: si chiedono a Windows una volta sola. */
-	let tipiNuovo = $state<TipoNuovo[]>([]);
+	/** The types of the «Nuovo» menu: Windows is asked for them only once. */
+	let newFileTypes = $state<NewFileType[]>([]);
 	$effect(() => {
 		tauriBackend
 			.newFileTypes()
-			.then((t) => (tipiNuovo = t))
+			.then((t) => (newFileTypes = t))
 			.catch(() => {});
 	});
 
 	/**
-	 * Crea un file nuovo come fa Esplora: col nome del tipo, numerato se
-	 * occupato, e subito pronto da rinominare.
+	 * Creates a new file the way Explorer does: with the name of the type,
+	 * numbered if taken, and immediately ready to be renamed.
 	 */
-	async function nuovoFile(ext: string) {
-		if (!store.activeTab || store.activeId === null || !modificabile) return;
-		erroreOp = null;
+	async function newFile(ext: string) {
+		if (!store.activeTab || store.activeId === null || !editable) return;
+		opError = null;
 		try {
-			const creato = await tauriBackend.createNewFile(store.activeTab.path, ext);
-			annulla.registra({ tipo: 'crea', paths: [creato], descrizione: `creazione di «${nomeDi(creato)}»` });
+			const createdFile = await tauriBackend.createNewFile(store.activeTab.path, ext);
+			undo.record({ kind: 'create', paths: [createdFile], description: `creazione di «${nameOf(createdFile)}»` });
 			await store.reload(store.activeId);
-			store.selezionaPercorsi(store.activeId, [creato]);
-			rinominando = creato;
+			store.selectPaths(store.activeId, [createdFile]);
+			renaming = createdFile;
 		} catch (e) {
-			erroreOp = descriviErrore(e);
+			opError = describeError(e);
 		}
 	}
 
-	function chiediCestino() {
-		const scelte = selezionate();
-		if (scelte.length === 0) return;
-		// Nel Cestino «elimina» non può che essere definitivo.
-		if (posizione === 'cestino') daEliminare = { voci: scelte, tipo: 'cestino' };
-		else if (posizione === 'server' && scrivibile) daEliminare = { voci: scelte, tipo: 'server' };
-		else if (posizione === 'normale') {
-			// Senza conferma, se l'utente l'ha spenta: il cestino resta un ripensamento possibile.
-			if (impostazioni.confermaCestino) daCestinare = scelte;
-			else void cestina(scelte);
+	function askTrash() {
+		const choices = selectedEntries();
+		if (choices.length === 0) return;
+		// In the Recycle Bin «delete» can only be permanent.
+		if (location === 'trash') toDelete = { items: choices, kind: 'trash' };
+		else if (location === 'server' && writable) toDelete = { items: choices, kind: 'server' };
+		else if (location === 'normal') {
+			// Without confirmation, if the user turned it off: the recycle bin is still a possible
+			// second thought.
+			if (settings.confirmTrash) toTrash = choices;
+			else void trash(choices);
 		}
 	}
 
-	function chiediEliminaDefinitivo() {
-		const scelte = selezionate();
-		if (scelte.length === 0) return;
-		if (posizione === 'cestino') daEliminare = { voci: scelte, tipo: 'cestino' };
-		else if (posizione === 'server' && scrivibile) daEliminare = { voci: scelte, tipo: 'server' };
-		else if (posizione === 'normale') daEliminare = { voci: scelte, tipo: 'disco' };
+	function askDeletePermanently() {
+		const choices = selectedEntries();
+		if (choices.length === 0) return;
+		if (location === 'trash') toDelete = { items: choices, kind: 'trash' };
+		else if (location === 'server' && writable) toDelete = { items: choices, kind: 'server' };
+		else if (location === 'normal') toDelete = { items: choices, kind: 'permanent' };
 	}
 
 	/**
@@ -1450,13 +1478,13 @@
 	 * With a transfer already on the bar, the deletion runs without showing
 	 * it. Returns the paths actually removed: the user can stop halfway.
 	 */
-	async function eliminaConBarra(mode: ModoElimina, paths: string[]): Promise<Eliminati> {
-		const opId = prossimoOpId++;
-		const mostra = opInCorso === null;
-		if (mostra) {
-			modoInCorso = mode === 'cestino' ? 'cestino' : 'elimina';
-			opInCorso = opId;
-			progresso = { transferred: 0, total: 0 };
+	async function deleteWithBar(mode: DeleteMode, paths: string[]): Promise<Deleted> {
+		const opId = nextOpId++;
+		const show = runningOp === null;
+		if (show) {
+			runningMode = mode === 'trash' ? 'trash' : 'delete';
+			runningOp = opId;
+			progress = { transferred: 0, total: 0 };
 		}
 		try {
 			return await tauriBackend.deleteItems({
@@ -1464,178 +1492,178 @@
 				mode,
 				paths,
 				onProgress: (p) => {
-					if (mostra) progresso = p;
+					if (show) progress = p;
 				}
 			});
 		} finally {
-			if (mostra) {
-				opInCorso = null;
-				progresso = null;
+			if (show) {
+				runningOp = null;
+				progress = null;
 			}
 		}
 	}
 
 	/** Items the deletion had to leave: named, with the reason, the rest went. */
-	function segnalaFalliti(esito: Eliminati) {
-		if (esito.failed.length === 0) return;
-		const righe = esito.failed.slice(0, 3).map((f) => `«${nomeDi(f.path)}»: ${descriviErrore(f.error)}`);
-		const altri = esito.failed.length - righe.length;
-		const titolo = esito.failed.length === 1 ? '1 elemento non eliminato' : `${esito.failed.length} elementi non eliminati`;
-		erroreOp = `${titolo} (gli altri sì). ${righe.join(' · ')}${altri > 0 ? ` e altri ${altri}` : ''}`;
+	function reportFailed(outcome: Deleted) {
+		if (outcome.failed.length === 0) return;
+		const rows = outcome.failed.slice(0, 3).map((f) => `«${nameOf(f.path)}»: ${describeError(f.error)}`);
+		const others = outcome.failed.length - rows.length;
+		const title = outcome.failed.length === 1 ? '1 elemento non eliminato' : `${outcome.failed.length} elementi non eliminati`;
+		opError = `${title} (gli altri sì). ${rows.join(' · ')}${others > 0 ? ` e altri ${others}` : ''}`;
 	}
 
-	async function cestina(voci = daCestinare) {
-		daCestinare = [];
-		erroreOp = null;
+	async function trash(items = toTrash) {
+		toTrash = [];
+		opError = null;
 		try {
-			const esito = await eliminaConBarra('cestino', voci.map((v) => v.path));
-			if (esito.done.length > 0) annulla.registra({ tipo: 'cestino', originali: esito.done });
-			segnalaFalliti(esito);
-			await ricarica();
+			const outcome = await deleteWithBar('trash', items.map((v) => v.path));
+			if (outcome.done.length > 0) undo.record({ kind: 'trash', originals: outcome.done });
+			reportFailed(outcome);
+			await reload();
 		} catch (e) {
-			erroreOp = descriviErrore(e);
-			await ricarica();
+			opError = describeError(e);
+			await reload();
 		}
 	}
 
-	async function eliminaDefinitivo() {
-		const richiesta = daEliminare;
-		daEliminare = null;
-		if (!richiesta) return;
-		erroreOp = null;
+	async function deletePermanently() {
+		const request = toDelete;
+		toDelete = null;
+		if (!request) return;
+		opError = null;
 		try {
-			const paths = richiesta.voci.map((v) => v.path);
-			if (richiesta.tipo === 'server') {
+			const paths = request.items.map((v) => v.path);
+			if (request.kind === 'server') {
 				await tauriBackend.deletePermanently(paths);
-				await ricarica();
+				await reload();
 				return;
 			}
-			const modo: ModoElimina =
-				richiesta.tipo === 'disco' ? 'disco' : richiesta.tipo === 'cestino' ? 'dalCestino' : 'svuota';
-			segnalaFalliti(await eliminaConBarra(modo, modo === 'svuota' ? [] : paths));
-			await ricarica();
+			const mode: DeleteMode =
+				request.kind === 'permanent' ? 'permanent' : request.kind === 'trash' ? 'fromTrash' : 'emptyTrash';
+			reportFailed(await deleteWithBar(mode, mode === 'emptyTrash' ? [] : paths));
+			await reload();
 		} catch (e) {
-			erroreOp = descriviErrore(e);
-			await ricarica();
+			opError = describeError(e);
+			await reload();
 		}
 	}
 
-	async function ripristina() {
-		const scelte = selezionate();
-		if (scelte.length === 0) return;
+	async function restore() {
+		const choices = selectedEntries();
+		if (choices.length === 0) return;
 		try {
-			await tauriBackend.trashRestore(scelte.map((e) => e.path));
-			avvisa(scelte.length === 1 ? `«${scelte[0].name}» ripristinato.` : `${scelte.length} elementi ripristinati.`);
-			await ricarica();
+			await tauriBackend.trashRestore(choices.map((e) => e.path));
+			notify(choices.length === 1 ? `«${choices[0].name}» ripristinato.` : `${choices.length} elementi ripristinati.`);
+			await reload();
 		} catch (e) {
-			erroreOp = descriviErrore(e);
+			opError = describeError(e);
 		}
 	}
 
-	async function annullaUltima() {
-		erroreOp = null;
+	async function undoLast() {
+		opError = null;
 		try {
-			const fatta = await annulla.annulla();
-			if (fatta) {
-				avvisa(`Annullata: ${fatta}.`);
-				await ricarica();
+			const undone = await undo.undo();
+			if (undone) {
+				notify(`Annullata: ${undone}.`);
+				await reload();
 			}
 		} catch (e) {
-			erroreOp = descriviErrore(e);
-			await ricarica();
+			opError = describeError(e);
+			await reload();
 		}
 	}
 
-	// ── Appunti e trasferimenti ──────────────────────────────────────
+	// ── Clipboard and transfers ──────────────────────────────────────
 
-	let progresso = $state<Progresso | null>(null);
-	let modoInCorso = $state<ModoBarra>('copy');
-	let opInCorso = $state<number | null>(null);
+	let progress = $state<Progress | null>(null);
+	let runningMode = $state<ProgressMode>('copy');
+	let runningOp = $state<number | null>(null);
 
 	// ── Transfer queue ───────────────────────────────────────────────
 	// Copies, moves, archives and LAN transfers run one at a time: a new one
 	// waits its turn instead of fighting the running one for the bar.
-	interface Lavoro {
+	interface Job {
 		id: number;
-		titolo: string;
-		avvia: () => Promise<unknown>;
-		finito: (v: unknown) => void;
+		title: string;
+		start: () => Promise<unknown>;
+		finished: (v: unknown) => void;
 	}
-	let coda = $state<Lavoro[]>([]);
-	let lavoroCorrente = $state<{ id: number; titolo: string } | null>(null);
-	let codaAperta = $state(false);
-	let inPausa = $state(false);
-	let prossimoLavoro = 1;
-	let svuotando = false;
+	let queue = $state<Job[]>([]);
+	let currentJob = $state<{ id: number; title: string } | null>(null);
+	let queueOpen = $state(false);
+	let paused = $state(false);
+	let nextJobId = 1;
+	let draining = false;
 
 	/** Puts a job in the queue; resolves with its result when it has run. */
-	function accoda<T>(titolo: string, avvia: () => Promise<T>): Promise<T | undefined> {
-		return new Promise((finito) => {
-			coda = [...coda, { id: prossimoLavoro++, titolo, avvia, finito: finito as (v: unknown) => void }];
-			void svuotaCoda();
+	function enqueue<T>(title: string, start: () => Promise<T>): Promise<T | undefined> {
+		return new Promise((finished) => {
+			queue = [...queue, { id: nextJobId++, title, start, finished: finished as (v: unknown) => void }];
+			void drainQueue();
 		});
 	}
 
-	async function svuotaCoda() {
-		if (svuotando) return;
-		svuotando = true;
+	async function drainQueue() {
+		if (draining) return;
+		draining = true;
 		try {
-			while (coda.length > 0) {
-				const [lavoro, ...resto] = coda;
-				coda = resto;
-				lavoroCorrente = { id: lavoro.id, titolo: lavoro.titolo };
-				inPausa = false;
-				let esito: unknown;
+			while (queue.length > 0) {
+				const [job, ...rest] = queue;
+				queue = rest;
+				currentJob = { id: job.id, title: job.title };
+				paused = false;
+				let outcome: unknown;
 				try {
-					esito = await lavoro.avvia();
+					outcome = await job.start();
 				} catch (e) {
-					erroreOp = descriviErrore(e);
+					opError = describeError(e);
 				}
-				lavoro.finito(esito);
+				job.finished(outcome);
 			}
 		} finally {
-			lavoroCorrente = null;
-			codaAperta = false;
-			svuotando = false;
+			currentJob = null;
+			queueOpen = false;
+			draining = false;
 		}
 	}
 
-	function togliDallaCoda(id: number) {
-		const l = coda.find((x) => x.id === id);
-		coda = coda.filter((x) => x.id !== id);
-		l?.finito(undefined);
+	function removeFromQueue(id: number) {
+		const l = queue.find((x) => x.id === id);
+		queue = queue.filter((x) => x.id !== id);
+		l?.finished(undefined);
 	}
 
-	function suNellaCoda(id: number) {
-		const i = coda.findIndex((x) => x.id === id);
+	function upInQueue(id: number) {
+		const i = queue.findIndex((x) => x.id === id);
 		if (i <= 0) return;
-		const c = [...coda];
+		const c = [...queue];
 		[c[i - 1], c[i]] = [c[i], c[i - 1]];
-		coda = c;
+		queue = c;
 	}
 
-	async function alternaPausa() {
-		if (opInCorso === null) return;
-		const nuova = !inPausa;
-		if (await tauriBackend.pauseTransfer(opInCorso, nuova).catch(() => false)) inPausa = nuova;
+	async function togglePause() {
+		if (runningOp === null) return;
+		const created = !paused;
+		if (await tauriBackend.pauseTransfer(runningOp, created).catch(() => false)) paused = created;
 	}
 
-	function quanti(paths: readonly string[]): string {
-		return paths.length === 1 ? `«${nomeDi(paths[0])}»` : `${paths.length} elementi`;
+	function count(paths: readonly string[]): string {
+		return paths.length === 1 ? `«${nameOf(paths[0])}»` : `${paths.length} elementi`;
 	}
-	/** Trasferimento in attesa che l'utente risolva i conflitti di nome. */
-	let inSospeso = $state<{ sources: string[]; dest: string; mode: 'copy' | 'move' } | null>(null);
-	let conflitti = $state<string[]>([]);
+	/** Transfer waiting for the user to resolve the name conflicts. */
+	let pendingConflicts = $state<{ sources: string[]; dest: string; mode: 'copy' | 'move' } | null>(null);
+	let conflicts = $state<string[]>([]);
 
-	let prossimoOpId = 1;
+	let nextOpId = 1;
 
 	/**
-	 * Vero quando il sistema sta effettivamente muovendo dati: un
-	 * trasferimento in corso o una cartella in lettura. È l'unica cosa che
-	 * accende i binari — senza questo aggancio sarebbero decorazione.
+	 * True when the system is actually moving data: a transfer in progress
+	 * or a folder being read. It is the only thing that lights up the
+	 * rails — without this hook they would be decoration.
 	 */
-	let caricoOra = $derived(
-		opInCorso !== null || (store.activeTab?.loading ?? false) || (store.activeTab?.cercando ?? false)
+	let loadingNow = $derived(
+		runningOp !== null || (store.activeTab?.loading ?? false) || (store.activeTab?.searching ?? false)
 	);
 	/**
 	 * The load the rails show: on only after it lasts a moment. A folder
@@ -1643,867 +1671,886 @@
 	 * and each flip changed the animation speeds mid-run: the train and the
 	 * current jumped back and forth.
 	 */
-	let sottoCarico = $state(false);
+	let underLoad = $state(false);
 	$effect(() => {
-		if (!caricoOra) {
-			sottoCarico = false;
+		if (!loadingNow) {
+			underLoad = false;
 			return;
 		}
-		const t = setTimeout(() => (sottoCarico = true), 400);
+		const t = setTimeout(() => (underLoad = true), 400);
 		return () => clearTimeout(t);
 	});
 
 	/**
-	 * Cambia colonna d'ordinamento, o inverte il verso se è già quella.
+	 * Changes the sort column, or flips the direction if it is already
+	 * that one.
 	 *
-	 * L'ordinamento avviene in Rust: il tab si ricarica. Nome e tipo
-	 * partono crescenti, dimensione e data decrescenti — il file più
-	 * grande e quello più recente sono ciò che si cerca quasi sempre.
+	 * The sorting happens in Rust: the tab reloads. Name and type start
+	 * ascending, size and date descending — the largest file and the most
+	 * recent one are what you are looking for almost always.
 	 */
-	function ordinaPer(chiave: SortKey) {
+	function sortBy(key: SortKey) {
 		const tab = store.activeTab;
 		if (!tab || store.activeId === null) return;
 
-		if (ordineMedia) {
+		if (mediaSort) {
 			// Back from a media column: the clicked one takes over in its usual direction.
-			const { [store.activeId]: _, ...resto } = ordiniMedia;
-			ordiniMedia = resto;
+			const { [store.activeId]: _, ...rest } = mediaSorts;
+			mediaSorts = rest;
 		}
-		const ascendente =
-			tab.sort.key === chiave && !ordineMedia ? !tab.sort.ascending : chiave === 'name' || chiave === 'kind';
+		const ascendingNow =
+			tab.sort.key === key && !mediaSort ? !tab.sort.ascending : key === 'name' || key === 'kind';
 
-		store.setSort(store.activeId, { key: chiave, ascending: ascendente });
+		store.setSort(store.activeId, { key: key, ascending: ascendingNow });
 	}
 
 	/**
-	 * Copia e taglia scrivono negli appunti di Windows, così si incolla
-	 * anche in Esplora o in un'altra app. La copia interna resta per
-	 * mostrare sbiadite le voci tagliate.
+	 * Copy and cut write to the Windows clipboard, so you can also paste
+	 * in Explorer or in another app. The internal copy stays to show the
+	 * cut items faded.
 	 */
-	async function mettiNegliAppunti(taglia: boolean) {
-		if (posizione === 'cestino') return;
-		const scelte = selezionate();
-		if (scelte.length === 0) return;
-		const paths = scelte.map((e) => e.path);
-		// La cartella di un altro PC è in sola lettura e Windows non saprebbe
-		// cosa farsene di quei path: si copia solo negli appunti interni.
-		if (posizione === 'lan') {
-			appunti.copy(paths);
+	async function putOnClipboard(cut: boolean) {
+		if (location === 'trash') return;
+		const choices = selectedEntries();
+		if (choices.length === 0) return;
+		const paths = choices.map((e) => e.path);
+		// The folder of another PC is read-only and Windows would not know
+		// what to do with those paths: it is copied only to the internal
+		// clipboard.
+		if (location === 'lan') {
+			clipboard.copy(paths);
 			return;
 		}
-		if (taglia) appunti.cut(paths);
-		else appunti.copy(paths);
+		if (cut) clipboard.cut(paths);
+		else clipboard.copy(paths);
 		try {
-			await tauriBackend.clipboardWrite(paths, taglia);
+			await tauriBackend.clipboardWrite(paths, cut);
 		} catch (e) {
-			erroreOp = descriviErrore(e);
+			opError = describeError(e);
 		}
 	}
 
-	/** Cosa c'è da incollare: gli appunti di Windows vincono su quelli interni. */
-	async function daIncollare(): Promise<{ paths: string[]; mode: 'copy' | 'move' } | null> {
-		// Voci copiate da un altro PC vivono solo negli appunti interni.
-		if (!appunti.vuoto && eReteLocale(appunti.paths[0])) {
-			return { paths: [...appunti.paths], mode: 'copy' };
+	/**
+	 * What there is to paste: the Windows clipboard wins over the internal
+	 * one.
+	 */
+	async function toPaste(): Promise<{ paths: string[]; mode: 'copy' | 'move' } | null> {
+		// Items copied from another PC live only in the internal
+		// clipboard.
+		if (!clipboard.empty && isLan(clipboard.paths[0])) {
+			return { paths: [...clipboard.paths], mode: 'copy' };
 		}
 		try {
-			const sistema = await tauriBackend.clipboardRead();
-			if (sistema && sistema.paths.length > 0) {
-				return { paths: sistema.paths, mode: sistema.taglia ? 'move' : 'copy' };
+			const platform = await tauriBackend.clipboardRead();
+			if (platform && platform.paths.length > 0) {
+				return { paths: platform.paths, mode: platform.cut ? 'move' : 'copy' };
 			}
 		} catch {
-			// Appunti illeggibili: si ripiega su quelli interni.
+			// Unreadable clipboard: fall back on the internal one.
 		}
-		if (appunti.vuoto) return null;
-		return { paths: [...appunti.paths], mode: appunti.mode === 'cut' ? 'move' : 'copy' };
+		if (clipboard.empty) return null;
+		return { paths: [...clipboard.paths], mode: clipboard.mode === 'cut' ? 'move' : 'copy' };
 	}
 
-	async function incolla() {
-		if (!store.activeTab || !scrivibile) return;
-		erroreOp = null;
-		const contenuto = await daIncollare();
-		if (!contenuto) return;
-		await trasferisci(contenuto.paths, store.activeTab.path, contenuto.mode);
+	async function paste() {
+		if (!store.activeTab || !writable) return;
+		opError = null;
+		const content = await toPaste();
+		if (!content) return;
+		await runTransfer(content.paths, store.activeTab.path, content.mode);
 	}
 
 	/**
-	 * Copia o sposta in due tempi: prima si cercano i conflitti, e solo se
-	 * ce ne sono si interrompe per chiedere. Senza collisioni non compare
-	 * nessuna finestra e l'operazione parte subito.
+	 * Copy or move in two steps: first the conflicts are looked for, and
+	 * only if there are any it stops to ask. Without collisions no dialog
+	 * appears and the operation starts right away.
 	 */
-	async function trasferisci(sources: string[], dest: string, mode: 'copy' | 'move') {
-		if (sources.length > 0 && eServer(sources[0]) && eServer(dest)) {
-			erroreOp = 'Fra due cartelle di server si copia passando dal PC: scarica e poi carica.';
+	async function runTransfer(sources: string[], dest: string, mode: 'copy' | 'move') {
+		if (sources.length > 0 && isServer(sources[0]) && isServer(dest)) {
+			opError = 'Fra due cartelle di server si copia passando dal PC: scarica e poi carica.';
 			return;
 		}
-		// Da un altro PC si copia sempre, e i nomi occupati si numerano da soli.
-		if (sources.length > 0 && eReteLocale(sources[0])) {
-			await scaricaDaRete(sources, dest);
+		// From another PC it is always a copy, and taken names are numbered by
+		// themselves.
+		if (sources.length > 0 && isLan(sources[0])) {
+			await downloadFromNetwork(sources, dest);
 			return;
 		}
 		try {
-			const trovati = await tauriBackend.scanConflicts(sources, dest);
-			if (trovati.length > 0) {
-				inSospeso = { sources, dest, mode };
-				conflitti = trovati;
+			const found = await tauriBackend.scanConflicts(sources, dest);
+			if (found.length > 0) {
+				pendingConflicts = { sources, dest, mode };
+				conflicts = found;
 				return;
 			}
-			await esegui('rinomina', { sources, dest, mode });
+			await run('rename', { sources, dest, mode });
 		} catch (e) {
-			erroreOp = descriviErrore(e);
+			opError = describeError(e);
 		}
 	}
 
-	function esegui(
-		policy: Politica,
-		op: { sources: string[]; dest: string; mode: 'copy' | 'move' } | null = inSospeso
+	function run(
+		policy: ConflictPolicy,
+		op: { sources: string[]; dest: string; mode: 'copy' | 'move' } | null = pendingConflicts
 	) {
-		conflitti = [];
-		inSospeso = null;
+		conflicts = [];
+		pendingConflicts = null;
 		if (!op) return Promise.resolve(undefined);
-		const titolo = `${op.mode === 'move' ? 'Sposta' : 'Copia'} ${quanti(op.sources)} → ${nomePosizione(op.dest)}`;
-		return accoda(titolo, () => eseguiOra(policy, op));
+		const title = `${op.mode === 'move' ? 'Sposta' : 'Copia'} ${count(op.sources)} → ${locationName(op.dest)}`;
+		return enqueue(title, () => runNow(policy, op));
 	}
 
-	async function eseguiOra(policy: Politica, op: { sources: string[]; dest: string; mode: 'copy' | 'move' }) {
+	async function runNow(policy: ConflictPolicy, op: { sources: string[]; dest: string; mode: 'copy' | 'move' }) {
 		if (store.activeId === null) return;
 
 		const { sources, dest, mode } = op;
-		const opId = prossimoOpId++;
+		const opId = nextOpId++;
 
-		modoInCorso = mode;
-		opInCorso = opId;
-		progresso = { transferred: 0, total: 0 };
+		runningMode = mode;
+		runningOp = opId;
+		progress = { transferred: 0, total: 0 };
 
 		try {
-			const esito = await tauriBackend.transfer({
+			const outcome = await tauriBackend.transfer({
 				opId,
 				sources,
 				dest,
 				mode,
 				policy,
-				onProgress: (p) => (progresso = p)
+				onProgress: (p) => (progress = p)
 			});
 
 			if (mode === 'move') {
-				annulla.registra({ tipo: 'sposta', coppie: esito.coppie });
-				for (const [da, a] of esito.coppie) {
-					colori.sposta(da, a);
-					accessoRapido.sposta(da, a);
+				undo.record({ kind: 'move', pairs: outcome.pairs });
+				for (const [from, a] of outcome.pairs) {
+					colors.move(from, a);
+					quickAccess.move(from, a);
 				}
 			}
 			else
-				annulla.registra({
-					tipo: 'crea',
-					paths: esito.coppie.map((c) => c[1]),
-					descrizione: `copia di ${esito.coppie.length === 1 ? '1 elemento' : `${esito.coppie.length} elementi`}`
+				undo.record({
+					kind: 'create',
+					paths: outcome.pairs.map((c) => c[1]),
+					description: `copia di ${outcome.pairs.length === 1 ? '1 elemento' : `${outcome.pairs.length} elementi`}`
 				});
 
-			// Tagliare consuma gli appunti, come in Esplora; copiare no, così
-			// puoi incollare lo stesso elemento in più cartelle di fila.
-			const daiAppunti =
-				appunti.paths.length > 0 && sources.every((s) => appunti.paths.includes(s));
-			if (mode === 'move' && !esito.annullato && (daiAppunti || appunti.mode === 'cut')) {
-				appunti.clear();
+			// Cutting uses up the clipboard, as in Explorer; copying does
+			// not, so you can paste the same item in several folders in a
+			// row.
+			const fromClipboard =
+				clipboard.paths.length > 0 && sources.every((s) => clipboard.paths.includes(s));
+			if (mode === 'move' && !outcome.cancelled && (fromClipboard || clipboard.mode === 'cut')) {
+				clipboard.clear();
 				void tauriBackend.clipboardClear().catch(() => {});
 			}
 
-			if (esito.annullato) erroreOp = 'Operazione annullata. I file già trasferiti restano.';
-			else if (esito.saltati > 0)
-				erroreOp = `${esito.saltati} ${esito.saltati === 1 ? 'elemento saltato' : 'elementi saltati'}.`;
+			if (outcome.cancelled) opError = 'Operazione annullata. I file già trasferiti restano.';
+			else if (outcome.skipped > 0)
+				opError = `${outcome.skipped} ${outcome.skipped === 1 ? 'elemento saltato' : 'elementi saltati'}.`;
 
-			await ricarica();
+			await reload();
 		} catch (e) {
-			erroreOp = descriviErrore(e);
+			opError = describeError(e);
 		} finally {
-			opInCorso = null;
-			progresso = null;
+			runningOp = null;
+			progress = null;
 		}
 	}
 
-	/** Copia dalla cartella condivisa di un altro PC, con la barra d'avanzamento. */
-	function scaricaDaRete(sources: string[], dest: string) {
-		return accoda(`Scarica ${quanti(sources)} → ${nomePosizione(dest)}`, () => scaricaDaReteOra(sources, dest));
+	/** Copies from the shared folder of another PC, with the progress bar. */
+	function downloadFromNetwork(sources: string[], dest: string) {
+		return enqueue(`Scarica ${count(sources)} → ${locationName(dest)}`, () => downloadFromNetworkNow(sources, dest));
 	}
 
-	async function scaricaDaReteOra(sources: string[], dest: string) {
-		const opId = prossimoOpId++;
-		modoInCorso = 'ricezione';
-		opInCorso = opId;
-		progresso = { transferred: 0, total: 0 };
-		erroreOp = null;
+	async function downloadFromNetworkNow(sources: string[], dest: string) {
+		const opId = nextOpId++;
+		runningMode = 'receive';
+		runningOp = opId;
+		progress = { transferred: 0, total: 0 };
+		opError = null;
 		try {
-			const esito = await tauriBackend.lanScarica({
+			const outcome = await tauriBackend.lanDownload({
 				opId,
 				sources,
 				dest,
-				onProgress: (p) => (progresso = p)
+				onProgress: (p) => (progress = p)
 			});
-			annulla.registra({
-				tipo: 'crea',
-				paths: esito.coppie.map((c) => c[1]),
-				descrizione: `copia di ${esito.coppie.length === 1 ? '1 elemento' : `${esito.coppie.length} elementi`} dalla rete locale`
+			undo.record({
+				kind: 'create',
+				paths: outcome.pairs.map((c) => c[1]),
+				description: `copia di ${outcome.pairs.length === 1 ? '1 elemento' : `${outcome.pairs.length} elementi`} dalla rete locale`
 			});
-			await ricarica();
-			return esito;
+			await reload();
+			return outcome;
 		} catch (e) {
-			erroreOp = descriviErrore(e);
+			opError = describeError(e);
 		} finally {
-			opInCorso = null;
-			progresso = null;
+			runningOp = null;
+			progress = null;
 		}
 	}
 
-	/** Invia la selezione a un altro PC: parte solo quando l'altro accetta. */
-	function inviaA(peer: string) {
-		const scelte = selezionate();
-		if (scelte.length === 0) return;
-		const nome = destinatari.find((p) => p.id === peer)?.nome ?? peer;
-		return accoda(`Invia ${quanti(scelte.map((e) => e.path))} a ${nome}`, () => inviaAOra(peer, nome, scelte));
+	/**
+	 * Sends the selection to another PC: it starts only when the other
+	 * accepts.
+	 */
+	function sendTo(peer: string) {
+		const choices = selectedEntries();
+		if (choices.length === 0) return;
+		const name = recipients.find((p) => p.id === peer)?.name ?? peer;
+		return enqueue(`Invia ${count(choices.map((e) => e.path))} a ${name}`, () => sendToNow(peer, name, choices));
 	}
 
-	async function inviaAOra(peer: string, nome: string, scelte: Entry[]) {
-		const opId = prossimoOpId++;
-		modoInCorso = 'invio';
-		opInCorso = opId;
-		progresso = { transferred: 0, total: 0 };
-		erroreOp = null;
-		avvisa(`In attesa che ${nome} accetti…`);
+	async function sendToNow(peer: string, name: string, choices: Entry[]) {
+		const opId = nextOpId++;
+		runningMode = 'send';
+		runningOp = opId;
+		progress = { transferred: 0, total: 0 };
+		opError = null;
+		notify(`In attesa che ${name} accetti…`);
 		try {
-			await tauriBackend.lanInvia({
+			await tauriBackend.lanSend({
 				opId,
 				peer,
-				paths: scelte.map((e) => e.path),
-				onProgress: (p) => (progresso = p)
+				paths: choices.map((e) => e.path),
+				onProgress: (p) => (progress = p)
 			});
-			avvisa(
-				`${scelte.length === 1 ? `«${scelte[0].name}» inviato` : `${scelte.length} elementi inviati`} a ${nome}.`
+			notify(
+				`${choices.length === 1 ? `«${choices[0].name}» inviato` : `${choices.length} elementi inviati`} a ${name}.`
 			);
 		} catch (e) {
-			erroreOp = descriviErrore(e);
+			opError = describeError(e);
 		} finally {
-			opInCorso = null;
-			progresso = null;
+			runningOp = null;
+			progress = null;
 		}
 	}
 
-	// ── Rete locale ──────────────────────────────────────────────────
+	// ── Local network ──────────────────────────────────────────────────
 
-	let statoLan = $state<StatoLan | null>(null);
-	let pariLan = $state<Pari[]>([]);
-	/** Richieste d'invio in attesa di risposta, la più vecchia per prima. */
-	let richiesteLan = $state<RichiestaInvio[]>([]);
+	let lanState = $state<LanStatus | null>(null);
+	let lanPeerList = $state<Peer[]>([]);
+	/** Send requests waiting for an answer, the oldest first. */
+	let lanRequests = $state<SendRequest[]>([]);
 
 	$effect(() => {
-		tauriBackend.lanStato().then((s) => (statoLan = s)).catch(() => {});
-		tauriBackend.lanPari().then((p) => (pariLan = p)).catch(() => {});
+		tauriBackend.lanStatus().then((s) => (lanState = s)).catch(() => {});
+		tauriBackend.lanPeers().then((p) => (lanPeerList = p)).catch(() => {});
 	});
 
 	$effect(() => {
-		const smonta: Array<() => void> = [];
-		let attivo = true;
-		// La lista dei PC vale per tutte le finestre; consenso e ricezione
-		// arrivano solo all'ultima usata, a cui Rust li indirizza.
-		const ascolta = <T,>(nome: string, f: (payload: T) => void) =>
-			(nome === 'lan-pari' || nome === 'amici' ? listen<T>(nome, (e) => f(e.payload)) : soloQui<T>(nome, f))
-				.then((u) => (attivo ? smonta.push(u) : u()))
+		const unmount: Array<() => void> = [];
+		let active = true;
+		// The list of PCs applies to all windows; consent and receiving
+		// reach only the last one used, to which Rust addresses them.
+		const listenHere = <T,>(name: string, f: (payload: T) => void) =>
+			(name === 'lan-peers' || name === 'friends' ? listen<T>(name, (e) => f(e.payload)) : onlyHere<T>(name, f))
+				.then((u) => (active ? unmount.push(u) : u()))
 				.catch(() => {});
 
-		void ascolta<Pari[]>('lan-pari', (p) => (pariLan = p));
-		void ascolta<MessaggioEditor>(EVENTO_EDITOR, daEditor);
-		void ascolta<StatoAmici>('amici', (s) => {
-			statoAmici = s;
-			// La posizione «Amici» elenca gli amici confermati: si aggiorna con loro.
-			void store.aggiornaCartella(AMICI);
+		void listenHere<Peer[]>('lan-peers', (p) => (lanPeerList = p));
+		void listenHere<EditorMessage>(EDITOR_EVENT, fromEditor);
+		void listenHere<FriendsStatus>('friends', (s) => {
+			friendsState = s;
+			// The «Amici» location lists the confirmed friends: it refreshes with
+			// them.
+			void store.refreshFolder(FRIENDS);
 		});
-		void ascolta<{ id: string; nome: string }>('amici-richiesta', (r) =>
-			avvisa(`${r.nome} ti ha chiesto l’amicizia: rispondi da Amici nella barra laterale.`)
+		void listenHere<{ id: string; name: string }>('friend-request', (r) =>
+			notify(`${r.name} ti ha chiesto l’amicizia: rispondi da Amici nella barra laterale.`)
 		);
-		void ascolta<{ id: string; nome: string }>('amici-backup', (r) =>
-			avvisa(`${r.nome} vuole tenere un backup su questo PC: rispondi da Amici nella barra laterale.`)
+		void listenHere<{ id: string; name: string }>('friend-backup', (r) =>
+			notify(`${r.name} vuole tenere un backup su questo PC: rispondi da Amici nella barra laterale.`)
 		);
-		void ascolta<RichiestaInvio>('lan-richiesta', (r) => (richiesteLan = [...richiesteLan, r]));
-		void ascolta<{ id: number; fatti: number; totale: number }>('lan-ricezione', (r) => {
-			if (opInCorso !== null && modoInCorso !== 'ricezione') return;
-			modoInCorso = 'ricezione';
-			ricezioneInCorso = r.id;
-			progresso = { transferred: r.fatti, total: r.totale };
+		void listenHere<SendRequest>('lan-request', (r) => (lanRequests = [...lanRequests, r]));
+		void listenHere<{ id: number; done: number; total: number }>('lan-receiving', (r) => {
+			if (runningOp !== null && runningMode !== 'receive') return;
+			runningMode = 'receive';
+			receiving = r.id;
+			progress = { transferred: r.done, total: r.total };
 		});
-		void ascolta<{
+		void listenHere<{
 			id: number;
-			da: string;
-			cartella: string;
-			quanti: number;
-			errore: string | null;
-			annullato?: boolean;
-			bloccati?: string | null;
+			from: string;
+			folder: string;
+			count: number;
+			error: string | null;
+			cancelled?: boolean;
+			blocked?: string | null;
 		}>(
-			'lan-ricevuto',
+			'lan-received',
 			(r) => {
-				if (ricezioneInCorso === r.id) ricezioneInCorso = null;
-				if (opInCorso === null) progresso = null;
-				if (r.annullato) avvisa(`Ricezione da ${r.da} annullata.`);
-				else if (r.errore) erroreOp = `Ricezione da ${r.da} interrotta: ${r.errore}`;
-				else if (r.bloccati) erroreOp = `Ricezione da ${r.da}: ${r.bloccati}`;
-				else avvisa(`Ricevuti ${r.quanti === 1 ? '1 elemento' : `${r.quanti} elementi`} da ${r.da} in ${r.cartella}.`);
-				void store.aggiornaCartella(r.cartella);
+				if (receiving === r.id) receiving = null;
+				if (runningOp === null) progress = null;
+				if (r.cancelled) notify(`Ricezione da ${r.from} annullata.`);
+				else if (r.error) opError = `Ricezione da ${r.from} interrotta: ${r.error}`;
+				else if (r.blocked) opError = `Ricezione da ${r.from}: ${r.blocked}`;
+				else notify(`Ricevuti ${r.count === 1 ? '1 elemento' : `${r.count} elementi`} da ${r.from} in ${r.folder}.`);
+				void store.refreshFolder(r.folder);
 			}
 		);
 		return () => {
-			attivo = false;
-			smonta.forEach((u) => u());
+			active = false;
+			unmount.forEach((u) => u());
 		};
 	});
 
-	// ── Amici ────────────────────────────────────────────────────────
+	// ── Friends ────────────────────────────────────────────────────────
 
-	let statoAmici = $state<StatoAmici | null>(null);
-	let amiciAperti = $state(false);
+	let friendsState = $state<FriendsStatus | null>(null);
+	let friendsOpen = $state(false);
 
 	$effect(() => {
-		tauriBackend.amiciStato().then((s) => (statoAmici = s)).catch(() => {});
+		tauriBackend.friendsStatus().then((s) => (friendsState = s)).catch(() => {});
 	});
 
-	// Le briciole e le schede mostrano il nome dell'amico, non il suo codice.
+	// Breadcrumbs and tabs show the friend's name, not their code.
 	$effect(() => {
-		impostaNomiAmici(Object.fromEntries((statoAmici?.amici ?? []).map((a) => [a.id, a.nome])));
+		setFriendNames(Object.fromEntries((friendsState?.friends ?? []).map((a) => [a.id, a.name])));
 	});
 
 	/**
-	 * A chi si può inviare: i PC della rete locale e gli amici confermati.
-	 * Un amico ha `@` davanti al codice, per distinguerlo da un PC di casa.
+	 * Who you can send to: the PCs on the local network and the confirmed
+	 * friends. A friend has `@` in front of the code, to tell them apart
+	 * from a PC at home.
 	 */
-	let destinatari = $derived([
-		...pariLan,
-		...(statoAmici?.amici ?? [])
-			.filter((a) => a.stato === 'confermato')
-			.map((a) => ({ id: '@' + a.id, nome: a.nome }))
+	let recipients = $derived([
+		...lanPeerList,
+		...(friendsState?.friends ?? [])
+			.filter((a) => a.status === 'confirmed')
+			.map((a) => ({ id: '@' + a.id, name: a.name }))
 	]);
 
-	async function impostaLan(modifica: Partial<StatoLan>) {
-		if (!statoLan) return;
+	async function configureLan(editing: Partial<LanStatus>) {
+		if (!lanState) return;
 		try {
-			const { visibile, condivisa, ricevuti, indirizzi } = { ...statoLan, ...modifica };
-			statoLan = await tauriBackend.lanImposta({ visibile, condivisa, ricevuti, indirizzi: indirizzi ?? [] });
+			const { visible, shared, received, addresses } = { ...lanState, ...editing };
+			lanState = await tauriBackend.lanConfigure({ visible, shared, received, addresses: addresses ?? [] });
 		} catch (e) {
-			erroreOp = descriviErrore(e);
+			opError = describeError(e);
 		}
 	}
 
 	/**
-	 * Condividere rende anche visibili: una cartella condivisa da un PC
-	 * invisibile non la vedrebbe nessuno, e l'utente penserebbe a un guasto.
+	 * Sharing also makes you visible: nobody would see a folder shared by an
+	 * invisible PC, and the user would think of a fault.
 	 */
-	async function condividi(cartella: string | null) {
-		await impostaLan(cartella ? { condivisa: cartella, visibile: true } : { condivisa: null });
-		if (cartella) avvisa(`«${nomeDi(cartella)}» è condivisa in rete locale, in sola lettura.`);
+	async function share(folder: string | null) {
+		await configureLan(folder ? { shared: folder, visible: true } : { shared: null });
+		if (folder) notify(`«${nameOf(folder)}» è condivisa in rete locale, in sola lettura.`);
 	}
 
-	function rispondiLan(accetta: boolean, dove: string | null) {
-		const r = richiesteLan[0];
+	function respondLan(accept: boolean, where: string | null) {
+		const r = lanRequests[0];
 		if (!r) return;
-		richiesteLan = richiesteLan.slice(1);
-		void tauriBackend.lanRispondi(r.id, accetta, dove);
+		lanRequests = lanRequests.slice(1);
+		void tauriBackend.lanRespond(r.id, accept, where);
 	}
 
 	/**
-	 * La ricezione da un altro PC che si sta mostrando nella barra. Non è
-	 * un'operazione partita da qui: si ferma col suo id, e chi invia lo
-	 * scopre quando la connessione si chiude.
+	 * The receive from another PC being shown in the bar. It is not an
+	 * operation started from here: it is stopped by its id, and the sender
+	 * finds out when the connection closes.
 	 */
-	let ricezioneInCorso = $state<number | null>(null);
+	let receiving = $state<number | null>(null);
 
-	async function annullaTrasferimento() {
-		if (opInCorso !== null) await tauriBackend.cancelTransfer(opInCorso);
-		else if (ricezioneInCorso !== null) await tauriBackend.lanAnnullaRicezione(ricezioneInCorso);
+	async function cancelTransfer() {
+		if (runningOp !== null) await tauriBackend.cancelTransfer(runningOp);
+		else if (receiving !== null) await tauriBackend.lanCancelReceive(receiving);
 	}
 
-	/** Comprime o estrae con la stessa barra d'avanzamento dei trasferimenti. */
-	function archivio(tipo: 'comprimi' | 'estrai') {
+	/** Compresses or extracts with the same progress bar as the transfers. */
+	function archive(kind: 'compress' | 'extract') {
 		const tab = store.activeTab;
-		const scelte = selezionate();
-		if (!tab || scelte.length === 0) return;
-		const titolo = tipo === 'comprimi' ? `Comprimi ${quanti(scelte.map((e) => e.path))}` : `Estrai «${scelte[0].name}»`;
-		return accoda(titolo, () => archivioOra(tipo, tab.path, scelte));
+		const choices = selectedEntries();
+		if (!tab || choices.length === 0) return;
+		const title = kind === 'compress' ? `Comprimi ${count(choices.map((e) => e.path))}` : `Estrai «${choices[0].name}»`;
+		return enqueue(title, () => archiveNow(kind, tab.path, choices));
 	}
 
-	async function ruotaImmagini(orario: boolean) {
-		const paths = selezionate().map((e) => e.path);
+	async function rotateImages(clockwise: boolean) {
+		const paths = selectedEntries().map((e) => e.path);
 		if (paths.length === 0) return;
-		erroreOp = null;
+		opError = null;
 		try {
-			await tauriBackend.imageRotate(paths, orario);
-			annulla.registra({ tipo: 'ruota', paths, orario });
+			await tauriBackend.imageRotate(paths, clockwise);
+			undo.record({ kind: 'rotate', paths, clockwise });
 		} catch (e) {
-			erroreOp = descriviErrore(e);
+			opError = describeError(e);
 		}
-		await ricarica();
+		await reload();
 	}
 
-	function convertiImmagini(voci: Entry[], o: { target: ImageTarget; maxSide: number | null; quality: number }) {
-		daConvertire = null;
-		const cartella = store.activeTab?.path;
-		if (!cartella) return;
-		return accoda(`Converti ${quanti(voci.map((e) => e.path))}`, async () => {
-			const opId = prossimoOpId++;
-			modoInCorso = 'immagini';
-			opInCorso = opId;
-			progresso = { transferred: 0, total: voci.length };
-			erroreOp = null;
+	function convertImages(items: Entry[], o: { target: ImageTarget; maxSide: number | null; quality: number }) {
+		toConvert = null;
+		const folder = store.activeTab?.path;
+		if (!folder) return;
+		return enqueue(`Converti ${count(items.map((e) => e.path))}`, async () => {
+			const opId = nextOpId++;
+			runningMode = 'images';
+			runningOp = opId;
+			progress = { transferred: 0, total: items.length };
+			opError = null;
 			try {
-				const creati = await tauriBackend.imageConvert({
+				const createdFiles = await tauriBackend.imageConvert({
 					opId,
-					paths: voci.map((e) => e.path),
+					paths: items.map((e) => e.path),
 					...o,
-					onProgress: (p) => (progresso = p)
+					onProgress: (p) => (progress = p)
 				});
-				annulla.registra({ tipo: 'crea', paths: creati, descrizione: `conversione di ${quanti(creati)}` });
-				if (store.activeId !== null && store.activeTab?.path === cartella) {
+				undo.record({ kind: 'create', paths: createdFiles, description: `conversione di ${count(createdFiles)}` });
+				if (store.activeId !== null && store.activeTab?.path === folder) {
 					await store.reload(store.activeId);
-					store.selezionaPercorsi(store.activeId, creati);
+					store.selectPaths(store.activeId, createdFiles);
 				}
-				aggiornamentoDischi++;
+				drivesRefresh++;
 			} catch (e) {
-				erroreOp = descriviErrore(e);
+				opError = describeError(e);
 			} finally {
-				opInCorso = null;
-				progresso = null;
+				runningOp = null;
+				progress = null;
 			}
 		});
 	}
 
-	async function archivioOra(tipo: 'comprimi' | 'estrai', cartella: string, scelte: Entry[]) {
-		const opId = prossimoOpId++;
-		modoInCorso = tipo;
-		opInCorso = opId;
-		progresso = { transferred: 0, total: 0 };
-		erroreOp = null;
+	async function archiveNow(kind: 'compress' | 'extract', folder: string, choices: Entry[]) {
+		const opId = nextOpId++;
+		runningMode = kind;
+		runningOp = opId;
+		progress = { transferred: 0, total: 0 };
+		opError = null;
 		try {
-			const creato =
-				tipo === 'comprimi'
+			const createdFile =
+				kind === 'compress'
 					? await tauriBackend.compress({
 							opId,
-							sources: scelte.map((e) => e.path),
-							dest: cartella,
-							onProgress: (p) => (progresso = p)
+							sources: choices.map((e) => e.path),
+							dest: folder,
+							onProgress: (p) => (progress = p)
 						})
 					: await tauriBackend.extract({
 							opId,
-							archive: scelte[0].path,
-							onProgress: (p) => (progresso = p)
+							archive: choices[0].path,
+							onProgress: (p) => (progress = p)
 						});
-			annulla.registra({
-				tipo: 'crea',
-				paths: [creato],
-				descrizione: tipo === 'comprimi' ? `compressione in «${nomeDi(creato)}»` : `estrazione in «${nomeDi(creato)}»`
+			undo.record({
+				kind: 'create',
+				paths: [createdFile],
+				description: kind === 'compress' ? `compressione in «${nameOf(createdFile)}»` : `estrazione in «${nameOf(createdFile)}»`
 			});
 			if (store.activeId !== null) {
 				await store.reload(store.activeId);
-				store.selezionaPercorsi(store.activeId, [creato]);
+				store.selectPaths(store.activeId, [createdFile]);
 			}
-			aggiornamentoDischi++;
+			drivesRefresh++;
 		} catch (e) {
-			erroreOp = descriviErrore(e);
+			opError = describeError(e);
 		} finally {
-			opInCorso = null;
-			progresso = null;
+			runningOp = null;
+			progress = null;
 		}
 	}
 
-	// ── Trascinamento ────────────────────────────────────────────────
+	// ── Drag and drop ────────────────────────────────────────────────
 
-	/** Cartella sotto il puntatore durante un trascinamento. */
-	let bersaglio = $state<string | null>(null);
+	/** Folder under the pointer during a drag. */
+	let dropTarget = $state<string | null>(null);
 
 	/**
-	 * La voce trascinata entra nella selezione se non c'era: si trascina ciò
-	 * che si vede evidenziato. Da qui il giro lo prende Windows, che sa
-	 * consegnare i file a Esplora, al desktop o a qualsiasi altra app.
+	 * The dragged item enters the selection if it was not there: you drag
+	 * what you see highlighted. From here Windows takes over, which knows
+	 * how to deliver the files to Explorer, to the desktop or to any other
+	 * app.
 	 */
-	async function trascina(voce: Entry) {
-		if (posizione === 'cestino' || posizione === 'rete' || posizione === 'pc') return;
+	async function drag(item: Entry) {
+		if (location === 'trash' || location === 'network' || location === 'pc') return;
 		// Dragging to other apps goes through the Windows Shell.
-		if (SU_LINUX) return;
-		// L'elenco dei PC in rete locale: trascinarne uno vorrebbe dire
-		// scaricare tutta la sua cartella condivisa.
-		if (posizione === 'lan' && store.activeTab?.path === RETE_LOCALE) return;
-		if (!insiemeSelezione.has(voce.path)) seleziona(voce);
-		let paths = insiemeSelezione.has(voce.path) ? selezionate().map((e) => e.path) : [voce.path];
+		if (ON_LINUX) return;
+		// The list of PCs on the local network: dragging one would mean
+		// downloading its whole shared folder.
+		if (location === 'lan' && store.activeTab?.path === LAN) return;
+		if (!selectionSet.has(item.path)) select(item);
+		let paths = selectionSet.has(item.path) ? selectedEntries().map((e) => e.path) : [item.path];
 		try {
-			// I file della cartella condivisa da un altro PC non esistono su
-			// questo disco: Windows li accetta solo dopo averli scaricati.
-			if (posizione === 'lan') {
-				avvisa('Preparo i file da trascinare…');
-				paths = await tauriBackend.lanPreparaTrascina(paths);
+			// The files of the folder shared by another PC do not exist on
+			// this disk: Windows accepts them only after they have been
+			// downloaded.
+			if (location === 'lan') {
+				notify('Preparo i file da trascinare…');
+				paths = await tauriBackend.lanPrepareDrag(paths);
 			}
 			await tauriBackend.startDrag(paths);
 		} catch (e) {
-			erroreOp = descriviErrore(e);
+			opError = describeError(e);
 		} finally {
-			bersaglio = null;
+			dropTarget = null;
 		}
 	}
 
 	/**
-	 * Cartella di destinazione per un punto della finestra, in pixel CSS.
-	 * Lo spazio libero fra le schede vale `NUOVA_SCHEDA`.
+	 * Destination folder for a point of the window, in CSS pixels. The
+	 * free space between the tabs counts as `NEW_TAB`.
 	 */
-	function cartellaSotto(x: number, y: number): string | null {
-		const sotto = document.elementFromPoint(x, y);
-		const el = sotto?.closest<HTMLElement>('[data-cartella]');
-		if (el) return el.dataset.cartella ?? null;
-		return sotto?.closest('[data-nuova-scheda]') ? NUOVA_SCHEDA : null;
+	function folderUnder(x: number, y: number): string | null {
+		const below = document.elementFromPoint(x, y);
+		const el = below?.closest<HTMLElement>('[data-folder]');
+		if (el) return el.dataset.folder ?? null;
+		return below?.closest('[data-new-tab]') ? NEW_TAB : null;
 	}
 
-	/** Ogni elemento rilasciato fra le schede si apre in una scheda sua: un file, nella sua cartella. */
-	async function apriInSchede(paths: string[]) {
+	/** Every item dropped between the tabs opens in a tab of its own: a file, in its folder. */
+	async function openInTabs(paths: string[]) {
 		for (const p of paths) {
 			try {
-				await apriDestinazione(await tauriBackend.resolvePath(p));
+				await openDestination(await tauriBackend.resolvePath(p));
 			} catch (e) {
-				erroreOp = descriviErrore(e);
+				opError = describeError(e);
 			}
 		}
 	}
 
 	/**
-	 * File rilasciati sulla finestra: da Esplora, dal desktop o da questa
-	 * stessa app. Come in Esplora, sullo stesso disco si sposta e fra dischi
-	 * diversi si copia; Ctrl forza la copia, Maiusc lo spostamento.
+	 * Files dropped on the window: from Explorer, from the desktop or from
+	 * this same app. As in Explorer, on the same drive it moves and between
+	 * different drives it copies; Ctrl forces the copy, Shift the move.
 	 */
-	async function rilascia(paths: string[], x: number, y: number) {
-		bersaglio = null;
-		if (store.activeTab?.archivio?.cassaforte) return aggiungiInCassaforte(paths);
-		const sopra = cartellaSotto(x, y);
-		if (sopra === NUOVA_SCHEDA) return apriInSchede(paths);
-		const dest = sopra ?? (scrivibile ? (store.activeTab?.path ?? null) : null);
+	async function release(paths: string[], x: number, y: number) {
+		dropTarget = null;
+		if (store.activeTab?.archive?.vault) return addToVault(paths);
+		const above = folderUnder(x, y);
+		if (above === NEW_TAB) return openInTabs(paths);
+		const dest = above ?? (writable ? (store.activeTab?.path ?? null) : null);
 		if (!dest || paths.length === 0) return;
 
-		if (dest === CESTINO) {
-			const voci = paths.map((p) => ({ name: nomeDi(p), path: p }) as Entry);
-			await cestina(voci);
+		if (dest === TRASH) {
+			const items = paths.map((p) => ({ name: nameOf(p), path: p }) as Entry);
+			await trash(items);
 			return;
 		}
-		// Una cartella dentro sé stessa, o elementi rilasciati dove già sono.
-		if (paths.some((p) => stessoPath(p, dest))) return;
+		// A folder inside itself, or items dropped where they already are.
+		if (paths.some((p) => samePath(p, dest))) return;
 
-		const tasti = await tauriBackend.keyModifiers().catch(() => ({ ctrl: false, shift: false, alt: false }));
-		const mode = tasti.ctrl ? 'copy' : tasti.shift ? 'move' : stessoVolume(paths[0], dest) ? 'move' : 'copy';
-		const giaQui = await Promise.all(
-			paths.map((p) => tauriBackend.navigate(p, 'up').then((g) => stessoPath(g, dest)).catch(() => false))
+		const keys = await tauriBackend.keyModifiers().catch(() => ({ ctrl: false, shift: false, alt: false }));
+		const mode = keys.ctrl ? 'copy' : keys.shift ? 'move' : sameVolume(paths[0], dest) ? 'move' : 'copy';
+		const alreadyHere = await Promise.all(
+			paths.map((p) => tauriBackend.navigate(p, 'up').then((g) => samePath(g, dest)).catch(() => false))
 		);
-		if (mode === 'move' && giaQui.every(Boolean)) return;
+		if (mode === 'move' && alreadyHere.every(Boolean)) return;
 
-		await trasferisci(paths, dest, mode);
+		await runTransfer(paths, dest, mode);
 	}
 
 	$effect(() => {
-		let smonta: (() => void) | undefined;
-		let attivo = true;
+		let unmount: (() => void) | undefined;
+		let active = true;
 		try {
 			getCurrentWebview()
-				.onDragDropEvent((evento) => {
-					const p = evento.payload;
-					const scala = window.devicePixelRatio || 1;
+				.onDragDropEvent((event) => {
+					const p = event.payload;
+					const scale = window.devicePixelRatio || 1;
 					if (p.type === 'over' || p.type === 'enter') {
-						bersaglio = cartellaSotto(p.position.x / scala, p.position.y / scala);
+						dropTarget = folderUnder(p.position.x / scale, p.position.y / scale);
 					} else if (p.type === 'drop') {
-						void rilascia(p.paths, p.position.x / scala, p.position.y / scala);
+						void release(p.paths, p.position.x / scale, p.position.y / scale);
 					} else {
-						bersaglio = null;
+						dropTarget = null;
 					}
 				})
-				.then((f) => (attivo ? (smonta = f) : f()))
+				.then((f) => (active ? (unmount = f) : f()))
 				.catch(() => {});
 		} catch {
-			// Fuori da Tauri (anteprima nel browser) non c'è trascinamento di file.
+			// Outside Tauri (preview in the browser) there is no file dragging.
 		}
 		return () => {
-			attivo = false;
-			smonta?.();
+			active = false;
+			unmount?.();
 		};
 	});
 
-	// ── Aggiornamento automatico ─────────────────────────────────────
+	// ── Automatic refresh ─────────────────────────────────────
 
-	// Rust osserva le cartelle aperte nei tab; quando una cambia, lo dice.
+	// Rust watches the folders open in the tabs; when one changes, it says
+	// so.
 	//
-	// Una richiesta alla volta, e dopo quella in corso solo l'ultima: aprendo
-	// cartelle in fretta, due richieste in volo insieme potevano arrivare
-	// in ordine inverso e lasciare osservata la cartella vecchia.
-	let osservaInVolo = false;
-	let osservaProssima: string[] | null = null;
+	// One request at a time, and after the running one only the last: opening
+	// folders quickly, two requests in flight together could arrive in
+	// reverse order and leave the old folder watched.
+	let watchInFlight = false;
+	let watchNext: string[] | null = null;
 
-	async function osserva(cartelle: string[]) {
-		osservaProssima = cartelle;
-		if (osservaInVolo) return;
-		osservaInVolo = true;
+	async function observe(folders: string[]) {
+		watchNext = folders;
+		if (watchInFlight) return;
+		watchInFlight = true;
 		try {
-			while (osservaProssima) {
-				const ora = osservaProssima;
-				osservaProssima = null;
-				await tauriBackend.watchDirs(ora).catch(() => {});
+			while (watchNext) {
+				const now = watchNext;
+				watchNext = null;
+				await tauriBackend.watchDirs(now).catch(() => {});
 			}
 		} finally {
-			osservaInVolo = false;
+			watchInFlight = false;
 		}
 	}
 
 	$effect(() => {
-		void osserva(store.tabs.map((t) => t.path));
+		void observe(store.tabs.map((t) => t.path));
 	});
 
 	$effect(() => {
-		let smonta: (() => void) | undefined;
-		let attivo = true;
-		listen<string>('cartella-cambiata', (e) => {
-			void store.aggiornaCartella(e.payload);
+		let unmount: (() => void) | undefined;
+		let active = true;
+		listen<string>('folder-changed', (e) => {
+			void store.refreshFolder(e.payload);
 		})
-			.then((f) => (attivo ? (smonta = f) : f()))
+			.then((f) => (active ? (unmount = f) : f()))
 			.catch(() => {});
 		return () => {
-			attivo = false;
-			smonta?.();
+			active = false;
+			unmount?.();
 		};
 	});
 
-	// ── Tastiera ─────────────────────────────────────────────────────
+	// ── Keyboard ─────────────────────────────────────────────────────
 
-	let indirizzoInModifica = $state(false);
+	let addressEditing = $state(false);
 
-	function tastiera(e: KeyboardEvent) {
+	function onKeyboard(e: KeyboardEvent) {
 		if (store.activeId === null) return;
 
-		// Con una finestra modale aperta o un campo in modifica, le
-		// scorciatoie della lista non devono sparare.
-		if (daCestinare.length > 0 || daEliminare || rinominando !== null || conflitti.length > 0 || batchRename.length > 0 || sommaDi || paletteAperta) return;
+		// With a modal dialog open or a field being edited, the list
+		// shortcuts must not fire.
+		if (toTrash.length > 0 || toDelete || renaming !== null || conflicts.length > 0 || batchRename.length > 0 || checksumOf || paletteOpen) return;
 
-		// Dentro un campo di testo i tasti servono a scrivere. Dal campo di
-		// ricerca passano solo quelli che muovono la selezione o la chiudono.
-		const campo = e.target as HTMLElement | null;
-		if (campo && (campo.tagName === 'INPUT' || campo.tagName === 'TEXTAREA')) {
-			const ricerca = campo.getAttribute('aria-label') === 'Filtra i file in questa cartella';
-			const ammessi = ['ArrowUp', 'ArrowDown', 'Enter', 'Escape', 'F3'];
-			if (!ricerca || !(ammessi.includes(e.key) || (e.ctrlKey && e.key.toLowerCase() === 'f'))) return;
+		// Inside a text field the keys are for typing. From the search field
+		// only those that move the selection or close it get through.
+		const field = e.target as HTMLElement | null;
+		if (field && (field.tagName === 'INPUT' || field.tagName === 'TEXTAREA')) {
+			const search = field.getAttribute('aria-label') === 'Filtra i file in questa cartella';
+			const allowed = ['ArrowUp', 'ArrowDown', 'Enter', 'Escape', 'F3'];
+			if (!search || !(allowed.includes(e.key) || (e.ctrlKey && e.key.toLowerCase() === 'f'))) return;
 		}
 
-		const azione = azioneConPersonalizzate(e, impostazioni.scorciatoie);
-		if (azione !== null) {
+		const action = actionWithCustom(e, settings.shortcuts);
+		if (action !== null) {
 			e.preventDefault();
-			void eseguiTasto(azione);
+			void runKey(action);
 			return;
 		}
 
-		if (e.key === 'Escape' && ricercaAperta) {
+		if (e.key === 'Escape' && searchOpen) {
 			e.preventDefault();
-			chiudiRicerca();
+			closeSearch();
 			return;
 		}
 
 		// Esc leaves the duplicates or comparison view and goes back to the folder.
-		if (e.key === 'Escape' && (puliziaDi || confrontoFile)) {
+		if (e.key === 'Escape' && (cleanupOf || fileComparison)) {
 			e.preventDefault();
-			puliziaDi = null;
-			confrontoFile = null;
+			cleanupOf = null;
+			fileComparison = null;
 			return;
 		}
-		if (e.key === 'Escape' && store.activeTab?.spazio && !store.activeTab.risultati) {
+		if (e.key === 'Escape' && store.activeTab?.space && !store.activeTab.results) {
 			e.preventDefault();
-			void store.impostaSpazio(store.activeId, false);
+			void store.setSpace(store.activeId, false);
 			return;
 		}
-		if (e.key === 'Escape' && (store.activeTab?.duplicati || store.activeTab?.confronto || store.activeTab?.etichetta || store.activeTab?.archivio)) {
+		if (e.key === 'Escape' && (store.activeTab?.duplicates || store.activeTab?.comparison || store.activeTab?.label || store.activeTab?.archive)) {
 			e.preventDefault();
-			void store.fermaRicerca(store.activeId);
+			void store.stopSearch(store.activeId);
 			return;
 		}
 
 		if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
 			e.preventDefault();
-			// In griglia su e giù saltano una riga intera, non una cella.
-			const passo = impostazioni.vista === 'dettagli' ? 1 : colonne;
-			// Con Maiusc la freccia estende invece di spostare, come in
-			// qualsiasi elenco di sistema.
-			spostaSelezione(e.key === 'ArrowDown' ? passo : -passo, e.shiftKey);
+			// In the grid up and down jump a whole row, not a cell.
+			const step = settings.view === 'details' ? 1 : columns;
+			// With Shift the arrow extends instead of moving, as in any
+			// system list.
+			moveSelection(e.key === 'ArrowDown' ? step : -step, e.shiftKey);
 			return;
 		}
 
-		if (impostazioni.vista !== 'dettagli' && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+		if (settings.view !== 'details' && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
 			e.preventDefault();
-			spostaSelezione(e.key === 'ArrowRight' ? 1 : -1, e.shiftKey);
+			moveSelection(e.key === 'ArrowRight' ? 1 : -1, e.shiftKey);
 			return;
 		}
 
-		if (e.key === 'Enter' && indice !== -1) {
+		if (e.key === 'Enter' && index !== -1) {
 			e.preventDefault();
-			apri(vociVisibili[indice]);
+			open(visibleItems[index]);
 		}
 	}
 
-	async function eseguiTasto(azione: AzioneTasto) {
+	async function runKey(action: KeyAction) {
 		const id = store.activeId;
 		if (id === null) return;
 
-		if (typeof azione === 'object') {
-			if ('scheda' in azione) {
-				store.attivaIndice(azione.scheda);
+		if (typeof action === 'object') {
+			if ('tab' in action) {
+				store.activateIndex(action.tab);
 				return;
 			}
-			// Lo stesso ordine di Esplora: quattro taglie di icone, poi
-			// elenco, dettagli, riquadri e contenuto.
-			const viste: Array<[Vista, number?]> = [
-				['icone', 256],
-				['icone', 128],
-				['icone', 64],
-				['icone', 24],
-				['elenco'],
-				['dettagli'],
-				['riquadri'],
-				['contenuto']
+			// The same order as Explorer: four icon sizes, then list,
+			// details, tiles and content.
+			const seenPaths: Array<[View, number?]> = [
+				['icons', 256],
+				['icons', 128],
+				['icons', 64],
+				['icons', 24],
+				['list'],
+				['details'],
+				['tiles'],
+				['content']
 			];
-			const [vista, lato] = viste[azione.vista] ?? viste[5];
-			impostazioni.impostaVista(vista, lato);
+			const [view, side] = seenPaths[action.view] ?? seenPaths[5];
+			settings.setView(view, side);
 			return;
 		}
 
 		// Inside an archive nothing can be written, cut or deleted: its items are not real files.
-		const scrive = ['copia', 'taglia', 'incolla', 'rinomina', 'nuovaCartella', 'cestina', 'eliminaDefinitivo', 'copiaAltroPannello', 'spostaAltroPannello', 'preferito'];
-		if (store.activeTab?.archivio?.cassaforte) {
-			if (azione === 'incolla') return incollaInCassaforte();
-			if (azione === 'cestina' || azione === 'eliminaDefinitivo') return chiediEliminaDaCassaforte();
+		const typing = ['copy', 'cut', 'paste', 'rename', 'newFolder', 'trash', 'deletePermanently', 'copyToOtherPane', 'moveToOtherPane', 'favorite'];
+		if (store.activeTab?.archive?.vault) {
+			if (action === 'paste') return pasteIntoVault();
+			if (action === 'trash' || action === 'deletePermanently') return askDeleteFromVault();
 		}
-		if (store.activeTab?.archivio && typeof azione === 'string' && scrive.includes(azione)) return;
-		if (store.activeTab?.archivio && (azione === 'su' || azione === 'indietro') && suNellArchivio()) return;
+		if (store.activeTab?.archive && typeof action === 'string' && typing.includes(action)) return;
+		if (store.activeTab?.archive && (action === 'up' || action === 'back') && upInArchive()) return;
 
-		switch (azione) {
-			case 'copia':
-				return mettiNegliAppunti(false);
-			case 'taglia':
-				return mettiNegliAppunti(true);
-			case 'incolla':
-				return incolla();
-			case 'rinomina':
+		switch (action) {
+			case 'copy':
+				return putOnClipboard(false);
+			case 'cut':
+				return putOnClipboard(true);
+			case 'paste':
+				return paste();
+			case 'rename':
 				return startRename();
-			case 'nuovaCartella':
-				return nuovaCartella();
-			case 'cestina':
-				return chiediCestino();
-			case 'eliminaDefinitivo':
-				return chiediEliminaDefinitivo();
-			case 'cerca':
-				return apriRicerca();
-			case 'selezionaTutto':
-				return store.selezionaTutto(id, vociVisibili);
-			case 'preferito':
-				return alternaPreferiti();
-			case 'annulla':
-				return annullaUltima();
-			case 'ricarica':
-				return ricarica();
-			case 'indirizzo':
-				indirizzoInModifica = true;
+			case 'newFolder':
+				return newFolder();
+			case 'trash':
+				return askTrash();
+			case 'deletePermanently':
+				return askDeletePermanently();
+			case 'search':
+				return openSearch();
+			case 'selectAll':
+				return store.selectAll(id, visibleItems);
+			case 'favorite':
+				return toggleFavorite();
+			case 'undo':
+				return undoLast();
+			case 'reload':
+				return reload();
+			case 'address':
+				addressEditing = true;
 				return;
-			case 'nuovaScheda':
-				await store.openTab(store.activeTab?.path ?? RADICE_SISTEMA);
+			case 'newTab':
+				await store.openTab(store.activeTab?.path ?? SYSTEM_ROOT);
 				return;
-			case 'nuovaFinestra':
-				return nuovaFinestra(store.activeTab?.path ?? null);
-			case 'chiudiScheda':
+			case 'newWindow':
+				return newWindow(store.activeTab?.path ?? null);
+			case 'closeTab':
 				return store.closeTab(id);
-			case 'schedaSuccessiva':
-				return store.attivaVicino(1);
-			case 'schedaPrecedente':
-				return store.attivaVicino(-1);
-			case 'indietro':
+			case 'nextTab':
+				return store.activateAdjacent(1);
+			case 'previousTab':
+				return store.activateAdjacent(-1);
+			case 'back':
 				return store.goBack(id);
-			case 'avanti':
+			case 'forward':
 				return store.goForward(id);
-			case 'su':
+			case 'up':
 				return store.goUp(id);
-			case 'proprieta':
-				return SU_LINUX ? undefined : proprieta();
-			case 'anteprima':
-				return impostazioni.imposta('anteprima', !impostazioni.anteprima);
-			case 'doppioPannello':
-				return alternaDoppio();
+			case 'properties':
+				return ON_LINUX ? undefined : properties();
+			case 'preview':
+				return settings.set('preview', !settings.preview);
+			case 'dualPane':
+				return toggleSplit();
 			case 'palette':
-				return apriPalette();
-			case 'altroPannello': {
-				const altro = otherPane(split, id);
-				if (altro !== null) store.setActive(altro);
+				return openPalette();
+			case 'otherPane': {
+				const other = otherPane(split, id);
+				if (other !== null) store.setActive(other);
 				return;
 			}
-			case 'copiaAltroPannello':
-				return versoAltro('copy');
-			case 'spostaAltroPannello':
-				return versoAltro('move');
+			case 'copyToOtherPane':
+				return toOther('copy');
+			case 'moveToOtherPane':
+				return toOther('move');
 		}
 	}
 
 	/**
-	 * All'avvio si apre la cartella che Windows ha passato all'app (doppio
-	 * clic su una cartella quando Space Train è il predefinito), altrimenti
-	 * il disco C:. Finché non si sa quale, nessun tab: aprirne uno su C: e
-	 * poi cambiarlo farebbe lampeggiare la lista sbagliata.
+	 * At startup the folder Windows passed to the app is opened (double
+	 * click on a folder when Space Train is the default), otherwise drive
+	 * C:. Until it is known which one, no tab: opening one on C: and then
+	 * changing it would make the wrong list flash.
 	 */
-	let avviato = $state(false);
+	let started = $state(false);
 
-	async function apriDestinazione(dest: { cartella: string; seleziona: string | null }) {
-		const id = await store.openTab(dest.cartella);
-		if (dest.seleziona) store.selezionaPercorsi(id, [dest.seleziona]);
+	async function openDestination(dest: { folder: string; select: string | null }) {
+		const id = await store.openTab(dest.folder);
+		if (dest.select) store.selectPaths(id, [dest.select]);
 	}
 
-	/** Porta una scheda già aperta in `dest`, con la voce selezionata. */
-	async function mostraDestinazione(id: number, dest: { cartella: string; seleziona: string | null }) {
-		await store.navigate(id, dest.cartella);
-		if (dest.seleziona) store.selezionaPercorsi(id, [dest.seleziona]);
+	/** Brings an already open tab to `dest`, with the item selected. */
+	async function showDestination(id: number, dest: { folder: string; select: string | null }) {
+		await store.navigate(id, dest.folder);
+		if (dest.select) store.selectPaths(id, [dest.select]);
 	}
 
-	/** L'ultima cartella aperta, per la pagina iniziale «Ultima cartella aperta». */
-	const CHIAVE_ULTIMA = 'space-train.ultima-cartella';
+	/** The last folder opened, for the start page «Ultima cartella aperta». */
+	const LAST_FOLDER_KEY = 'space-train.ultima-cartella';
 
 	$effect(() => {
 		const path = store.activeTab?.path;
-		if (!avviato || !path) return;
+		if (!started || !path) return;
 		try {
-			localStorage.setItem(CHIAVE_ULTIMA, path);
+			localStorage.setItem(LAST_FOLDER_KEY, path);
 		} catch {
-			// Archivio negato: all'avvio si ripiega sul disco C:.
+			// Storage denied: at startup it falls back on drive C:.
 		}
 	});
 
 	/**
-	 * Dopo un aggiornamento, alla prima apertura, si racconta cosa è
-	 * cambiato. Solo nella finestra principale, una volta per versione.
+	 * After an update, at the first opening, it tells what has changed.
+	 * Only in the main window, once per version.
 	 */
-	const CHIAVE_VERSIONE = 'space-train.versione-vista';
-	let novitaAperte = $state<Novita[]>([]);
-	let versioneAttuale = $state('');
+	const VERSION_KEY = 'space-train.versione-vista';
+	let whatsNewOpen = $state<WhatsNew[]>([]);
+	let currentVersion = $state('');
 
-	/** Il megafono: le novità della versione installata, le altre a richiesta. */
-	let novitaDalMegafono = $state(false);
-	function riapriNovita() {
-		const i = Math.max(0, NOVITA.findIndex((n) => n.versione === versioneAttuale));
-		novitaDalMegafono = true;
-		novitaAperte = [NOVITA[i]];
+	/**
+	 * The megaphone: the news of the installed version, the others on
+	 * request.
+	 */
+	let whatsNewFromMegaphone = $state(false);
+	function reopenWhatsNew() {
+		const i = Math.max(0, WHATS_NEW.findIndex((n) => n.version === currentVersion));
+		whatsNewFromMegaphone = true;
+		whatsNewOpen = [WHATS_NEW[i]];
 	}
 
-	function chiudiNovita() {
-		novitaDalMegafono = false;
-		novitaAperte = [];
+	function closeWhatsNew() {
+		whatsNewFromMegaphone = false;
+		whatsNewOpen = [];
 		try {
-			localStorage.setItem(CHIAVE_VERSIONE, versioneAttuale);
+			localStorage.setItem(VERSION_KEY, currentVersion);
 		} catch {
-			// Archivio negato: le novità si riproporranno, pazienza.
+			// Storage denied: the news will be offered again, never mind.
 		}
 	}
 
 	$effect(() => {
-		if (!avviato || finestra !== 'main') return;
-		// Per provarla in sviluppo: `VITE_PROVA_NOVITA=1` la apre sempre, con
-		// le novità della versione più recente dell'elenco.
-		if (import.meta.env.DEV && import.meta.env.VITE_PROVA_NOVITA === '1') {
-			untrack(() => (novitaAperte = NOVITA.slice(0, 1)));
+		if (!started || windowLabel !== 'main') return;
+		// To try it in development: `VITE_TEST_WHATS_NEW=1` always opens it,
+		// with the news of the most recent version in the list.
+		if (import.meta.env.DEV && import.meta.env.VITE_TEST_WHATS_NEW === '1') {
+			untrack(() => (whatsNewOpen = WHATS_NEW.slice(0, 1)));
 			return;
 		}
 		untrack(() => {
@@ -2511,906 +2558,926 @@
 				.appVersion()
 				.then((v) => {
 					if (typeof v !== 'string' || !v) return;
-					versioneAttuale = v;
-					let vista: string | null = null;
-					let giaUsata = false;
+					currentVersion = v;
+					let view: string | null = null;
+					let alreadyUsed = false;
 					try {
-						vista = localStorage.getItem(CHIAVE_VERSIONE);
-						giaUsata = localStorage.getItem('space-train.impostazioni') !== null;
+						view = localStorage.getItem(VERSION_KEY);
+						alreadyUsed = localStorage.getItem('space-train.impostazioni') !== null;
 					} catch {
 						return;
 					}
-					const da = novitaDaMostrare(vista, v, giaUsata);
-					if (da.length > 0) novitaAperte = da;
-					// Alla prima installazione non c'è niente da raccontare: si
-					// ricorda la versione e basta.
-					else if (vista !== v) localStorage.setItem(CHIAVE_VERSIONE, v);
+					const from = whatsNewToShow(view, v, alreadyUsed);
+					if (from.length > 0) whatsNewOpen = from;
+					// At the first install there is nothing to tell: the
+					// version is remembered and that is all.
+					else if (view !== v) localStorage.setItem(VERSION_KEY, v);
 				})
 				.catch(() => {});
 		});
 	});
 
-	/** Le schede aperte, per riprenderle al prossimo avvio. */
-	const CHIAVE_SESSIONE = 'space-train.sessione';
+	/** The open tabs, to pick them up again at the next startup. */
+	const SESSION_KEY = 'space-train.sessione';
 
-	interface Sessione {
+	interface Session {
+		tabs: string[];
+		active: number;
+	}
+	/** The session as saved: it keeps the field names it was first written with. */
+	interface StoredSession {
 		schede: string[];
 		attiva: number;
 	}
 
-	// Solo la finestra principale: le altre si chiudono e si riaprono a
-	// piacere, e sovrascriverebbero la sessione con le loro poche schede.
+	// Only the main window: the others are closed and reopened at will,
+	// and would overwrite the session with their few tabs.
 	$effect(() => {
-		const schede = store.tabs.map((t) => t.path);
-		const attiva = store.tabs.findIndex((t) => t.id === store.activeId);
-		if (!avviato || finestra !== 'main' || schede.length === 0) return;
+		const tabs = store.tabs.map((t) => t.path);
+		const active = store.tabs.findIndex((t) => t.id === store.activeId);
+		if (!started || windowLabel !== 'main' || tabs.length === 0) return;
 		try {
-			localStorage.setItem(CHIAVE_SESSIONE, JSON.stringify({ schede, attiva } satisfies Sessione));
+			localStorage.setItem(SESSION_KEY, JSON.stringify({ schede: tabs, attiva: active } satisfies StoredSession));
 		} catch {
-			// Archivio negato: la sessione non si riprenderà.
+			// Storage denied: the session will not be resumed.
 		}
 	});
 
-	function sessioneSalvata(): Sessione | null {
+	function savedSession(): Session | null {
 		try {
-			const s = JSON.parse(localStorage.getItem(CHIAVE_SESSIONE) ?? 'null') as Sessione | null;
-			return s && Array.isArray(s.schede) ? s : null;
+			const s = JSON.parse(localStorage.getItem(SESSION_KEY) ?? 'null') as StoredSession | null;
+			return s && Array.isArray(s.schede) ? { tabs: s.schede, active: s.attiva } : null;
 		} catch {
 			return null;
 		}
 	}
 
 	/**
-	 * Le schede con cui parte l'app quando Windows non chiede una cartella:
-	 * quelle della volta scorsa, se l'utente vuole riprenderle, più le
-	 * cartelle fissate per l'avvio. Quelle sparite nel frattempo si saltano;
-	 * se non resta niente, la pagina iniziale.
+	 * The tabs the app starts with when Windows does not ask for a folder:
+	 * those of last time, if the user wants to resume them, plus the folders
+	 * pinned for startup. Those that disappeared in the meantime are
+	 * skipped; if nothing is left, the start page.
 	 */
-	async function schedeIniziali(): Promise<Sessione> {
-		const salvata = impostazioni.sessione ? sessioneSalvata() : null;
-		const candidate = [...(salvata?.schede ?? [])];
-		for (const c of impostazioni.cartelleAvvio) {
-			if (!candidate.some((p) => stessoPath(p, c))) candidate.push(c);
+	async function initialTabs(): Promise<Session> {
+		const saved = settings.session ? savedSession() : null;
+		const candidate = [...(saved?.tabs ?? [])];
+		for (const c of settings.startupFolders) {
+			if (!candidate.some((p) => samePath(p, c))) candidate.push(c);
 		}
-		const esistono = await Promise.all(
+		const exist = await Promise.all(
 			candidate.map((p) =>
 				p.startsWith('::')
 					? Promise.resolve(p)
 					: tauriBackend
 							.resolvePath(p)
-							.then((d) => (d.seleziona === null ? d.cartella : null))
+							.then((d) => (d.select === null ? d.folder : null))
 							.catch(() => null)
 			)
 		);
-		const schede = esistono.filter((p): p is string => p !== null);
-		if (schede.length === 0) return { schede: [await paginaIniziale()], attiva: 0 };
-		const attiva = salvata ? Math.min(Math.max(salvata.attiva, 0), schede.length - 1) : 0;
-		return { schede, attiva };
+		const tabs = exist.filter((p): p is string => p !== null);
+		if (tabs.length === 0) return { tabs: [await startPage()], active: 0 };
+		const active = saved ? Math.min(Math.max(saved.active, 0), tabs.length - 1) : 0;
+		return { tabs, active };
 	}
 
 	/**
-	 * La cartella da aprire quando Windows non ne chiede una. Una pagina
-	 * iniziale sparita nel frattempo (disco staccato, cartella cancellata)
-	 * non lascia l'utente davanti a un errore: si torna al disco C:.
+	 * The folder to open when Windows does not ask for one. A start page
+	 * that disappeared in the meantime (drive unplugged, folder deleted)
+	 * does not leave the user in front of an error: it goes back to drive
+	 * C:.
 	 */
-	async function paginaIniziale(): Promise<string> {
-		let scelta = impostazioni.paginaIniziale;
-		if (scelta === INIZIALE_ULTIMA) {
+	async function startPage(): Promise<string> {
+		let choice = settings.startPage;
+		if (choice === LAST_FOLDER_START_PAGE) {
 			try {
-				scelta = localStorage.getItem(CHIAVE_ULTIMA) ?? INIZIALE_PREDEFINITA;
+				choice = localStorage.getItem(LAST_FOLDER_KEY) ?? DEFAULT_START_PAGE;
 			} catch {
-				scelta = INIZIALE_PREDEFINITA;
+				choice = DEFAULT_START_PAGE;
 			}
 		}
-		if (scelta.startsWith('::')) return scelta;
+		if (choice.startsWith('::')) return choice;
 		return tauriBackend
-			.resolvePath(scelta)
-			.then((d) => d.cartella)
-			.catch(() => INIZIALE_PREDEFINITA);
+			.resolvePath(choice)
+			.then((d) => d.folder)
+			.catch(() => DEFAULT_START_PAGE);
 	}
 
-	// Una volta sola, all'avvio. `untrack` è indispensabile: aprire una scheda
-	// cambia la lista delle schede, e senza ogni scheda aperta qui faceva
-	// ripartire l'effetto, che ne apriva un'altra, all'infinito.
+	// Only once, at startup. `untrack` is essential: opening a tab changes the
+	// list of tabs, and without it every tab opened here restarted the effect,
+	// which opened another one, forever.
 	$effect(() => {
 		untrack(() => {
-			if (finestra !== 'main') {
-				const apri = (window as unknown as { __SPACE_TRAIN_APRI?: string | null }).__SPACE_TRAIN_APRI;
-				void store.openTab(apri ?? RADICE_SISTEMA).then(() => (avviato = true));
+			if (windowLabel !== 'main') {
+				const open = (window as unknown as { __SPACE_TRAIN_OPEN?: string | null }).__SPACE_TRAIN_OPEN;
+				void store.openTab(open ?? SYSTEM_ROOT).then(() => (started = true));
 				return;
 			}
 			tauriBackend
 				.initialPath()
 				.catch(() => null)
 				.then(async (dest) => {
-					if (dest) await apriDestinazione(dest);
+					if (dest) await openDestination(dest);
 					else {
-						const { schede, attiva } = await schedeIniziali();
-						// Tutte insieme: le schede entrano subito nell'ordine giusto,
-						// e i loro contenuti arrivano in parallelo.
-						const ids = await Promise.all(schede.map((p) => store.openTab(p)));
-						// Una cartella arrivata da Windows nel frattempo resta davanti.
+						const { tabs, active } = await initialTabs();
+						// All together: the tabs enter in the right order straight
+						// away, and their contents arrive in parallel.
+						const ids = await Promise.all(tabs.map((p) => store.openTab(p)));
+						// A folder that arrived from Windows in the meantime stays in
+						// front.
 						if (store.activeId !== null && ids.includes(store.activeId)) {
-							store.setActive(ids[attiva] ?? ids[0]);
+							store.setActive(ids[active] ?? ids[0]);
 						}
 					}
-					avviato = true;
+					started = true;
 				});
 		});
 	});
 
 	$effect(() => {
-		if (avviato && store.tabs.length === 0) void paginaIniziale().then((p) => store.openTab(p));
+		if (started && store.tabs.length === 0) void startPage().then((p) => store.openTab(p));
 	});
 
-	// Una cartella aperta da Windows mentre l'app è già in esecuzione arriva
-	// qui, come scheda nuova, invece di avviare una seconda copia.
+	// A folder opened from Windows while the app is already running arrives
+	// here, as a new tab, instead of starting a second copy.
 	$effect(() => {
-		let smonta: (() => void) | undefined;
-		let attivo = true;
-		listen<{ finestra: string; dest: { cartella: string; seleziona: string | null } }>(
-			'apri-percorso',
+		let unmount: (() => void) | undefined;
+		let active = true;
+		listen<{ window: string; dest: { folder: string; select: string | null } }>(
+			'open-path',
 			(e) => {
-				// Con più finestre la cartella va solo a quella scelta da Rust.
-				if (e.payload.finestra === finestra) void apriDestinazione(e.payload.dest);
+				// With several windows the folder goes only to the one chosen
+				// by Rust.
+				if (e.payload.window === windowLabel) void openDestination(e.payload.dest);
 			}
 		)
-			.then((f) => (attivo ? (smonta = f) : f()))
+			.then((f) => (active ? (unmount = f) : f()))
 			.catch(() => {});
 		return () => {
-			attivo = false;
-			smonta?.();
+			active = false;
+			unmount?.();
 		};
 	});
 
-	function apri(e: Entry) {
-		if (store.activeId === null || posizione === 'cestino') return;
-		const arc = store.activeTab?.archivio;
+	function open(e: Entry) {
+		if (store.activeId === null || location === 'trash') return;
+		const arc = store.activeTab?.archive;
 		if (arc) {
-			if (arc.cassaforte) tocca(arc.file);
-			if (e.kind === 'dir') void store.mostraArchivio(store.activeId, arc.file, internoDi(e.path), arc.voci, arc.cassaforte);
+			if (arc.vault) touch(arc.file);
+			if (e.kind === 'dir') void store.showArchive(store.activeId, arc.file, innerOf(e.path), arc.items, arc.vault);
 			else
-				(arc.cassaforte ? tauriBackend.vaultOpenItem(arc.file, internoDi(e.path)) : tauriBackend.archiveOpenItem(arc.file, internoDi(e.path)))
+				(arc.vault ? tauriBackend.vaultOpenItem(arc.file, innerOf(e.path)) : tauriBackend.archiveOpenItem(arc.file, innerOf(e.path)))
 					.then((p) => tauriBackend.openEntry(p))
-					.catch((err) => (erroreOp = descriviErrore(err)));
+					.catch((err) => (opError = describeError(err)));
 			return;
 		}
-		if (posizione === 'normale' && eCassaforte(e)) {
-			void apriCassaforte(e.path);
+		if (location === 'normal' && isVault(e)) {
+			void openVault(e.path);
 			return;
 		}
-		if (e.kind !== 'dir' && posizione === 'normale' && eArchivio(e.name)) {
-			void apriArchivio(e.path);
+		if (e.kind !== 'dir' && location === 'normal' && isArchive(e.name)) {
+			void openArchive(e.path);
 			return;
 		}
 		if (e.kind === 'dir') store.navigate(store.activeId, e.path);
-		// Un file di un altro PC si scarica in una cartella temporanea e si apre.
-		else if (eReteLocale(e.path))
-			tauriBackend.lanApri(e.path).catch((err) => (erroreOp = descriviErrore(err)));
+		// A file of another PC is downloaded into a temporary folder and opened.
+		else if (isLan(e.path))
+			tauriBackend.lanOpen(e.path).catch((err) => (opError = describeError(err)));
 		else tauriBackend.openEntry(e.path);
 	}
 
-	function seleziona(e: Entry, modificatori: { ctrl?: boolean; shift?: boolean } = {}) {
+	function select(e: Entry, modifiers: { ctrl?: boolean; shift?: boolean } = {}) {
 		if (store.activeId === null) return;
-		store.seleziona(store.activeId, e.path, vociVisibili, modificatori);
+		store.select(store.activeId, e.path, visibleItems, modifiers);
 	}
 
 	/**
-	 * Clic sul vuoto e rettangolo di selezione. Con Ctrl o Maiusc il
-	 * rettangolo si aggiunge a ciò che era già selezionato quando è partito.
+	 * Click on empty space and selection marquee. With Ctrl or Shift the
+	 * marquee is added to what was already selected when it started.
 	 */
-	let selezionePrimaDelRettangolo: string[] = [];
-	const rettangolo = {
-		oninizio: () => {
-			selezionePrimaDelRettangolo = [...(store.activeTab?.selection ?? [])];
+	let selectionBeforeMarquee: string[] = [];
+	const marquee = {
+		onstart: () => {
+			selectionBeforeMarquee = [...(store.activeTab?.selection ?? [])];
 		},
-		oncambia: (paths: string[], aggiungi: boolean) => {
+		onchange: (paths: string[], add: boolean) => {
 			if (store.activeId === null) return;
-			const scelte = aggiungi ? [...new Set([...selezionePrimaDelRettangolo, ...paths])] : paths;
-			// Nell'ordine della lista, come ogni altra selezione.
-			const dentro = new Set(scelte);
-			store.selezionaPercorsi(
+			const choices = add ? [...new Set([...selectionBeforeMarquee, ...paths])] : paths;
+			// In the order of the list, like every other selection.
+			const inner = new Set(choices);
+			store.selectPaths(
 				store.activeId,
-				vociVisibili.filter((v) => dentro.has(v.path)).map((v) => v.path)
+				visibleItems.filter((v) => inner.has(v.path)).map((v) => v.path)
 			);
 		},
-		onvuoto: () => {
-			if (store.activeId !== null) store.pulisciSelezione(store.activeId);
+		onempty: () => {
+			if (store.activeId !== null) store.clearSelection(store.activeId);
 		}
 	};
 
-	function alternaPreferiti() {
-		const scelte = selezionate();
-		if (scelte.length === 0 || !store.activeTab || !modificabile) return;
-		preferiti.alterna(store.activeTab.path, scelte.map((e) => e.name));
+	function toggleFavorite() {
+		const choices = selectedEntries();
+		if (choices.length === 0 || !store.activeTab || !editable) return;
+		favorites.toggle(store.activeTab.path, choices.map((e) => e.name));
 	}
 
-	async function proprieta() {
+	async function properties() {
 		const tab = store.activeTab;
-		if (!tab || posizione === 'cestino' || posizione === 'rete') return;
-		const scelte = selezionate().map((e) => e.path);
-		const paths = scelte.length > 0 ? scelte : eVirtuale(tab.path) ? [] : [tab.path];
+		if (!tab || location === 'trash' || location === 'network') return;
+		const choices = selectedEntries().map((e) => e.path);
+		const paths = choices.length > 0 ? choices : isVirtual(tab.path) ? [] : [tab.path];
 		if (paths.length === 0) return;
 		try {
 			await tauriBackend.showProperties(paths);
 		} catch (e) {
-			erroreOp = descriviErrore(e);
+			opError = describeError(e);
 		}
 	}
 
-	async function vaiAIndirizzo(testo: string) {
+	async function goToAddress(text: string) {
 		if (store.activeId === null) return;
-		erroreOp = null;
+		opError = null;
 		try {
-			const dest = await tauriBackend.resolvePath(testo);
-			await store.navigate(store.activeId, dest.cartella);
-			if (dest.seleziona) store.selezionaPercorsi(store.activeId, [dest.seleziona]);
+			const dest = await tauriBackend.resolvePath(text);
+			await store.navigate(store.activeId, dest.folder);
+			if (dest.select) store.selectPaths(store.activeId, [dest.select]);
 		} catch {
-			erroreOp = `Impossibile trovare «${testo}». Controlla di averlo scritto correttamente.`;
+			opError = `Impossibile trovare «${text}». Controlla di averlo scritto correttamente.`;
 		}
 	}
 
 	/**
-	 * Quale schermata vuota mostrare, o `null` se c'è una lista da vedere.
+	 * Which empty screen to show, or `null` if there is a list to see.
 	 *
-	 * L'ordine conta: un errore va detto prima di dichiarare vuota una
-	 * cartella che non siamo nemmeno riusciti a leggere.
+	 * The order matters: an error must be told before declaring empty a
+	 * folder we did not even manage to read.
 	 */
-	let statoVuoto = $derived.by(() => {
+	let emptyState = $derived.by(() => {
 		const tab = store.activeTab;
 		if (!tab || tab.loading) return null;
-		if (tab.risultati) {
-			if (tab.risultati.length > 0 || tab.cercando) return null;
-			if (tab.confronto) return 'cartelleUguali' as const;
-			return tab.duplicati ? ('nessunDuplicato' as const) : ('nessunRisultato' as const);
+		if (tab.results) {
+			if (tab.results.length > 0 || tab.searching) return null;
+			if (tab.comparison) return 'sameFolders' as const;
+			return tab.duplicates ? ('noDuplicates' as const) : ('noResults' as const);
 		}
 
 		if (tab.entries.length === 0) {
 			switch (tab.error?.kind) {
 				case 'accessDenied':
-					return 'accessoNegato' as const;
+					return 'accessDenied' as const;
 				case 'deviceNotReady':
-					return 'nonPronta' as const;
+					return 'notReady' as const;
 				case undefined:
-					return 'cartellaVuota' as const;
+					return 'emptyFolder' as const;
 				default:
 					return null;
 			}
 		}
 
-		return vociVisibili.length === 0 ? ('nessunRisultato' as const) : null;
+		return visibleItems.length === 0 ? ('noResults' as const) : null;
 	});
 
-	let colonne = $state(1);
+	let columns = $state(1);
 
 	/**
-	 * L'apertura non viene nemmeno montata se l'utente ha chiesto meno
-	 * movimento: nasconderla via CSS lascerebbe comunque girare i timer.
+	 * The intro is not even mounted if the user asked for less motion:
+	 * hiding it with CSS would still leave the timers running.
 	 */
-	// Spenta di default: l'avvio deve essere istantaneo. Chi la vuole la
-	// riaccende dal menu Aspetto.
+	// Off by default: startup must be instant. Whoever wants it turns it
+	// back on from the Appearance menu.
 	// svelte-ignore state_referenced_locally
-	let apertura = $state(impostazioni.animazioneAvvio && animazioni.avvio !== 'nessuna' && !motoRidotto());
+	let opening = $state(settings.introAnimation && animations.intro !== 'none' && !reducedMotion());
 
 	// The folder animation plays when a folder has finished loading.
-	let contenuto = $state<HTMLElement | null>(null);
-	let ultimaAnimata: string | null = null;
+	let content = $state<HTMLElement | null>(null);
+	let lastAnimated: string | null = null;
 	$effect(() => {
 		const tab = store.activeTab;
 		if (!tab || tab.loading) return;
-		const chiave = `${store.activeId}:${tab.path}`;
-		if (chiave === ultimaAnimata) return;
-		const prima = ultimaAnimata;
-		ultimaAnimata = chiave;
+		const key = `${store.activeId}:${tab.path}`;
+		if (key === lastAnimated) return;
+		const before = lastAnimated;
+		lastAnimated = key;
 		// Not at startup, and not when the theme asks for none.
-		const tipo = untrack(() => animazioni.cartella);
-		if (prima === null || tipo === 'nessuna' || motoRidotto()) return;
+		const kind = untrack(() => animations.folder);
+		if (before === null || kind === 'none' || reducedMotion()) return;
 		void tick().then(() =>
-			animaCartella(tipo, contenuto?.querySelector('.pannello-attivo') ?? null, document.querySelector('.barra .linea'))
+			animateFolder(kind, content?.querySelector('.active-pane') ?? null, document.querySelector('.bar .line'))
 		);
 	});
 
 	// ── Menu ─────────────────────────────────────────────────────────
 
-	let menu = $state<{ voci: VoceMenu[]; x: number; y: number } | null>(null);
+	let menu = $state<{ items: MenuItem[]; x: number; y: number } | null>(null);
 
 	/**
-	 * Il clic destro su una voce già selezionata non tocca la selezione:
-	 * altrimenti, dopo aver scelto dieci file, il menu ne opererebbe uno.
-	 * Su una voce fuori dalla selezione, invece, la sposta lì.
+	 * The right click on an already selected item does not touch the
+	 * selection: otherwise, after choosing ten files, the menu would act
+	 * on one. On an item outside the selection, instead, it moves it
+	 * there.
 	 */
-	function menuSuVoce(e: Entry, evento: MouseEvent) {
-		if (!insiemeSelezione.has(e.path)) seleziona(e);
-		void apriMenu(evento);
+	function menuOnItem(e: Entry, event: MouseEvent) {
+		if (!selectionSet.has(e.path)) select(e);
+		void openMenu(event);
 	}
 
-	function menuSulVuoto(evento: MouseEvent) {
-		if (store.activeId !== null) store.pulisciSelezione(store.activeId);
-		void apriMenu(evento);
+	function menuOnEmpty(event: MouseEvent) {
+		if (store.activeId !== null) store.clearSelection(store.activeId);
+		void openMenu(event);
 	}
 
-	/** La cartella a cui si riferisce il menu: quella selezionata o quella aperta. */
-	function cartellaDelMenu(scelte: Entry[]): string | null {
-		if (scelte.length === 1 && scelte[0].kind === 'dir') return scelte[0].path;
+	/** The folder the menu refers to: the selected one or the open one. */
+	function menuFolder(choices: Entry[]): string | null {
+		if (choices.length === 1 && choices[0].kind === 'dir') return choices[0].path;
 		const tab = store.activeTab;
-		return tab && !eVirtuale(tab.path) ? tab.path : null;
+		return tab && !isVirtual(tab.path) ? tab.path : null;
 	}
 
-	/** La cartella del menu si apre già a ogni avvio. */
-	function eAllAvvio(scelte: Entry[]): boolean {
-		const cartella = cartellaDelMenu(scelte);
-		return cartella !== null && impostazioni.cartelleAvvio.some((c) => stessoPath(c, cartella));
+	/** The folder of the menu already opens at every startup. */
+	function isAtStartup(choices: Entry[]): boolean {
+		const folder = menuFolder(choices);
+		return folder !== null && settings.startupFolders.some((c) => samePath(c, folder));
 	}
 
-	/** La cartella del menu è già la pagina iniziale. */
-	function eIniziale(scelte: Entry[]): boolean {
-		const pagina = impostazioni.paginaIniziale;
-		if (posizione === 'pc' && scelte.length === 0) return pagina === '::pc';
-		const cartella = cartellaDelMenu(scelte);
-		return cartella !== null && stessoPath(cartella, pagina);
+	/** The folder of the menu is already the start page. */
+	function isStartPageOf(choices: Entry[]): boolean {
+		const page = settings.startPage;
+		if (location === 'pc' && choices.length === 0) return page === '::pc';
+		const folder = menuFolder(choices);
+		return folder !== null && samePath(folder, page);
 	}
 
-	/** Voce dell'Accesso rapido su cui è stato aperto il menu della barra laterale. */
-	let menuAccesso = $state<string | null>(null);
+	/** Quick Access item on which the sidebar menu was opened. */
+	let quickAccessMenu = $state<string | null>(null);
 
-	function apriMenuAccesso(path: string, evento: MouseEvent) {
-		menuAccesso = path;
-		const i = accessoRapido.cartelle.findIndex((c) => stessoPath(c, path));
+	function openQuickAccessMenu(path: string, event: MouseEvent) {
+		quickAccessMenu = path;
+		const i = quickAccess.folders.findIndex((c) => samePath(c, path));
 		menu = {
-			voci: vociAccessoRapido(i === 0, i === accessoRapido.cartelle.length - 1),
-			x: evento.clientX,
-			y: evento.clientY
+			items: quickAccessItems(i === 0, i === quickAccess.folders.length - 1),
+			x: event.clientX,
+			y: event.clientY
 		};
 	}
 
-	async function apriMenu(evento: MouseEvent) {
-		menuAccesso = null;
-		const x = evento.clientX;
-		const y = evento.clientY;
-		const scelte = selezionate();
-		const inCassaforte = !!store.activeTab?.archivio?.cassaforte;
-		const pieni = scrivibile || inCassaforte ? (await daIncollare()) !== null : false;
+	async function openMenu(event: MouseEvent) {
+		quickAccessMenu = null;
+		const x = event.clientX;
+		const y = event.clientY;
+		const choices = selectedEntries();
+		const inVault = !!store.activeTab?.archive?.vault;
+		const full = writable || inVault ? (await toPaste()) !== null : false;
 		menu = {
-			voci: vociMenu({
-				selezione: scelte,
-				appuntiPieni: pieni,
-				giaPreferiti:
+			items: menuItems({
+				selection: choices,
+				clipboardFull: full,
+				alreadyFavorite:
 					store.activeTab !== undefined &&
-					preferiti.tutti(store.activeTab.path, scelte.map((e) => e.name)),
-				posizione,
-				ricerca: inRicerca,
-				annullabile: annulla.prossima(),
-				coloreAttuale: coloreComune(scelte),
-				cassaforte: inCassaforte,
-				labelName: (id) => colori.nameOf(id),
-				pari: destinatari,
-				condivisa: statoLan?.condivisa ?? null,
-				condivisaQui:
-					!!statoLan?.condivisa &&
+					favorites.all(store.activeTab.path, choices.map((e) => e.name)),
+				location,
+				search: inSearch,
+				undoable: undo.next(),
+				currentColor: commonColor(choices),
+				vault: inVault,
+				labelName: (id) => colors.nameOf(id),
+				peers: recipients,
+				shared: lanState?.shared ?? null,
+				sharedHere:
+					!!lanState?.shared &&
 					store.activeTab !== undefined &&
-					stessoPath(statoLan.condivisa, store.activeTab.path),
-				fissata: accessoRapido.contiene(cartellaDelMenu(scelte) ?? ''),
-				iniziale: eIniziale(scelte),
-				allAvvio: eAllAvvio(scelte),
-				altroPannello: tabAltro && !eVirtuale(tabAltro.path) ? tabAltro.path : null
+					samePath(lanState.shared, store.activeTab.path),
+				pinned: quickAccess.has(menuFolder(choices) ?? ''),
+				isStartPage: isStartPageOf(choices),
+				atStartup: isAtStartup(choices),
+				otherPane: otherTab && !isVirtual(otherTab.path) ? otherTab.path : null
 			}),
 			x,
 			y
 		};
 	}
 
-	/** I menu della barra si aprono sotto il loro pulsante, come in Esplora. */
-	function sottoIlPulsante(evento: MouseEvent, voci: VoceMenu[]) {
-		const r = (evento.currentTarget as HTMLElement).getBoundingClientRect();
-		menu = { voci, x: r.left, y: r.bottom + 4 };
+	/** The bar menus open below their button, as in Explorer. */
+	function belowButton(event: MouseEvent, items: MenuItem[]) {
+		const r = (event.currentTarget as HTMLElement).getBoundingClientRect();
+		menu = { items, x: r.left, y: r.bottom + 4 };
 	}
 
-	function apriMenuVista(evento: MouseEvent) {
-		sottoIlPulsante(
-			evento,
-			vociVista({
-				vista: impostazioni.vista,
-				lato: impostazioni.lato,
-				compatta: impostazioni.compatta,
-				colonne: impostazioni.colonne,
-				estensioni: impostazioni.estensioni,
-				nascosti: store.showHidden,
-				anteprima: impostazioni.anteprima,
-				iniziale: impostazioni.paginaIniziale,
-				sessione: impostazioni.sessione
+	function openViewMenu(event: MouseEvent) {
+		belowButton(
+			event,
+			viewItems({
+				view: settings.view,
+				side: settings.side,
+				compact: settings.compact,
+				columns: settings.columns,
+				extensions: settings.extensions,
+				hidden: store.showHidden,
+				preview: settings.preview,
+				startPage: settings.startPage,
+				session: settings.session
 			})
 		);
 	}
 
-	function apriMenuOrdina(evento: MouseEvent) {
+	function openSortMenu(event: MouseEvent) {
 		const tab = store.activeTab;
 		if (!tab) return;
-		sottoIlPulsante(evento, vociOrdina(tab.sort, impostazioni.raggruppa));
+		belowButton(event, sortItems(tab.sort, settings.grouping));
 	}
 
-	function apriMenuNuovo(evento: MouseEvent) {
-		if (!modificabile) return;
-		sottoIlPulsante(evento, vociNuovo(tipiNuovo));
+	function openNewMenu(event: MouseEvent) {
+		if (!editable) return;
+		belowButton(event, newItems(newFileTypes));
 	}
 
-	/** La galleria dei temi, aperta sotto il pulsante Aspetto. */
-	let galleria = $state<{ x: number; y: number } | null>(null);
+	/** The theme gallery, opened below the Appearance button. */
+	let gallery = $state<{ x: number; y: number } | null>(null);
 
-	function apriMenuAspetto(evento: MouseEvent) {
-		const r = (evento.currentTarget as HTMLElement).getBoundingClientRect();
-		galleria = { x: Math.max(8, window.innerWidth - r.right), y: r.bottom + 4 };
-	}
-
-	/** La galleria aperta da dentro le impostazioni: sotto il pulsante Aspetto. */
-	function galleriaDalleImpostazioni() {
-		impostazioniAperte = false;
-		const r = document.querySelector('[aria-label="Aspetto"]')?.getBoundingClientRect();
-		galleria = r ? { x: Math.max(8, window.innerWidth - r.right), y: r.bottom + 4 } : { x: 12, y: 84 };
-	}
-
-	let impostazioniAperte = $state(false);
-
-	/** Dalla galleria: un tema o un colore si provano restando lì, l'editor la chiude. */
-	function daGalleria(azione: AzioneMenu) {
-		if (azione === 'editorTemi') galleria = null;
-		void eseguiAzione(azione);
-	}
-
-	/** Colore comune delle cartelle selezionate, o `null` se diverso o assente. */
-	function coloreComune(scelte: Entry[]): IdColore | null {
-		const primo = scelte[0] ? colori.idDi(scelte[0].path) : undefined;
-		return primo && scelte.every((e) => colori.idDi(e.path) === primo) ? primo : null;
+	function openAppearanceMenu(event: MouseEvent) {
+		const r = (event.currentTarget as HTMLElement).getBoundingClientRect();
+		gallery = { x: Math.max(8, window.innerWidth - r.right), y: r.bottom + 4 };
 	}
 
 	/**
-	 * Le azioni con un parametro arrivano come `tipo:valore`: ordina per una
-	 * colonna, raggruppa, vista, lato delle icone, tema, accento, colore.
+	 * The gallery opened from inside the settings: below the Appearance
+	 * button.
 	 */
-	function eseguiParametrica(azione: string, scelte: Entry[]): boolean {
-		const [tipo, valore] = azione.split(':');
-		if (valore === undefined) return false;
+	function galleryFromSettings() {
+		settingsOpen = false;
+		const r = document.querySelector('[aria-label="Appearance"]')?.getBoundingClientRect();
+		gallery = r ? { x: Math.max(8, window.innerWidth - r.right), y: r.bottom + 4 } : { x: 12, y: 84 };
+	}
+
+	let settingsOpen = $state(false);
+
+	/**
+	 * From the gallery: a theme or a colour is tried while staying there, the editor
+	 * closes it.
+	 */
+	function fromGallery(action: MenuAction) {
+		if (action === 'themeEditor') gallery = null;
+		void runAction(action);
+	}
+
+	/**
+	 * Common colour of the selected folders, or `null` if different or
+	 * missing.
+	 */
+	function commonColor(choices: Entry[]): ColorId | null {
+		const first = choices[0] ? colors.idOf(choices[0].path) : undefined;
+		return first && choices.every((e) => colors.idOf(e.path) === first) ? first : null;
+	}
+
+	/**
+	 * Actions with a parameter arrive as `kind:value`: sort by a column,
+	 * group, view, icon side, theme, accent, colour.
+	 */
+	function runParametric(action: string, choices: Entry[]): boolean {
+		const [kind, value] = action.split(':');
+		if (value === undefined) return false;
 		const id = store.activeId;
 		const tab = store.activeTab;
 
-		switch (tipo) {
-			case 'nuovo':
-				void nuovoFile(valore);
+		switch (kind) {
+			case 'new':
+				void newFile(value);
 				return true;
-			case 'invia':
-				void inviaA(valore);
+			case 'send':
+				void sendTo(value);
 				return true;
-			case 'ordina':
+			case 'sort':
 				if (tab && id !== null) {
-					const chiave = valore as SortKey;
-					// Come le intestazioni: una colonna nuova parte nel verso
-					// in cui di solito la si vuole, la stessa resta com'è.
-					const ascendente =
-						tab.sort.key === chiave ? tab.sort.ascending : chiave === 'name' || chiave === 'kind';
-					void store.setSort(id, { key: chiave, ascending: ascendente });
+					const key = value as SortKey;
+					// Like the headers: a new column starts in the direction
+					// it is usually wanted in, the same one stays as it is.
+					const ascendingNow =
+						tab.sort.key === key ? tab.sort.ascending : key === 'name' || key === 'kind';
+					void store.setSort(id, { key: key, ascending: ascendingNow });
 				}
 				return true;
-			case 'gruppi':
-				impostazioni.imposta('raggruppa', valore as ModoGruppi);
+			case 'group':
+				settings.set('grouping', value as GroupMode);
 				return true;
-			case 'vista':
-				impostazioni.impostaVista(valore as Vista);
+			case 'view':
+				settings.setView(value as View);
 				return true;
-			case 'lato':
-				impostazioni.impostaVista('icone', Number(valore));
+			case 'side':
+				settings.setView('icons', Number(value));
 				return true;
-			case 'tema':
-				impostazioni.imposta('tema', valore);
+			case 'theme':
+				settings.set('theme', value);
 				return true;
-			case 'pausa':
-				impostazioni.imposta('pausaTreno', Number(valore));
+			case 'pause':
+				settings.set('trainPause', Number(value));
 				return true;
-			case 'iniziale': {
-				const scelte: Record<string, string> = { pc: '::pc', c: INIZIALE_PREDEFINITA, ultima: INIZIALE_ULTIMA };
-				if (scelte[valore]) impostazioni.imposta('paginaIniziale', scelte[valore]);
-				if (valore === 'pc') avvisa('Questo PC si aprirà all’avvio.');
+			case 'start': {
+				const choices: Record<string, string> = { pc: '::pc', c: DEFAULT_START_PAGE, last: LAST_FOLDER_START_PAGE };
+				if (choices[value]) settings.set('startPage', choices[value]);
+				if (value === 'pc') notify('Questo PC si aprirà all’avvio.');
 				return true;
 			}
-			case 'accento':
-				impostazioni.imposta('accento', valore as IdAccento);
-				// Il campione personalizzato apre il selettore di colore di sistema.
-				if (valore === 'personalizzato') selettoreColore?.click();
+			case 'accent':
+				settings.set('accent', value as AccentId);
+				// The custom swatch opens the system colour picker.
+				if (value === CUSTOM_ACCENT) colorPicker?.click();
 				return true;
-			case 'colore':
-				colori.imposta(
-					scelte.map((e) => e.path),
-					valore as IdColore
+			case 'color':
+				colors.set(
+					choices.map((e) => e.path),
+					value as ColorId
 				);
 				return true;
 		}
 		return false;
 	}
 
-	/** Ctrl+rotella ingrandisce e rimpicciolisce, come in Esplora. */
+	/** Ctrl+wheel zooms in and out, as in Explorer. */
 	$effect(() => {
-		function rotella(e: WheelEvent) {
+		function wheel(e: WheelEvent) {
 			if (!e.ctrlKey || e.deltaY === 0) return;
 			e.preventDefault();
-			const s = zoom({ vista: impostazioni.vista, lato: impostazioni.lato }, e.deltaY < 0 ? 1 : -1);
-			impostazioni.impostaVista(s.vista, s.lato);
+			const s = zoom({ view: settings.view, side: settings.side }, e.deltaY < 0 ? 1 : -1);
+			settings.setView(s.view, s.side);
 		}
-		// Non passivo: senza, il preventDefault non ferma lo zoom della pagina.
-		window.addEventListener('wheel', rotella, { passive: false });
-		return () => window.removeEventListener('wheel', rotella);
+		// Not passive: without it, preventDefault does not stop the page zoom.
+		window.addEventListener('wheel', wheel, { passive: false });
+		return () => window.removeEventListener('wheel', wheel);
 	});
 
-	function apriMenuColonne(evento: MouseEvent) {
+	function openColumnsMenu(event: MouseEvent) {
 		const tab = store.activeTab;
-		const conMedia = tab && posizione === 'normale' && !tab.risultati;
+		const withMedia = tab && location === 'normal' && !tab.results;
 		menu = {
-			voci: vociColonne(
-				impostazioni.colonne,
-				conMedia ? { shown: colonneMedia, chosen: media.isChosen(tab.path) } : null
+			items: columnItems(
+				settings.columns,
+				withMedia ? { shown: mediaColumns, chosen: media.isChosen(tab.path) } : null
 			),
-			x: evento.clientX,
-			y: evento.clientY
+			x: event.clientX,
+			y: event.clientY
 		};
 	}
 
-	const COLONNE: Partial<Record<AzioneMenu, keyof Colonne>> = {
-		colonnaTipo: 'tipo',
-		colonnaDimensione: 'dimensione',
-		colonnaData: 'data'
+	const COLUMN_ACTIONS: Partial<Record<MenuAction, keyof Columns>> = {
+		columnType: 'type',
+		columnSize: 'size',
+		columnDate: 'date'
 	};
 
-	async function eseguiAzione(azione: AzioneMenu) {
-		const punto = menu ? { x: menu.x, y: menu.y } : { x: 0, y: 0 };
+	async function runAction(action: MenuAction) {
+		const point = menu ? { x: menu.x, y: menu.y } : { x: 0, y: 0 };
 		menu = null;
-		// Dal menu dell'Accesso rapido il bersaglio è la cartella cliccata
-		// nella barra laterale, non la selezione nella lista.
-		const dallaBarra = menuAccesso;
-		menuAccesso = null;
-		if (dallaBarra) {
-			switch (azione) {
-				case 'apriNuovaScheda':
-					await store.openTab(dallaBarra);
+		// From the Quick Access menu the target is the folder clicked in
+		// the sidebar, not the selection in the list.
+		const fromBar = quickAccessMenu;
+		quickAccessMenu = null;
+		if (fromBar) {
+			switch (action) {
+				case 'openNewTab':
+					await store.openTab(fromBar);
 					return;
-				case 'apriNuovaFinestra':
-					return nuovaFinestra(dallaBarra);
-				case 'sgancia':
-					return accessoRapido.sgancia(dallaBarra);
-				case 'suAccesso':
-					return accessoRapido.muovi(dallaBarra, -1);
-				case 'giuAccesso':
-					return accessoRapido.muovi(dallaBarra, 1);
+				case 'openNewWindow':
+					return newWindow(fromBar);
+				case 'unpin':
+					return quickAccess.unpin(fromBar);
+				case 'quickAccessUp':
+					return quickAccess.shift(fromBar, -1);
+				case 'quickAccessDown':
+					return quickAccess.shift(fromBar, 1);
 			}
 		}
-		const scelte = selezionate();
+		const choices = selectedEntries();
 		const id = store.activeId;
 		const tab = store.activeTab;
 
 		// Area names may hold ':', so they never go through the split below.
-		if (azione.startsWith('area:')) return apriArea(azione.slice('area:'.length));
-		if (azione.startsWith('media:')) return alternaColonnaMedia(azione.slice('media:'.length) as MediaKey);
-		switch (azione) {
+		if (action.startsWith('workspace:')) return openWorkspace(action.slice('workspace:'.length));
+		if (action.startsWith('media:')) return toggleMediaColumn(action.slice('media:'.length) as MediaKey);
+		switch (action) {
 			case 'mediaAuto':
 				if (store.activeTab) media.automatic(store.activeTab.path);
 				return;
-			case 'areaNuova':
-				nomeArea = { mode: 'new', error: null };
+			case 'workspaceNew':
+				workspaceName = { mode: 'new', error: null };
 				return;
-			case 'areaRinomina':
-				nomeArea = { mode: 'rename', error: null };
+			case 'workspaceRename':
+				workspaceName = { mode: 'rename', error: null };
 				return;
-			case 'areaEsci':
-				return aree.setCurrent(null);
-			case 'areaElimina':
-				if (aree.current !== null) aree.remove(aree.current);
+			case 'workspaceLeave':
+				return workspaces.setCurrent(null);
+			case 'workspaceDelete':
+				if (workspaces.current !== null) workspaces.remove(workspaces.current);
 				return;
 		}
 
-		const colonna = COLONNE[azione];
-		if (colonna) return impostazioni.alternaColonna(colonna);
-		if (eseguiParametrica(azione, scelte)) return;
+		const column = COLUMN_ACTIONS[action];
+		if (column) return settings.toggleColumn(column);
+		if (runParametric(action, choices)) return;
 
 		try {
-			switch (azione) {
-				case 'apri':
-					if (scelte[0]) apri(scelte[0]);
+			switch (action) {
+				case 'open':
+					if (choices[0]) open(choices[0]);
 					break;
-				case 'apriNuovaFinestra':
-					if (scelte[0]) await nuovaFinestra(scelte[0].path);
+				case 'openNewWindow':
+					if (choices[0]) await newWindow(choices[0].path);
 					break;
-				case 'fissa': {
-					const cartella = cartellaDelMenu(scelte);
-					if (cartella) {
-						accessoRapido.fissa(cartella);
-						avvisa(`«${nomeDi(cartella)}» fissata nella barra laterale.`);
+				case 'pin': {
+					const folder = menuFolder(choices);
+					if (folder) {
+						quickAccess.pin(folder);
+						notify(`«${nameOf(folder)}» fissata nella barra laterale.`);
 					}
 					break;
 				}
-				case 'sgancia': {
-					const cartella = cartellaDelMenu(scelte);
-					if (cartella) accessoRapido.sgancia(cartella);
+				case 'unpin': {
+					const folder = menuFolder(choices);
+					if (folder) quickAccess.unpin(folder);
 					break;
 				}
-				case 'apriNuovaScheda':
-					if (scelte[0]) await store.openTab(scelte[0].path);
+				case 'openNewTab':
+					if (choices[0]) await store.openTab(choices[0].path);
 					break;
-				case 'apriCon':
-					if (scelte[0]) await tauriBackend.openWith(scelte[0].path);
+				case 'openWith':
+					if (choices[0]) await tauriBackend.openWith(choices[0].path);
 					break;
-				case 'amministratore':
-					if (scelte[0]) await tauriBackend.runAsAdmin(scelte[0].path);
+				case 'runAsAdmin':
+					if (choices[0]) await tauriBackend.runAsAdmin(choices[0].path);
 					break;
-				case 'apriPercorso':
-					if (scelte[0] && id !== null) {
-						const cartella = await tauriBackend.navigate(scelte[0].path, 'up');
-						await store.navigate(id, cartella);
-						store.selezionaPercorsi(id, [scelte[0].path]);
+				case 'openFileLocation':
+					if (choices[0] && id !== null) {
+						const folder = await tauriBackend.navigate(choices[0].path, 'up');
+						await store.navigate(id, folder);
+						store.selectPaths(id, [choices[0].path]);
 					}
 					break;
-				case 'rinomina':
+				case 'rename':
 					startRename();
 					break;
-				case 'copia':
-					await mettiNegliAppunti(false);
+				case 'copy':
+					await putOnClipboard(false);
 					break;
-				case 'taglia':
-					await mettiNegliAppunti(true);
+				case 'cut':
+					await putOnClipboard(true);
 					break;
-				case 'incolla':
-					await incolla();
+				case 'paste':
+					await paste();
 					break;
-				case 'cestina':
-					chiediCestino();
+				case 'trash':
+					askTrash();
 					break;
-				case 'eliminaDefinitivo':
-					chiediEliminaDefinitivo();
+				case 'deletePermanently':
+					askDeletePermanently();
 					break;
-				case 'nuovaCartella':
-					await nuovaCartella();
+				case 'newFolder':
+					await newFolder();
 					break;
-				case 'preferito':
-					alternaPreferiti();
+				case 'favorite':
+					toggleFavorite();
 					break;
-				case 'copiaPercorso':
-					await copiaPercorsi(scelte);
+				case 'copyPath':
+					await copyPaths(choices);
 					break;
-				case 'duplicati': {
-					const cartella = cartellaDelMenu(scelte);
-					if (cartella && id !== null) {
-						if (cartella !== store.activeTab?.path) await store.navigate(id, cartella);
-						void store.trovaDuplicati(id, store.showHidden).catch((e) => (erroreOp = descriviErrore(e)));
+				case 'duplicates': {
+					const folder = menuFolder(choices);
+					if (folder && id !== null) {
+						if (folder !== store.activeTab?.path) await store.navigate(id, folder);
+						void store.findDuplicates(id, store.showHidden).catch((e) => (opError = describeError(e)));
 					}
 					break;
 				}
-				case 'estraiQui': {
-					const arc = store.activeTab?.archivio;
-					if (arc) await estraiDaArchivio(cartellaDi(arc.file));
+				case 'extractHere': {
+					const arc = store.activeTab?.archive;
+					if (arc) await extractFromArchive(folderOf(arc.file));
 					break;
 				}
-				case 'estraiIn': {
-					const arc = store.activeTab?.archivio;
-					const dest = arc ? await tauriBackend.scegliCartella('Estrai in…', cartellaDi(arc.file)) : null;
-					if (dest) await estraiDaArchivio(dest);
+				case 'extractTo': {
+					const arc = store.activeTab?.archive;
+					const dest = arc ? await tauriBackend.pickFolder('Estrai in…', folderOf(arc.file)) : null;
+					if (dest) await extractFromArchive(dest);
 					break;
 				}
 				case 'checksum':
-					if (scelte[0]) sommaDi = scelte[0];
+					if (choices[0]) checksumOf = choices[0];
 					break;
-				case 'pulizia':
-					if (scelte[0]) await apriPulizia(scelte[0].path);
+				case 'cleanup':
+					if (choices[0]) await openCleanup(choices[0].path);
 					break;
-				case 'confrontaFile':
-					if (scelte.length === 2) confrontaFile(scelte[0], scelte[1]);
+				case 'compareFiles':
+					if (choices.length === 2) compareFiles(choices[0], choices[1]);
 					break;
-				case 'confrontaFileAltro': {
-					const gemello = tabAltro?.entries.find((e) => e.kind === 'file' && e.name.toLowerCase() === scelte[0]?.name.toLowerCase());
-					if (scelte[0] && gemello) confrontaFile(scelte[0], gemello);
-					else if (scelte[0]) erroreOp = `Nell’altro pannello non c’è «${scelte[0].name}».`;
-					break;
-				}
-				case 'spazio': {
-					const cartella = cartellaDelMenu(scelte);
-					if (cartella) await analizzaSpazio(cartella);
+				case 'compareFileOtherPane': {
+					const twin = otherTab?.entries.find((e) => e.kind === 'file' && e.name.toLowerCase() === choices[0]?.name.toLowerCase());
+					if (choices[0] && twin) compareFiles(choices[0], twin);
+					else if (choices[0]) opError = `Nell’altro pannello non c’è «${choices[0].name}».`;
 					break;
 				}
-				case 'regole':
-					regoleDi = cartellaDelMenu(scelte);
-					break;
-				case 'nuovaCassaforte':
-					if (tab && modificabile) dialogoCassaforte = { mode: 'create', path: tab.path, error: null, busy: false };
-					break;
-				case 'aggiungiInCassaforte':
-					await incollaInCassaforte();
-					break;
-				case 'eliminaDaCassaforte':
-					chiediEliminaDaCassaforte();
-					break;
-				case 'chiudiCassaforte':
-					if (tab?.archivio?.cassaforte) await chiudiCassaforte(tab.archivio.file);
-					break;
-				case 'confronta': {
-					const cartella = cartellaDelMenu(scelte);
-					if (cartella) await confrontaCon(cartella);
+				case 'space': {
+					const folder = menuFolder(choices);
+					if (folder) await analyzeSpace(folder);
 					break;
 				}
-				case 'terminale': {
-					const cartella = cartellaDelMenu(scelte);
-					if (cartella) await tauriBackend.openTerminal(cartella);
+				case 'rules':
+					rulesOf = menuFolder(choices);
+					break;
+				case 'newVault':
+					if (tab && editable) vaultDialog = { mode: 'create', path: tab.path, error: null, busy: false };
+					break;
+				case 'addToVault':
+					await pasteIntoVault();
+					break;
+				case 'deleteFromVault':
+					askDeleteFromVault();
+					break;
+				case 'lockVault':
+					if (tab?.archive?.vault) await lockVault(tab.archive.file);
+					break;
+				case 'compare': {
+					const folder = menuFolder(choices);
+					if (folder) await compareWith(folder);
 					break;
 				}
-				case 'cartellaAvvio': {
-					const cartella = cartellaDelMenu(scelte);
-					if (!cartella) break;
-					if (eAllAvvio(scelte)) {
-						impostazioni.imposta(
-							'cartelleAvvio',
-							impostazioni.cartelleAvvio.filter((c) => !stessoPath(c, cartella))
+				case 'terminal': {
+					const folder = menuFolder(choices);
+					if (folder) await tauriBackend.openTerminal(folder);
+					break;
+				}
+				case 'startupFolder': {
+					const folder = menuFolder(choices);
+					if (!folder) break;
+					if (isAtStartup(choices)) {
+						settings.set(
+							'startupFolders',
+							settings.startupFolders.filter((c) => !samePath(c, folder))
 						);
 					} else {
-						impostazioni.imposta('cartelleAvvio', [...impostazioni.cartelleAvvio, cartella]);
-						avvisa(`«${nomeDi(cartella)}» si aprirà a ogni avvio, in una scheda sua.`);
+						settings.set('startupFolders', [...settings.startupFolders, folder]);
+						notify(`«${nameOf(folder)}» si aprirà a ogni avvio, in una scheda sua.`);
 					}
 					break;
 				}
-				case 'sessione':
-					impostazioni.imposta('sessione', !impostazioni.sessione);
+				case 'session':
+					settings.set('session', !settings.session);
 					break;
-				case 'paginaIniziale': {
-					const cartella = cartellaDelMenu(scelte);
-					if (cartella) {
-						impostazioni.imposta('paginaIniziale', cartella);
-						avvisa(`«${nomeDi(cartella)}» si aprirà all’avvio.`);
+				case 'setStartPage': {
+					const folder = menuFolder(choices);
+					if (folder) {
+						settings.set('startPage', folder);
+						notify(`«${nameOf(folder)}» si aprirà all’avvio.`);
 					}
 					break;
 				}
-				case 'mostraInEsplora':
-					if (scelte[0]) await tauriBackend.revealInExplorer(scelte[0].path);
+				case 'revealInExplorer':
+					if (choices[0]) await tauriBackend.revealInExplorer(choices[0].path);
 					break;
-				case 'comprimi':
-					await archivio('comprimi');
+				case 'compress':
+					await archive('compress');
 					break;
-				case 'ruotaDestra':
-				case 'ruotaSinistra':
-					await ruotaImmagini(azione === 'ruotaDestra');
+				case 'rotateRight':
+				case 'rotateLeft':
+					await rotateImages(action === 'rotateRight');
 					break;
-				case 'convertiImmagini':
-					daConvertire = scelte;
+				case 'convertImages':
+					toConvert = choices;
 					break;
-				case 'estrai':
-					await archivio('estrai');
+				case 'extract':
+					await archive('extract');
 					break;
-				case 'proprieta':
-					await proprieta();
+				case 'properties':
+					await properties();
 					break;
-				case 'altreOpzioni':
+				case 'moreOptions':
 					if (tab) {
-						const esito = await tauriBackend.showShellMenu(
-							scelte.map((e) => e.path),
-							eVirtuale(tab.path) ? '' : tab.path,
-							punto.x,
-							punto.y
+						const outcome = await tauriBackend.showShellMenu(
+							choices.map((e) => e.path),
+							isVirtual(tab.path) ? '' : tab.path,
+							point.x,
+							point.y
 						);
-						// «Apri percorso file» lo esegue l'app: la cartella si apre qui.
-						if (esito.apri && id !== null) await mostraDestinazione(id, esito.apri);
-						else if (esito.eseguito) await ricarica();
+						// «Apri percorso file» is run by the app: the folder opens here.
+						if (outcome.open && id !== null) await showDestination(id, outcome.open);
+						else if (outcome.executed) await reload();
 					}
 					break;
-				case 'annulla':
-					await annullaUltima();
+				case 'undo':
+					await undoLast();
 					break;
-				case 'aggiorna':
-					await ricarica();
+				case 'refresh':
+					await reload();
 					break;
-				case 'ripristina':
-					await ripristina();
+				case 'restore':
+					await restore();
 					break;
-				case 'svuotaCestino':
-					daEliminare = { voci: tab?.entries ?? [], tipo: 'svuota' };
+				case 'emptyTrash':
+					toDelete = { items: tab?.entries ?? [], kind: 'emptyTrash' };
 					break;
-				case 'condividi': {
-					const cartella = scelte.length === 1 && scelte[0].kind === 'dir' ? scelte[0].path : tab?.path;
-					if (cartella && !eVirtuale(cartella)) await condividi(cartella);
+				case 'share': {
+					const folder = choices.length === 1 && choices[0].kind === 'dir' ? choices[0].path : tab?.path;
+					if (folder && !isVirtual(folder)) await share(folder);
 					break;
 				}
-				case 'nonCondividere':
-					await condividi(null);
-					avvisa('La cartella non è più condivisa.');
+				case 'stopSharing':
+					await share(null);
+					notify('La cartella non è più condivisa.');
 					break;
-				case 'scarica':
-					if (statoLan) {
-						const esito = await scaricaDaRete(scelte.map((e) => e.path), statoLan.cartellaRicevuti);
-						if (esito) avvisa(`Scaricato in ${statoLan.cartellaRicevuti}.`);
+				case 'download':
+					if (lanState) {
+						const outcome = await downloadFromNetwork(choices.map((e) => e.path), lanState.receivedFolder);
+						if (outcome) notify(`Scaricato in ${lanState.receivedFolder}.`);
 					}
 					break;
-				case 'menuNuovo':
-					// Dal menu sullo sfondo: il menu «Nuovo» si apre nello stesso punto.
-					menu = { voci: vociNuovo(tipiNuovo), x: punto.x, y: punto.y };
+				case 'newMenu':
+					// From the menu on the background: the «Nuovo» menu opens in the
+					// same spot.
+					menu = { items: newItems(newFileTypes), x: point.x, y: point.y };
 					break;
-				case 'coloreNessuno':
-					colori.imposta(
-						scelte.map((e) => e.path),
+				case 'noColor':
+					colors.set(
+						choices.map((e) => e.path),
 						null
 					);
 					break;
-				case 'crescente':
-				case 'decrescente':
+				case 'ascending':
+				case 'descending':
 					if (tab && id !== null) {
-						await store.setSort(id, { key: tab.sort.key, ascending: azione === 'crescente' });
+						await store.setSort(id, { key: tab.sort.key, ascending: action === 'ascending' });
 					}
 					break;
-				case 'compatta':
-					impostazioni.imposta('compatta', !impostazioni.compatta);
+				case 'compact':
+					settings.set('compact', !settings.compact);
 					break;
-				case 'editorTemi':
-					void apriEditor();
+				case 'themeEditor':
+					void openEditor();
 					break;
-				case 'animazioneAvvio':
-					impostazioni.imposta('animazioneAvvio', !impostazioni.animazioneAvvio);
+				case 'introAnimation':
+					settings.set('introAnimation', !settings.introAnimation);
 					break;
-				case 'estensioni':
-					impostazioni.imposta('estensioni', !impostazioni.estensioni);
+				case 'extensions':
+					settings.set('extensions', !settings.extensions);
 					break;
-				case 'nascosti':
+				case 'hidden':
 					await store.setShowHidden(!store.showHidden);
 					break;
-				case 'anteprima':
-					impostazioni.imposta('anteprima', !impostazioni.anteprima);
+				case 'preview':
+					settings.set('preview', !settings.preview);
 					break;
 			}
 		} catch (e) {
-			erroreOp = descriviErrore(e);
+			opError = describeError(e);
 		}
 	}
 
-	/** Un percorso per riga: è la forma che si incolla in un terminale. */
-	async function copiaPercorsi(scelte: Entry[]) {
-		if (scelte.length === 0) return;
+	/** One path per line: it is the form you paste into a terminal. */
+	async function copyPaths(choices: Entry[]) {
+		if (choices.length === 0) return;
 		try {
-			await navigator.clipboard.writeText(scelte.map((e) => e.path).join('\n'));
+			await navigator.clipboard.writeText(choices.map((e) => e.path).join('\n'));
 		} catch (e) {
-			erroreOp = descriviErrore(e);
+			opError = describeError(e);
 		}
 	}
 
 	/**
-	 * I tasti laterali arrivano su mousedown. Il preventDefault serve perché
-	 * la WebView li interpreta come navigazione del browser, che qui non
-	 * esiste: senza, il gesto verrebbe mangiato prima di arrivare allo store.
+	 * The side buttons arrive on mousedown. preventDefault is needed because
+	 * the WebView reads them as browser navigation, which does not exist
+	 * here: without it, the gesture would be swallowed before reaching the
+	 * store.
 	 */
-	function tastiLaterali(e: MouseEvent) {
-		const azione = historyActionFor(e.button);
-		if (azione === null || store.activeId === null) return;
+	function sideButtons(e: MouseEvent) {
+		const action = historyActionFor(e.button);
+		if (action === null || store.activeId === null) return;
 		e.preventDefault();
-		if (azione === 'back') store.goBack(store.activeId);
+		if (action === 'back') store.goBack(store.activeId);
 		else store.goForward(store.activeId);
 	}
 
-	let predefinito = $state(false);
-	let messaggio = $state('');
+	let isDefault = $state(false);
+	let message = $state('');
 
 	$effect(() => {
-		invoke<boolean>('is_default').then((v) => (predefinito = v));
+		invoke<boolean>('is_default').then((v) => (isDefault = v));
 	});
 
-	async function impostaPredefinito() {
+	async function setAsDefault() {
 		try {
 			const backup = await invoke<string>('set_as_default');
-			predefinito = true;
-			messaggio = `Ora le cartelle si aprono con Space Train. Backup in ${backup}`;
+			isDefault = true;
+			message = `Ora le cartelle si aprono con Space Train. Backup in ${backup}`;
 		} catch (e) {
-			// Prima l'errore si perdeva e il pulsante sembrava aver funzionato.
-			erroreOp = `Impossibile impostare Space Train come predefinito: ${descriviErrore(e)}`;
+			// Before, the error was lost and the button seemed to have worked.
+			opError = `Impossibile impostare Space Train come predefinito: ${describeError(e)}`;
 		}
 	}
 
-	async function ripristinaEsplora() {
+	async function restoreExplorer() {
 		try {
 			await invoke('restore_windows_explorer');
-			predefinito = false;
-			messaggio = 'Esplora risorse di Windows ripristinato.';
+			isDefault = false;
+			message = 'Esplora risorse di Windows ripristinato.';
 		} catch (e) {
-			erroreOp = `Impossibile ripristinare Esplora risorse: ${descriviErrore(e)}`;
+			opError = `Impossibile ripristinare Esplora risorse: ${describeError(e)}`;
 		}
 	}
 
-	function messaggioErrore(err: FsError | null): string {
+	function errorMessage(err: FsError | null): string {
 		switch (err?.kind) {
 			case 'accessDenied':
 				return 'Accesso negato a questa cartella.';
@@ -3431,545 +3498,546 @@
 		}
 	}
 
-	let chiaveContenuto = $derived(`${store.activeId}:${store.activeTab?.path}:${inRicerca}`);
+	let pageContentKey = $derived(`${store.activeId}:${store.activeTab?.path}:${inSearch}`);
 </script>
 
 <svelte:window
-	onfocus={() => aggiornamentoDischi++}
-	onmousedown={tastiLaterali}
+	onfocus={() => drivesRefresh++}
+	onmousedown={sideButtons}
 	onauxclick={(e) => historyActionFor(e.button) !== null && e.preventDefault()}
-	onkeydown={tastiera}
+	onkeydown={onKeyboard}
 />
 
-{#if apertura}
-	<Avvio
-		onfine={() => (apertura = false)}
-		tipo={animazioni.avvio === 'nessuna' ? 'treno' : animazioni.avvio}
-		figura={animazioni.figura ? aspettoDi(leggiMovimento(animazioni.figura).voce) : null}
-		moto={animazioni.moto}
-		durata={animazioni.durata}
+{#if opening}
+	<Intro
+		onend={() => (opening = false)}
+		kind={animations.intro === 'none' ? 'train' : animations.intro}
+		figure={animations.figure ? appearanceOf(readMotion(animations.figure).item) : null}
+		motion={animations.motion}
+		duration={animations.duration}
 	/>
 {/if}
 
 <div class="app">
 	<TitleBar
 		{store}
-		{bersaglio}
-		onnovita={riapriNovita}
-		onimpostazioni={() => (impostazioniAperte = true)}
-		area={aree.current}
-		onaree={finestra === 'main' ? (e) => sottoIlPulsante(e, vociAree(aree.areas, aree.current)) : undefined}
+		dropTarget={dropTarget}
+		onwhatsnew={reopenWhatsNew}
+		onsettings={() => (settingsOpen = true)}
+		area={workspaces.current}
+		onareas={windowLabel === 'main' ? (e) => belowButton(e, workspaceItems(workspaces.areas, workspaces.current)) : undefined}
 	/>
 
-	<!-- La linea principale: corre per tutta la larghezza sotto la testata.
-	     Si accende quando il sistema muove davvero qualcosa, e ogni tanto
-	     ci passa sopra un convoglio. -->
-	<div class="linea-principale" data-tauri-drag-region style:padding-top="{spazioCorteo}px">
-		<Rail attivo={sottoCarico} />
-		<Treno
-			attivo={sottoCarico}
-			{corteo}
-			pausa={impostazioni.pausaTreno < 0 ? null : impostazioni.pausaTreno * 1000}
+	<!-- The main line: it runs the whole width below the header. It lights
+	     up when the system really moves something, and every now and then a
+	     train passes over it. -->
+	<div class="main-line" data-tauri-drag-region style:padding-top="{paradeSpace}px">
+		<Rail active={underLoad} />
+		<Parade
+			active={underLoad}
+			parade={parade}
+			pause={settings.trainPause < 0 ? null : settings.trainPause * 1000}
 		/>
 	</div>
 
-	<div class="corpo">
-		<!-- Le posizioni sono fermate: il binario verticale corre sopra la
-		     barra laterale e ne attraversa i nodi. -->
-		<div class="luoghi">
+	<div class="body">
+		<!-- The locations are stops: the vertical rail runs over the sidebar
+		     and crosses its nodes. -->
+		<div class="places">
 		<Sidebar
 			{store}
 			backend={tauriBackend}
-			{bersaglio}
-			aggiornamento={aggiornamentoDischi}
-			coloreDi={(p) => colori.di(p)}
-			lan={statoLan}
-			pari={pariLan}
-			ontogglevisibile={() => impostaLan({ visibile: !statoLan?.visibile })}
-			amici={statoAmici}
-			onapriamici={() => (amiciAperti = true)}
-			onindirizzi={(indirizzi) =>
-				// Chi aggiunge un PC lontano vuole farsi trovare: si rende visibile.
-				impostaLan(indirizzi.length > (statoLan?.indirizzi?.length ?? 0) ? { indirizzi, visibile: true } : { indirizzi })}
-			accessoRapido={accessoRapido.cartelle}
-			onmenuaccesso={apriMenuAccesso}
-			etichette={colori.usati}
-			etichettaAperta={store.activeTab?.etichetta ?? null}
-			onetichetta={(id) => void mostraEtichetta(id)}
-			server={serverSalvati}
-			onaggiungiserver={() => (dialogoServer = { mode: { kind: 'edit', server: null }, error: null, busy: false })}
-			onmodificaserver={(s) => (dialogoServer = { mode: { kind: 'edit', server: s }, error: null, busy: false })}
+			dropTarget={dropTarget}
+			refresh={drivesRefresh}
+			colorOf={(p) => colors.of(p)}
+			lan={lanState}
+			peers={lanPeerList}
+			ontogglevisible={() => configureLan({ visible: !lanState?.visible })}
+			friends={friendsState}
+			onopenfriends={() => (friendsOpen = true)}
+			onaddresses={(addresses) =>
+				// Whoever adds a distant PC wants to be found: it makes itself
+				// visible.
+				configureLan(addresses.length > (lanState?.addresses?.length ?? 0) ? { addresses, visible: true } : { addresses })}
+			quickAccess={quickAccess.folders}
+			onquickaccessmenu={openQuickAccessMenu}
+			labels={colors.used}
+			openLabel={store.activeTab?.label ?? null}
+			onlabel={(id) => void showLabel(id)}
+			servers={savedServers}
+			onaddserver={() => (serverDialog = { mode: { kind: 'edit', server: null }, error: null, busy: false })}
+			oneditserver={(s) => (serverDialog = { mode: { kind: 'edit', server: s }, error: null, busy: false })}
 			onrenamelabel={(id, name) => {
-				const before = colori.nameOf(id);
-				colori.rename(id, name);
+				const before = colors.nameOf(id);
+				colors.rename(id, name);
 				// The open label view is titled with the old name: follow it.
-				if (store.activeTab?.etichetta === before) void mostraEtichetta(id);
+				if (store.activeTab?.label === before) void showLabel(id);
 			}}
-			ricerche={[...RICERCHE_PRONTE, ...ricerche.voci]}
-			onricerca={(r) => void apriRicercaSalvata(r)}
-			ontogliricerca={(nome) => ricerche.togli(nome)}
+			searches={[...READY_SEARCHES, ...searches.items]}
+			onsearch={(r) => void openSavedSearch(r)}
+			onremovesearch={(name) => searches.remove(name)}
 		/>
-		<Rail orientamento="verticale" attivo={sottoCarico} />
+		<Rail orientation="vertical" active={underLoad} />
 		</div>
 		<main>
 			<Breadcrumb
 				{store}
-				bind:inModifica={indirizzoInModifica}
-				onindirizzo={vaiAIndirizzo}
-				oncerca={apriRicerca}
-				{bersaglio}
-				ramo={gitQui}
-				chiusura={chiusuraQui}
-				fermata={puliziaDi ? 'Pulizia' : confrontoFile ? 'Confronto' : null}
-				onfermata={() => {
-					puliziaDi = null;
-					confrontoFile = null;
+				bind:editing={addressEditing}
+				onaddress={goToAddress}
+				onsearch={openSearch}
+				dropTarget={dropTarget}
+				branchInfo={gitHere}
+				lockIn={lockInHere}
+				stop={cleanupOf ? 'Pulizia' : fileComparison ? 'Confronto' : null}
+				onstop={() => {
+					cleanupOf = null;
+					fileComparison = null;
 				}}
-				onchiudi={() => {
-					const arc = store.activeTab?.archivio;
-					if (arc?.cassaforte) void chiudiCassaforte(arc.file);
+				onlock={() => {
+					const arc = store.activeTab?.archive;
+					if (arc?.vault) void lockVault(arc.file);
 				}}
 			/>
-			<BarraComandi
-				haSelezione={selezione.length > 0}
-				{modificabile}
-				mostraNascosti={store.showHidden}
-				anteprima={impostazioni.anteprima}
-				doppio={split !== null}
-				ontoggledoppio={() => void alternaDoppio()}
-				onnuovo={apriMenuNuovo}
-				ontaglia={() => mettiNegliAppunti(true)}
-				oncopia={() => mettiNegliAppunti(false)}
-				onincolla={incolla}
-				onrinomina={startRename}
-				onelimina={chiediCestino}
-				onordina={apriMenuOrdina}
-				onvista={apriMenuVista}
-				onaspetto={apriMenuAspetto}
-				ontoggleanteprima={() => impostazioni.imposta('anteprima', !impostazioni.anteprima)}
-				ontogglenascosti={() => store.setShowHidden(!store.showHidden)}
-				recenti={impostazioni.recenti}
-				ontogglerecenti={() => impostazioni.imposta('recenti', !impostazioni.recenti)}
+			<CommandBar
+				hasSelection={selection.length > 0}
+				editable={editable}
+				showHidden={store.showHidden}
+				preview={settings.preview}
+				split={split !== null}
+				ontogglesplit={() => void toggleSplit()}
+				onnew={openNewMenu}
+				oncut={() => putOnClipboard(true)}
+				oncopy={() => putOnClipboard(false)}
+				onpaste={paste}
+				onrename={startRename}
+				ondelete={askTrash}
+				onsort={openSortMenu}
+				onview={openViewMenu}
+				onappearance={openAppearanceMenu}
+				ontogglepreview={() => settings.set('preview', !settings.preview)}
+				ontogglehidden={() => store.setShowHidden(!store.showHidden)}
+				recent={settings.recent}
+				ontogglerecent={() => settings.set('recent', !settings.recent)}
 			/>
-			{#if impostazioni.recenti}
-				<BarraRecenti
-					giorni={impostazioni.giorniRecenti}
-					quanti={impaginato.zone.find((z) => z.tono === 'recenti')?.quante ?? 0}
-					oncambia={(g) => impostazioni.imposta('giorniRecenti', g)}
-					onchiudi={() => impostazioni.imposta('recenti', false)}
+			{#if settings.recent}
+				<RecentBar
+					days={settings.recentDays}
+					count={laidOut.zones.find((z) => z.tone === 'recent')?.count ?? 0}
+					onchange={(g) => settings.set('recentDays', g)}
+					onclose={() => settings.set('recent', false)}
 				/>
 			{/if}
 
-			{#if ricercaAperta && store.activeTab}
+			{#if searchOpen && store.activeTab}
 				<SearchBar
 					query={store.activeTab.query}
-					risultati={vociVisibili.length}
-					totale={store.activeTab.entries.length}
-					posizione={indice + 1}
+					results={visibleItems.length}
+					total={store.activeTab.entries.length}
+					position={index + 1}
 					onchange={(q) => store.activeId !== null && store.setQuery(store.activeId, q)}
-					onclose={chiudiRicerca}
-					sottocartelle={ricercaRicorsiva}
-					contenuto={ricercaContenuto}
-					cercando={store.activeTab.cercando}
-					ontogglesottocartelle={posizione === 'normale' ? alternaRicorsiva : undefined}
-					ontogglecontenuto={() => (ricercaContenuto = !ricercaContenuto)}
-					{filtri}
-					onfiltri={(f) => (filtri = f)}
-					onsalva={salvaRicerca}
+					onclose={closeSearch}
+					subfolders={recursiveSearch}
+					content={contentSearch}
+					searching={store.activeTab.searching}
+					ontogglesubfolders={location === 'normal' ? toggleRecursive : undefined}
+					ontogglecontent={() => (contentSearch = !contentSearch)}
+					filters={filters}
+					onfilters={(f) => (filters = f)}
+					onsave={saveSearch}
 				/>
 			{/if}
 
-			<!-- L'errore resta anche come barra quando c'è già una lista a
-			     schermo: sostituirla toglierebbe all'utente il contesto in cui
-			     si trova. La schermata intera compare solo se non c'è nulla. -->
+			<!-- The error also stays as a bar when there is already a list on
+			     screen: replacing it would take away the context the user is
+			     in. The full screen appears only if there is nothing. -->
 			{#if store.activeTab?.error && store.activeTab.entries.length > 0}
-				<div class="errore">{messaggioErrore(store.activeTab.error)}</div>
+				<div class="error">{errorMessage(store.activeTab.error)}</div>
 			{/if}
-			{#if store.activeTab?.duplicati && store.activeTab.cercando}
-				<BarraProgresso
-					progresso={store.activeTab.duplicati.progress}
-					modo="duplicati"
-					oncancel={() => store.activeId !== null && store.fermaRicerca(store.activeId, { tieniRisultati: true })}
+			{#if store.activeTab?.duplicates && store.activeTab.searching}
+				<ProgressBar
+					progress={store.activeTab.duplicates.progress}
+					mode="duplicates"
+					oncancel={() => store.activeId !== null && store.stopSearch(store.activeId, { keepResults: true })}
 				/>
 			{/if}
 			{#if duplicateSummary.groups > 0}
-				<div class="riepilogo-duplicati">
+				<div class="duplicates-summary">
 					<span><b>{duplicateSummary.groups}</b> {duplicateSummary.groups === 1 ? 'gruppo di copie' : 'gruppi di copie'}</span>
-					<span><b>{byte(duplicateSummary.recoverable)}</b> recuperabili</span>
+					<span><b>{formatBytes(duplicateSummary.recoverable)}</b> recuperabili</span>
 					<button onclick={selectExtraCopies} title="Tutte tranne la più vecchia di ogni gruppo">Seleziona le copie in più</button>
 				</div>
 			{/if}
-			{#if inSpazio && store.activeTab}
-				<div class="riepilogo-duplicati" role="status">
-					<span><b>{byte(spazioTotale)}</b> in {nomePosizione(store.activeTab.path)}</span>
-					{#if crescitaTotale}
+			{#if inSpace && store.activeTab}
+				<div class="duplicates-summary" role="status">
+					<span><b>{formatBytes(totalSpace)}</b> in {locationName(store.activeTab.path)}</span>
+					{#if totalGrowth}
 						<span
-							><b class="crescita-totale">{testoCrescita(crescitaTotale.delta, byte)}</b> dal {new Date(crescitaTotale.dal).toLocaleDateString('it-IT', {
+							><b class="total-growth">{growthText(totalGrowth.delta, formatBytes)}</b> dal {new Date(totalGrowth.since).toLocaleDateString('it-IT', {
 								day: 'numeric',
 								month: 'long'
 							})}</span
 						>
-						<button class:on={perCrescita} aria-pressed={perCrescita} onclick={() => (perCrescita = !perCrescita)}
-							>{perCrescita ? 'Ordina per peso' : 'Ordina per crescita'}</button
+						<button class:on={byGrowth} aria-pressed={byGrowth} onclick={() => (byGrowth = !byGrowth)}
+							>{byGrowth ? 'Ordina per peso' : 'Ordina per crescita'}</button
 						>
 					{/if}
-					{#if spazioInCalcolo > 0}<span>pesando <b>{spazioInCalcolo}</b> {spazioInCalcolo === 1 ? 'cartella' : 'cartelle'}…</span>{/if}
-					<button onclick={() => store.activeId !== null && store.impostaSpazio(store.activeId, false)}>Chiudi l’analisi</button>
+					{#if spaceComputing > 0}<span>pesando <b>{spaceComputing}</b> {spaceComputing === 1 ? 'cartella' : 'cartelle'}…</span>{/if}
+					<button onclick={() => store.activeId !== null && store.setSpace(store.activeId, false)}>Chiudi l’analisi</button>
 				</div>
 			{/if}
-			{#if store.activeTab?.confronto}
-				{@const c = store.activeTab.confronto}
-				<div class="riepilogo-duplicati" role="status">
-					{#if c.inCorso}
+			{#if store.activeTab?.comparison}
+				{@const c = store.activeTab.comparison}
+				<div class="duplicates-summary" role="status">
+					{#if c.running}
 						<span>Confronto in corso…</span>
 					{:else}
-						<span><b>{c.onlyHere}</b> mancano in {nomePosizione(c.altro)}</span>
+						<span><b>{c.onlyHere}</b> mancano in {locationName(c.other)}</span>
 						<span><b>{c.different.length}</b> {c.different.length === 1 ? 'diverso' : 'diversi'}</span>
 						<span><b>{c.onlyThere}</b> mancano qui</span>
-						{#if !c.contenuto}
-							<button onclick={confrontaContenuto} title="Legge i file invece di guardare dimensione e data">Controlla il contenuto</button>
+						{#if !c.content}
+							<button onclick={compareContent} title="Legge i file invece di guardare dimensione e data">Controlla il contenuto</button>
 						{/if}
 						{#if c.onlyThere > 0 || c.different.some((d) => !d.newerHere)}
-							<button onclick={() => void allinea('qui')} title="Copia qui ciò che manca e le versioni più recenti">Allinea qui</button>
+							<button onclick={() => void align('here')} title="Copia qui ciò che manca e le versioni più recenti">Allinea qui</button>
 						{/if}
 						{#if c.onlyHere > 0 || c.different.some((d) => d.newerHere)}
-							<button class="primario" onclick={() => void allinea('la')} title="Copia ciò che manca e le versioni più recenti; non cancella niente"
-								>Allinea {nomePosizione(c.altro)}</button
+							<button class="primary" onclick={() => void align('there')} title="Copia ciò che manca e le versioni più recenti; non cancella niente"
+								>Allinea {locationName(c.other)}</button
 							>
 						{/if}
 					{/if}
 				</div>
 			{/if}
-			{#if progresso}
-				<BarraProgresso
-					{progresso}
-					modo={modoInCorso}
-					oncancel={annullaTrasferimento}
-					{inPausa}
-					onpausa={lavoroCorrente ? alternaPausa : undefined}
-					inCoda={coda.length}
-					oncoda={() => (codaAperta = !codaAperta)}
+			{#if progress}
+				<ProgressBar
+					progress={progress}
+					mode={runningMode}
+					oncancel={cancelTransfer}
+					paused={paused}
+					onpause={currentJob ? togglePause : undefined}
+					queued={queue.length}
+					onqueue={() => (queueOpen = !queueOpen)}
 				/>
-				{#if codaAperta && lavoroCorrente}
-					<CodaLavori
-						corrente={lavoroCorrente}
-						{coda}
-						{inPausa}
-						onpausa={alternaPausa}
-						onannullaCorrente={annullaTrasferimento}
-						onsu={suNellaCoda}
-						ontogli={togliDallaCoda}
+				{#if queueOpen && currentJob}
+					<JobQueue
+						running={currentJob}
+						queue={queue}
+						paused={paused}
+						onpause={togglePause}
+						oncancelrunning={cancelTransfer}
+						onup={upInQueue}
+						onremove={removeFromQueue}
 					/>
 				{/if}
 			{/if}
 
-			{#if erroreOp}
-				<div class="errore">
-					{erroreOp}
-					<button class="chiudi-errore" onclick={() => (erroreOp = null)} aria-label="Chiudi"
-						><Icona nome="chiudi" /></button
+			{#if opError}
+				<div class="error">
+					{opError}
+					<button class="close-error" onclick={() => (opError = null)} aria-label="Chiudi"
+						><Icon name="close" /></button
 					>
 				</div>
 			{/if}
-			{#if avviso}
-				<div class="avviso" role="status">{avviso}</div>
+			{#if notice}
+				<div class="notice" role="status">{notice}</div>
 			{/if}
 
-			{#if promemoria}
-				{@const p = promemoria}
-				<div class="avviso aggiornamento promemoria" role="status">
+			{#if reminder}
+				{@const p = reminder}
+				<div class="notice update reminder" role="status">
 					<span
-						>{nomePosizione(p.drive.path)} ha <b>{byte(p.drive.libero ?? 0)}</b> liberi ({Math.round(p.quota * 100)}%).{#if p.trovati}{' '}La Pulizia ha trovato <b>{byte(p.trovati)}</b> da togliere.{/if}</span
+						>{locationName(p.drive.path)} ha <b>{formatBytes(p.drive.free ?? 0)}</b> liberi ({Math.round(p.share * 100)}%).{#if p.found}{' '}La Pulizia ha trovato <b>{formatBytes(p.found)}</b> da togliere.{/if}</span
 					>
-					<button onclick={zittisciPromemoria}>Non ora</button>
+					<button onclick={snoozeReminder}>Non ora</button>
 					<button
-						class="primario"
+						class="primary"
 						onclick={() => {
-							promemoria = null;
-							void apriPulizia(p.drive.path);
+							reminder = null;
+							void openCleanup(p.drive.path);
 						}}>Apri la Pulizia</button
 					>
 				</div>
 			{/if}
-			{#if aggiornamenti.daMostrare}
-				<div class="avviso aggiornamento" role="status">
+			{#if updates.visible}
+				<div class="notice update" role="status">
 					<span>
-						{aggiornamenti.stato === 'installa'
+						{updates.state === 'installing'
 							? 'Installazione dell’aggiornamento…'
-							: `È pronta la versione ${aggiornamenti.versione} di Space Train.`}
+							: `È pronta la versione ${updates.version} di Space Train.`}
 					</span>
-					{#if aggiornamenti.stato === 'pronto'}
-						<button onclick={() => aggiornamenti.rimanda()}>Più tardi</button>
-						<button class="primario" onclick={installaAggiornamento}>Riavvia e aggiorna</button>
+					{#if updates.state === 'ready'}
+						<button onclick={() => updates.postpone()}>Più tardi</button>
+						<button class="primary" onclick={installUpdate}>Riavvia e aggiorna</button>
 					{/if}
 				</div>
 			{/if}
 
-			<div class="contenuto" bind:this={contenuto}>
-				<div class="pannello-attivo" class:diviso={tabAltro} style:order={attivaADestra ? 2 : 0}>
-				{#if tabAltro && store.activeTab}<TestataPannello path={store.activeTab.path} attivo />{/if}
-				{#if puliziaDi}
-					<Pulizia
-						drive={puliziaDi}
-						radici={radiciProgetti}
-						onradici={(r) => impostazioni.imposta('cartelleProgetti', r)}
-						onlibera={liberaPulizia}
-						onchiudi={() => (puliziaDi = null)}
-						{descriviErrore}
-						ontrovati={ricordaPulizia}
+			<div class="content" bind:this={content}>
+				<div class="active-pane" class:divided={otherTab} style:order={activeOnRight ? 2 : 0}>
+				{#if otherTab && store.activeTab}<PaneHeader path={store.activeTab.path} active />{/if}
+				{#if cleanupOf}
+					<DiskCleanup
+						drive={cleanupOf}
+						roots={projectRoots}
+						onroots={(r) => settings.set('projectFolders', r)}
+						onfree={runCleanup}
+						onclose={() => (cleanupOf = null)}
+						describeError={describeError}
+						onfound={rememberCleanup}
 					/>
-				{:else if confrontoFile}
-					<ConfrontoFile a={confrontoFile.a} b={confrontoFile.b} onchiudi={() => (confrontoFile = null)} {descriviErrore} />
-				{:else if statoVuoto}
-					<StatoVuoto
-						variante={statoVuoto}
-						azione={statoVuoto === 'cartellaVuota' && modificabile
+				{:else if fileComparison}
+					<FileCompare a={fileComparison.a} b={fileComparison.b} onclose={() => (fileComparison = null)} describeError={describeError} />
+				{:else if emptyState}
+					<EmptyState
+						variant={emptyState}
+						action={emptyState === 'emptyFolder' && editable
 							? 'Nuova cartella'
-							: statoVuoto === 'nessunRisultato'
+							: emptyState === 'noResults'
 								? 'Azzera la ricerca'
 								: undefined}
-						onazione={statoVuoto === 'cartellaVuota' && modificabile
-							? nuovaCartella
-							: statoVuoto === 'nessunRisultato'
-								? chiudiRicerca
+						onaction={emptyState === 'emptyFolder' && editable
+							? newFolder
+							: emptyState === 'noResults'
+								? closeSearch
 								: undefined}
 					/>
-				{:else if store.activeTab && impostazioni.vista !== 'dettagli'}
+				{:else if store.activeTab && settings.view !== 'details'}
 					<FileGrid
-						entries={vociVisibili}
-						zone={impaginato.zone}
-						chiave={chiaveContenuto}
-						misura={misuraCella({ vista: impostazioni.vista, lato: impostazioni.lato })}
-						coloreDi={coloreVoce}
-						nascondiEstensione={!impostazioni.estensioni}
-						{bersaglio}
-						selection={insiemeSelezione}
-						activeIndex={indice}
-						cutPaths={appunti.mode === 'cut' ? appunti.paths : undefined}
-						{icone}
-						onactivate={apri}
-						unClic={impostazioni.unClic}
+						entries={visibleItems}
+						zones={laidOut.zones}
+						contentKey={pageContentKey}
+						size={cellSize({ view: settings.view, side: settings.side })}
+						colorOf={itemColor}
+						hideExtension={!settings.extensions}
+						dropTarget={dropTarget}
+						selection={selectionSet}
+						activeIndex={index}
+						cutPaths={clipboard.mode === 'cut' ? clipboard.paths : undefined}
+						icons={icons}
+						onactivate={open}
+						singleClick={settings.singleClick}
 						{folderStyle}
-						onselect={seleziona}
-						oncontext={menuSuVoce}
-						oncontextvuoto={menuSulVuoto}
-						oncolonne={(n) => (colonne = n)}
-						ontrascina={trascina}
-						{rettangolo}
+						onselect={select}
+						oncontext={menuOnItem}
+						oncontextempty={menuOnEmpty}
+						oncolumncount={(n) => (columns = n)}
+						ondrag={drag}
+						marquee={marquee}
 					/>
 				{:else if store.activeTab}
 					<FileList
-						entries={vociVisibili}
-						{dimensioni}
-						oncalcola={impostazioni.dimensioneCartelle === 'richiesta' && posizione === 'normale'
-							? (e: Entry) => void pesa([e.path])
+						entries={visibleItems}
+						{sizes}
+						oncompute={settings.folderSizes === 'onRequest' && location === 'normal'
+							? (e: Entry) => void weigh([e.path])
 							: undefined}
-						zone={impaginato.zone}
-						chiave={chiaveContenuto}
-						colonne={colonneVista}
-						mediaDi={(e) => media.of(e)}
-						gitDi={gitQui ? (e) => gitQui?.items[e.name] : undefined}
-						regoleDi={(e) => regole.hasRules(e.path)}
-						mediaSort={ordineMedia}
-						onsortmedia={ordinaPerMedia}
-						nascondiEstensione={!impostazioni.estensioni}
-						cartellaDi={cartellaVoce}
-						coloreDi={coloreVoce}
-						altezzaRiga={conFrammenti ? Math.round(altezzaRiga * 1.55) : altezzaRiga}
-						quotaDi={inSpazio ? quotaVoce : undefined}
-						crescitaDi={inSpazio ? (e: Entry) => crescite[e.path] : undefined}
-						{bersaglio}
-						selection={insiemeSelezione}
-						matches={store.activeTab.query === '' || inRicerca ? undefined : evidenziazioni}
-						activeIndex={indice}
-						renamingPath={rinominando}
-						cutPaths={appunti.mode === 'cut' ? appunti.paths : undefined}
-						{icone}
+						zones={laidOut.zones}
+						contentKey={pageContentKey}
+						columns={viewColumns}
+						mediaOf={(e) => media.of(e)}
+						gitOf={gitHere ? (e) => gitHere?.items[e.name] : undefined}
+						rulesOf={(e) => rules.hasRules(e.path)}
+						mediaSort={mediaSort}
+						onsortmedia={sortByMediaKey}
+						hideExtension={!settings.extensions}
+						folderOf={itemFolder}
+						colorOf={itemColor}
+						rowHeight={withSnippets ? Math.round(rowHeight * 1.55) : rowHeight}
+						shareOf={inSpace ? itemShare : undefined}
+						growthOf={inSpace ? (e: Entry) => growths[e.path] : undefined}
+						dropTarget={dropTarget}
+						selection={selectionSet}
+						matches={store.activeTab.query === '' || inSearch ? undefined : highlights}
+						activeIndex={index}
+						renamingPath={renaming}
+						cutPaths={clipboard.mode === 'cut' ? clipboard.paths : undefined}
+						icons={icons}
 						sort={store.activeTab.sort}
-						onsort={ordinaPer}
-						oncolonne={apriMenuColonne}
-						onactivate={apri}
-						unClic={impostazioni.unClic}
+						onsort={sortBy}
+						oncolumns={openColumnsMenu}
+						onactivate={open}
+						singleClick={settings.singleClick}
 						{folderStyle}
-						onselect={seleziona}
-						oncontext={menuSuVoce}
-						oncontextvuoto={menuSulVuoto}
-						onrename={confermaRinomina}
-						oncancelrename={() => (rinominando = null)}
-						ontrascina={trascina}
-						{rettangolo}
+						onselect={select}
+						oncontext={menuOnItem}
+						oncontextempty={menuOnEmpty}
+						onrename={confirmRename}
+						oncancelrename={() => (renaming = null)}
+						ondrag={drag}
+						marquee={marquee}
 					/>
 				{/if}
 				</div>
 
-				{#if tabAltro}
-					<PannelloPassivo
-						tab={tabAltro}
-						{altezzaRiga}
-						colonne={impostazioni.colonne}
-						nascondiEstensione={!impostazioni.estensioni}
-						coloreDi={coloreVoce}
-						{icone}
+				{#if otherTab}
+					<PassivePane
+						tab={otherTab}
+						rowHeight={rowHeight}
+						columns={settings.columns}
+						hideExtension={!settings.extensions}
+						colorOf={itemColor}
+						icons={icons}
 						{folderStyle}
-						unClic={impostazioni.unClic}
-						{bersaglio}
-						onattiva={() => tabAltro && store.setActive(tabAltro.id)}
-						onapri={apri}
-						onseleziona={seleziona}
+						singleClick={settings.singleClick}
+						dropTarget={dropTarget}
+						onactivatepane={() => otherTab && store.setActive(otherTab.id)}
+						onopen={open}
+						onselect={select}
 					/>
 				{/if}
 
-				{#if impostazioni.anteprima}
-					<Anteprima
-						voce={voceAnteprima}
-						quante={selezione.length}
+				{#if settings.preview}
+					<Preview
+						item={previewItem}
+						count={selection.length}
 						backend={tauriBackend}
-						media={voceAnteprima ? media.of(voceAnteprima) : undefined}
+						media={previewItem ? media.of(previewItem) : undefined}
 					/>
 				{/if}
 			</div>
 		</main>
 	</div>
 
-	{#if impostazioniAperte}
-		<FinestraImpostazioni
-			{impostazioni}
-			mostraNascosti={store.showHidden}
-			onnascosti={() => void store.setShowHidden(!store.showHidden)}
-			{predefinito}
-			onpredefinito={() => void (predefinito ? ripristinaEsplora() : impostaPredefinito())}
-			versione={versioneAttuale}
-			cartellaRicevuti={statoLan?.cartellaRicevuti ?? ''}
-			ricevutiScelta={statoLan?.ricevuti != null}
-			onricevuti={(cartella) => void impostaLan({ ricevuti: cartella })}
-			onscegliCartella={(titolo, da) => tauriBackend.scegliCartella(titolo, da)}
-			onprovaScorciatoia={(acc) => tauriBackend.shortcutFree(acc)}
-			onnovita={() => {
-				impostazioniAperte = false;
-				riapriNovita();
+	{#if settingsOpen}
+		<SettingsWindow
+			settings={settings}
+			showHidden={store.showHidden}
+			onhidden={() => void store.setShowHidden(!store.showHidden)}
+			isDefault={isDefault}
+			ondefault={() => void (isDefault ? restoreExplorer() : setAsDefault())}
+			version={currentVersion}
+			receivedFolder={lanState?.receivedFolder ?? ''}
+			receivedChosen={lanState?.received != null}
+			onreceived={(folder) => void configureLan({ received: folder })}
+			onpickfolder={(title, from) => tauriBackend.pickFolder(title, from)}
+			ontestshortcut={(acc) => tauriBackend.shortcutFree(acc)}
+			onwhatsnew={() => {
+				settingsOpen = false;
+				reopenWhatsNew();
 			}}
-			ongalleria={galleriaDalleImpostazioni}
+			ongallery={galleryFromSettings}
 			oneditor={() => {
-				impostazioniAperte = false;
-				void apriEditor();
+				settingsOpen = false;
+				void openEditor();
 			}}
-			onchiudi={() => (impostazioniAperte = false)}
+			onclose={() => (settingsOpen = false)}
 		/>
 	{/if}
 
-	{#if galleria}
-		<GalleriaTemi
-			tema={impostazioni.tema}
-			personali={impostazioni.temiPersonali}
-			accento={impostazioni.accento}
-			coloreAccento={impostazioni.coloreAccento}
-			x={galleria.x}
-			y={galleria.y}
-			onscegli={daGalleria}
-			onchiudi={() => (galleria = null)}
+	{#if gallery}
+		<ThemeGallery
+			theme={settings.theme}
+			personal={settings.personalThemes}
+			accent={settings.accent}
+			accentColor={settings.accentColor}
+			x={gallery.x}
+			y={gallery.y}
+			onpick={fromGallery}
+			onclose={() => (gallery = null)}
 		/>
 	{/if}
 
 	{#if menu}
-		<MenuContestuale
-			voci={menu.voci}
+		<ContextMenu
+			items={menu.items}
 			x={menu.x}
 			y={menu.y}
-			onscegli={eseguiAzione}
-			onchiudi={() => (menu = null)}
+			onpick={runAction}
+			onclose={() => (menu = null)}
 		/>
 	{/if}
 
-	{#if conflitti.length > 0}
-		<ConfermaConflitti
-			nomi={conflitti}
-			modo={inSospeso?.mode ?? 'copy'}
-			onscegli={(p) => esegui(p)}
+	{#if conflicts.length > 0}
+		<ConfirmConflicts
+			names={conflicts}
+			mode={pendingConflicts?.mode ?? 'copy'}
+			onpick={(p) => run(p)}
 			oncancel={() => {
-				conflitti = [];
-				inSospeso = null;
+				conflicts = [];
+				pendingConflicts = null;
 			}}
 		/>
 	{/if}
 
-	{#if dialogoServer}
+	{#if serverDialog}
 		<ServerDialog
-			mode={dialogoServer.mode}
-			error={dialogoServer.error}
-			busy={dialogoServer.busy}
-			onsave={(c, pw) => void salvaServer(c, pw)}
-			onremove={(id) => void rimuoviServer(id)}
-			ontrust={() => void confermaChiaveServer()}
-			onpassword={(pw, r) => void passwordServer(pw, r)}
-			oncancel={() => (dialogoServer = null)}
+			mode={serverDialog.mode}
+			error={serverDialog.error}
+			busy={serverDialog.busy}
+			onsave={(c, pw) => void saveServer(c, pw)}
+			onremove={(id) => void removeServer(id)}
+			ontrust={() => void confirmServerKey()}
+			onpassword={(pw, r) => void submitServerPassword(pw, r)}
+			oncancel={() => (serverDialog = null)}
 		/>
 	{/if}
 
-	{#if dialogoCassaforte}
-		{@const d = dialogoCassaforte}
+	{#if vaultDialog}
+		{@const d = vaultDialog}
 		<VaultDialog
 			mode={d.mode}
-			name={nomeDi(d.path).replace(/\.cassaforte$/i, '')}
+			name={nameOf(d.path).replace(/\.cassaforte$/i, '')}
 			count={d.sources?.length ?? 0}
 			error={d.error}
 			busy={d.busy}
-			onunlock={(pw) => void sbloccaCassaforte(pw)}
-			oncreate={(n, pw) => void creaCassaforte(n, pw)}
-			onadd={(t) => void confermaAggiunta(t)}
-			oncancel={() => (dialogoCassaforte = null)}
+			onunlock={(pw) => void unlockVault(pw)}
+			oncreate={(n, pw) => void createVault(n, pw)}
+			onadd={(t) => void confirmAdd(t)}
+			oncancel={() => (vaultDialog = null)}
 		/>
 	{/if}
 
-	{#if daEliminareCassaforte}
-		<ConfermaCestino
-			voci={daEliminareCassaforte}
-			definitivo
-			onconfirm={() => void eliminaDaCassaforte()}
-			oncancel={() => (daEliminareCassaforte = null)}
+	{#if vaultToDelete}
+		<ConfirmTrash
+			items={vaultToDelete}
+			permanent
+			onconfirm={() => void deleteFromVault()}
+			oncancel={() => (vaultToDelete = null)}
 		/>
 	{/if}
 
-	{#if regoleDi}
-		{@const cartella = regoleDi}
+	{#if rulesOf}
+		{@const folder = rulesOf}
 		<RulesDialog
-			folder={cartella}
-			rules={regole.forFolder(cartella)}
-			log={regole.log.filter((l) => stessaCartella(l.folder, cartella))}
+			folder={folder}
+			rules={rules.forFolder(folder)}
+			log={rules.log.filter((l) => sameFolder(l.folder, folder))}
 			backend={tauriBackend}
-			labelName={(id) => colori.nameOf(id)}
+			labelName={(id) => colors.nameOf(id)}
 			onsave={(r) => {
-				regole.saveFolder(cartella, r);
-				regoleDi = null;
+				rules.saveFolder(folder, r);
+				rulesOf = null;
 			}}
-			onclose={() => (regoleDi = null)}
-			onundo={(id) => void annullaRegola(id)}
+			onclose={() => (rulesOf = null)}
+			onundo={(id) => void undoRule(id)}
 		/>
 	{/if}
 
-	{#if nomeArea}
+	{#if workspaceName}
 		<NameDialog
-			title={nomeArea.mode === 'new' ? 'Nuova area di lavoro' : 'Rinomina l’area'}
+			title={workspaceName.mode === 'new' ? 'Nuova area di lavoro' : 'Rinomina l’area'}
 			label="Nome dell'area"
-			value={nomeArea.mode === 'rename' ? (aree.current ?? '') : (store.activeTab ? nomePosizione(store.activeTab.path) : '')}
-			confirm={nomeArea.mode === 'new' ? 'Salva area' : 'Rinomina'}
-			error={nomeArea.error}
-			onconfirm={confermaNomeArea}
-			oncancel={() => (nomeArea = null)}
+			value={workspaceName.mode === 'rename' ? (workspaces.current ?? '') : (store.activeTab ? locationName(store.activeTab.path) : '')}
+			confirm={workspaceName.mode === 'new' ? 'Salva area' : 'Rinomina'}
+			error={workspaceName.error}
+			onconfirm={confirmWorkspaceName}
+			oncancel={() => (workspaceName = null)}
 		/>
 	{/if}
 
-	{#if daCestinare.length > 0}
-		<ConfermaCestino voci={daCestinare} onconfirm={() => cestina()} oncancel={() => (daCestinare = [])} />
+	{#if toTrash.length > 0}
+		<ConfirmTrash items={toTrash} onconfirm={() => trash()} oncancel={() => (toTrash = [])} />
 	{/if}
-	{#if paletteAperta}
-		<Palette comandi={comandiPalette()} onclose={() => (paletteAperta = false)} />
+	{#if paletteOpen}
+		<Palette commands={paletteCommands()} onclose={() => (paletteOpen = false)} />
 	{/if}
-	{#if daConvertire}
-		{@const voci = daConvertire}
-		<ConvertiImmagini {voci} onconverti={(o) => void convertiImmagini(voci, o)} onclose={() => (daConvertire = null)} />
+	{#if toConvert}
+		{@const items = toConvert}
+		<ImageConvert items={items} onconvert={(o) => void convertImages(items, o)} onclose={() => (toConvert = null)} />
 	{/if}
-	{#if sommaDi}
-		<SommaControllo voce={sommaDi} backend={tauriBackend} onclose={() => (sommaDi = null)} />
+	{#if checksumOf}
+		<ChecksumDialog item={checksumOf} backend={tauriBackend} onclose={() => (checksumOf = null)} />
 	{/if}
 
 	{#if batchRename.length > 0}
@@ -3978,111 +4046,111 @@
 			taken={new Set((store.activeTab?.entries ?? []).map((e) => e.name.toLowerCase()))}
 			onconfirm={runBatchRename}
 			oncancel={() => (batchRename = [])}
-			mediaDi={(e) => media.of(e)}
+			mediaOf={(e) => media.of(e)}
 		/>
 	{/if}
 
-	{#if amiciAperti && statoAmici}
-		<AmiciFinestra
+	{#if friendsOpen && friendsState}
+		<FriendsDialog
 			backend={tauriBackend}
-			stato={statoAmici}
-			condivisa={statoLan?.condivisa ?? null}
-			onchiudi={() => (amiciAperti = false)}
-			onerrore={(e) => (erroreOp = descriviErrore(e))}
+			status={friendsState}
+			shared={lanState?.shared ?? null}
+			onclose={() => (friendsOpen = false)}
+			onerror={(e) => (opError = describeError(e))}
 		/>
 	{/if}
 
-	{#if novitaAperte.length > 0}
-		<NovitaFinestra
-			novita={novitaAperte}
-			onchiudi={chiudiNovita}
-			installata={novitaDalMegafono ? versioneAttuale || NOVITA[0].versione : undefined}
-			precedenti={novitaDalMegafono ? NOVITA.filter((n) => n.versione !== novitaAperte[0]?.versione) : []}
+	{#if whatsNewOpen.length > 0}
+		<WhatsNewDialog
+			entries={whatsNewOpen}
+			onclose={closeWhatsNew}
+			installed={whatsNewFromMegaphone ? currentVersion || WHATS_NEW[0].version : undefined}
+			previous={whatsNewFromMegaphone ? WHATS_NEW.filter((n) => n.version !== whatsNewOpen[0]?.version) : []}
 		/>
 	{/if}
 
-	{#if richiesteLan[0] && statoLan}
-		<!-- Una richiesta nuova riparte dalla cartella dei ricevuti, non dalla
-		     scelta fatta per quella prima. -->
-		{#key richiesteLan[0].id}
-			<RichiestaLan
-				richiesta={richiesteLan[0]}
-				cartella={statoLan.cartellaRicevuti}
-				onscegli={(da) => tauriBackend.scegliCartella('Dove salvare i file in arrivo', da)}
-				onrisposta={rispondiLan}
+	{#if lanRequests[0] && lanState}
+		<!-- A new request starts again from the received folder, not from the
+		     choice made for the one before. -->
+		{#key lanRequests[0].id}
+			<IncomingFiles
+				request={lanRequests[0]}
+				folder={lanState.receivedFolder}
+				onpick={(from) => tauriBackend.pickFolder('Dove salvare i file in arrivo', from)}
+				onanswer={respondLan}
 			/>
 		{/key}
 	{/if}
 
-	{#if editorAperto}
-		<EditorTemi
-			temaAttuale={temaCorrente}
-			personali={impostazioni.temiPersonali}
+	{#if editorOpen}
+		<ThemeEditor
+			currentTheme={activeTheme}
+			personal={settings.personalThemes}
 			backend={tauriBackend}
-			onanteprima={(t) => daEditor({ tipo: 'anteprima', tema: t })}
-			onsalva={(t) => daEditor({ tipo: 'salva', tema: t })}
-			onelimina={(id) => daEditor({ tipo: 'elimina', id })}
-			onchiudi={() => daEditor({ tipo: 'chiudi' })}
+			onpreview={(t) => fromEditor({ kind: 'preview', theme: t })}
+			onsave={(t) => fromEditor({ kind: 'save', theme: t })}
+			ondelete={(id) => fromEditor({ kind: 'delete', id })}
+			onclose={() => fromEditor({ kind: 'close' })}
 		/>
 	{/if}
 
-	<!-- Il selettore di colore di sistema per l'evidenziazione personalizzata:
-	     nascosto, lo apre il campione arcobaleno del menu Aspetto. -->
+	<!-- The system colour picker for the custom highlight: hidden, it is
+	     opened by the rainbow swatch of the Appearance menu. -->
 	<input
-		class="selettore-colore"
+		class="color-picker"
 		type="color"
-		bind:this={selettoreColore}
-		value={impostazioni.coloreAccento}
+		bind:this={colorPicker}
+		value={settings.accentColor}
 		aria-label="Colore d'evidenziazione personalizzato"
 		oninput={(e) => {
-			impostazioni.imposta('coloreAccento', e.currentTarget.value);
-			impostazioni.imposta('accento', 'personalizzato');
+			settings.set('accentColor', e.currentTarget.value);
+			settings.set('accent', CUSTOM_ACCENT);
 		}}
 	/>
 
-	{#if daEliminare}
-		<ConfermaCestino
-			voci={daEliminare.voci}
-			definitivo
-			onconfirm={eliminaDefinitivo}
-			oncancel={() => (daEliminare = null)}
+	{#if toDelete}
+		<ConfirmTrash
+			items={toDelete.items}
+			permanent
+			onconfirm={deletePermanently}
+			oncancel={() => (toDelete = null)}
 		/>
 	{/if}
 
-	<footer class="impostazioni">
-		{#if predefinito}
-			<button onclick={ripristinaEsplora}>Ripristina Esplora risorse</button>
+	<footer class="settings">
+		{#if isDefault}
+			<button onclick={restoreExplorer}>Ripristina Esplora risorse</button>
 		{:else}
-			<button onclick={impostaPredefinito}>Imposta come predefinito</button>
+			<button onclick={setAsDefault}>Imposta come predefinito</button>
 		{/if}
-		{#if messaggio}<span class="nota">{messaggio}</span>{/if}
-		<span class="stato">
-			<!-- Una sola espressione: Svelte toglie lo spazio in coda a un blocco
-			     {#if}, e il testo diventava «1 selezionati ·10 elementi». -->
-			{selezione.length > 0 ? `${selezione.length} selezionati · ` : ''}{vociVisibili.length} elementi
+		{#if message}<span class="note">{message}</span>{/if}
+		<span class="state">
+			<!-- A single expression: Svelte strips the trailing space of an {#if}
+			     block, and the text became «1 selezionati ·10 elementi». -->
+			{selection.length > 0 ? `${selection.length} selezionati · ` : ''}{visibleItems.length} elementi
 		</span>
-		<!-- Come nella barra di stato di Esplora: passaggio rapido fra
-		     dettagli e icone, più un cursore per la grandezza delle icone. -->
-		<div class="vista-rapida">
-			{#if impostazioni.vista === 'icone'}
+		<!-- As in Explorer's status bar: quick switch between details and
+		     icons, plus a slider for the icon size. -->
+		<div class="quick-view">
+			{#if settings.view === 'icons'}
 				<input
-					class="cursore"
+					class="cursor"
 					type="range"
-					min={LATO_MIN}
-					max={LATO_MAX}
-					value={impostazioni.lato}
+					min={SIDE_MIN}
+					max={SIDE_MAX}
+					value={settings.side}
 					aria-label="Dimensione delle icone"
 					title="Dimensione delle icone (anche Ctrl+rotella)"
-					oninput={(e) => impostazioni.impostaVista('icone', Number(e.currentTarget.value))}
+					oninput={(e) => settings.setView('icons', Number(e.currentTarget.value))}
 				/>
 			{/if}
 			<button
-				class="rapido"
-				class:acceso={impostazioni.vista === 'dettagli'}
-				aria-pressed={impostazioni.vista === 'dettagli'}
+				class="quick"
+				class:on={settings.view === 'details'}
+				aria-pressed={settings.view === 'details'}
 				aria-label="Dettagli"
 				title="Dettagli"
-				onclick={() => impostazioni.impostaVista('dettagli')}
+				onclick={() => settings.setView('details')}
 			>
 				<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
 					<rect x="2" y="3" width="12" height="2" fill="currentColor" />
@@ -4091,12 +4159,12 @@
 				</svg>
 			</button>
 			<button
-				class="rapido"
-				class:acceso={impostazioni.vista === 'icone'}
-				aria-pressed={impostazioni.vista === 'icone'}
+				class="quick"
+				class:on={settings.view === 'icons'}
+				aria-pressed={settings.view === 'icons'}
 				aria-label="Icone grandi"
 				title="Icone grandi"
-				onclick={() => impostazioni.impostaVista('icone', impostazioni.vista === 'icone' ? impostazioni.lato : 128)}
+				onclick={() => settings.setView('icons', settings.view === 'icons' ? settings.side : 128)}
 			>
 				<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
 					<rect x="2" y="2" width="5" height="5" fill="currentColor" />
@@ -4110,42 +4178,51 @@
 </div>
 
 <style>
-	/* Contiene il binario e fa da riferimento al convoglio, che sborda
-	   verso l'alto sopra la testata. */
-	/* Lo stesso cielo della testata continua fin sul binario; la tessera è
-	   spostata perché le due strisce non si ripetano una sotto l'altra. */
-	.linea-principale {
+	/*
+	 * It holds the rail and is the reference for the train, which
+	 * overflows upwards over the header.
+	 */
+	/*
+	 * The same sky as the header continues down to the rail; the tile is
+	 * shifted so that the two strips do not repeat one below the other.
+	 */
+	.main-line {
 		position: relative;
 		flex-shrink: 0;
 		z-index: 3;
-		background: var(--stelle, none) 210px 0 / var(--cielo-misura, 480px 40px) repeat, var(--bg);
+		background: var(--stars, none) 210px 0 / var(--sky-size, 480px 40px) repeat, var(--bg);
 	}
-	/* Il binario è decorazione: il clic passa al contenitore, che sposta
-	   la finestra. */
-	.linea-principale > :global(*) {
+	/*
+	 * The rail is decoration: the click passes to the container, which
+	 * moves the window.
+	 */
+	.main-line > :global(*) {
 		pointer-events: none;
 	}
-	.corpo {
+	.body {
 		display: flex;
 		flex: 1;
 		min-height: 0;
 	}
-	/* Il fondo sta qui e non sulla barra: così il binario passa fra i due e
-	   i nodi delle fermate gli stanno sopra, come stazioni sulla linea. */
-	.luoghi {
+	/*
+	 * The background sits here and not on the bar: this way the rail passes
+	 * between the two and the nodes of the stops sit above it, like
+	 * stations on the line.
+	 */
+	.places {
 		position: relative;
 		display: flex;
 		flex-shrink: 0;
 		background: var(--surface-glass);
 	}
-	.luoghi > :global(.binario) {
+	.places > :global(.rail) {
 		position: absolute;
 		top: 0;
 		bottom: 0;
 		left: 13px;
 		pointer-events: none;
 	}
-	.luoghi > :global(.sidebar) {
+	.places > :global(.sidebar) {
 		position: relative;
 		z-index: 1;
 		background: transparent;
@@ -4157,38 +4234,38 @@
 		min-width: 0;
 		border-left: 1px solid var(--border);
 	}
-	/* Lista e anteprima affiancate: la lista prende tutto lo spazio libero. */
-	.contenuto {
+	/* List and preview side by side: the list takes all the free space. */
+	.content {
 		display: flex;
 		flex: 1;
 		min-height: 0;
 	}
-	.contenuto > :global(:first-child) {
+	.content > :global(:first-child) {
 		flex: 1;
 		min-width: 0;
 	}
-	.pannello-attivo {
+	.active-pane {
 		display: flex;
 		flex-direction: column;
 		min-height: 0;
 	}
-	.pannello-attivo > :global(:last-child) {
+	.active-pane > :global(:last-child) {
 		flex: 1;
 		min-height: 0;
 	}
 	/* Dual pane: two equal halves split by a hairline; the passive one is order 1. */
-	.contenuto > :global(.pannello.passivo) {
+	.content > :global(.pane.passive) {
 		flex: 1;
 		order: 1;
 		border-inline: 1px solid var(--border);
 	}
-	.contenuto > :global(.anteprima) {
+	.content > :global(.preview) {
 		order: 3;
 	}
-	.pannello-attivo.diviso {
+	.active-pane.divided {
 		background: color-mix(in srgb, var(--text) 2%, transparent);
 	}
-	.impostazioni {
+	.settings {
 		display: flex;
 		align-items: center;
 		gap: 12px;
@@ -4198,7 +4275,7 @@
 		border-top: 1px solid var(--border);
 		flex-shrink: 0;
 	}
-	.impostazioni button {
+	.settings button {
 		height: 24px;
 		padding: 0 10px;
 		border: 1px solid var(--border);
@@ -4208,22 +4285,22 @@
 		font: inherit;
 		cursor: default;
 	}
-	.impostazioni button:hover {
+	.settings button:hover {
 		background: var(--row-hover);
 		color: var(--text);
 	}
-	.nota {
+	.note {
 		color: var(--text-dim);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
-	.vista-rapida {
+	.quick-view {
 		display: flex;
 		align-items: center;
 		gap: 2px;
 	}
-	.impostazioni .rapido {
+	.settings .quick {
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -4231,44 +4308,44 @@
 		padding: 0;
 		border: none;
 	}
-	.impostazioni .rapido.acceso {
+	.settings .quick.on {
 		color: var(--current);
 		background: var(--accent-soft);
 	}
-	.cursore {
+	.cursor {
 		width: 120px;
 		margin-right: 6px;
 		accent-color: var(--accent);
 	}
-	.stato {
+	.state {
 		margin-left: auto;
 		color: var(--text-dim);
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
 	}
-	.selettore-colore {
+	.color-picker {
 		position: fixed;
 		width: 1px;
 		height: 1px;
 		opacity: 0;
 		pointer-events: none;
 	}
-	.chiudi-errore {
+	.close-error {
 		float: right;
 		border: none;
 		background: transparent;
 		color: inherit;
-		font-size: calc(15px * var(--scala-testo, 1));
+		font-size: calc(15px * var(--text-scale, 1));
 		cursor: default;
 	}
-	.errore {
+	.error {
 		padding: 10px 16px;
 		background: rgba(196, 43, 28, 0.12);
 		border-bottom: 1px solid rgba(196, 43, 28, 0.3);
-		color: var(--errore-testo);
+		color: var(--error-text);
 	}
 	/* Duplicates summary: counts as timetable figures, one action at the end. */
-	.riepilogo-duplicati {
+	.duplicates-summary {
 		display: flex;
 		align-items: center;
 		gap: 20px;
@@ -4278,56 +4355,56 @@
 		border-bottom: 1px solid var(--border);
 		color: var(--text-dim);
 	}
-	.riepilogo-duplicati b {
+	.duplicates-summary b {
 		margin-right: 4px;
 		color: var(--text);
 		font-family: var(--font-display);
 		font-weight: 400;
-		font-size: calc(15px * var(--scala-testo, 1));
+		font-size: calc(15px * var(--text-scale, 1));
 		font-variant-numeric: tabular-nums;
 	}
-	.riepilogo-duplicati button + button {
+	.duplicates-summary button + button {
 		margin-left: -12px;
 	}
-	.riepilogo-duplicati button {
+	.duplicates-summary button {
 		margin-left: auto;
 		height: 24px;
 		padding: 0 10px;
 		border: 1px solid var(--border);
 		border-radius: var(--radius-sm);
-		clip-path: var(--forma-sm, none);
-		mask: var(--maschera-sm, none);
+		clip-path: var(--shape-sm, none);
+		mask: var(--mask-sm, none);
 		background: transparent;
 		color: var(--text);
 		font: inherit;
 		cursor: default;
 	}
-	.riepilogo-duplicati button:hover {
+	.duplicates-summary button:hover {
 		background: var(--row-hover);
 	}
-	.riepilogo-duplicati .crescita-totale {
+	.duplicates-summary .total-growth {
 		color: var(--signal, #ffb454);
 	}
-	.riepilogo-duplicati button.primario {
+	.duplicates-summary button.primary {
 		background: var(--accent);
 		border-color: var(--accent);
 		color: #fff;
 	}
-	.avviso {
+	.notice {
 		padding: 8px 16px;
 		background: color-mix(in srgb, var(--current) 10%, transparent);
 		border-bottom: 1px solid color-mix(in srgb, var(--current) 30%, transparent);
 		color: var(--current);
 	}
-	.aggiornamento {
+	.update {
 		display: flex;
 		align-items: center;
 		gap: 8px;
 	}
-	.aggiornamento span {
+	.update span {
 		flex: 1;
 	}
-	.aggiornamento button {
+	.update button {
 		padding: 4px 12px;
 		border: 1px solid color-mix(in srgb, var(--current) 40%, transparent);
 		border-radius: 6px;
@@ -4336,23 +4413,23 @@
 		font: inherit;
 		cursor: pointer;
 	}
-	.aggiornamento button.primario {
+	.update button.primary {
 		background: var(--accent);
 		border-color: var(--accent);
 		color: #fff;
 	}
 	/* A full drive is a warning, not news: signal orange instead of the current's cyan. */
-	.promemoria {
+	.reminder {
 		background: color-mix(in srgb, var(--signal, #ffb454) 8%, transparent);
 		border-bottom-color: color-mix(in srgb, var(--signal, #ffb454) 30%, transparent);
 		color: var(--signal, #ffb454);
 	}
-	.promemoria b {
+	.reminder b {
 		font-family: var(--font-display);
 		font-weight: 400;
 		font-variant-numeric: tabular-nums;
 	}
-	.promemoria button {
+	.reminder button {
 		border-color: color-mix(in srgb, var(--signal, #ffb454) 40%, transparent);
 	}
 </style>

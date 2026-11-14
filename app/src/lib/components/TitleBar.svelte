@@ -1,84 +1,84 @@
 <script lang="ts">
 	import { getCurrentWindow } from '@tauri-apps/api/window';
 	import type { TabsStore } from '../stores/tabs.svelte';
-	import { NUOVA_SCHEDA, eVirtuale, nomePosizione } from '../posizioni';
-	import { RADICE_SISTEMA } from '../sistema';
+	import { NEW_TAB, isVirtual, locationName } from '../locations';
+	import { SYSTEM_ROOT } from '../platform';
 
 	let {
 		store,
-		bersaglio = null,
-		onnovita = undefined,
-		onimpostazioni = undefined,
+		dropTarget = null,
+		onwhatsnew = undefined,
+		onsettings = undefined,
 		area = null,
-		onaree = undefined
+		onareas = undefined
 	}: {
 		store: TabsStore;
-		/** Cartella sopra cui passa un trascinamento. */
-		bersaglio?: string | null;
-		/** Riapre le novità della versione installata. */
-		onnovita?: () => void;
-		onimpostazioni?: () => void;
+		/** Folder a drag is passing over. */
+		dropTarget?: string | null;
+		/** Reopens the release notes of the installed version. */
+		onwhatsnew?: () => void;
+		onsettings?: () => void;
 		/** Name of the current workspace, if any. */
 		area?: string | null;
 		/** Opens the workspace menu under the button. */
-		onaree?: (e: MouseEvent) => void;
+		onareas?: (e: MouseEvent) => void;
 	} = $props();
 
 	const win = getCurrentWindow();
 
 	/**
-	 * A finestra in secondo piano le lampade si spengono, come i segnali di
-	 * una linea non alimentata. È il dettaglio che distingue la finestra
-	 * attiva quando ne hai due aperte affiancate.
+	 * With the window in the background the lamps go out, like the signals of
+	 * an unpowered line. It is the detail that tells the active window apart
+	 * when you have two open side by side.
 	 */
-	let attiva = $state(true);
+	let active = $state(true);
 
-	function nomeTab(path: string): string {
-		return nomePosizione(path);
+	function tabName(path: string): string {
+		return locationName(path);
 	}
 </script>
 
-<svelte:window onfocus={() => (attiva = true)} onblur={() => (attiva = false)} />
+<svelte:window onfocus={() => (active = true)} onblur={() => (active = false)} />
 
-<header class="titlebar" data-tauri-drag-region class:inattiva={!attiva}>
-	<span class="marchio" data-tauri-drag-region>Space Train</span>
+<header class="titlebar" data-tauri-drag-region class:inactive={!active}>
+	<span class="wordmark" data-tauri-drag-region>Space Train</span>
 
-	<!-- Lo spazio libero fra le schede, dove passa il treno, sposta la
-	     finestra come la scritta: Tauri reagisce solo se il clic cade
-	     proprio su un elemento marcato, quindi le schede restano cliccabili. -->
-	<!-- Una cartella rilasciata nello spazio libero fra le schede si apre in
-	     una scheda nuova: `data-nuova-scheda` lo distingue da una scheda. -->
-	{#if onaree}
+	<!-- The free space between the tabs, where the train passes, moves the
+	     window like the wordmark: Tauri reacts only if the click lands
+	     right on a marked element, so the tabs stay clickable. -->
+	<!-- A folder dropped in the free space between the tabs opens in
+	     a new tab: `data-new-tab` tells it apart from a tab. -->
+	{#if onareas}
 		<button
 			class="area"
-			class:vuota={area === null}
-			onclick={onaree}
+			class:empty={area === null}
+			onclick={onareas}
 			title="Aree di lavoro"
 			aria-label={area === null ? 'Aree di lavoro' : `Area di lavoro: ${area}`}
 			aria-haspopup="menu"
-			><span class="nome-area">{area ?? 'Aree'}</span><svg viewBox="0 0 10 10" width="9" height="9" aria-hidden="true"
+			><span class="area-name">{area ?? 'Aree'}</span><svg viewBox="0 0 10 10" width="9" height="9" aria-hidden="true"
 				><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4" /></svg
 			></button
 		>
 	{/if}
 
-	<div class="tabs" data-tauri-drag-region data-nuova-scheda class:bersaglio={bersaglio === NUOVA_SCHEDA}>
+	<div class="tabs" data-tauri-drag-region data-new-tab class:drop-target={dropTarget === NEW_TAB}>
 		{#each store.tabs as tab (tab.id)}
 			<button
 				class="tab"
 				class:active={tab.id === store.activeId}
-				class:bersaglio={bersaglio === tab.path}
-				data-cartella={eVirtuale(tab.path) ? undefined : tab.path}
+				class:drop-target={dropTarget === tab.path}
+				data-folder={isVirtual(tab.path) ? undefined : tab.path}
 				title={tab.path}
 				onclick={() => store.setActive(tab.id)}
 				onauxclick={(e) => {
-					// Clic con la rotella: chiude, come nei browser.
+					// Middle click: closes, as in browsers.
 					if (e.button === 1) store.closeTab(tab.id);
 				}}
 			>
-				<span class="label">{nomeTab(tab.path)}</span>
+				<span class="label">{tabName(tab.path)}</span>
 				<span
-					class="chiudi"
+					class="close"
 					role="button"
 					tabindex="0"
 					onclick={(e) => {
@@ -91,19 +91,19 @@
 			</button>
 		{/each}
 		<button
-			class="nuovo"
-			onclick={() => store.openTab(store.activeTab?.path ?? RADICE_SISTEMA)}
+			class="new"
+			onclick={() => store.openTab(store.activeTab?.path ?? SYSTEM_ROOT)}
 			title="Nuova scheda (Ctrl+T)"
 			aria-label="Nuova scheda"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.5" /></svg></button
 		>
 	</div>
 
-	{#if onnovita || onimpostazioni}
-		<!-- Strumenti della finestra, prima delle lampade e staccati da un filo:
-		     sono pulsanti, non segnali. -->
-		<div class="strumenti">
-			{#if onnovita}
-				<button class="strumento" onclick={onnovita} title="Novità di questa versione" aria-label="Novità di questa versione">
+	{#if onwhatsnew || onsettings}
+		<!-- Window tools, before the lamps and set apart by a wire:
+		     they are buttons, not signals. -->
+		<div class="tools">
+			{#if onwhatsnew}
+				<button class="tool" onclick={onwhatsnew} title="Novità di questa versione" aria-label="Novità di questa versione">
 					<svg viewBox="0 0 16 16" aria-hidden="true"
 						><path d="M2 6.5v3h2.2L10 13V3L4.2 6.5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" /><path
 							d="M12.3 5.6a3.3 3.3 0 0 1 0 4.8M4.6 9.6l.9 4"
@@ -115,8 +115,8 @@
 					>
 				</button>
 			{/if}
-			{#if onimpostazioni}
-				<button class="strumento" onclick={onimpostazioni} title="Impostazioni" aria-label="Impostazioni">
+			{#if onsettings}
+				<button class="tool" onclick={onsettings} title="Impostazioni" aria-label="Impostazioni">
 					<svg viewBox="0 0 16 16" aria-hidden="true"
 						><circle cx="8" cy="8" r="2.6" fill="none" stroke="currentColor" stroke-width="1.4" /><path
 							d="M6.8 1.5h2.4l.4 1.8 1.2.7 1.8-.6 1.2 2.1-1.4 1.2v1.4l1.4 1.2-1.2 2.1-1.8-.6-1.2.7-.4 1.8H6.8l-.4-1.8-1.2-.7-1.8.6-1.2-2.1 1.4-1.2V7.3L2.2 6.1l1.2-2.1 1.8.6 1.2-.7z"
@@ -131,15 +131,15 @@
 		</div>
 	{/if}
 
-	<!-- A destra, come su Windows: chiudi resta l'ultimo, nell'angolo che
-	     la mano cerca. Cambia la posizione, non il trattamento. -->
-	<div class="lampade">
-		<button class="lampada riduci" onclick={() => win.minimize()} aria-label="Riduci a icona">
+	<!-- On the right, as on Windows: close stays last, in the corner the
+	     hand looks for. The position changes, not the treatment. -->
+	<div class="lamps">
+		<button class="lamp minimize" onclick={() => win.minimize()} aria-label="Riduci a icona">
 			<svg viewBox="0 0 8 8" aria-hidden="true"
 				><path d="M2 4 L6 4" stroke="currentColor" stroke-width="1.4" /></svg
 			>
 		</button>
-		<button class="lampada allarga" onclick={() => win.toggleMaximize()} aria-label="Ingrandisci">
+		<button class="lamp maximize" onclick={() => win.toggleMaximize()} aria-label="Ingrandisci">
 			<svg viewBox="0 0 8 8" aria-hidden="true"
 				><path
 					d="M2.5 5.5 L2.5 2.5 L5.5 2.5 M5.5 2.5 L2.5 5.5"
@@ -149,7 +149,7 @@
 				/></svg
 			>
 		</button>
-		<button class="lampada chiudi" onclick={() => win.close()} aria-label="Chiudi">
+		<button class="lamp close" onclick={() => win.close()} aria-label="Chiudi">
 			<svg viewBox="0 0 8 8" aria-hidden="true"
 				><path d="M2 2 L6 6 M6 2 L2 6" stroke="currentColor" stroke-width="1.4" /></svg
 			>
@@ -173,17 +173,17 @@
 		padding: 0 8px;
 		border: 1px solid var(--rail-metal, var(--border));
 		border-radius: var(--radius-sm);
-		clip-path: var(--forma-sm, none);
-		mask: var(--maschera-sm, none);
+		clip-path: var(--shape-sm, none);
+		mask: var(--mask-sm, none);
 		background: transparent;
 		color: var(--text);
 		font-family: var(--font-display);
-		font-size: calc(11px * var(--scala-testo, 1));
+		font-size: calc(11px * var(--text-scale, 1));
 		font-weight: 600;
 		letter-spacing: 0.06em;
 		cursor: default;
 	}
-	.area.vuota {
+	.area.empty {
 		color: var(--text-dim);
 	}
 	.area:hover {
@@ -198,15 +198,15 @@
 		flex: none;
 		color: var(--text-dim);
 	}
-	.nome-area {
+	.area-name {
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 
-	/* Tre strati, perché il convoglio passi fra lo sfondo e il contenuto:
-	   il cielo sta in un ::before sotto il convoglio (z 3, nella linea
-	   principale), marchio, schede e lampade sopra (z 4). */
+	/* Three layers, so the train passes between the background and the content:
+	   the sky sits in a ::before under the train (z 3, in the main
+	   line), wordmark, tabs and lamps above (z 4). */
 	.titlebar {
 		position: relative;
 		display: flex;
@@ -217,28 +217,28 @@
 		border-bottom: 1px solid var(--border);
 		flex-shrink: 0;
 	}
-	/* Il pezzo di cielo che il convoglio attraversa: fondo dello spazio e
-	   il disegno del tema (stelle, griglia, bolle…: `variabiliCielo`). */
+	/* The piece of sky the train crosses: space background and
+	   the theme's drawing (stars, grid, bubbles…: `skyVariables`). */
 	.titlebar::before {
 		content: '';
 		position: absolute;
 		inset: 0;
-		background: var(--stelle, none) 0 0 / var(--cielo-misura, 480px 40px) repeat, var(--bg);
+		background: var(--stars, none) 0 0 / var(--sky-size, 480px 40px) repeat, var(--bg);
 		pointer-events: none;
 	}
-	.marchio,
+	.wordmark,
 	.tabs,
-	.lampade {
+	.lamps {
 		position: relative;
 		z-index: 4;
 	}
-	/* Il marchio in DIN, spaziato come una targa di stazione. Piccolo:
-	   deve dare identità, non rubare spazio ai tab. */
-	.marchio {
+	/* The wordmark in DIN, spaced like a station sign. Small:
+	   it must give identity, not steal room from the tabs. */
+	.wordmark {
 		flex-shrink: 0;
 		padding: 0 12px 0 4px;
 		font-family: var(--font-display);
-		font-size: calc(12px * var(--scala-titoli, var(--scala-testo, 1)));
+		font-size: calc(12px * var(--title-scale, var(--text-scale, 1)));
 		font-weight: 600;
 		letter-spacing: 0.22em;
 		text-transform: uppercase;
@@ -255,26 +255,26 @@
 		scrollbar-width: none;
 		flex: 1;
 	}
-	.tabs.bersaglio {
+	.tabs.drop-target {
 		border-radius: var(--radius-sm);
-		clip-path: var(--forma-sm, none);
-		mask: var(--maschera-sm, none);
+		clip-path: var(--shape-sm, none);
+		mask: var(--mask-sm, none);
 		box-shadow: inset 0 0 0 1px var(--current);
 	}
-	/* Le schede poggiano sul bordo inferiore della testata; il profilo
-	   (tetto, trapezio, arco, pillola) viene dal tema: `variabiliForme`. */
+	/* The tabs rest on the header's bottom edge; the profile
+	   (roof, trapezoid, arch, pill) comes from the theme: `shapeVariables`. */
 	.tab {
 		display: flex;
 		align-items: center;
 		gap: 8px;
 		max-width: 180px;
-		height: var(--scheda-altezza, 32px);
-		margin-bottom: var(--scheda-stacco, 0px);
-		padding: var(--scheda-margini, 0 8px 0 12px);
+		height: var(--tab-height, 32px);
+		margin-bottom: var(--tab-gap, 0px);
+		padding: var(--tab-margins, 0 8px 0 12px);
 		border: none;
-		border-radius: var(--scheda-raggio, var(--radius-sm) var(--radius-sm) 0 0);
-		clip-path: var(--scheda-forma, none);
-		mask: var(--scheda-maschera, none);
+		border-radius: var(--tab-radius, var(--radius-sm) var(--radius-sm) 0 0);
+		clip-path: var(--tab-shape, none);
+		mask: var(--tab-mask, none);
 		background: transparent;
 		color: var(--text-dim);
 		font: inherit;
@@ -284,11 +284,11 @@
 	.tab:hover {
 		background: var(--row-hover);
 	}
-	.tab.bersaglio {
+	.tab.drop-target {
 		box-shadow: inset 0 0 0 1px var(--current);
 	}
-	/* La scheda aperta è un pezzo della fiancata: stessa superficie del
-	   contenuto, niente cornice. */
+	/* The open tab is a piece of the car's side: same surface as the
+	   content, no frame. */
 	.tab.active {
 		background: var(--surface);
 		color: var(--text);
@@ -297,15 +297,15 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
-	.tab .chiudi {
+	.tab .close {
 		display: inline-flex;
 		opacity: 0.5;
 		padding: 0 2px;
 	}
-	.tab .chiudi:hover {
+	.tab .close:hover {
 		opacity: 1;
 	}
-	.nuovo {
+	.new {
 		align-self: center;
 		display: inline-flex;
 		align-items: center;
@@ -314,29 +314,29 @@
 		height: 28px;
 		border: none;
 		border-radius: var(--radius-sm);
-		clip-path: var(--forma-sm, none);
-		mask: var(--maschera-sm, none);
+		clip-path: var(--shape-sm, none);
+		mask: var(--mask-sm, none);
 		background: transparent;
 		color: var(--text-dim);
-		font-size: calc(16px * var(--scala-testo, 1));
+		font-size: calc(16px * var(--text-scale, 1));
 		cursor: default;
 	}
-	.nuovo:hover {
+	.new:hover {
 		background: var(--row-hover);
 		color: var(--text);
 	}
-	/* Tre lampade di segnalazione. La forma è quella del semaforo Mac —
-	   pastiglie tonde — ma il trattamento è ferroviario: ghiera scura,
-	   nucleo acceso, riflesso in alto a sinistra. Non fanno alone: l'unica
-	   luce che si spande nella finestra è la corrente. */
-	.lampade {
+	/* Three signal lamps. The shape is the Mac traffic light's —
+	   round pills — but the treatment is railway: dark bezel,
+	   lit core, reflection at the top left. They give off no halo: the only
+	   light spreading in the window is the current. */
+	.lamps {
 		display: flex;
 		gap: 8px;
 		padding: 0 14px 0 12px;
 		flex-shrink: 0;
 	}
 
-	.strumenti {
+	.tools {
 		position: relative;
 		z-index: 4;
 		display: flex;
@@ -347,7 +347,7 @@
 		height: 16px;
 		flex-shrink: 0;
 	}
-	.strumento {
+	.tool {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
@@ -356,29 +356,29 @@
 		padding: 0;
 		border: none;
 		border-radius: var(--radius-sm);
-		clip-path: var(--forma-sm, none);
-		mask: var(--maschera-sm, none);
+		clip-path: var(--shape-sm, none);
+		mask: var(--mask-sm, none);
 		background: transparent;
 		color: var(--text-dim);
 		cursor: default;
 	}
-	.strumento svg {
+	.tool svg {
 		width: 16px;
 		height: 16px;
 	}
-	.strumento:hover {
+	.tool:hover {
 		background: var(--row-hover);
 		color: var(--text);
 	}
 
-	.lampada {
+	.lamp {
 		position: relative;
 		width: 13px;
 		height: 13px;
 		padding: 0;
 		border: 1px solid rgba(0, 0, 0, 0.55);
 		border-radius: 50%;
-		background: var(--nucleo);
+		background: var(--lamp-core);
 		color: transparent;
 		cursor: default;
 		transition:
@@ -386,9 +386,9 @@
 			color 160ms ease;
 	}
 
-	/* Il riflesso: è ciò che fa leggere il cerchio come una lampada di
-	   vetro invece che come un pallino colorato. */
-	.lampada::after {
+	/* The reflection: it is what makes the circle read as a glass lamp
+	   instead of a coloured dot. */
+	.lamp::after {
 		content: '';
 		position: absolute;
 		top: 1.5px;
@@ -400,54 +400,54 @@
 		pointer-events: none;
 	}
 
-	.lampada svg {
+	.lamp svg {
 		display: block;
 		width: 100%;
 		height: 100%;
 	}
 
-	.chiudi {
-		--nucleo: #ff5f6e;
-		--alone: #ff5f6e;
+	.close {
+		--lamp-core: #ff5f6e;
+		--lamp-halo: #ff5f6e;
 	}
-	.riduci {
-		--nucleo: var(--signal);
-		--alone: var(--signal);
+	.minimize {
+		--lamp-core: var(--signal);
+		--lamp-halo: var(--signal);
 	}
-	.allarga {
-		--nucleo: var(--current);
-		--alone: var(--current);
+	.maximize {
+		--lamp-core: var(--current);
+		--lamp-halo: var(--current);
 	}
 
-	/* I simboli compaiono passando sul gruppo, non sulla singola lampada:
-	   così si legge come una pulsantiera unica. */
-	.lampade:hover .lampada {
+	/* The symbols appear when hovering the group, not the single lamp:
+	   so it reads as a single button panel. */
+	.lamps:hover .lamp {
 		color: rgba(0, 0, 0, 0.62);
 	}
 
-	/* Al passaggio la ghiera si accende del colore della lampada. */
-	.lampada:hover,
-	.lampada:focus-visible {
-		box-shadow: 0 0 0 2px color-mix(in srgb, var(--alone) 45%, transparent);
+	/* On hover the bezel lights up in the lamp's colour. */
+	.lamp:hover,
+	.lamp:focus-visible {
+		box-shadow: 0 0 0 2px color-mix(in srgb, var(--lamp-halo) 45%, transparent);
 	}
 
-	.lampada:active {
+	.lamp:active {
 		filter: brightness(0.8);
 	}
 
-	/* Spente, ma non invisibili: restano cliccabili e riconoscibili. */
-	.inattiva .lampada {
+	/* Off, but not invisible: they stay clickable and recognisable. */
+	.inactive .lamp {
 		background: #4a4360;
 	}
-	.inattiva .lampada::after {
+	.inactive .lamp::after {
 		background: rgba(255, 255, 255, 0.18);
 	}
-	.inattiva .marchio {
+	.inactive .wordmark {
 		opacity: 0.55;
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.lampada {
+		.lamp {
 			transition: none;
 		}
 	}

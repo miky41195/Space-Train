@@ -1,29 +1,29 @@
 <script lang="ts">
 	import '../app.css';
-	import FinestraEditor from '$lib/components/FinestraEditor.svelte';
-	import { finestraDaAvvisare } from '$lib/editor-finestra';
+	import EditorWindow from '$lib/components/EditorWindow.svelte';
+	import { windowToNotify } from '$lib/editor-window';
 
 	let { children } = $props();
 
-	/** In una finestra aperta per l'editor dei temi si mostra solo lui. */
-	const editorPer = finestraDaAvvisare();
+	/** A window opened for the theme editor shows only the editor. */
+	const editorFor = windowToNotify();
 
 	/**
-	 * Il menu del browser (Indietro, Aggiorna, Stampa…) non c'entra con
-	 * l'app: si toglie ovunque. Resta nei campi di testo, dove servono
-	 * Taglia, Copia e Incolla. I menu dell'app fermano l'evento da soli.
+	 * The browser menu (Back, Reload, Print…) has nothing to do with the
+	 * app: it is removed everywhere. It stays in text fields, where Cut,
+	 * Copy and Paste are needed. The app's menus stop the event by themselves.
 	 */
-	function menuDelBrowser(e: MouseEvent) {
+	function browserMenu(e: MouseEvent) {
 		const t = e.target as HTMLElement | null;
 		if (t?.closest('input, textarea, [contenteditable="true"]')) return;
 		e.preventDefault();
 	}
 </script>
 
-<svelte:window oncontextmenu={menuDelBrowser} />
+<svelte:window oncontextmenu={browserMenu} />
 
-{#if editorPer}
-	<FinestraEditor da={editorPer} />
+{#if editorFor}
+	<EditorWindow from={editorFor} />
 {:else}
 	{@render children()}
 {/if}

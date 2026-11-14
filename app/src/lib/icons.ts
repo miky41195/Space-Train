@@ -1,13 +1,13 @@
 import type { Entry } from './ipc';
 
-const CARTELLA =
+const FOLDER =
 	'<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M1.5 3.5A1.5 1.5 0 0 1 3 2h3l1.5 1.5H13A1.5 1.5 0 0 1 14.5 5v7A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12z"/></svg>';
 
 const FILE =
 	'<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M4 1.5h5L13 5.5v9A1.5 1.5 0 0 1 11.5 16h-8A1.5 1.5 0 0 1 2 14.5v-11A1.5 1.5 0 0 1 3.5 1.5z" opacity=".85"/></svg>';
 
-/** Categorie riconosciute per estensione. */
-const CATEGORIE: Record<string, string[]> = {
+/** Categories recognised by extension. */
+const CATEGORIES: Record<string, string[]> = {
 	code: ['ts', 'tsx', 'js', 'jsx', 'rs', 'py', 'go', 'java', 'c', 'cpp', 'cs', 'rb', 'php', 'swift'],
 	markup: ['html', 'xml', 'svelte', 'vue'],
 	style: ['css', 'scss', 'less'],
@@ -26,40 +26,40 @@ const CATEGORIE: Record<string, string[]> = {
 };
 
 /** Every extension of the given categories (smart folder type filter). */
-export function estensioniDi(categorie: string[]): string[] {
-	return categorie.flatMap((c) => CATEGORIE[c] ?? []);
+export function extensionsOf(categories: string[]): string[] {
+	return categories.flatMap((c) => CATEGORIES[c] ?? []);
 }
 
-const PER_ESTENSIONE = new Map<string, string>();
-for (const [categoria, estensioni] of Object.entries(CATEGORIE)) {
-	for (const e of estensioni) PER_ESTENSIONE.set(e, categoria);
+const BY_EXTENSION = new Map<string, string>();
+for (const [category, extensions] of Object.entries(CATEGORIES)) {
+	for (const e of extensions) BY_EXTENSION.set(e, category);
 }
 
 export function categoryFor(name: string): string {
 	const i = name.lastIndexOf('.');
 	if (i <= 0) return 'plain';
-	return PER_ESTENSIONE.get(name.slice(i + 1).toLowerCase()) ?? 'plain';
+	return BY_EXTENSION.get(name.slice(i + 1).toLowerCase()) ?? 'plain';
 }
 
-/** Categorie per cui vale la pena leggere il file per una miniatura vera. */
-const CON_MINIATURA = new Set(['image', 'video', 'doc', 'slide']);
+/** Categories for which reading the file for a real thumbnail is worth it. */
+const WITH_THUMBNAIL = new Set(['image', 'video', 'doc', 'slide']);
 
 /**
- * Vero se l'elemento merita una miniatura reale invece dell'icona di tipo.
+ * True when the item deserves a real thumbnail instead of the type icon.
  *
- * Le cartelle no: Windows genererebbe un collage del contenuto, costoso e
- * di scarsa utilità in una lista fitta.
+ * Folders do not: Windows would make a collage of the contents, costly and
+ * of little use in a dense list.
  */
-export function vuoleMiniatura(entry: Entry): boolean {
-	// Programmi, collegamenti, cartelle con `desktop.ini`: l'icona di tipo
-	// sarebbe quella generica, la loro vera la dà solo il file.
-	if (entry.iconaPropria) return true;
+export function wantsThumbnail(entry: Entry): boolean {
+	// Programs, shortcuts, folders with `desktop.ini`: the type icon would
+	// be the generic one, only the file gives their real one.
+	if (entry.ownIcon) return true;
 	if (entry.kind === 'dir') return false;
-	return CON_MINIATURA.has(categoryFor(entry.name));
+	return WITH_THUMBNAIL.has(categoryFor(entry.name));
 }
 
-/** Chiave di cache per l'icona di tipo: le voci dello stesso tipo la condividono. */
-export function chiaveIcona(entry: Entry, large = false): string {
+/** Cache key for the type icon: items of the same type share it. */
+export function iconKey(entry: Entry, large = false): string {
 	if (entry.kind === 'dir') return `dir|${large}`;
 	const i = entry.name.lastIndexOf('.');
 	const ext = i > 0 ? entry.name.slice(i + 1).toLowerCase() : '';
@@ -67,15 +67,15 @@ export function chiaveIcona(entry: Entry, large = false): string {
 }
 
 export function iconFor(entry: Entry): string {
-	return entry.kind === 'dir' ? CARTELLA : FILE;
+	return entry.kind === 'dir' ? FOLDER : FILE;
 }
 
 /**
- * Cartella colorata a due toni, disegnata a qualsiasi lato: la linguetta
- * dietro più scura, il corpo davanti col colore scelto dall'utente.
+ * Two-tone coloured folder, drawn at any side: the tab behind darker, the
+ * body in front in the colour the user chose.
  */
-export function iconaCartella(colore: string): string {
-	return folderIcon('flat', colore);
+export function coloredFolderIcon(color: string): string {
+	return folderIcon('flat', color);
 }
 
 /** How a theme draws folders; `windows` keeps the system icon. */
@@ -93,7 +93,7 @@ export function drawnFolder(
 ): Exclude<FolderStyle, 'windows'> | null {
 	if (entry.kind !== 'dir') return null;
 	if (color) return style === 'windows' ? 'flat' : style;
-	if (style === 'windows' || entry.libero !== undefined || entry.iconaPropria) return null;
+	if (style === 'windows' || entry.free !== undefined || entry.ownIcon) return null;
 	return style;
 }
 

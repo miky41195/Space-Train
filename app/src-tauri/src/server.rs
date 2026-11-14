@@ -16,7 +16,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use zeroize::Zeroizing;
 
-pub const RADICE: &str = "::server";
+pub const ROOT: &str = "::server";
 
 /// The saved servers, for the commands that only get a path (list, rename, download…).
 static SERVERS: std::sync::OnceLock<std::sync::Arc<Servers>> = std::sync::OnceLock::new();
@@ -31,7 +31,7 @@ pub fn servers() -> Result<&'static std::sync::Arc<Servers>, FsError> {
 
 /// A path on a remote server (or the list of servers).
 pub fn is_server(path: &str) -> bool {
-    path == RADICE || path.starts_with(&format!("{RADICE}\\"))
+    path == ROOT || path.starts_with(&format!("{ROOT}\\"))
 }
 const CHUNK: usize = 256 * 1024;
 
@@ -224,7 +224,7 @@ impl Servers {
     pub fn entries(&self) -> Vec<Entry> {
         self.all()
             .into_iter()
-            .map(|c| entry(c.name.clone(), format!("{RADICE}\\{}", c.id), true, 0, None))
+            .map(|c| entry(c.name.clone(), format!("{ROOT}\\{}", c.id), true, 0, None))
             .collect()
     }
 
@@ -261,7 +261,7 @@ impl Servers {
         let (c, mut r) = self.connect(&id)?;
         let parent = rel.rsplit_once('/').map(|p| p.0).unwrap_or("");
         r.rename(&remote_path(&c, &rel), &join(&remote_path(&c, parent), name))?;
-        Ok(format!("{}\\{name}", genitore(path).unwrap_or_default()))
+        Ok(format!("{}\\{name}", parent_of(path).unwrap_or_default()))
     }
 
     pub fn mkdir(&self, parent: &str, name: &str) -> Result<String, FsError> {
@@ -440,10 +440,10 @@ fn entry(name: String, path: String, dir: bool, size: u64, modified: Option<i64>
         kind: if dir { EntryKind::Dir } else { EntryKind::File },
         size,
         modified,
-        origine: None,
-        libero: None,
-        totale: None,
-        icona_propria: false,
+        origin: None,
+        free: None,
+        total: None,
+        own_icon: false,
         snippet: None,
     }
 }
@@ -480,7 +480,7 @@ fn remote_path(c: &Config, rel: &str) -> String {
 
 /// `::server\<id>\a\b` → (`id`, `a/b`). Refuses `..` and empty segments.
 pub fn split(path: &str) -> Option<(String, String)> {
-    let rest = path.strip_prefix(RADICE)?.strip_prefix('\\')?;
+    let rest = path.strip_prefix(ROOT)?.strip_prefix('\\')?;
     let mut parts = rest.split('\\');
     let id = parts.next().filter(|s| !s.is_empty())?.to_string();
     let rel: Vec<&str> = parts.collect();
@@ -490,13 +490,13 @@ pub fn split(path: &str) -> Option<(String, String)> {
     Some((id, rel.join("/")))
 }
 
-pub fn genitore(path: &str) -> Option<String> {
-    if path == RADICE {
+pub fn parent_of(path: &str) -> Option<String> {
+    if path == ROOT {
         return None;
     }
     let (_, rel) = split(path)?;
     let cut = path.rfind('\\')?;
-    Some(if rel.is_empty() { RADICE.to_string() } else { path[..cut].to_string() })
+    Some(if rel.is_empty() { ROOT.to_string() } else { path[..cut].to_string() })
 }
 
 /// Reads `from` into the server stream in chunks, counting and checking cancel.
@@ -1114,8 +1114,8 @@ mod tests {
         assert_eq!(split(r"::server\abc"), Some(("abc".into(), "".into())));
         assert_eq!(split(r"::server\abc\..\x"), None);
         assert_eq!(split("::server"), None);
-        assert_eq!(genitore(r"::server\abc\Foto"), Some(r"::server\abc".into()));
-        assert_eq!(genitore(r"::server\abc"), Some("::server".into()));
+        assert_eq!(parent_of(r"::server\abc\Foto"), Some(r"::server\abc".into()));
+        assert_eq!(parent_of(r"::server\abc"), Some("::server".into()));
         let c = Config { id: "a".into(), name: "".into(), protocol: Protocol::Sftp, host: "h".into(), port: 0, user: "u".into(), path: "/var/www".into(), fingerprint: None, remember: false };
         assert_eq!(remote_path(&c, "a/b"), "/var/www/a/b");
         assert_eq!(remote_path(&Config { path: "/".into(), ..c }, ""), "/");

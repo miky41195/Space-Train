@@ -5,7 +5,7 @@
  */
 
 import type { MediaProps } from './ipc';
-import { senzaEstensione } from './posizioni';
+import { withoutExtension } from './locations';
 
 export type RenameRule =
 	| {
@@ -123,7 +123,7 @@ function escapeRegExp(text: string): string {
 function apply(rule: RenameRule, item: RenameItem, index: number): { name: string; note?: string } {
 	// Folders have no extension: a dot in a folder name is part of the name.
 	const split = rule.keepExtension && !item.isDir;
-	const base = split ? senzaEstensione(item.name) : item.name;
+	const base = split ? withoutExtension(item.name) : item.name;
 	// The original spelling of the extension: `.JPG` stays `.JPG`.
 	const tail = item.name.slice(base.length);
 

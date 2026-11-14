@@ -29,12 +29,12 @@
 </script>
 
 <div
-	class="sfondo"
+	class="backdrop"
 	role="presentation"
 	onclick={(e) => e.target === e.currentTarget && oncancel()}
 	onkeydown={(e) => e.key === 'Escape' && oncancel()}
 >
-	<div class="finestra" role="dialog" aria-modal="true" aria-label={title}>
+	<div class="dialog" role="dialog" aria-modal="true" aria-label={title}>
 	<form
 		onsubmit={(e) => {
 			e.preventDefault();
@@ -43,20 +43,20 @@
 	>
 		<h2>{title}</h2>
 		<label>
-			<span class="etichetta">{label}</span>
+			<span class="label">{label}</span>
 			<input bind:this={field} bind:value={name} maxlength="40" aria-invalid={error ? 'true' : undefined} />
 		</label>
-		{#if error}<p class="errore" role="alert">{error}</p>{/if}
-		<div class="azioni">
+		{#if error}<p class="error" role="alert">{error}</p>{/if}
+		<div class="actions">
 			<button type="button" onclick={oncancel}>Annulla</button>
-			<button type="submit" class="primario" disabled={!name.trim()}>{confirm}</button>
+			<button type="submit" class="primary" disabled={!name.trim()}>{confirm}</button>
 		</div>
 	</form>
 	</div>
 </div>
 
 <style>
-	.sfondo {
+	.backdrop {
 		position: fixed;
 		inset: 0;
 		display: flex;
@@ -65,28 +65,28 @@
 		background: color-mix(in srgb, var(--bg) 72%, transparent);
 		z-index: 10;
 	}
-	.finestra {
+	.dialog {
 		width: min(380px, 90vw);
 		padding: 20px;
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: var(--radius);
-		clip-path: var(--forma, none);
-		mask: var(--maschera, none);
+		clip-path: var(--shape, none);
+		mask: var(--mask, none);
 		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
 	}
 	h2 {
 		margin: 0 0 12px;
-		font-size: calc(15px * var(--scala-testo, 1));
+		font-size: calc(15px * var(--text-scale, 1));
 		font-weight: 600;
 	}
 	label {
 		display: grid;
 		gap: 6px;
 	}
-	.etichetta {
+	.label {
 		font-family: var(--font-display);
-		font-size: calc(11px * var(--scala-testo, 1));
+		font-size: calc(11px * var(--text-scale, 1));
 		font-weight: 600;
 		letter-spacing: 0.12em;
 		text-transform: uppercase;
@@ -97,19 +97,19 @@
 		padding: 0 10px;
 		border: 1px solid var(--accent);
 		border-radius: var(--radius-sm);
-		clip-path: var(--forma-sm, none);
-		mask: var(--maschera-sm, none);
+		clip-path: var(--shape-sm, none);
+		mask: var(--mask-sm, none);
 		background: var(--bg);
 		color: var(--text);
 		font: inherit;
 		outline: none;
 	}
-	.errore {
+	.error {
 		margin: 8px 0 0;
-		color: var(--errore-testo, #ffb4ab);
-		font-size: calc(12px * var(--scala-testo, 1));
+		color: var(--error-text, #ffb4ab);
+		font-size: calc(12px * var(--text-scale, 1));
 	}
-	.azioni {
+	.actions {
 		display: flex;
 		justify-content: flex-end;
 		gap: 8px;
@@ -120,8 +120,8 @@
 		padding: 0 14px;
 		border: 1px solid var(--border);
 		border-radius: var(--radius-sm);
-		clip-path: var(--forma-sm, none);
-		mask: var(--maschera-sm, none);
+		clip-path: var(--shape-sm, none);
+		mask: var(--mask-sm, none);
 		background: transparent;
 		color: var(--text);
 		font: inherit;
@@ -137,12 +137,12 @@
 	button:disabled {
 		opacity: 0.5;
 	}
-	.primario {
+	.primary {
 		border-color: transparent;
 		background: var(--accent);
 		color: #fff;
 	}
-	.primario:hover:not(:disabled) {
+	.primary:hover:not(:disabled) {
 		background: var(--accent);
 		filter: brightness(1.1);
 	}

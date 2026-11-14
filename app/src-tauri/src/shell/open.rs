@@ -1,13 +1,13 @@
 use crate::fs::error::{from_io, FsError};
 use std::process::Command;
 
-/// Apre il path con l'applicazione predefinita, come il doppio click della
-/// shell.
+/// Opens the path with the default application, like the shell's
+/// double click.
 ///
-/// Va direttamente a ShellExecuteW e mai attraverso `cmd /C start`: cmd
-/// interpreta `&`, `|` e `^` anche dentro un nome di file, e un file
-/// chiamato `foto&calc.exe&.jpg` (arrivato da un altro PC) avrebbe fatto
-/// partire un comando al primo clic.
+/// It goes straight to ShellExecuteW and never through `cmd /C start`: cmd
+/// interprets `&`, `|` and `^` even inside a file name, and a file
+/// called `foto&calc.exe&.jpg` (arrived from another PC) would have started
+/// a command at the first click.
 #[cfg(windows)]
 pub fn open_default(path: &str) -> Result<(), FsError> {
     use windows::core::PCWSTR;
@@ -16,10 +16,10 @@ pub fn open_default(path: &str) -> Result<(), FsError> {
     use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
 
     let file: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
-    let esito = unsafe {
-        // Alcune estensioni della shell vogliono COM sul thread che apre;
-        // dai thread di lavoro (`lan_apri`) non c'è ancora. Se c'è già, la
-        // chiamata non cambia niente.
+    let outcome = unsafe {
+        // Some shell extensions want COM on the opening thread; on the
+        // worker threads (`lan_open`) it is not there yet. If it already is,
+        // the call changes nothing.
         let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
         ShellExecuteW(
             None,
@@ -30,9 +30,9 @@ pub fn open_default(path: &str) -> Result<(), FsError> {
             SW_SHOWNORMAL,
         )
     };
-    // ShellExecute segnala il successo con un valore maggiore di 32.
-    if esito.0 as isize <= 32 {
-        return Err(match esito.0 as isize {
+    // ShellExecute signals success with a value greater than 32.
+    if outcome.0 as isize <= 32 {
+        return Err(match outcome.0 as isize {
             2 | 3 => FsError::NotFound,
             _ => FsError::Io {
                 message: "Nessuna applicazione ha potuto aprire il file.".to_string(),
@@ -49,21 +49,21 @@ pub fn open_default(path: &str) -> Result<(), FsError> {
     if !std::path::Path::new(path).exists() {
         return Err(FsError::NotFound);
     }
-    lancia(Command::new("xdg-open").arg(path))
+    launch(Command::new("xdg-open").arg(path))
 }
 
 /// Starts a helper program and reaps it in the background, so it does not
 /// linger as a zombie process until the app quits.
 #[cfg(not(windows))]
-fn lancia(comando: &mut Command) -> Result<(), FsError> {
-    let mut figlio = comando.spawn().map_err(|e| from_io(&e))?;
+fn launch(command: &mut Command) -> Result<(), FsError> {
+    let mut child = command.spawn().map_err(|e| from_io(&e))?;
     std::thread::spawn(move || {
-        let _ = figlio.wait();
+        let _ = child.wait();
     });
     Ok(())
 }
 
-/// Apre Esplora risorse selezionando il path indicato.
+/// Opens File Explorer selecting the given path.
 #[cfg(windows)]
 pub fn reveal(path: &str) -> Result<(), FsError> {
     Command::new("explorer")
@@ -76,18 +76,18 @@ pub fn reveal(path: &str) -> Result<(), FsError> {
 /// Opens the folder that contains `path` in the desktop's file manager.
 #[cfg(not(windows))]
 pub fn reveal(path: &str) -> Result<(), FsError> {
-    let cartella = crate::fs::paths::parent_of(path).unwrap_or_else(|| path.to_string());
-    lancia(Command::new("xdg-open").arg(cartella))
+    let folder = crate::fs::paths::parent_of(path).unwrap_or_else(|| path.to_string());
+    launch(Command::new("xdg-open").arg(folder))
 }
 
-/// Apre un terminale nella cartella `cartella`.
+/// Opens a terminal in the folder `folder`.
 ///
-/// Prima Windows Terminal, se c'è; altrimenti PowerShell in una console sua.
-/// La cartella passa come cartella di lavoro del processo e non come
-/// argomento: così una radice come `C:\` non si porta dietro i problemi
-/// di virgolette della barra finale.
-pub fn terminale(cartella: &str) -> Result<(), FsError> {
-    let dir = std::path::Path::new(cartella);
+/// Windows Terminal first, if present; otherwise PowerShell in its own console.
+/// The folder goes as the process's working directory and not as an
+/// argument: that way a root like `C:\` does not carry along the quoting
+/// problems of the trailing backslash.
+pub fn terminal(folder: &str) -> Result<(), FsError> {
+    let dir = std::path::Path::new(folder);
     if !dir.is_dir() {
         return Err(FsError::NotADirectory);
     }
@@ -97,7 +97,7 @@ pub fn terminale(cartella: &str) -> Result<(), FsError> {
             return Ok(());
         }
         use std::os::windows::process::CommandExt;
-        /// La console nuova: l'app non ne ha una da prestare.
+        /// The new console: the app has none to lend.
         const CREATE_NEW_CONSOLE: u32 = 0x0000_0010;
         Command::new("powershell.exe")
             .arg("-NoExit")
@@ -110,7 +110,7 @@ pub fn terminale(cartella: &str) -> Result<(), FsError> {
     #[cfg(not(windows))]
     {
         // The desktop's own terminal first, then the common ones.
-        let candidati = [
+        let candidates = [
             "x-terminal-emulator",
             "gnome-terminal",
             "konsole",
@@ -123,8 +123,8 @@ pub fn terminale(cartella: &str) -> Result<(), FsError> {
             "foot",
             "xterm",
         ];
-        for t in candidati {
-            if lancia(Command::new(t).current_dir(dir)).is_ok() {
+        for t in candidates {
+            if launch(Command::new(t).current_dir(dir)).is_ok() {
                 return Ok(());
             }
         }
@@ -138,12 +138,12 @@ pub fn terminale(cartella: &str) -> Result<(), FsError> {
 mod tests {
     use super::*;
 
-    /// Con `cmd /C start` la `&` spezzava il nome e il resto partiva come
-    /// comando, e l'apertura risultava riuscita. Ora il nome è un nome: un
-    /// file che non esiste è un errore, qualunque carattere contenga.
+    /// With `cmd /C start` the `&` split the name and the rest ran as a
+    /// command, and the open looked successful. Now the name is a name: a
+    /// file that does not exist is an error, whatever characters it holds.
     #[test]
-    fn un_nome_con_e_commerciale_non_diventa_un_comando() {
-        let nome = std::env::temp_dir().join("non-esiste-&echo,INIETTATO&.txt");
-        assert!(open_default(&nome.to_string_lossy()).is_err());
+    fn a_name_with_an_ampersand_does_not_become_a_command() {
+        let name = std::env::temp_dir().join("non-esiste-&echo,INIETTATO&.txt");
+        assert!(open_default(&name.to_string_lossy()).is_err());
     }
 }

@@ -1,18 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { filtraComandi, type Comando } from './palette';
+import { filterCommands, type Command } from './palette';
 
-const c = (tipo: Comando['tipo'], nome: string): Comando => ({ tipo, nome, esegui: () => {} });
-const comandi = [c('azione', 'Copia'), c('azione', 'Doppio pannello'), c('cartella', 'Download'), c('impostazione', 'Clic doppio per aprire')];
+const c = (kind: Command['kind'], name: string): Command => ({ kind, name, run: () => {} });
+const commands = [c('action', 'Copia'), c('action', 'Doppio pannello'), c('folder', 'Download'), c('setting', 'Clic doppio per aprire')];
 
 describe('command palette', () => {
 	it('with no text lists the first commands in order', () => {
-		expect(filtraComandi(comandi, '', 2).map((t) => t.comando.nome)).toEqual(['Copia', 'Doppio pannello']);
+		expect(filterCommands(commands, '', 2).map((t) => t.command.name)).toEqual(['Copia', 'Doppio pannello']);
 	});
 
 	it('finds by fuzzy match, best first, with the letters to highlight', () => {
-		const t = filtraComandi(comandi, 'dopp');
-		expect(t[0].comando.nome).toBe('Doppio pannello');
-		expect(t[0].posizioni).toEqual([0, 1, 2, 3]);
-		expect(filtraComandi(comandi, 'zzz')).toEqual([]);
+		const t = filterCommands(commands, 'dopp');
+		expect(t[0].command.name).toBe('Doppio pannello');
+		expect(t[0].positions).toEqual([0, 1, 2, 3]);
+		expect(filterCommands(commands, 'zzz')).toEqual([]);
 	});
 });

@@ -1,58 +1,58 @@
 use serde::Serialize;
 
-/// Caratteri che Windows non ammette in un nome di file.
-const VIETATI: &[char] = &['<', '>', ':', '"', '/', '\\', '|', '?', '*'];
+/// Characters Windows does not allow in a file name.
+const FORBIDDEN: &[char] = &['<', '>', ':', '"', '/', '\\', '|', '?', '*'];
 
-/// Nomi riservati dal sistema, validi anche con estensione (`CON.txt` è
-/// altrettanto rifiutato di `CON`).
-const RISERVATI: &[&str] = &[
+/// Names reserved by the system, also with an extension (`CON.txt` is
+/// rejected just like `CON`).
+const RESERVED: &[&str] = &[
     "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
     "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
 ];
 
-/// Limite per singolo componente del path, non per il path intero.
-const LUNGHEZZA_MAX: usize = 255;
+/// Limit for a single path component, not for the whole path.
+const MAX_LENGTH: usize = 255;
 
 #[derive(Serialize, Debug, PartialEq, Eq, Clone)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum NameError {
-    Vuoto,
-    CarattereVietato { carattere: String },
-    NomeRiservato { nome: String },
-    FinisceMale,
-    TroppoLungo,
+    Empty,
+    ForbiddenChar { character: String },
+    ReservedName { name: String },
+    BadEnding,
+    TooLong,
 }
 
-/// Verifica che `nome` sia utilizzabile come nome di file o cartella.
+/// Checks that `name` can be used as a file or folder name.
 ///
-/// Controlla il singolo componente, non un path: uno `\` qui è un errore,
-/// non un separatore.
-pub fn validate_name(nome: &str) -> Result<(), NameError> {
-    if nome.trim().is_empty() {
-        return Err(NameError::Vuoto);
+/// It checks the single component, not a path: a `\` here is an error,
+/// not a separator.
+pub fn validate_name(name: &str) -> Result<(), NameError> {
+    if name.trim().is_empty() {
+        return Err(NameError::Empty);
     }
 
-    if nome.chars().count() > LUNGHEZZA_MAX {
-        return Err(NameError::TroppoLungo);
+    if name.chars().count() > MAX_LENGTH {
+        return Err(NameError::TooLong);
     }
 
-    for c in nome.chars() {
-        if VIETATI.contains(&c) || (c as u32) < 0x20 {
-            return Err(NameError::CarattereVietato {
-                carattere: c.to_string(),
+    for c in name.chars() {
+        if FORBIDDEN.contains(&c) || (c as u32) < 0x20 {
+            return Err(NameError::ForbiddenChar {
+                character: c.to_string(),
             });
         }
     }
 
-    // Windows tronca silenziosamente punti e spazi finali: un nome che li
-    // contiene non è quello che l'utente crede di aver scritto.
-    if nome.ends_with('.') || nome.ends_with(' ') {
-        return Err(NameError::FinisceMale);
+    // Windows silently trims trailing dots and spaces: a name that has
+    // them is not what the user thinks they typed.
+    if name.ends_with('.') || name.ends_with(' ') {
+        return Err(NameError::BadEnding);
     }
 
-    let base = nome.split('.').next().unwrap_or(nome).to_uppercase();
-    if RISERVATI.contains(&base.as_str()) {
-        return Err(NameError::NomeRiservato { nome: base });
+    let base = name.split('.').next().unwrap_or(name).to_uppercase();
+    if RESERVED.contains(&base.as_str()) {
+        return Err(NameError::ReservedName { name: base });
     }
 
     Ok(())
@@ -63,7 +63,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn accetta_i_nomi_normali() {
+    fn accepts_normal_names() {
         assert_eq!(validate_name("appunti.txt"), Ok(()));
         assert_eq!(validate_name("Cartella nuova"), Ok(()));
         assert_eq!(validate_name("café–🚀.md"), Ok(()));
@@ -71,65 +71,65 @@ mod tests {
     }
 
     #[test]
-    fn rifiuta_il_nome_vuoto_o_di_soli_spazi() {
-        assert_eq!(validate_name(""), Err(NameError::Vuoto));
-        assert_eq!(validate_name("   "), Err(NameError::Vuoto));
+    fn refuses_an_empty_or_blank_name() {
+        assert_eq!(validate_name(""), Err(NameError::Empty));
+        assert_eq!(validate_name("   "), Err(NameError::Empty));
     }
 
     #[test]
-    fn rifiuta_i_caratteri_vietati() {
+    fn refuses_forbidden_characters() {
         for c in ['<', '>', ':', '"', '/', '\\', '|', '?', '*'] {
-            let nome = format!("file{}nome.txt", c);
+            let name = format!("file{}nome.txt", c);
             assert!(
-                matches!(validate_name(&nome), Err(NameError::CarattereVietato { .. })),
-                "avrebbe dovuto rifiutare {}",
+                matches!(validate_name(&name), Err(NameError::ForbiddenChar { .. })),
+                "should have refused {}",
                 c
             );
         }
     }
 
     #[test]
-    fn rifiuta_i_caratteri_di_controllo() {
+    fn refuses_control_characters() {
         assert!(matches!(
             validate_name("file\u{1}.txt"),
-            Err(NameError::CarattereVietato { .. })
+            Err(NameError::ForbiddenChar { .. })
         ));
     }
 
     #[test]
-    fn rifiuta_i_nomi_riservati_dal_sistema() {
+    fn refuses_names_reserved_by_the_system() {
         assert!(matches!(
             validate_name("CON"),
-            Err(NameError::NomeRiservato { .. })
+            Err(NameError::ReservedName { .. })
         ));
         assert!(matches!(
             validate_name("nul"),
-            Err(NameError::NomeRiservato { .. })
+            Err(NameError::ReservedName { .. })
         ));
         assert!(matches!(
             validate_name("COM1.txt"),
-            Err(NameError::NomeRiservato { .. })
+            Err(NameError::ReservedName { .. })
         ));
     }
 
     #[test]
-    fn i_nomi_che_contengono_un_riservato_vanno_bene() {
+    fn names_containing_a_reserved_one_are_fine() {
         assert_eq!(validate_name("console.txt"), Ok(()));
         assert_eq!(validate_name("nullo.md"), Ok(()));
     }
 
     #[test]
-    fn rifiuta_punti_e_spazi_finali() {
-        assert_eq!(validate_name("appunti."), Err(NameError::FinisceMale));
-        assert_eq!(validate_name("appunti "), Err(NameError::FinisceMale));
+    fn refuses_trailing_dots_and_spaces() {
+        assert_eq!(validate_name("appunti."), Err(NameError::BadEnding));
+        assert_eq!(validate_name("appunti "), Err(NameError::BadEnding));
     }
 
     #[test]
-    fn rifiuta_i_nomi_troppo_lunghi() {
-        let lungo = "a".repeat(256);
-        assert_eq!(validate_name(&lungo), Err(NameError::TroppoLungo));
+    fn refuses_names_too_long() {
+        let long = "a".repeat(256);
+        assert_eq!(validate_name(&long), Err(NameError::TooLong));
 
-        let limite = "a".repeat(255);
-        assert_eq!(validate_name(&limite), Ok(()));
+        let limit = "a".repeat(255);
+        assert_eq!(validate_name(&limit), Ok(()));
     }
 }

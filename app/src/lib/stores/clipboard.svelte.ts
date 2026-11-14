@@ -1,26 +1,26 @@
-export type ModoAppunti = 'copy' | 'cut';
+export type ClipboardMode = 'copy' | 'cut';
 
 /**
- * Appunti interni all'applicazione.
+ * The application's own clipboard.
  *
- * Non tocca la clipboard di Windows: incollare in Esplora risorse o in
- * un'altra app non funzionerà. Servirebbe registrare il formato CF_HDROP
- * via OLE, che è un progetto a sé.
+ * It does not touch the Windows clipboard: pasting into File Explorer or
+ * another app will not work. That would need registering the CF_HDROP
+ * format through OLE, a project of its own.
  */
 export class ClipboardStore {
 	paths = $state<string[]>([]);
-	mode = $state<ModoAppunti | null>(null);
+	mode = $state<ClipboardMode | null>(null);
 
-	get vuoto(): boolean {
+	get empty(): boolean {
 		return this.paths.length === 0 || this.mode === null;
 	}
 
 	copy(paths: string[]): void {
-		this.#imposta(paths, 'copy');
+		this.#set(paths, 'copy');
 	}
 
 	cut(paths: string[]): void {
-		this.#imposta(paths, 'cut');
+		this.#set(paths, 'cut');
 	}
 
 	clear(): void {
@@ -28,12 +28,12 @@ export class ClipboardStore {
 		this.mode = null;
 	}
 
-	/** Vero se il path è stato tagliato: l'interfaccia lo mostra sbiadito. */
-	tagliato(path: string): boolean {
+	/** True when the path was cut: the interface shows it faded. */
+	isCut(path: string): boolean {
 		return this.mode === 'cut' && this.paths.includes(path);
 	}
 
-	#imposta(paths: string[], mode: ModoAppunti): void {
+	#set(paths: string[], mode: ClipboardMode): void {
 		if (paths.length === 0) {
 			this.clear();
 			return;

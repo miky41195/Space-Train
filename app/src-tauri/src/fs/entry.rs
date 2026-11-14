@@ -17,22 +17,22 @@ pub struct Entry {
     pub path: String,
     pub kind: EntryKind,
     pub size: u64,
-    /// Millisecondi dall'epoch Unix. `None` se il filesystem non lo fornisce.
+    /// Milliseconds since the Unix epoch. `None` if the filesystem does not provide it.
     pub modified: Option<i64>,
     pub hidden: bool,
-    /// Solo nel Cestino: dove si trovava l'elemento prima di essere eliminato.
+    /// Only in the Recycle Bin: where the item was before it was deleted.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub origine: Option<String>,
-    /// Solo per i volumi in «Questo PC»: byte liberi e capacità.
+    pub origin: Option<String>,
+    /// Only for the volumes in «Questo PC»: free bytes and capacity.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub libero: Option<u64>,
+    pub free: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub totale: Option<u64>,
-    /// L'elemento ha un'icona tutta sua, diversa da quella del suo tipo:
-    /// un programma, un collegamento, una cartella con `desktop.ini`. Va
-    /// chiesta alla Shell sul file vero, non sull'estensione.
+    pub total: Option<u64>,
+    /// The item has an icon of its own, different from its type's one:
+    /// a program, a shortcut, a folder with `desktop.ini`. It must be
+    /// asked of the Shell on the real file, not on the extension.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub icona_propria: bool,
+    pub own_icon: bool,
     /// Only in content search results: where the text was found.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub snippet: Option<Snippet>,
@@ -53,24 +53,24 @@ pub struct Snippet {
     pub more: usize,
 }
 
-/// Estensioni i cui file portano un'icona propria.
-const CON_ICONA_PROPRIA: [&str; 9] = ["exe", "lnk", "ico", "url", "scr", "cpl", "msc", "appref-ms", "cur"];
+/// Extensions whose files carry an icon of their own.
+const WITH_OWN_ICON: [&str; 9] = ["exe", "lnk", "ico", "url", "scr", "cpl", "msc", "appref-ms", "cur"];
 
-fn ha_icona_propria(path: &std::path::Path, kind: EntryKind, meta: Option<&std::fs::Metadata>) -> bool {
+fn has_own_icon(path: &std::path::Path, kind: EntryKind, meta: Option<&std::fs::Metadata>) -> bool {
     if kind == EntryKind::Dir {
-        return meta.map(cartella_personalizzabile).unwrap_or(false) && path.join("desktop.ini").is_file();
+        return meta.map(customizable_folder).unwrap_or(false) && path.join("desktop.ini").is_file();
     }
     path.extension()
         .and_then(|e| e.to_str())
-        .map(|e| CON_ICONA_PROPRIA.iter().any(|c| e.eq_ignore_ascii_case(c)))
+        .map(|e| WITH_OWN_ICON.iter().any(|c| e.eq_ignore_ascii_case(c)))
         .unwrap_or(false)
 }
 
-/// Windows legge il `desktop.ini` di una cartella solo se lei ha l'attributo
-/// sola lettura o di sistema: senza, non c'è icona personalizzata, e si
-/// risparmia di cercare il file in ogni cartella.
+/// Windows reads a folder's `desktop.ini` only if the folder has the
+/// read-only or system attribute: without it there is no custom icon, and
+/// we save looking for the file in every folder.
 #[cfg(windows)]
-fn cartella_personalizzabile(meta: &std::fs::Metadata) -> bool {
+fn customizable_folder(meta: &std::fs::Metadata) -> bool {
     use std::os::windows::fs::MetadataExt;
     const FILE_ATTRIBUTE_READONLY: u32 = 0x1;
     const FILE_ATTRIBUTE_SYSTEM: u32 = 0x4;
@@ -78,15 +78,15 @@ fn cartella_personalizzabile(meta: &std::fs::Metadata) -> bool {
 }
 
 #[cfg(not(windows))]
-fn cartella_personalizzabile(_meta: &std::fs::Metadata) -> bool {
+fn customizable_folder(_meta: &std::fs::Metadata) -> bool {
     false
 }
 
-/// Converte una voce di directory in `Entry`.
+/// Converts a directory entry into an `Entry`.
 ///
-/// Restituisce `None` solo se il nome non è rappresentabile come UTF-8.
-/// I metadati illeggibili (permessi negati sul singolo file) non fanno
-/// fallire la conversione: la voce entra con dimensione 0 e data assente.
+/// Returns `None` only if the name cannot be represented as UTF-8.
+/// Unreadable metadata (permissions denied on the single file) does not make
+/// the conversion fail: the entry goes in with size 0 and no date.
 pub fn entry_from_dir_entry(de: &DirEntry) -> Option<Entry> {
     let name = de.file_name().into_string().ok()?;
     build(name, &de.path(), de.metadata().ok())
@@ -128,7 +128,7 @@ fn build(name: String, full: &std::path::Path, meta: Option<std::fs::Metadata>) 
     });
 
     let hidden = meta.as_ref().map(is_hidden).unwrap_or(false);
-    let icona_propria = ha_icona_propria(full, kind, meta.as_ref());
+    let own_icon = has_own_icon(full, kind, meta.as_ref());
 
     Some(Entry {
         name,
@@ -137,10 +137,10 @@ fn build(name: String, full: &std::path::Path, meta: Option<std::fs::Metadata>) 
         size,
         modified,
         hidden,
-        origine: None,
-        libero: None,
-        totale: None,
-        icona_propria,
+        origin: None,
+        free: None,
+        total: None,
+        own_icon,
         snippet: None,
     })
 }
@@ -176,7 +176,7 @@ mod tests {
     }
 
     #[test]
-    fn legge_un_file_normale() {
+    fn reads_a_normal_file() {
         let dir = tempdir().unwrap();
         fs::write(dir.path().join("ciao.txt"), b"12345").unwrap();
 
@@ -191,7 +191,7 @@ mod tests {
     }
 
     #[test]
-    fn una_cartella_ha_dimensione_zero() {
+    fn a_folder_has_size_zero() {
         let dir = tempdir().unwrap();
         fs::create_dir(dir.path().join("sub")).unwrap();
 
@@ -203,23 +203,23 @@ mod tests {
     }
 
     #[test]
-    fn programmi_e_collegamenti_hanno_un_icona_propria() {
+    fn programs_and_shortcuts_have_their_own_icon() {
         let dir = tempdir().unwrap();
         fs::write(dir.path().join("Gioco.EXE"), b"x").unwrap();
         fs::write(dir.path().join("nota.txt"), b"x").unwrap();
         fs::create_dir(dir.path().join("normale")).unwrap();
 
-        let mut voci: Vec<Entry> = fs::read_dir(dir.path())
+        let mut items: Vec<Entry> = fs::read_dir(dir.path())
             .unwrap()
             .filter_map(|d| entry_from_dir_entry(&d.unwrap()))
             .collect();
-        voci.sort_by(|a, b| a.name.cmp(&b.name));
-        let proprie: Vec<(&str, bool)> = voci.iter().map(|e| (e.name.as_str(), e.icona_propria)).collect();
-        assert_eq!(proprie, vec![("Gioco.EXE", true), ("normale", false), ("nota.txt", false)]);
+        items.sort_by(|a, b| a.name.cmp(&b.name));
+        let own: Vec<(&str, bool)> = items.iter().map(|e| (e.name.as_str(), e.own_icon)).collect();
+        assert_eq!(own, vec![("Gioco.EXE", true), ("normale", false), ("nota.txt", false)]);
     }
 
     #[test]
-    fn conserva_i_nomi_unicode() {
+    fn keeps_unicode_names() {
         let dir = tempdir().unwrap();
         fs::write(dir.path().join("café–🚀.txt"), b"x").unwrap();
 

@@ -1,81 +1,81 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/svelte';
 
-const finestra = {
+const win = {
 	close: vi.fn(),
 	minimize: vi.fn(),
 	toggleMaximize: vi.fn()
 };
 
 vi.mock('@tauri-apps/api/window', () => ({
-	getCurrentWindow: () => finestra
+	getCurrentWindow: () => win
 }));
 
 const { default: TitleBar } = await import('./TitleBar.svelte');
 const { TabsStore } = await import('../stores/tabs.svelte');
-const { backendFinto } = await import('../test-doppi');
+const { fakeBackend } = await import('../test-doubles');
 
 afterEach(cleanup);
 beforeEach(() => {
-	finestra.close.mockClear();
-	finestra.minimize.mockClear();
-	finestra.toggleMaximize.mockClear();
+	win.close.mockClear();
+	win.minimize.mockClear();
+	win.toggleMaximize.mockClear();
 });
 
-async function monta() {
-	const store = new TabsStore(backendFinto());
-	await store.openTab('C:\\uno');
+async function mount() {
+	const store = new TabsStore(fakeBackend());
+	await store.openTab('C:\\one');
 	render(TitleBar, { props: { store } });
 	return store;
 }
 
 describe('TitleBar', () => {
-	it('mostra il nome del progetto', async () => {
-		await monta();
+	it('shows the project name', async () => {
+		await mount();
 		expect(screen.getByText('Space Train')).toBeTruthy();
 	});
 
-	it('le tre lampade hanno un nome accessibile', async () => {
-		await monta();
+	it('the three lamps have an accessible name', async () => {
+		await mount();
 
-		// I glifi sono decorativi: senza aria-label i comandi finestra
-		// sarebbero tre cerchi muti per chi usa uno screen reader.
+		// The glyphs are decorative: without aria-label the window commands
+		// would be three mute circles for screen reader users.
 		expect(screen.getByLabelText('Chiudi')).toBeTruthy();
 		expect(screen.getByLabelText('Riduci a icona')).toBeTruthy();
 		expect(screen.getByLabelText('Ingrandisci')).toBeTruthy();
 	});
 
-	it('ogni lampada comanda la finestra giusta', async () => {
-		await monta();
+	it('each lamp drives the right window command', async () => {
+		await mount();
 
 		screen.getByLabelText('Riduci a icona').click();
-		expect(finestra.minimize).toHaveBeenCalledTimes(1);
+		expect(win.minimize).toHaveBeenCalledTimes(1);
 
 		screen.getByLabelText('Ingrandisci').click();
-		expect(finestra.toggleMaximize).toHaveBeenCalledTimes(1);
+		expect(win.toggleMaximize).toHaveBeenCalledTimes(1);
 
 		screen.getByLabelText('Chiudi').click();
-		expect(finestra.close).toHaveBeenCalledTimes(1);
+		expect(win.close).toHaveBeenCalledTimes(1);
 	});
 
-	it('il tab aperto porta il nome della cartella', async () => {
-		await monta();
-		expect(screen.getByText('uno')).toBeTruthy();
+	it('the open tab carries the folder name', async () => {
+		await mount();
+		expect(screen.getByText('one')).toBeTruthy();
 	});
 
-	it('megafono e ingranaggio compaiono solo se qualcuno li ascolta', async () => {
-		await monta();
+	it('megaphone and gear appear only if someone listens', async () => {
+		await mount();
 		expect(screen.queryByLabelText('Novità di questa versione')).toBeNull();
 		cleanup();
 
-		const store = new TabsStore(backendFinto());
-		await store.openTab('C:\\uno');
-		const onnovita = vi.fn();
-		const onimpostazioni = vi.fn();
-		render(TitleBar, { props: { store, onnovita, onimpostazioni } });
+		const store = new TabsStore(fakeBackend());
+		await store.openTab('C:\\one');
+		const onwhatsnew = vi.fn();
+		const onsettings = vi.fn();
+		render(TitleBar, { props: { store, onwhatsnew, onsettings } });
 		screen.getByLabelText('Novità di questa versione').click();
 		screen.getByLabelText('Impostazioni').click();
-		expect(onnovita).toHaveBeenCalledTimes(1);
-		expect(onimpostazioni).toHaveBeenCalledTimes(1);
+		expect(onwhatsnew).toHaveBeenCalledTimes(1);
+		expect(onsettings).toHaveBeenCalledTimes(1);
 	});
 });

@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
 import FileList from './FileList.svelte';
-import { ROW_HEIGHT, ZONA_TESTATA } from '../virtual';
+import { ROW_HEIGHT, ZONE_HEADER } from '../virtual';
 import type { Entry } from '../ipc';
 
 afterEach(cleanup);
 
-function voci(quante: number): Entry[] {
-	return Array.from({ length: quante }, (_, i) => ({
+function makeEntries(count: number): Entry[] {
+	return Array.from({ length: count }, (_, i) => ({
 		name: `file${i}.txt`,
 		path: `C:\\file${i}.txt`,
 		kind: 'file' as const,
@@ -17,98 +17,98 @@ function voci(quante: number): Entry[] {
 	}));
 }
 
-function monta(entries: Entry[], preferiti = 0) {
-	// Come fa la pagina: con dei preferiti la lista ha due zone.
-	const zone =
-		preferiti > 0
+function mount(entries: Entry[], favorites = 0) {
+	// As the page does: with favourites the list has two zones.
+	const zones =
+		favorites > 0
 			? [
-					{ etichetta: 'Preferiti', quante: preferiti, tono: 'preferiti' as const },
-					{ etichetta: 'Comuni', quante: entries.length - preferiti }
+					{ label: 'Preferiti', count: favorites, tone: 'favorites' as const },
+					{ label: 'Comuni', count: entries.length - favorites }
 				]
 			: [];
-	const risultato = render(FileList, {
-		props: { entries, zone, onactivate: vi.fn(), onselect: vi.fn() }
+	const result = render(FileList, {
+		props: { entries, zones, onactivate: vi.fn(), onselect: vi.fn() }
 	});
 
-	const viewport = risultato.container.querySelector('.viewport') as HTMLElement;
-	// jsdom non fa layout: clientHeight resta 0 e la finestra visibile
-	// sarebbe vuota. Lo imponiamo a mano.
+	const viewport = result.container.querySelector('.viewport') as HTMLElement;
+	// jsdom does no layout: clientHeight stays 0 and the visible window
+	// would be empty. We set it by hand.
 	Object.defineProperty(viewport, 'clientHeight', { value: 320, configurable: true });
 
-	return { ...risultato, viewport };
+	return { ...result, viewport };
 }
 
-describe('FileList virtualizzata', () => {
-	it('renderizza poche righe anche con diecimila voci', async () => {
-		const { container, viewport } = monta(voci(10_000));
+describe('virtualised FileList', () => {
+	it('renders few rows even with ten thousand items', async () => {
+		const { container, viewport } = mount(makeEntries(10_000));
 
 		viewport.dispatchEvent(new Event('scroll'));
 		await Promise.resolve();
 
-		const righe = container.querySelectorAll('.row');
-		// Il punto della virtualizzazione: il DOM non cresce col dataset.
-		expect(righe.length).toBeGreaterThan(0);
-		expect(righe.length).toBeLessThan(60);
+		const rows = container.querySelectorAll('.row');
+		// The point of virtualisation: the DOM does not grow with the dataset.
+		expect(rows.length).toBeGreaterThan(0);
+		expect(rows.length).toBeLessThan(60);
 	});
 
-	it('lo spaziatore è alto quanto l intera lista', () => {
-		const { container } = monta(voci(1000));
+	it('the spacer is as tall as the whole list', () => {
+		const { container } = mount(makeEntries(1000));
 
 		const spacer = container.querySelector('.spacer') as HTMLElement;
 		expect(spacer.style.height).toBe(`${1000 * ROW_HEIGHT}px`);
 	});
 
-	it('una lista vuota non renderizza righe', () => {
-		const { container } = monta([]);
+	it('an empty list renders no rows', () => {
+		const { container } = mount([]);
 		expect(container.querySelectorAll('.row').length).toBe(0);
 	});
 
-	it('scorrendo cambiano le righe mostrate', async () => {
-		const { container, viewport } = monta(voci(1000));
+	it('scrolling changes the rows shown', async () => {
+		const { container, viewport } = mount(makeEntries(1000));
 
-		const primoNome = () => container.querySelector('.name')?.textContent;
-		const inizio = primoNome();
+		const firstName = () => container.querySelector('.name')?.textContent;
+		const start = firstName();
 
 		Object.defineProperty(viewport, 'scrollTop', { value: ROW_HEIGHT * 500, configurable: true });
 		viewport.dispatchEvent(new Event('scroll'));
 		await Promise.resolve();
 
-		expect(primoNome()).not.toBe(inizio);
+		expect(firstName()).not.toBe(start);
 	});
 
-	it('senza preferiti non compare nessuna testata di zona', () => {
-		const { container } = monta(voci(10));
-		expect(container.querySelectorAll('.testata').length).toBe(0);
+	it('without favourites no zone header appears', () => {
+		const { container } = mount(makeEntries(10));
+		expect(container.querySelectorAll('.header').length).toBe(0);
 	});
 
-	it('con i preferiti la cartella si divide in due zone', () => {
-		const { container } = monta(voci(10), 3);
+	it('with favourites the folder splits into two zones', () => {
+		const { container } = mount(makeEntries(10), 3);
 
-		const testate = container.querySelectorAll('.testata');
-		expect(testate.length).toBe(2);
-		expect(testate[0].getAttribute('aria-label')).toBe('Preferiti, 3');
-		expect(testate[1].getAttribute('aria-label')).toBe('Comuni, 7');
+		const headers = container.querySelectorAll('.header');
+		expect(headers.length).toBe(2);
+		expect(headers[0].getAttribute('aria-label')).toBe('Preferiti, 3');
+		expect(headers[1].getAttribute('aria-label')).toBe('Comuni, 7');
 
 		const spacer = container.querySelector('.spacer') as HTMLElement;
-		expect(spacer.style.height).toBe(`${10 * ROW_HEIGHT + 2 * ZONA_TESTATA}px`);
+		expect(spacer.style.height).toBe(`${10 * ROW_HEIGHT + 2 * ZONE_HEADER}px`);
 	});
 });
 
 describe('scroll memory', () => {
 	it('a list mounted again with the same content key comes back where it was', async () => {
-		const props = { entries: voci(1000), chiave: 'tab1:cartella', onactivate: vi.fn(), onselect: vi.fn() };
-		const primo = render(FileList, { props });
-		const v1 = primo.container.querySelector('.viewport') as HTMLElement;
+		const props = { entries: makeEntries(1000), contentKey: 'tab1:folder', onactivate: vi.fn(), onselect: vi.fn() };
+		const first = render(FileList, { props });
+		const v1 = first.container.querySelector('.viewport') as HTMLElement;
 		v1.scrollTop = 640;
 		v1.dispatchEvent(new Event('scroll'));
-		primo.unmount();
+		first.unmount();
 
-		const secondo = render(FileList, { props });
+		const second = render(FileList, { props });
 		await Promise.resolve();
-		expect((secondo.container.querySelector('.viewport') as HTMLElement).scrollTop).toBe(640);
+		expect((second.container.querySelector('.viewport') as HTMLElement).scrollTop).toBe(640);
 
-		const altro = render(FileList, { props: { ...props, chiave: 'tab1:altra' } });
+		const other = render(FileList, { props: { ...props, contentKey: 'tab1:other' } });
 		await Promise.resolve();
-		expect((altro.container.querySelectorAll('.viewport')[0] as HTMLElement).scrollTop).toBe(0);
+		expect((other.container.querySelectorAll('.viewport')[0] as HTMLElement).scrollTop).toBe(0);
 	});
 });

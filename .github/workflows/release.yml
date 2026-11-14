@@ -1,8 +1,8 @@
-# Pubblica una release quando si spinge un tag `v*` (per esempio v0.2.0).
+# Publishes a release when a `v*` tag is pushed (for example v0.2.0).
 #
-# Costruisce l'installatore Windows, lo firma con la chiave degli
-# aggiornamenti e carica `latest.json`: è il file che le copie installate
-# leggono per sapere che c'è una versione nuova.
+# Builds the Windows installer, signs it with the updates key and
+# uploads `latest.json`: the file installed copies read to learn
+# that a new version exists.
 name: Release
 
 on:

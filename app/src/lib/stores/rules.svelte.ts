@@ -1,11 +1,12 @@
 import type { Backend, Entry } from '../ipc';
-import { nomeDi } from '../posizioni';
+import { nameOf } from '../locations';
 import { dayStart, matches, problem, samePath, settled, type Rule } from '../rules';
-import { AnnullaStore, type Operazione } from './annulla.svelte';
-import type { IdColore } from './colori.svelte';
-import type { Archivio } from './preferiti.svelte';
-import { alCambioDi } from './sincronizza';
+import { UndoStore, type Operation } from './undo.svelte';
+import type { ColorId } from './colors.svelte';
+import type { KeyValueStore } from './favorites.svelte';
+import { onChangeOf } from './sync';
 
+// Saved key: unchanged so existing rules survive.
 const KEY = 'space-train.regole';
 const MAX_LOG = 100;
 
@@ -29,9 +30,9 @@ export interface LogEntry {
 /** What the rules need from the rest of the app, so tests can stand in for it. */
 export interface RuleDeps {
 	backend: Pick<Backend, 'listDir' | 'transfer' | 'moveToTrash' | 'navigate' | 'renameEntry' | 'trashRestoreOriginals' | 'imageRotate'>;
-	labelOf: (path: string) => IdColore | undefined;
-	setLabel: (paths: string[], color: IdColore | null) => void;
-	labelName: (id: IdColore) => string;
+	labelOf: (path: string) => ColorId | undefined;
+	setLabel: (paths: string[], color: ColorId | null) => void;
+	labelName: (id: ColorId) => string;
 }
 
 /**
@@ -49,10 +50,10 @@ export class RulesStore {
 
 	constructor(
 		private deps: RuleDeps,
-		private archivio: Archivio | null = defaultStorage()
+		private storage: KeyValueStore | null = defaultStorage()
 	) {
-		this.#read(archivio?.getItem(KEY) ?? null);
-		alCambioDi(KEY, (v) => this.#read(v));
+		this.#read(storage?.getItem(KEY) ?? null);
+		onChangeOf(KEY, (v) => this.#read(v));
 	}
 
 	forFolder(folder: string): Rule[] {
@@ -126,7 +127,7 @@ export class RulesStore {
 		const { backend } = this.deps;
 		const text = logText(f.name, r, this.deps.labelName);
 		try {
-			let op: Operazione | null = null;
+			let op: Operation | null = null;
 			let undoLabel: (() => Promise<void>) | null = null;
 			switch (r.then.type) {
 				case 'move':
@@ -136,19 +137,19 @@ export class RulesStore {
 						sources: [f.path],
 						dest: r.then.dest,
 						mode: r.then.type,
-						policy: 'salta',
+						policy: 'skip',
 						onProgress: () => {}
 					});
-					if (res.saltati > 0 || res.coppie.length === 0) {
-						this.#push(r.folder, `${f.name}: saltato, esiste già in ${nomeDi(r.then.dest)}`, null, true);
+					if (res.skipped > 0 || res.pairs.length === 0) {
+						this.#push(r.folder, `${f.name}: saltato, esiste già in ${nameOf(r.then.dest)}`, null, true);
 						return;
 					}
-					op = r.then.type === 'move' ? { tipo: 'sposta', coppie: res.coppie } : { tipo: 'crea', paths: res.coppie.map(([, to]) => to), descrizione: '' };
+					op = r.then.type === 'move' ? { kind: 'move', pairs: res.pairs } : { kind: 'create', paths: res.pairs.map(([, to]) => to), description: '' };
 					break;
 				}
 				case 'trash':
 					await backend.moveToTrash([f.path]);
-					op = { tipo: 'cestino', originali: [f.path] };
+					op = { kind: 'trash', originals: [f.path] };
 					break;
 				case 'label': {
 					const previous = this.deps.labelOf(f.path) ?? null;
@@ -161,9 +162,9 @@ export class RulesStore {
 				undoLabel ??
 				(op &&
 					(async () => {
-						const u = new AnnullaStore(backend as Backend);
-						u.registra(op);
-						await u.annulla();
+						const u = new UndoStore(backend as Backend);
+						u.record(op);
+						await u.undo();
 					}));
 			this.#push(r.folder, text, undo ?? null);
 		} catch (err) {
@@ -197,19 +198,19 @@ export class RulesStore {
 
 	#write(): void {
 		try {
-			this.archivio?.setItem(KEY, JSON.stringify({ rules: this.rules, lastDaily: this.#lastDaily } satisfies Saved));
+			this.storage?.setItem(KEY, JSON.stringify({ rules: this.rules, lastDaily: this.#lastDaily } satisfies Saved));
 		} catch {
 			// Storage denied: rules last for this session.
 		}
 	}
 }
 
-function logText(name: string, r: Rule, labelName: (id: IdColore) => string): string {
+function logText(name: string, r: Rule, labelName: (id: ColorId) => string): string {
 	switch (r.then.type) {
 		case 'move':
-			return `${name} spostato in ${nomeDi(r.then.dest)}`;
+			return `${name} spostato in ${nameOf(r.then.dest)}`;
 		case 'copy':
-			return `${name} copiato in ${nomeDi(r.then.dest)}`;
+			return `${name} copiato in ${nameOf(r.then.dest)}`;
 		case 'trash':
 			return `${name} nel cestino`;
 		case 'label':
@@ -236,7 +237,7 @@ function validShape(r: unknown): r is Rule {
 	}
 }
 
-function defaultStorage(): Archivio | null {
+function defaultStorage(): KeyValueStore | null {
 	try {
 		return typeof localStorage === 'undefined' ? null : localStorage;
 	} catch {

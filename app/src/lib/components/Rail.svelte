@@ -1,36 +1,36 @@
 <script lang="ts">
 	/**
-	 * Binario elettrificato.
+	 * Electrified rail.
 	 *
-	 * Non è ornamento: la velocità e la luminosità della corrente dicono se
-	 * il sistema sta muovendo dati. A riposo passa un impulso ogni nove
-	 * secondi, appena percettibile; sotto carico ne passano due, veloci e
-	 * accesi. Guardare il binario deve bastare per sapere se sta lavorando.
+	 * It is not decoration: the speed and brightness of the current tell
+	 * whether the system is moving data. At rest one pulse passes every nine
+	 * seconds, barely noticeable; under load two pass, fast and bright.
+	 * Looking at the rail must be enough to know whether it is working.
 	 */
 	let {
-		orientamento = 'orizzontale',
-		attivo = false
+		orientation = 'horizontal',
+		active = false
 	}: {
-		orientamento?: 'orizzontale' | 'verticale';
-		attivo?: boolean;
+		orientation?: 'horizontal' | 'vertical';
+		active?: boolean;
 	} = $props();
 </script>
 
 <div
-	class="binario"
-	class:verticale={orientamento === 'verticale'}
-	class:attivo
+	class="rail"
+	class:vertical={orientation === 'vertical'}
+	class:active
 	aria-hidden="true"
 >
-	<span class="corrente"></span>
-	{#if attivo}
-		<span class="corrente seconda"></span>
+	<span class="current"></span>
+	{#if active}
+		<span class="current second"></span>
 	{/if}
 </div>
 
 <style>
-	/* Due fili paralleli: il binario spento è metallo, non una linea sola. */
-	.binario {
+	/* Two parallel wires: the idle rail is metal, not a single line. */
+	.rail {
 		position: relative;
 		flex-shrink: 0;
 		height: 5px;
@@ -40,7 +40,7 @@
 			linear-gradient(var(--rail-metal), var(--rail-metal)) 0 3px / 100% 1px no-repeat;
 	}
 
-	.binario.verticale {
+	.rail.vertical {
 		width: 5px;
 		height: auto;
 		align-self: stretch;
@@ -49,17 +49,17 @@
 			linear-gradient(var(--rail-metal), var(--rail-metal)) 3px 0 / 1px 100% no-repeat;
 	}
 
-	/* L'alone del nucleo deve uscire dai cinque pixel del binario: il clip
-	   resta, ma con un margine. */
-	.binario {
+	/* The core's halo must spill out of the rail's five pixels: the clip
+	   stays, but with a margin. */
+	.rail {
 		overflow: clip;
 		overflow-clip-margin: 8px;
 	}
 
-	/* Solo transform e opacity: restano sul compositore, non ridisegnano.
-	   La corrente ha un verso: una coda di plasma che si spegne dietro e un
-	   nucleo bianco davanti, l'unica cosa dell'app che fa luce. */
-	.corrente {
+	/* Only transform and opacity: they stay on the compositor, no repaint.
+	   The current has a direction: a plasma tail fading out behind and a
+	   white core in front, the only thing in the app that gives off light. */
+	.current {
 		position: absolute;
 		top: 0;
 		left: 0;
@@ -73,9 +73,9 @@
 			var(--current) 88%,
 			transparent
 		);
-		animation: scorre 9s linear infinite;
+		animation: flow 9s linear infinite;
 	}
-	.corrente::after {
+	.current::after {
 		content: '';
 		position: absolute;
 		top: 0;
@@ -88,7 +88,7 @@
 			0 0 10px 2px var(--current);
 	}
 
-	.verticale .corrente {
+	.vertical .current {
 		width: 100%;
 		height: 24%;
 		background: linear-gradient(
@@ -98,9 +98,9 @@
 			var(--current) 88%,
 			transparent
 		);
-		animation-name: scorre-verticale;
+		animation-name: flow-vertical;
 	}
-	.verticale .corrente::after {
+	.vertical .current::after {
 		top: auto;
 		right: 0;
 		bottom: 6%;
@@ -108,16 +108,16 @@
 		height: 6px;
 	}
 
-	.attivo .corrente {
+	.active .current {
 		opacity: 1;
 		animation-duration: 1.6s;
 	}
 
-	.seconda {
+	.second {
 		animation-delay: 0.8s;
 	}
 
-	@keyframes scorre {
+	@keyframes flow {
 		from {
 			transform: translateX(-110%);
 		}
@@ -126,7 +126,7 @@
 		}
 	}
 
-	@keyframes scorre-verticale {
+	@keyframes flow-vertical {
 		from {
 			transform: translateY(-110%);
 		}
@@ -135,25 +135,25 @@
 		}
 	}
 
-	/* Senza movimento resta il binario acceso ma fermo: l'informazione
-	   "sta lavorando" passa dalla luminosità invece che dal moto. */
+	/* Without motion the rail stays lit but still: the "it is working"
+	   information comes through brightness instead of movement. */
 	@media (prefers-reduced-motion: reduce) {
-		.corrente {
+		.current {
 			animation: none;
 			transform: none;
 			width: 100%;
 			opacity: 0.18;
 		}
-		.corrente::after {
+		.current::after {
 			display: none;
 		}
-		.verticale .corrente {
+		.vertical .current {
 			height: 100%;
 		}
-		.attivo .corrente {
+		.active .current {
 			opacity: 0.6;
 		}
-		.seconda {
+		.second {
 			display: none;
 		}
 	}

@@ -1,8 +1,8 @@
 /**
- * Azione di cronologia associata a un pulsante del mouse.
+ * History action tied to a mouse button.
  *
- * I due tasti laterali sono standardizzati in `MouseEvent.button`:
- * 3 = indietro, 4 = avanti. Gli altri pulsanti non toccano la cronologia.
+ * The two side buttons are standardised in `MouseEvent.button`:
+ * 3 = back, 4 = forward. The other buttons do not touch the history.
  */
 export type HistoryAction = 'back' | 'forward';
 

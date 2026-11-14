@@ -1,16 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import {
-	vociMenu,
-	vociVista,
-	vociOrdina,
-	vociNuovo,
-	vociAccessoRapido,
-	posizionaMenu
+	menuItems,
+	viewItems,
+	sortItems,
+	newItems,
+	quickAccessItems,
+	placeMenu
 } from './menu';
 import type { Entry } from './ipc';
 
-function voci(quante: number): Entry[] {
-	return Array.from({ length: quante }, (_, i) => ({
+function items(count: number): Entry[] {
+	return Array.from({ length: count }, (_, i) => ({
 		name: `f${i}.txt`,
 		path: `C:\\f${i}.txt`,
 		kind: 'file' as const,
@@ -20,255 +20,255 @@ function voci(quante: number): Entry[] {
 	}));
 }
 
-const azioni = (c: Parameters<typeof vociMenu>[0]) => vociMenu(c).map((v) => v.azione);
+const actions = (c: Parameters<typeof menuItems>[0]) => menuItems(c).map((v) => v.action);
 
-describe('vociMenu', () => {
-	it('sul vuoto offre di creare, aggiornare e le proprietà della cartella', () => {
-		expect(azioni({ selezione: [], appuntiPieni: false })).toEqual([
-			'menuNuovo',
-			'nuovaCartella',
-			'aggiorna',
-			'fissa',
-			'condividi',
-			'paginaIniziale',
-			'cartellaAvvio',
-			'duplicati',
-			'confronta',
-			'spazio',
-			'regole',
-			'terminale',
-			'altreOpzioni',
-			'proprieta'
+describe('menuItems', () => {
+	it('on empty space offers to create, refresh and the folder properties', () => {
+		expect(actions({ selection: [], clipboardFull: false })).toEqual([
+			'newMenu',
+			'newFolder',
+			'refresh',
+			'pin',
+			'share',
+			'setStartPage',
+			'startupFolder',
+			'duplicates',
+			'compare',
+			'space',
+			'rules',
+			'terminal',
+			'moreOptions',
+			'properties'
 		]);
 	});
 
-	it('una cartella si fissa per l avvio e si toglie dallo stesso posto', () => {
-		const v = (allAvvio: boolean) =>
-			vociMenu({ selezione: [], appuntiPieni: false, allAvvio }).find((x) => x.azione === 'cartellaAvvio')?.etichetta;
+	it('a folder is pinned for startup and unpinned from the same place', () => {
+		const v = (atStartup: boolean) =>
+			menuItems({ selection: [], clipboardFull: false, atStartup }).find((x) => x.action === 'startupFolder')?.label;
 		expect(v(false)).toBe('Apri sempre all’avvio');
 		expect(v(true)).toBe('Non aprire più all’avvio');
 	});
 
-	it('la cartella che è già pagina iniziale non la offre di nuovo', () => {
-		expect(azioni({ selezione: [], appuntiPieni: false, iniziale: true })).not.toContain('paginaIniziale');
-		const cartella = [{ ...voci(1)[0], name: 'Foto', kind: 'dir' as const }];
-		expect(azioni({ selezione: cartella, appuntiPieni: false })).toEqual(
-			expect.arrayContaining(['paginaIniziale', 'terminale'])
+	it('the folder that is already the start page does not offer it again', () => {
+		expect(actions({ selection: [], clipboardFull: false, isStartPage: true })).not.toContain('setStartPage');
+		const folder = [{ ...items(1)[0], name: 'Foto', kind: 'dir' as const }];
+		expect(actions({ selection: folder, clipboardFull: false })).toEqual(
+			expect.arrayContaining(['setStartPage', 'terminal'])
 		);
-		expect(azioni({ selezione: voci(1), appuntiPieni: false })).not.toContain('terminale');
-		expect(azioni({ selezione: [], appuntiPieni: false, posizione: 'pc' })).toContain('iniziale:pc');
+		expect(actions({ selection: items(1), clipboardFull: false })).not.toContain('terminal');
+		expect(actions({ selection: [], clipboardFull: false, location: 'pc' })).toContain('start:pc');
 	});
 
-	it('sul vuoto con appunti pieni offre anche di incollare', () => {
-		expect(azioni({ selezione: [], appuntiPieni: true })).toContain('incolla');
+	it('on empty space with a full clipboard also offers to paste', () => {
+		expect(actions({ selection: [], clipboardFull: true })).toContain('paste');
 	});
 
-	it('sul vuoto offre di annullare l ultima operazione, dicendo quale', () => {
-		const v = vociMenu({ selezione: [], appuntiPieni: false, annullabile: 'rinomina di «a.txt»' });
-		expect(v.find((x) => x.azione === 'annulla')?.etichetta).toBe('Annulla rinomina di «a.txt»');
+	it('on empty space offers to undo the last operation, saying which', () => {
+		const v = menuItems({ selection: [], clipboardFull: false, undoable: 'rinomina di «a.txt»' });
+		expect(v.find((x) => x.action === 'undo')?.label).toBe('Annulla rinomina di «a.txt»');
 	});
 
-	it('su un file offre apri con, comprimi ed elimina definitivamente', () => {
-		const a = azioni({ selezione: voci(1), appuntiPieni: false });
+	it('on a file offers open with, compress and delete permanently', () => {
+		const a = actions({ selection: items(1), clipboardFull: false });
 		expect(a).toEqual(
-			expect.arrayContaining(['apriCon', 'comprimi', 'eliminaDefinitivo', 'altreOpzioni', 'proprieta'])
+			expect.arrayContaining(['openWith', 'compress', 'deletePermanently', 'moreOptions', 'properties'])
 		);
-		expect(a).not.toContain('apriNuovaScheda');
-		expect(a).not.toContain('estrai');
+		expect(a).not.toContain('openNewTab');
+		expect(a).not.toContain('extract');
 	});
 
 	it('on Linux leaves out what only the Windows Shell can do', () => {
-		const a = vociMenu({ selezione: voci(1), appuntiPieni: false }, true).map((v) => v.azione);
-		for (const solo of ['apriCon', 'altreOpzioni', 'proprieta', 'mostraInEsplora']) {
-			expect(a).not.toContain(solo);
+		const a = menuItems({ selection: items(1), clipboardFull: false }, true).map((v) => v.action);
+		for (const only of ['openWith', 'moreOptions', 'properties', 'revealInExplorer']) {
+			expect(a).not.toContain(only);
 		}
-		expect(a).toEqual(expect.arrayContaining(['apri', 'comprimi', 'cestina']));
+		expect(a).toEqual(expect.arrayContaining(['open', 'compress', 'trash']));
 	});
 
-	it('su una cartella offre di aprirla in una nuova scheda', () => {
-		const cartella = [{ ...voci(1)[0], name: 'Foto', kind: 'dir' as const }];
-		const a = azioni({ selezione: cartella, appuntiPieni: false });
-		expect(a).toContain('apriNuovaScheda');
-		expect(a).not.toContain('apriCon');
+	it('on a folder offers to open it in a new tab', () => {
+		const folder = [{ ...items(1)[0], name: 'Foto', kind: 'dir' as const }];
+		const a = actions({ selection: folder, clipboardFull: false });
+		expect(a).toContain('openNewTab');
+		expect(a).not.toContain('openWith');
 	});
 
-	it('su uno zip offre di estrarlo, su un exe di avviarlo come amministratore', () => {
-		const zip = [{ ...voci(1)[0], name: 'a.zip' }];
-		const exe = [{ ...voci(1)[0], name: 'setup.exe' }];
-		expect(azioni({ selezione: zip, appuntiPieni: false })).toContain('estrai');
-		expect(azioni({ selezione: exe, appuntiPieni: false })).toContain('amministratore');
+	it('on a zip offers to extract it, on an exe to run it as administrator', () => {
+		const zip = [{ ...items(1)[0], name: 'a.zip' }];
+		const exe = [{ ...items(1)[0], name: 'setup.exe' }];
+		expect(actions({ selection: zip, clipboardFull: false })).toContain('extract');
+		expect(actions({ selection: exe, clipboardFull: false })).toContain('runAsAdmin');
 	});
 
-	it('fra i risultati di ricerca offre il percorso e non i preferiti', () => {
-		const a = azioni({ selezione: voci(1), appuntiPieni: true, ricerca: true });
-		expect(a).toContain('apriPercorso');
-		expect(a).not.toContain('preferito');
-		expect(a).not.toContain('incolla');
+	it('among search results offers the location and not the favourites', () => {
+		const a = actions({ selection: items(1), clipboardFull: true, search: true });
+		expect(a).toContain('openFileLocation');
+		expect(a).not.toContain('favorite');
+		expect(a).not.toContain('paste');
 	});
 
-	it('nel Cestino si ripristina o si elimina per sempre', () => {
-		expect(azioni({ selezione: voci(2), appuntiPieni: true, posizione: 'cestino' })).toEqual([
-			'ripristina',
-			'eliminaDefinitivo'
+	it('in the Recycle Bin items are restored or deleted for good', () => {
+		expect(actions({ selection: items(2), clipboardFull: true, location: 'trash' })).toEqual([
+			'restore',
+			'deletePermanently'
 		]);
-		expect(azioni({ selezione: [], appuntiPieni: false, posizione: 'cestino' })).toEqual([
-			'aggiorna',
-			'svuotaCestino'
+		expect(actions({ selection: [], clipboardFull: false, location: 'trash' })).toEqual([
+			'refresh',
+			'emptyTrash'
 		]);
 	});
 
-	it('in Questo PC un disco si apre o se ne vedono le proprietà', () => {
-		const disco = [{ ...voci(1)[0], name: 'C:', kind: 'dir' as const }];
-		const a = azioni({ selezione: disco, appuntiPieni: false, posizione: 'pc' });
-		expect(a).toContain('apri');
-		expect(a).toContain('proprieta');
-		expect(a).not.toContain('cestina');
+	it('in This PC a drive opens or shows its properties', () => {
+		const drive = [{ ...items(1)[0], name: 'C:', kind: 'dir' as const }];
+		const a = actions({ selection: drive, clipboardFull: false, location: 'pc' });
+		expect(a).toContain('open');
+		expect(a).toContain('properties');
+		expect(a).not.toContain('trash');
 	});
 
-	it('su una voce sola offre apri e rinomina', () => {
-		const a = azioni({ selezione: voci(1), appuntiPieni: false });
+	it('on a single item offers open and rename', () => {
+		const a = actions({ selection: items(1), clipboardFull: false });
 
-		expect(a).toContain('apri');
-		expect(a).toContain('rinomina');
-		expect(a).toContain('mostraInEsplora');
+		expect(a).toContain('open');
+		expect(a).toContain('rename');
+		expect(a).toContain('revealInExplorer');
 	});
 
-	it('su più voci non offre apri, e rinomina apre la rinomina multipla', () => {
-		const a = azioni({ selezione: voci(3), appuntiPieni: false });
+	it('on several items does not offer open, and rename opens the batch rename', () => {
+		const a = actions({ selection: items(3), clipboardFull: false });
 
-		// Aprire venti file insieme è quasi sempre un incidente.
-		expect(a).not.toContain('apri');
-		expect(a).not.toContain('mostraInEsplora');
-		expect(a).toContain('rinomina');
+		// Opening twenty files together is almost always an accident.
+		expect(a).not.toContain('open');
+		expect(a).not.toContain('revealInExplorer');
+		expect(a).toContain('rename');
 		// Search results come from different folders: no batch rename there.
-		expect(azioni({ selezione: voci(3), appuntiPieni: false, ricerca: true })).not.toContain('rinomina');
+		expect(actions({ selection: items(3), clipboardFull: false, search: true })).not.toContain('rename');
 	});
 
-	it('la voce preferiti dice se aggiunge o toglie', () => {
-		const etichetta = (giaPreferiti: boolean) =>
-			vociMenu({ selezione: voci(1), appuntiPieni: false, giaPreferiti }).find(
-				(v) => v.azione === 'preferito'
-			)?.etichetta;
+	it('the favourites item says whether it adds or removes', () => {
+		const label = (alreadyFavorite: boolean) =>
+			menuItems({ selection: items(1), clipboardFull: false, alreadyFavorite }).find(
+				(v) => v.action === 'favorite'
+			)?.label;
 
-		expect(etichetta(false)).toBe('Aggiungi ai preferiti');
-		expect(etichetta(true)).toBe('Rimuovi dai preferiti');
+		expect(label(false)).toBe('Aggiungi ai preferiti');
+		expect(label(true)).toBe('Rimuovi dai preferiti');
 	});
 
-	it('sul vuoto non offre i preferiti', () => {
-		expect(azioni({ selezione: [], appuntiPieni: false })).not.toContain('preferito');
+	it('on empty space does not offer favourites', () => {
+		expect(actions({ selection: [], clipboardFull: false })).not.toContain('favorite');
 	});
 
-	it('incolla compare solo con gli appunti pieni', () => {
-		expect(azioni({ selezione: voci(1), appuntiPieni: false })).not.toContain('incolla');
-		expect(azioni({ selezione: voci(1), appuntiPieni: true })).toContain('incolla');
+	it('paste shows only with a full clipboard', () => {
+		expect(actions({ selection: items(1), clipboardFull: false })).not.toContain('paste');
+		expect(actions({ selection: items(1), clipboardFull: true })).toContain('paste');
 	});
 
-	it('l etichetta del cestino dice quanti elementi spariscono', () => {
-		const uno = vociMenu({ selezione: voci(1), appuntiPieni: false }).find(
-			(v) => v.azione === 'cestina'
+	it('the trash label says how many items go', () => {
+		const one = menuItems({ selection: items(1), clipboardFull: false }).find(
+			(v) => v.action === 'trash'
 		);
-		const tre = vociMenu({ selezione: voci(3), appuntiPieni: false }).find(
-			(v) => v.azione === 'cestina'
-		);
-
-		expect(uno?.etichetta).toBe('Sposta nel Cestino');
-		expect(tre?.etichetta).toBe('Sposta 3 elementi nel Cestino');
-	});
-
-	it('il cestino è marcato come pericoloso', () => {
-		const cestina = vociMenu({ selezione: voci(1), appuntiPieni: false }).find(
-			(v) => v.azione === 'cestina'
-		);
-		expect(cestina?.pericolosa).toBe(true);
-	});
-
-	it('copia percorso si accorda al numero', () => {
-		const uno = vociMenu({ selezione: voci(1), appuntiPieni: false }).find(
-			(v) => v.azione === 'copiaPercorso'
-		);
-		const due = vociMenu({ selezione: voci(2), appuntiPieni: false }).find(
-			(v) => v.azione === 'copiaPercorso'
+		const three = menuItems({ selection: items(3), clipboardFull: false }).find(
+			(v) => v.action === 'trash'
 		);
 
-		expect(uno?.etichetta).toBe('Copia percorso');
-		expect(due?.etichetta).toBe('Copia percorsi');
+		expect(one?.label).toBe('Sposta nel Cestino');
+		expect(three?.label).toBe('Sposta 3 elementi nel Cestino');
+	});
+
+	it('trash is marked as dangerous', () => {
+		const trashItem = menuItems({ selection: items(1), clipboardFull: false }).find(
+			(v) => v.action === 'trash'
+		);
+		expect(trashItem?.danger).toBe(true);
+	});
+
+	it('copy path agrees with the number', () => {
+		const one = menuItems({ selection: items(1), clipboardFull: false }).find(
+			(v) => v.action === 'copyPath'
+		);
+		const two = menuItems({ selection: items(2), clipboardFull: false }).find(
+			(v) => v.action === 'copyPath'
+		);
+
+		expect(one?.label).toBe('Copia percorso');
+		expect(two?.label).toBe('Copia percorsi');
 	});
 });
 
-describe('posizionaMenu', () => {
-	const menu = { larghezza: 200, altezza: 300 };
-	const finestra = { larghezza: 1000, altezza: 700 };
+describe('placeMenu', () => {
+	const menu = { width: 200, height: 300 };
+	const window = { width: 1000, height: 700 };
 
-	it('al centro resta dove è stato chiesto', () => {
-		expect(posizionaMenu(400, 200, menu, finestra)).toEqual({ x: 400, y: 200 });
+	it('in the middle it stays where it was asked', () => {
+		expect(placeMenu(400, 200, menu, window)).toEqual({ x: 400, y: 200 });
 	});
 
-	it('vicino al bordo destro rientra nella finestra', () => {
-		const { x } = posizionaMenu(950, 200, menu, finestra);
-		expect(x + menu.larghezza).toBeLessThanOrEqual(finestra.larghezza);
+	it('near the right edge it comes back inside the window', () => {
+		const { x } = placeMenu(950, 200, menu, window);
+		expect(x + menu.width).toBeLessThanOrEqual(window.width);
 	});
 
-	it('vicino al bordo inferiore rientra nella finestra', () => {
-		const { y } = posizionaMenu(400, 690, menu, finestra);
-		expect(y + menu.altezza).toBeLessThanOrEqual(finestra.altezza);
+	it('near the bottom edge it comes back inside the window', () => {
+		const { y } = placeMenu(400, 690, menu, window);
+		expect(y + menu.height).toBeLessThanOrEqual(window.height);
 	});
 
-	it('non finisce mai a coordinate negative', () => {
-		const p = posizionaMenu(0, 0, menu, finestra);
+	it('never ends up at negative coordinates', () => {
+		const p = placeMenu(0, 0, menu, window);
 		expect(p.x).toBeGreaterThanOrEqual(0);
 		expect(p.y).toBeGreaterThanOrEqual(0);
 	});
 
-	it('un menu più alto della finestra resta comunque ancorato in alto', () => {
-		const gigante = { larghezza: 200, altezza: 900 };
-		const p = posizionaMenu(400, 300, gigante, finestra);
+	it('a menu taller than the window stays anchored at the top all the same', () => {
+		const huge = { width: 200, height: 900 };
+		const p = placeMenu(400, 300, huge, window);
 		expect(p.y).toBe(8);
 	});
 });
 
-describe('vociVista', () => {
-	it('spunta la taglia, la vista e le opzioni attive', () => {
-		const v = vociVista({
-			vista: 'icone',
-			lato: 128,
-			compatta: true,
-			colonne: { tipo: true, dimensione: false, data: true },
-			estensioni: false,
-			nascosti: true,
-			anteprima: false
+describe('viewItems', () => {
+	it('checks the size, the view and the active options', () => {
+		const v = viewItems({
+			view: 'icons',
+			side: 128,
+			compact: true,
+			columns: { type: true, size: false, date: true },
+			extensions: false,
+			hidden: true,
+			preview: false
 		});
-		const spuntate = v.filter((x) => x.spunta).map((x) => x.azione);
-		expect(spuntate).toEqual(['lato:128', 'compatta', 'colonnaTipo', 'colonnaData', 'nascosti', 'iniziale:c']);
+		const checked = v.filter((x) => x.checked).map((x) => x.action);
+		expect(checked).toEqual(['side:128', 'compact', 'columnType', 'columnDate', 'hidden', 'start:c']);
 	});
 
-	it('spunta la pagina iniziale, anche una cartella scelta col menu', () => {
+	it('checks the start page, even a folder chosen with the menu', () => {
 		const base = {
-			vista: 'dettagli' as const,
-			lato: 96,
-			compatta: false,
-			colonne: { tipo: false, dimensione: true, data: true },
-			estensioni: true,
-			nascosti: false,
-			anteprima: false
+			view: 'details' as const,
+			side: 96,
+			compact: false,
+			columns: { type: false, size: true, date: true },
+			extensions: true,
+			hidden: false,
+			preview: false
 		};
-		const spuntata = (iniziale: string) =>
-			vociVista({ ...base, iniziale }).filter((x) => x.azione.startsWith('iniziale:') && x.spunta);
-		expect(spuntata('::pc').map((x) => x.azione)).toEqual(['iniziale:pc']);
-		expect(spuntata('::ultima').map((x) => x.azione)).toEqual(['iniziale:ultima']);
-		expect(spuntata('D:\\Progetti\\').map((x) => x.etichetta)).toEqual(['Progetti']);
+		const checked = (startPage: string) =>
+			viewItems({ ...base, startPage }).filter((x) => x.action.startsWith('start:') && x.checked);
+		expect(checked('::pc').map((x) => x.action)).toEqual(['start:pc']);
+		expect(checked('::ultima').map((x) => x.action)).toEqual(['start:last']);
+		expect(checked('D:\\Progetti\\').map((x) => x.label)).toEqual(['Progetti']);
 	});
 
-	it('elenca le otto viste di Esplora', () => {
-		const v = vociVista({
-			vista: 'dettagli',
-			lato: 96,
-			compatta: false,
-			colonne: { tipo: false, dimensione: true, data: true },
-			estensioni: true,
-			nascosti: false,
-			anteprima: false
+	it('lists the eight Explorer views', () => {
+		const v = viewItems({
+			view: 'details',
+			side: 96,
+			compact: false,
+			columns: { type: false, size: true, date: true },
+			extensions: true,
+			hidden: false,
+			preview: false
 		});
-		expect(v.slice(0, 8).map((x) => x.etichetta)).toEqual([
+		expect(v.slice(0, 8).map((x) => x.label)).toEqual([
 			'Icone molto grandi',
 			'Icone grandi',
 			'Icone medie',
@@ -281,82 +281,82 @@ describe('vociVista', () => {
 	});
 });
 
-describe('vociOrdina', () => {
-	it('spunta colonna, verso e raggruppamento', () => {
-		const v = vociOrdina({ key: 'modified', ascending: false }, 'tipo');
-		expect(v.filter((x) => x.spunta).map((x) => x.azione)).toEqual([
-			'ordina:modified',
-			'decrescente',
-			'gruppi:tipo'
+describe('sortItems', () => {
+	it('checks column, direction and grouping', () => {
+		const v = sortItems({ key: 'modified', ascending: false }, 'type');
+		expect(v.filter((x) => x.checked).map((x) => x.action)).toEqual([
+			'sort:modified',
+			'descending',
+			'group:type'
 		]);
-		expect(v.find((x) => x.sezione)?.sezione).toBe('Raggruppa per');
+		expect(v.find((x) => x.section)?.section).toBe('Raggruppa per');
 	});
 });
 
-describe('colore cartella', () => {
+describe('folder colour', () => {
 	it('the palette is offered for files (colour label) and folders, with the current colour marked', () => {
-		const file = voci(1);
-		const cartella = [{ ...voci(1)[0], kind: 'dir' as const }];
-		expect(azioni({ selezione: file, appuntiPieni: false })).toContain('coloreCartella');
-		const v = vociMenu({ selezione: cartella, appuntiPieni: false, coloreAttuale: 'verde' });
-		const tavolozza = v.find((x) => x.azione === 'coloreCartella')?.tavolozza ?? [];
-		expect(tavolozza.find((c) => c.attivo)?.azione).toBe('colore:verde');
-		expect(tavolozza[0].azione).toBe('coloreNessuno');
+		const file = items(1);
+		const folder = [{ ...items(1)[0], kind: 'dir' as const }];
+		expect(actions({ selection: file, clipboardFull: false })).toContain('folderColor');
+		const v = menuItems({ selection: folder, clipboardFull: false, currentColor: 'verde' });
+		const palette = v.find((x) => x.action === 'folderColor')?.palette ?? [];
+		expect(palette.find((c) => c.active)?.action).toBe('color:verde');
+		expect(palette[0].action).toBe('noColor');
 	});
 });
 
-describe('vociNuovo', () => {
-	it('prima la cartella, poi i tipi di file di Windows', () => {
-		const v = vociNuovo([
-			{ ext: '.txt', nome: 'Documento di testo' },
-			{ ext: '.docx', nome: 'Documento di Microsoft Word' }
+describe('newItems', () => {
+	it('first the folder, then the Windows file types', () => {
+		const v = newItems([
+			{ ext: '.txt', name: 'Documento di testo' },
+			{ ext: '.docx', name: 'Documento di Microsoft Word' }
 		]);
-		expect(v.map((x) => x.azione)).toEqual(['nuovaCartella', 'nuovaCassaforte', 'nuovo:.txt', 'nuovo:.docx']);
-		expect(v[2].stacca).toBe(true);
+		expect(v.map((x) => x.action)).toEqual(['newFolder', 'newVault', 'new:.txt', 'new:.docx']);
+		expect(v[2].separator).toBe(true);
 	});
 });
 
-describe('rete locale nel menu', () => {
-	const pari = [
-		{ id: 'PC2-ab12', nome: 'PC2' },
-		{ id: 'PC3-cd34', nome: 'PC3' }
+describe('local network in the menu', () => {
+	const peers = [
+		{ id: 'PC2-ab12', name: 'PC2' },
+		{ id: 'PC3-cd34', name: 'PC3' }
 	];
 
-	it('offre un invio per ogni PC trovato', () => {
-		const a = azioni({ selezione: voci(1), appuntiPieni: false, pari });
-		expect(a).toContain('invia:PC2-ab12');
-		expect(a).toContain('invia:PC3-cd34');
+	it('offers one send per PC found', () => {
+		const a = actions({ selection: items(1), clipboardFull: false, peers });
+		expect(a).toContain('send:PC2-ab12');
+		expect(a).toContain('send:PC3-cd34');
 	});
 
-	it('una cartella si condivide o si smette di condividere', () => {
-		const cartella = [{ ...voci(1)[0], path: 'C:\\Foto', kind: 'dir' as const }];
-		expect(azioni({ selezione: cartella, appuntiPieni: false })).toContain('condividi');
-		expect(azioni({ selezione: cartella, appuntiPieni: false, condivisa: 'c:\\foto' })).toContain(
-			'nonCondividere'
+	it('a folder is shared or stops being shared', () => {
+		const folder = [{ ...items(1)[0], path: 'C:\\Foto', kind: 'dir' as const }];
+		expect(actions({ selection: folder, clipboardFull: false })).toContain('share');
+		expect(actions({ selection: folder, clipboardFull: false, shared: 'c:\\foto' })).toContain(
+			'stopSharing'
 		);
 	});
 
-	it('nella cartella di un altro PC si legge e si copia soltanto', () => {
-		expect(azioni({ selezione: voci(1), appuntiPieni: true, posizione: 'lan' })).toEqual([
-			'apri',
-			'copia',
-			'scarica'
+	it('in the folder of another PC you only read and copy', () => {
+		expect(actions({ selection: items(1), clipboardFull: true, location: 'lan' })).toEqual([
+			'open',
+			'copy',
+			'download'
 		]);
 	});
 });
 
-describe('accesso rapido nel menu', () => {
-	it('una cartella si fissa o si rimuove, un file no', () => {
-		const cartella = [{ ...voci(1)[0], kind: 'dir' as const }];
-		expect(azioni({ selezione: cartella, appuntiPieni: false })).toContain('fissa');
-		expect(azioni({ selezione: cartella, appuntiPieni: false, fissata: true })).toContain('sgancia');
-		expect(azioni({ selezione: voci(1), appuntiPieni: false })).not.toContain('fissa');
+describe('Quick access in the menu', () => {
+	it('a folder is pinned or removed, a file is not', () => {
+		const folder = [{ ...items(1)[0], kind: 'dir' as const }];
+		expect(actions({ selection: folder, clipboardFull: false })).toContain('pin');
+		expect(actions({ selection: folder, clipboardFull: false, pinned: true })).toContain('unpin');
+		expect(actions({ selection: items(1), clipboardFull: false })).not.toContain('pin');
 	});
 
-	it('il menu della barra laterale non offre di spostare oltre i bordi', () => {
-		const az = (v: ReturnType<typeof vociAccessoRapido>) => v.map((x) => x.azione);
-		expect(az(vociAccessoRapido(true, false))).not.toContain('suAccesso');
-		expect(az(vociAccessoRapido(false, true))).not.toContain('giuAccesso');
-		expect(az(vociAccessoRapido(true, true))).toEqual(['apriNuovaScheda', 'apriNuovaFinestra', 'sgancia']);
+	it('the sidebar menu does not offer to move past the edges', () => {
+		const act = (v: ReturnType<typeof quickAccessItems>) => v.map((x) => x.action);
+		expect(act(quickAccessItems(true, false))).not.toContain('quickAccessUp');
+		expect(act(quickAccessItems(false, true))).not.toContain('quickAccessDown');
+		expect(act(quickAccessItems(true, true))).toEqual(['openNewTab', 'openNewWindow', 'unpin']);
 	});
 });

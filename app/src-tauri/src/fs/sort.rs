@@ -27,8 +27,8 @@ impl Default for SortSpec {
     }
 }
 
-/// Le cartelle precedono sempre i file, in qualsiasi direzione: l'inversione
-/// dell'ordine si applica solo dentro ciascun gruppo.
+/// Folders always come before files, in either direction: reversing the
+/// order only applies inside each group.
 pub fn sort_entries(entries: &mut [Entry], spec: &SortSpec) {
     entries.sort_by(|a, b| {
         let group = rank(a).cmp(&rank(b));
@@ -87,16 +87,16 @@ mod tests {
             size,
             modified: Some(modified),
             hidden: false,
-            origine: None,
-            libero: None,
-            totale: None,
-            icona_propria: false,
+            origin: None,
+            free: None,
+            total: None,
+            own_icon: false,
             snippet: None,
         }
     }
 
     #[test]
-    fn le_cartelle_vengono_sempre_prima() {
+    fn folders_always_come_first() {
         let mut v = vec![
             e("zeta.txt", EntryKind::File, 1, 1),
             e("alfa", EntryKind::Dir, 0, 1),
@@ -113,7 +113,7 @@ mod tests {
     }
 
     #[test]
-    fn le_cartelle_restano_prima_anche_in_ordine_inverso() {
+    fn folders_stay_first_even_in_reverse_order() {
         let mut v = vec![
             e("zeta.txt", EntryKind::File, 1, 1),
             e("alfa", EntryKind::Dir, 0, 1),
@@ -130,7 +130,7 @@ mod tests {
     }
 
     #[test]
-    fn ordina_per_nome_ignorando_maiuscole() {
+    fn sorts_by_name_ignoring_case() {
         let mut v = vec![
             e("Banana", EntryKind::File, 1, 1),
             e("ananas", EntryKind::File, 1, 1),
@@ -146,7 +146,7 @@ mod tests {
     }
 
     #[test]
-    fn ordina_per_dimensione_decrescente() {
+    fn sorts_by_size_descending() {
         let mut v = vec![
             e("piccolo.txt", EntryKind::File, 10, 1),
             e("grande.txt", EntryKind::File, 900, 1),
@@ -162,7 +162,7 @@ mod tests {
     }
 
     #[test]
-    fn ordina_per_data() {
+    fn sorts_by_date() {
         let mut v = vec![
             e("vecchio.txt", EntryKind::File, 1, 100),
             e("nuovo.txt", EntryKind::File, 1, 900),

@@ -10,19 +10,19 @@ const inTest = Boolean(process.env.VITEST);
 export default defineConfig({
   plugins: [sveltekit()],
 
-  // Senza la condizione "browser", Vite risolve la build server-side di
-  // Svelte e `mount()` non esiste. Va al livello principale: dentro `test`
-  // viene ignorata. La guardia tiene la modifica fuori dalla build dell'app.
+  // Without the "browser" condition, Vite resolves the server-side build of
+  // Svelte and `mount()` does not exist. It goes at the top level: inside `test`
+  // it is ignored. The guard keeps the change out of the app build.
   resolve: inTest ? { conditions: ["browser"] } : undefined,
 
   test: {
-    // Due ambienti separati: avviare jsdom anche per i file di sola logica
-    // porta la suite da 3 a 24 secondi senza verificare nulla di più.
+    // Two separate environments: starting jsdom for logic-only files too
+    // takes the suite from 3 to 24 seconds without checking anything more.
     projects: [
       {
         extends: true,
         test: {
-          name: "logica",
+          name: "logic",
           environment: "node",
           include: ["src/**/*.test.ts"],
           exclude: ["src/**/*.dom.test.ts"],
@@ -40,11 +40,11 @@ export default defineConfig({
     ],
   },
 
-  // Opzioni per Tauri, applicate solo da `tauri dev` e `tauri build`
+  // Tauri options, applied only by `tauri dev` and `tauri build`
   //
-  // 1. impedisce a Vite di nascondere gli errori di Rust
+  // 1. prevents Vite from hiding Rust errors
   clearScreen: false,
-  // 2. Tauri pretende una porta fissa e fallisce se occupata
+  // 2. Tauri expects a fixed port and fails if it is taken
   server: {
     port: 1420,
     strictPort: true,
@@ -57,7 +57,7 @@ export default defineConfig({
         }
       : undefined,
     watch: {
-      // 3. dice a Vite di non sorvegliare `src-tauri`
+      // 3. tells Vite not to watch `src-tauri`
       ignored: ["**/src-tauri/**"],
     },
   },

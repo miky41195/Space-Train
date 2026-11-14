@@ -1,9 +1,9 @@
-//! Estrazione di icone e miniature dalla Shell di Windows.
+//! Extraction of icons and thumbnails from the Windows Shell.
 //!
-//! Due percorsi distinti, con costi molto diversi:
-//! - le icone si risolvono per estensione senza toccare il disco;
-//! - le miniature leggono il file vero e vanno chieste solo per ciò che è
-//!   effettivamente a schermo.
+//! Two separate paths, with very different costs:
+//! - icons are resolved by extension without touching the disk;
+//! - thumbnails read the real file and must be asked only for what is
+//!   actually on screen.
 
 use base64::Engine;
 use windows::core::PCWSTR;
@@ -22,110 +22,110 @@ use windows::Win32::UI::Shell::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{DestroyIcon, GetIconInfo, HICON, ICONINFO};
 
-/// Immagine pronta per il frontend: PNG in base64, dentro una data URL.
+/// Image ready for the frontend: PNG in base64, inside a data URL.
 pub type DataUrl = String;
 
 /// Richiesta indirizzata al thread STA.
-enum Richiesta {
-    Icona {
+enum Request {
+    Icon {
         ext: String,
         is_dir: bool,
         large: bool,
-        risposta: std::sync::mpsc::Sender<Option<DataUrl>>,
+        reply: std::sync::mpsc::Sender<Option<DataUrl>>,
     },
-    Miniatura {
+    Thumbnail {
         path: String,
-        lato: u32,
-        risposta: std::sync::mpsc::Sender<Option<DataUrl>>,
+        side: u32,
+        reply: std::sync::mpsc::Sender<Option<DataUrl>>,
     },
 }
 
-/// Canali verso i thread STA, creati alla prima richiesta.
+/// Channels to the STA threads, created at the first request.
 ///
-/// Due thread, uno per le icone e uno per le miniature: un video lento da
-/// decodificare non deve tenere in fila le icone di tipo, che costano poco
-/// e servono subito a ogni cartella aperta.
-static SPORTELLO_ICONE: std::sync::OnceLock<std::sync::mpsc::Sender<Richiesta>> =
+/// Two threads, one for icons and one for thumbnails: a video slow to
+/// decode must not keep in line the type icons, which cost little
+/// and are needed right away for every opened folder.
+static ICON_WORKER: std::sync::OnceLock<std::sync::mpsc::Sender<Request>> =
     std::sync::OnceLock::new();
-static SPORTELLO_MINIATURE: std::sync::OnceLock<std::sync::mpsc::Sender<Richiesta>> =
+static THUMB_WORKER: std::sync::OnceLock<std::sync::mpsc::Sender<Request>> =
     std::sync::OnceLock::new();
 
-/// Oltre questa attesa la richiesta si abbandona: meglio un'icona di
-/// ripiego che una voce in attesa per sempre dietro un file che non si
-/// lascia leggere.
-const ATTESA_MAX: std::time::Duration = std::time::Duration::from_secs(8);
+/// Past this wait the request is abandoned: better a fallback
+/// icon than an item waiting forever behind a file that does not
+/// let itself be read.
+const MAX_WAIT: std::time::Duration = std::time::Duration::from_secs(8);
 
-/// Tutte le estrazioni passano da thread inizializzati STA.
+/// All extractions go through STA-initialized threads.
 ///
-/// `SHGetFileInfoW` con `SHGFI_ICON` e `IShellItemImageFactory` invocano
-/// handler della Shell che pretendono un apartment a thread singolo. I
-/// comandi Tauri girano su un pool di thread qualunque: chiamarli da lì
-/// riesce o fallisce a seconda del thread che capita, e il sintomo è un
-/// fallimento intermittente che non si riproduce mai isolato.
-fn avvia_sportello(nome: &str) -> std::sync::mpsc::Sender<Richiesta> {
-    let (invia, ricevi) = std::sync::mpsc::channel::<Richiesta>();
+/// `SHGetFileInfoW` with `SHGFI_ICON` and `IShellItemImageFactory` invoke
+/// Shell handlers that require a single-threaded apartment. Tauri
+/// commands run on any pool thread: calling them from there
+/// succeeds or fails depending on the thread at hand, and the symptom is an
+/// intermittent failure that never reproduces in isolation.
+fn start_worker(name: &str) -> std::sync::mpsc::Sender<Request> {
+    let (tx, rx) = std::sync::mpsc::channel::<Request>();
 
     std::thread::Builder::new()
-        .name(nome.into())
+        .name(name.into())
         .spawn(move || {
             unsafe {
                 let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
             }
 
-            while let Ok(richiesta) = ricevi.recv() {
-                match richiesta {
-                    Richiesta::Icona {
+            while let Ok(request) = rx.recv() {
+                match request {
+                    Request::Icon {
                         ext,
                         is_dir,
                         large,
-                        risposta,
+                        reply,
                     } => {
-                        let _ = risposta.send(icona_impl(&ext, is_dir, large));
+                        let _ = reply.send(icon_impl(&ext, is_dir, large));
                     }
-                    Richiesta::Miniatura {
+                    Request::Thumbnail {
                         path,
-                        lato,
-                        risposta,
+                        side,
+                        reply,
                     } => {
-                        let _ = risposta.send(miniatura_impl(&path, lato));
+                        let _ = reply.send(thumbnail_impl(&path, side));
                     }
                 }
             }
         })
-        .expect("impossibile avviare il thread delle icone");
+        .expect("cannot start the icon thread");
 
-    invia
+    tx
 }
 
-fn chiedi(
-    sportello: &'static std::sync::OnceLock<std::sync::mpsc::Sender<Richiesta>>,
-    nome: &str,
-    richiesta: impl FnOnce(std::sync::mpsc::Sender<Option<DataUrl>>) -> Richiesta,
+fn ask(
+    worker: &'static std::sync::OnceLock<std::sync::mpsc::Sender<Request>>,
+    name: &str,
+    request: impl FnOnce(std::sync::mpsc::Sender<Option<DataUrl>>) -> Request,
 ) -> Option<DataUrl> {
-    let (invia, ricevi) = std::sync::mpsc::channel();
-    sportello
-        .get_or_init(|| avvia_sportello(nome))
-        .send(richiesta(invia))
+    let (tx, rx) = std::sync::mpsc::channel();
+    worker
+        .get_or_init(|| start_worker(name))
+        .send(request(tx))
         .ok()?;
-    ricevi.recv_timeout(ATTESA_MAX).ok()?
+    rx.recv_timeout(MAX_WAIT).ok()?
 }
 
-/// Icona associata a un'estensione. Vedi `icona_impl` per i dettagli.
+/// Icon associated with an extension. See `icon_impl` for the details.
 pub fn icon_for_extension(ext: &str, is_dir: bool, large: bool) -> Option<DataUrl> {
-    chiedi(&SPORTELLO_ICONE, "shell-icons", |risposta| Richiesta::Icona {
+    ask(&ICON_WORKER, "shell-icons", |reply| Request::Icon {
         ext: ext.to_string(),
         is_dir,
         large,
-        risposta,
+        reply,
     })
 }
 
-/// Miniatura reale del file. Vedi `miniatura_impl` per i dettagli.
-pub fn thumbnail(path: &str, lato: u32) -> Option<DataUrl> {
-    chiedi(&SPORTELLO_MINIATURE, "shell-thumbs", |risposta| Richiesta::Miniatura {
+/// Real thumbnail of the file. See `thumbnail_impl` for the details.
+pub fn thumbnail(path: &str, side: u32) -> Option<DataUrl> {
+    ask(&THUMB_WORKER, "shell-thumbs", |reply| Request::Thumbnail {
         path: path.to_string(),
-        lato,
-        risposta,
+        side,
+        reply,
     })
 }
 
@@ -133,15 +133,15 @@ fn a_utf16(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
-/// Icona associata a un'estensione, senza leggere alcun file dal disco.
+/// Icon associated with an extension, without reading any file from disk.
 ///
-/// `SHGFI_USEFILEATTRIBUTES` fa risolvere l'icona sul solo nome: si può
-/// chiedere una volta per tipo e riusare per tutte le voci di quel tipo.
+/// `SHGFI_USEFILEATTRIBUTES` makes the icon resolve on the name alone: it can be
+/// asked once per type and reused for all the items of that type.
 ///
-/// Da invocare solo dal thread STA: vedi `sportello`.
-fn icona_impl(ext: &str, is_dir: bool, large: bool) -> Option<DataUrl> {
-    // Un nome finto basta: nulla viene aperto.
-    let finto = if is_dir {
+/// To be invoked only from the STA thread: see `worker`.
+fn icon_impl(ext: &str, is_dir: bool, large: bool) -> Option<DataUrl> {
+    // A fake name is enough: nothing gets opened.
+    let fake = if is_dir {
         "cartella".to_string()
     } else if ext.is_empty() {
         "file".to_string()
@@ -149,7 +149,7 @@ fn icona_impl(ext: &str, is_dir: bool, large: bool) -> Option<DataUrl> {
         format!("file.{}", ext.trim_start_matches('.'))
     };
 
-    let attributi: FILE_FLAGS_AND_ATTRIBUTES = if is_dir {
+    let attributes: FILE_FLAGS_AND_ATTRIBUTES = if is_dir {
         FILE_ATTRIBUTE_DIRECTORY
     } else {
         FILE_ATTRIBUTE_NORMAL
@@ -160,15 +160,15 @@ fn icona_impl(ext: &str, is_dir: bool, large: bool) -> Option<DataUrl> {
         | SHGFI_USEFILEATTRIBUTES
         | if large { SHGFI_LARGEICON } else { SHGFI_SMALLICON };
 
-    // Il buffer UTF-16 deve sopravvivere alla chiamata: passarlo inline come
-    // `PCWSTR(a_utf16(..).as_ptr())` lo fa liberare prima che la Shell lo
-    // legga, e la lettura di memoria liberata riesce o fallisce a caso.
-    let wide = a_utf16(&finto);
+    // The UTF-16 buffer must outlive the call: passing it inline as
+    // `PCWSTR(to_utf16(..).as_ptr())` frees it before the Shell reads it,
+    // and reading freed memory succeeds or fails at random.
+    let wide = a_utf16(&fake);
 
     let ok = unsafe {
         SHGetFileInfoW(
             PCWSTR(wide.as_ptr()),
-            attributi,
+            attributes,
             Some(&mut info),
             std::mem::size_of::<SHFILEINFOW>() as u32,
             flag,
@@ -179,39 +179,39 @@ fn icona_impl(ext: &str, is_dir: bool, large: bool) -> Option<DataUrl> {
         return None;
     }
 
-    let risultato = icona_in_png(info.hIcon);
+    let result = icon_to_png(info.hIcon);
     unsafe {
         let _ = DestroyIcon(info.hIcon);
     }
 
-    risultato.map(in_data_url)
+    result.map(in_data_url)
 }
 
-/// Miniatura reale del file: anteprima delle immagini, fotogramma dei video,
-/// prima pagina dei PDF. Legge il file, quindi costa.
+/// Real thumbnail of the file: preview of images, frame of videos,
+/// first page of PDFs. It reads the file, so it costs.
 ///
-/// Da invocare solo dal thread STA: vedi `sportello`.
-fn miniatura_impl(path: &str, lato: u32) -> Option<DataUrl> {
+/// To be invoked only from the STA thread: see `worker`.
+fn thumbnail_impl(path: &str, side: u32) -> Option<DataUrl> {
     let wide = a_utf16(path);
 
-    let fabbrica: IShellItemImageFactory =
+    let factory: IShellItemImageFactory =
         unsafe { SHCreateItemFromParsingName(PCWSTR(wide.as_ptr()), None).ok()? };
 
-    let dimensione = SIZE {
-        cx: lato as i32,
-        cy: lato as i32,
+    let size = SIZE {
+        cx: side as i32,
+        cy: side as i32,
     };
 
-    // SIIGBF_BIGGERSIZEOK accetta una sorgente più grande invece di
-    // rifiutare: meglio ridurre noi che restare senza anteprima.
-    let bitmap: HBITMAP = unsafe { fabbrica.GetImage(dimensione, SIIGBF_BIGGERSIZEOK).ok()? };
+    // SIIGBF_BIGGERSIZEOK accepts a larger source instead of refusing:
+    // better for us to scale down than to be left without a preview.
+    let bitmap: HBITMAP = unsafe { factory.GetImage(size, SIIGBF_BIGGERSIZEOK).ok()? };
 
-    let risultato = bitmap_in_png(bitmap);
+    let result = bitmap_in_png(bitmap);
     unsafe {
         let _ = DeleteObject(HGDIOBJ(bitmap.0));
     }
 
-    risultato.map(in_data_url)
+    result.map(in_data_url)
 }
 
 fn in_data_url(png: Vec<u8>) -> DataUrl {
@@ -221,68 +221,68 @@ fn in_data_url(png: Vec<u8>) -> DataUrl {
     )
 }
 
-fn icona_in_png(icona: HICON) -> Option<Vec<u8>> {
+fn icon_to_png(icon: HICON) -> Option<Vec<u8>> {
     let mut info = ICONINFO::default();
-    unsafe { GetIconInfo(icona, &mut info).ok()? };
+    unsafe { GetIconInfo(icon, &mut info).ok()? };
 
-    let risultato = bitmap_in_png(info.hbmColor);
+    let result = bitmap_in_png(info.hbmColor);
 
     unsafe {
         let _ = DeleteObject(HGDIOBJ(info.hbmColor.0));
         let _ = DeleteObject(HGDIOBJ(info.hbmMask.0));
     }
 
-    risultato
+    result
 }
 
-/// Legge i pixel di una HBITMAP e li codifica in PNG.
+/// Reads the pixels of an HBITMAP and encodes them as PNG.
 ///
-/// GDI restituisce BGRA con le righe capovolte; la conversione a RGBA
-/// dall'alto in basso avviene qui, perché è l'unico punto che conosce il
-/// formato di GDI.
+/// GDI returns BGRA with the rows upside down; the conversion to RGBA
+/// top to bottom happens here, because it is the only place that knows
+/// GDI's format.
 fn bitmap_in_png(bitmap: HBITMAP) -> Option<Vec<u8>> {
     if bitmap.is_invalid() {
         return None;
     }
 
-    let mut descrizione = BITMAP::default();
-    let letti = unsafe {
+    let mut bitmap_info = BITMAP::default();
+    let read_bytes = unsafe {
         GetObjectW(
             HGDIOBJ(bitmap.0),
             std::mem::size_of::<BITMAP>() as i32,
-            Some(&mut descrizione as *mut _ as *mut std::ffi::c_void),
+            Some(&mut bitmap_info as *mut _ as *mut std::ffi::c_void),
         )
     };
-    if letti == 0 {
+    if read_bytes == 0 {
         return None;
     }
 
-    let larghezza = descrizione.bmWidth;
-    let altezza = descrizione.bmHeight;
-    if larghezza <= 0 || altezza <= 0 {
+    let width = bitmap_info.bmWidth;
+    let height = bitmap_info.bmHeight;
+    if width <= 0 || height <= 0 {
         return None;
     }
 
-    let mut intestazione = BITMAPINFO::default();
-    intestazione.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
-    intestazione.bmiHeader.biWidth = larghezza;
-    // Negativo = righe dall'alto in basso, così non serve capovolgere dopo.
-    intestazione.bmiHeader.biHeight = -altezza;
-    intestazione.bmiHeader.biPlanes = 1;
-    intestazione.bmiHeader.biBitCount = 32;
-    intestazione.bmiHeader.biCompression = BI_RGB.0;
+    let mut header = BITMAPINFO::default();
+    header.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
+    header.bmiHeader.biWidth = width;
+    // Negative = rows top to bottom, so there is no need to flip afterwards.
+    header.bmiHeader.biHeight = -height;
+    header.bmiHeader.biPlanes = 1;
+    header.bmiHeader.biBitCount = 32;
+    header.bmiHeader.biCompression = BI_RGB.0;
 
-    let mut pixel = vec![0u8; (larghezza * altezza * 4) as usize];
+    let mut pixel = vec![0u8; (width * height * 4) as usize];
 
     let dc = unsafe { GetDC(None) };
-    let righe = unsafe {
+    let lines = unsafe {
         GetDIBits(
             dc,
             bitmap,
             0,
-            altezza as u32,
+            height as u32,
             Some(pixel.as_mut_ptr() as *mut std::ffi::c_void),
-            &mut intestazione,
+            &mut header,
             DIB_RGB_COLORS,
         )
     };
@@ -290,25 +290,25 @@ fn bitmap_in_png(bitmap: HBITMAP) -> Option<Vec<u8>> {
         ReleaseDC(None, dc);
     }
 
-    if righe == 0 {
+    if lines == 0 {
         return None;
     }
 
     bgra_in_rgba(&mut pixel);
-    codifica_png(&pixel, larghezza as u32, altezza as u32)
+    encode_png(&pixel, width as u32, height as u32)
 }
 
-/// GDI usa BGRA, PNG vuole RGBA: scambia i due canali sul posto.
+/// GDI uses BGRA, PNG wants RGBA: swaps the two channels in place.
 fn bgra_in_rgba(pixel: &mut [u8]) {
     for p in pixel.chunks_exact_mut(4) {
         p.swap(0, 2);
     }
 }
 
-fn codifica_png(rgba: &[u8], larghezza: u32, altezza: u32) -> Option<Vec<u8>> {
+fn encode_png(rgba: &[u8], width: u32, height: u32) -> Option<Vec<u8>> {
     let mut out = Vec::new();
     {
-        let mut encoder = png::Encoder::new(&mut out, larghezza, altezza);
+        let mut encoder = png::Encoder::new(&mut out, width, height);
         encoder.set_color(png::ColorType::Rgba);
         encoder.set_depth(png::BitDepth::Eight);
         let mut writer = encoder.write_header().ok()?;
@@ -322,52 +322,52 @@ mod tests {
     use super::*;
 
     #[test]
-    fn bgra_diventa_rgba() {
+    fn bgra_becomes_rgba() {
         let mut pixel = vec![1u8, 2, 3, 4, 10, 20, 30, 40];
         bgra_in_rgba(&mut pixel);
 
-        // Primo e terzo byte scambiati, alfa e verde intatti.
+        // First and third byte swapped, alpha and green intact.
         assert_eq!(pixel, vec![3, 2, 1, 4, 30, 20, 10, 40]);
     }
 
     #[test]
-    fn codifica_un_png_valido() {
+    fn encodes_a_valid_png() {
         let rgba = vec![255u8; 2 * 2 * 4];
-        let png = codifica_png(&rgba, 2, 2).unwrap();
+        let png = encode_png(&rgba, 2, 2).unwrap();
 
         // Firma PNG.
         assert_eq!(&png[..8], &[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A]);
     }
 
     #[test]
-    fn l_icona_di_un_estensione_nota_esiste() {
-        let icona = icon_for_extension("txt", false, false).unwrap();
-        assert!(icona.starts_with("data:image/png;base64,"));
-        assert!(icona.len() > 100);
+    fn the_icon_of_a_known_extension_exists() {
+        let icon = icon_for_extension("txt", false, false).unwrap();
+        assert!(icon.starts_with("data:image/png;base64,"));
+        assert!(icon.len() > 100);
     }
 
     #[test]
-    fn l_icona_delle_cartelle_esiste() {
-        let icona = icon_for_extension("", true, false).unwrap();
-        assert!(icona.starts_with("data:image/png;base64,"));
+    fn the_folder_icon_exists() {
+        let icon = icon_for_extension("", true, false).unwrap();
+        assert!(icon.starts_with("data:image/png;base64,"));
     }
 
     #[test]
-    fn estensioni_diverse_danno_icone_diverse() {
+    fn different_extensions_give_different_icons() {
         let exe = icon_for_extension("exe", false, false).unwrap();
-        let cartella = icon_for_extension("", true, false).unwrap();
+        let folder = icon_for_extension("", true, false).unwrap();
 
-        assert_ne!(exe, cartella);
+        assert_ne!(exe, folder);
     }
 
     #[test]
-    fn un_estensione_inventata_da_comunque_l_icona_generica() {
-        let icona = icon_for_extension("qwertyuiop", false, false);
-        assert!(icona.is_some(), "Windows ha sempre un'icona di ripiego");
+    fn a_made_up_extension_still_gives_the_generic_icon() {
+        let icon = icon_for_extension("qwertyuiop", false, false);
+        assert!(icon.is_some(), "Windows always has a fallback icon");
     }
 
     #[test]
-    fn la_miniatura_di_un_path_inesistente_e_none() {
+    fn the_thumbnail_of_a_missing_path_is_none() {
         assert!(thumbnail(r"C:\questo\non\esiste\mai.png", 128).is_none());
     }
 }

@@ -1,18 +1,18 @@
 :root {
-	/* Lo spazio fra le stazioni. */
+	/* The space between the stations. */
 	--void: #0c0a13;
-	/* Le superfici dell'app: la fiancata del convoglio. */
+	/* The app's surfaces: the side of the train. */
 	--hull: #171420;
 	--hull-glass: rgba(23, 20, 32, 0.72);
-	/* Binario spento. */
+	/* Rail switched off. */
 	--rail-metal: #3a3350;
-	/* La corrente che ci passa dentro. */
+	/* The current running through it. */
 	--current: #7cf5ff;
-	/* Struttura e selezione. */
+	/* Structure and selection. */
 	--plasma: #8b5cf6;
 	--signal: #ffb454;
 
-	/* Nomi funzionali usati dai componenti. */
+	/* Functional names used by the components. */
 	--bg: var(--void);
 	--surface: var(--hull);
 	--surface-glass: var(--hull-glass);
@@ -23,16 +23,16 @@
 	--text-dim: #948da8;
 	--row-hover: rgba(255, 255, 255, 0.05);
 	--scroll: rgba(255, 255, 255, 0.12);
-	/* Testo degli avvisi d'errore, leggibile sul fondo del tema. */
-	--errore-testo: #ffb4ab;
-	/* Un PC o un amico raggiungibile adesso. */
-	--in-linea: #22c55e;
+	/* Text of error notices, readable on the theme's background. */
+	--error-text: #ffb4ab;
+	/* A PC or a friend reachable right now. */
+	--online: #22c55e;
 	--radius: 12px;
 	--radius-sm: 8px;
 
-	/* Bahnschrift è l'implementazione Windows del DIN 1451, il carattere
-	   della segnaletica ferroviaria. Già presente nel sistema: nessun
-	   download, che la CSP dell'app non permetterebbe comunque. */
+	/* Bahnschrift is the Windows implementation of DIN 1451, the typeface
+	   of railway signage. Already on the system: no
+	   download, which the app's CSP would not allow anyway. */
 	--font-display: 'Bahnschrift', 'DIN Alternate', 'Segoe UI Variable Display', system-ui,
 		sans-serif;
 	--font-ui: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
@@ -53,7 +53,7 @@ body {
 	background: transparent;
 	color: var(--text);
 	font-family: var(--font-ui);
-	font-size: calc(13px * var(--scala-testo, 1));
+	font-size: calc(13px * var(--text-scale, 1));
 }
 
 .app {
@@ -61,18 +61,18 @@ body {
 	flex-direction: column;
 	height: 100vh;
 	background: var(--bg);
-	border: var(--cornice, 1px solid var(--border));
+	border: var(--frame, 1px solid var(--border));
 	border-radius: var(--radius);
-	clip-path: var(--forma, none);
-	mask: var(--maschera, none);
+	clip-path: var(--shape, none);
+	mask: var(--mask, none);
 	overflow: hidden;
 }
 
-/* Il focus da tastiera deve restare visibile ovunque. Con gli angoli
-   ritagliati il contorno va dentro, o il ritaglio lo nasconde. */
+/* Keyboard focus must stay visible everywhere. With clipped
+   corners the outline goes inside, or the clipping hides it. */
 :focus-visible {
 	outline: 2px solid var(--current);
-	outline-offset: var(--fuoco-scarto, 2px);
+	outline-offset: var(--focus-offset, 2px);
 }
 
 ::-webkit-scrollbar {
@@ -89,8 +89,8 @@ body {
 	background-clip: content-box;
 }
 
-/* Il rettangolo con cui si selezionano più voci trascinando sul vuoto. */
-.rettangolo-selezione {
+/* The rectangle used to select several items by dragging on empty space. */
+.selection-marquee {
 	position: absolute;
 	left: 0;
 	top: 0;

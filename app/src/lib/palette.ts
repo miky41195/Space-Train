@@ -1,43 +1,43 @@
 import { fuzzyMatch } from './fuzzy';
 
-export type TipoComando = 'azione' | 'cartella' | 'ricerca' | 'tema' | 'impostazione';
+export type CommandKind = 'action' | 'folder' | 'search' | 'theme' | 'setting';
 
-export const ETICHETTE_TIPO: Record<TipoComando, string> = {
-	azione: 'Azione',
-	cartella: 'Cartella',
-	ricerca: 'Ricerca',
-	tema: 'Tema',
-	impostazione: 'Impostaz.'
+export const KIND_LABELS: Record<CommandKind, string> = {
+	action: 'Azione',
+	folder: 'Cartella',
+	search: 'Ricerca',
+	theme: 'Tema',
+	setting: 'Impostaz.'
 };
 
 /** One line of the command palette. */
-export interface Comando {
-	tipo: TipoComando;
-	nome: string;
+export interface Command {
+	kind: CommandKind;
+	name: string;
 	/** Second, dimmer text: a path, the current state of a setting. */
-	dettaglio?: string;
+	detail?: string;
 	/** The shortcut that does the same, shown at the right. */
-	tasti?: string;
-	esegui: () => void;
+	keys?: string;
+	run: () => void;
 }
 
-export interface Trovato {
-	comando: Comando;
-	/** Characters of `nome` to highlight. */
-	posizioni: number[];
+export interface PaletteMatch {
+	command: Command;
+	/** Characters of `name` to highlight. */
+	positions: number[];
 }
 
 /**
- * The commands matching `testo`, best first; with no text, the first ones
+ * The commands matching `text`, best first; with no text, the first ones
  * in the order given (actions first). Ties keep the given order.
  */
-export function filtraComandi(comandi: Comando[], testo: string, massimo = 12): Trovato[] {
-	const q = testo.trim();
-	if (q === '') return comandi.slice(0, massimo).map((comando) => ({ comando, posizioni: [] }));
-	return comandi
-		.map((comando, i) => ({ comando, i, m: fuzzyMatch(q, comando.nome) }))
+export function filterCommands(commands: Command[], text: string, max = 12): PaletteMatch[] {
+	const q = text.trim();
+	if (q === '') return commands.slice(0, max).map((command) => ({ command, positions: [] }));
+	return commands
+		.map((command, i) => ({ command, i, m: fuzzyMatch(q, command.name) }))
 		.filter((x) => x.m !== null)
 		.sort((a, b) => b.m!.score - a.m!.score || a.i - b.i)
-		.slice(0, massimo)
-		.map((x) => ({ comando: x.comando, posizioni: x.m!.positions }));
+		.slice(0, max)
+		.map((x) => ({ command: x.command, positions: x.m!.positions }));
 }

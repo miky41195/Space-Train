@@ -1,12 +1,12 @@
 /**
- * Da PNG in base64 ai pixel e ritorno, col canvas della WebView. Separato
- * da `trasparenza.ts` perché ha bisogno del browser: nei test si sostituisce.
+ * From base64 PNG to pixels and back, with the WebView's canvas. Apart from
+ * `transparency.ts` because it needs the browser: tests replace it.
  */
-import type { Pixel } from './trasparenza';
+import type { Pixel } from './transparency';
 
-export async function leggiPixel(base64: string): Promise<Pixel> {
-	const byte = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-	const bitmap = await createImageBitmap(new Blob([byte]));
+export async function readPixels(base64: string): Promise<Pixel> {
+	const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+	const bitmap = await createImageBitmap(new Blob([bytes]));
 	const canvas = document.createElement('canvas');
 	canvas.width = bitmap.width;
 	canvas.height = bitmap.height;
@@ -16,7 +16,7 @@ export async function leggiPixel(base64: string): Promise<Pixel> {
 	return ctx.getImageData(0, 0, canvas.width, canvas.height);
 }
 
-export async function scriviPng(img: Pixel): Promise<string> {
+export async function writePng(img: Pixel): Promise<string> {
 	const canvas = document.createElement('canvas');
 	canvas.width = img.width;
 	canvas.height = img.height;
@@ -24,8 +24,8 @@ export async function scriviPng(img: Pixel): Promise<string> {
 	const blob = await new Promise<Blob>((ok, ko) =>
 		canvas.toBlob((b) => (b ? ok(b) : ko(new Error('PNG non creato'))), 'image/png')
 	);
-	const byte = new Uint8Array(await blob.arrayBuffer());
-	let testo = '';
-	for (let i = 0; i < byte.length; i += 0x8000) testo += String.fromCharCode(...byte.subarray(i, i + 0x8000));
-	return btoa(testo);
+	const bytes = new Uint8Array(await blob.arrayBuffer());
+	let text = '';
+	for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+	return btoa(text);
 }

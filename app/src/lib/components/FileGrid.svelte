@@ -1,148 +1,148 @@
 <script lang="ts">
 	import type { FolderStyle } from '../icons';
-	import { selezioneRettangolo, type OpzioniRettangolo } from '../rettangolo';
+	import { marqueeSelection, type MarqueeOptions } from '../marquee';
 	import type { Entry } from '../ipc';
 	import {
-		impaginaZone,
-		finestraZona,
-		cimaVoce,
-		colonneGriglia,
-		ZONA_TESTATA
+		layoutZones,
+		zoneWindow,
+		itemTop,
+		gridColumns,
+		ZONE_HEADER
 	} from '../virtual';
-	import { misuraCella, type MisuraCella } from '../vista';
-	import type { Zona } from '../raggruppa';
-	import Cella from './Cella.svelte';
-	import TestataZona from './TestataZona.svelte';
-	import type { IconeStore } from '../stores/icone.svelte';
+	import { cellSize, type CellSize } from '../view';
+	import type { Zone } from '../grouping';
+	import Cell from './Cell.svelte';
+	import ZoneHeader from './ZoneHeader.svelte';
+	import type { IconsStore } from '../stores/icons.svelte';
 
 	let {
 		entries,
-		zone = [],
-		chiave = undefined,
-		misura = misuraCella({ vista: 'icone', lato: 72 }),
-		coloreDi = undefined,
-		nascondiEstensione = false,
-		bersaglio = null,
+		zones = [],
+		contentKey = undefined,
+		size = cellSize({ view: 'icons', side: 72 }),
+		colorOf = undefined,
+		hideExtension = false,
+		dropTarget = null,
 		selection = undefined,
 		activeIndex = null,
 		cutPaths = undefined,
-		icone = undefined,
+		icons = undefined,
 		onactivate,
-		unClic = false,
+		singleClick = false,
 		folderStyle = 'windows',
 		onselect,
 		oncontext = undefined,
-		oncontextvuoto = undefined,
-		oncolonne = undefined,
-		ontrascina = undefined,
-		rettangolo = undefined
+		oncontextempty = undefined,
+		oncolumncount = undefined,
+		ondrag = undefined,
+		marquee = undefined
 	}: {
 		entries: Entry[];
-		/** Zone in cui è divisa la griglia. Vuoto = nessuna divisione. */
-		zone?: Zona[];
-		/** Identità del contenuto: lo scroll torna in cima solo quando cambia. */
-		chiave?: string;
-		/** Dimensioni delle celle, decise dalla vista e dal lato delle icone. */
-		misura?: MisuraCella;
-		/** Colore scelto per una cartella, se ne ha uno. */
-		coloreDi?: (e: Entry) => string | undefined;
-		nascondiEstensione?: boolean;
-		bersaglio?: string | null;
+		/** Zones the grid is divided into. Empty = no division. */
+		zones?: Zone[];
+		/** Identity of the contents: the scroll goes back to the top only when it changes. */
+		contentKey?: string;
+		/** Cell sizes, decided by the view and the icon side. */
+		size?: CellSize;
+		/** Colour chosen for a folder, if it has one. */
+		colorOf?: (e: Entry) => string | undefined;
+		hideExtension?: boolean;
+		dropTarget?: string | null;
 		selection?: ReadonlySet<string>;
 		activeIndex?: number | null;
 		cutPaths?: string[];
-		icone?: IconeStore;
+		icons?: IconsStore;
 		onactivate: (e: Entry) => void;
-		/** Apre con un clic, come l'opzione di Esplora; il doppio clic non serve più. */
-		unClic?: boolean;
+		/** Opens with one click, like the Explorer option; double click is no longer needed. */
+		singleClick?: boolean;
 		/** How the theme draws folders. */
 		folderStyle?: FolderStyle;
-		onselect: (e: Entry, modificatori: { ctrl?: boolean; shift?: boolean }) => void;
-		oncontext?: (e: Entry, evento: MouseEvent) => void;
-		oncontextvuoto?: (evento: MouseEvent) => void;
-		/** Quante celle stanno per riga: serve alle frecce su e giù. */
-		oncolonne?: (n: number) => void;
-		ontrascina?: (e: Entry) => void;
-		/** Clic sul vuoto e selezione col rettangolo. */
-		rettangolo?: OpzioniRettangolo;
+		onselect: (e: Entry, modifiers: { ctrl?: boolean; shift?: boolean }) => void;
+		oncontext?: (e: Entry, event: MouseEvent) => void;
+		oncontextempty?: (event: MouseEvent) => void;
+		/** How many cells fit in a row: the up and down arrows need it. */
+		oncolumncount?: (n: number) => void;
+		ondrag?: (e: Entry) => void;
+		/** Click on empty space and marquee selection. */
+		marquee?: MarqueeOptions;
 	} = $props();
 
-	const SENZA_RETTANGOLO: OpzioniRettangolo = { oncambia: () => {}, onvuoto: () => {} };
+	const NO_MARQUEE: MarqueeOptions = { onchange: () => {}, onempty: () => {} };
 
-	let altezzaCella = $derived(misura.altezza);
+	let cellHeight = $derived(size.height);
 
 	let scrollTop = $state(0);
 	let viewportHeight = $state(600);
 	let viewportWidth = $state(800);
 	let viewport = $state<HTMLDivElement | null>(null);
 
-	let tagliati = $derived(new Set(cutPaths ?? []));
-	/** Le celle sono più alte delle righe: bastano meno file di margine. */
+	let cut = $derived(new Set(cutPaths ?? []));
+	/** Cells are taller than rows: fewer rows of margin are enough. */
 	const OVERSCAN = 2;
 
-	// La vista «contenuto» ha una cella sola per riga, larga quanto la lista.
-	// Il padding della viewport (8 + 8) non è spazio per le celle.
-	let colonne = $derived(
-		misura.piena ? 1 : colonneGriglia(Math.max(0, viewportWidth - 16), misura.larghezza)
+	// The «content» view has a single cell per row, as wide as the list.
+	// The viewport padding (8 + 8) is not space for the cells.
+	let columns = $derived(
+		size.full ? 1 : gridColumns(Math.max(0, viewportWidth - 16), size.width)
 	);
-	let diviso = $derived(zone.length > 0);
-	// Ogni zona ricomincia a capo: i comuni non devono finire a metà
-	// dell'ultima riga di preferiti.
-	let impaginato = $derived(
-		impaginaZone(
-			diviso ? zone.map((z) => z.quante) : [entries.length],
-			colonne,
-			altezzaCella,
-			diviso ? ZONA_TESTATA : 0
+	let divided = $derived(zones.length > 0);
+	// Every zone starts on a new line: the common ones must not end up halfway
+	// through the last row of favourites.
+	let layout = $derived(
+		layoutZones(
+			divided ? zones.map((z) => z.count) : [entries.length],
+			columns,
+			cellHeight,
+			divided ? ZONE_HEADER : 0
 		)
 	);
-	let finestre = $derived(
-		impaginato.zone.map((zona) => {
-			const f = finestraZona(zona, scrollTop, viewportHeight, colonne, altezzaCella, OVERSCAN);
-			return { zona, top: f.top, voci: entries.slice(f.start, f.start + f.count) };
+	let windows = $derived(
+		layout.zones.map((zone) => {
+			const f = zoneWindow(zone, scrollTop, viewportHeight, columns, cellHeight, OVERSCAN);
+			return { zone, top: f.top, items: entries.slice(f.start, f.start + f.count) };
 		})
 	);
-	let visible = $derived(finestre.flatMap((f) => f.voci));
+	let visible = $derived(windows.flatMap((f) => f.items));
 
 
 	$effect(() => {
-		if (chiave === undefined) entries;
-		else chiave;
+		if (contentKey === undefined) entries;
+		else contentKey;
 		if (viewport) viewport.scrollTop = 0;
 		scrollTop = 0;
 	});
 
-	// Il conteggio delle colonne nasce qui, dove si conosce la larghezza:
-	// la pagina ne ha bisogno per far muovere le frecce di una riga intera.
+	// The column count is born here, where the width is known: the page
+	// needs it to make the arrows move by a whole row.
 	$effect(() => {
-		oncolonne?.(colonne);
+		oncolumncount?.(columns);
 	});
 
-	// Come nella vista a righe: si chiede solo a scorrimento fermo, e la
-	// coda viene sostituita da ciò che è davvero visibile.
+	// As in the row view: requests go out only once scrolling stops, and the
+	// queue is replaced by what is really visible.
 	$effect(() => {
-		if (!icone) return;
-		const visibili = visible;
-		// Il doppio del lato per gli schermi ad alta densità, fino al massimo
-		// che la Shell estrae. Dai 48 pixel in su anche cartelle e programmi
-		// hanno la loro icona vera invece di quella di tipo ingrandita.
-		const lato = Math.min(256, Math.round(misura.icona * (window.devicePixelRatio || 1)));
-		const attesa = setTimeout(() => icone.richiedi(visibili, lato, misura.icona >= 48), 120);
-		return () => clearTimeout(attesa);
+		if (!icons) return;
+		const shown = visible;
+		// Double the side for high-density screens, up to the maximum the
+		// Shell extracts. From 48 pixels up, folders and programs also get
+		// their real icon instead of the enlarged type icon.
+		const side = Math.min(256, Math.round(size.icon * (window.devicePixelRatio || 1)));
+		const wait = setTimeout(() => icons.request(shown, side, size.icon >= 48), 120);
+		return () => clearTimeout(wait);
 	});
 
-	// La cella scelta da tastiera può stare fuori dalla finestra: si calcola
-	// la sua riga, perché non esiste un elemento su cui chiamare scrollIntoView.
+	// The cell chosen by keyboard may be outside the window: its row is
+	// computed, because there is no element to call scrollIntoView on.
 	$effect(() => {
 		if (activeIndex === null || activeIndex < 0 || !viewport) return;
 
-		const alto = cimaVoce(impaginato.zone, activeIndex, colonne, altezzaCella);
-		const basso = alto + altezzaCella;
+		const top = itemTop(layout.zones, activeIndex, columns, cellHeight);
+		const bottom = top + cellHeight;
 
-		if (alto < viewport.scrollTop) {
-			viewport.scrollTop = alto;
-		} else if (basso > viewport.scrollTop + viewportHeight) {
-			viewport.scrollTop = basso - viewportHeight;
+		if (top < viewport.scrollTop) {
+			viewport.scrollTop = top;
+		} else if (bottom > viewport.scrollTop + viewportHeight) {
+			viewport.scrollTop = bottom - viewportHeight;
 		}
 	});
 </script>
@@ -156,41 +156,41 @@
 	role="presentation"
 	oncontextmenu={(e) => {
 		e.preventDefault();
-		oncontextvuoto?.(e);
+		oncontextempty?.(e);
 	}}
-	use:selezioneRettangolo={rettangolo ?? SENZA_RETTANGOLO}
+	use:marqueeSelection={marquee ?? NO_MARQUEE}
 >
-	<div class="spaziatore" style:height="{impaginato.altezzaTotale}px">
-		{#each finestre as f, z (z)}
-		{#if diviso}
-			<TestataZona
-				etichetta={zone[z].etichetta}
-				tono={zone[z].tono}
-				quante={f.zona.quante}
-				top={f.zona.alto}
+	<div class="spacer" style:height="{layout.totalHeight}px">
+		{#each windows as f, z (z)}
+		{#if divided}
+			<ZoneHeader
+				label={zones[z].label}
+				tone={zones[z].tone}
+				count={f.zone.count}
+				top={f.zone.top}
 			/>
 		{/if}
 		<div
-			class="finestra"
+			class="window"
 			style:transform="translateY({f.top}px)"
-			style:grid-template-columns="repeat({colonne}, 1fr)"
-			style:justify-items={misura.orizzontale ? "start" : "center"}
+			style:grid-template-columns="repeat({columns}, 1fr)"
+			style:justify-items={size.horizontal ? "start" : "center"}
 			role="grid"
-			aria-label={diviso ? zone[z].etichetta : 'Elementi della cartella'}
+			aria-label={divided ? zones[z].label : 'Elementi della cartella'}
 		>
-			{#each f.voci as entry (entry.path)}
-				<Cella
+			{#each f.items as entry (entry.path)}
+				<Cell
 					{entry}
 					selected={selection?.has(entry.path) ?? false}
-					tagliato={tagliati.has(entry.path)}
-					{icone}
-					{misura}
-					colore={coloreDi?.(entry)}
-					{nascondiEstensione}
-					bersaglio={entry.path === bersaglio}
-					{ontrascina}
+					cut={cut.has(entry.path)}
+					{icons}
+					{size}
+					color={colorOf?.(entry)}
+					{hideExtension}
+					dropTarget={entry.path === dropTarget}
+					{ondrag}
 					{onactivate}
-					{unClic}
+					{singleClick}
 					{folderStyle}
 					{onselect}
 					{oncontext}
@@ -207,19 +207,19 @@
 		overflow-y: auto;
 		overflow-x: hidden;
 		background: var(--surface);
-		/* Lo sfondo decorativo dei temi mondo: fiocchi, foglie, zampette. */
-		background-image: var(--motivo, none);
+		/* The decorative background of world themes: flakes, leaves, paws. */
+		background-image: var(--pattern, none);
 		background-size: 96px 96px;
 		background-attachment: local;
 		padding: 8px;
-		/* Il rettangolo di selezione si posa dentro, e scorre col contenuto. */
+		/* The selection marquee rests inside, and scrolls with the contents. */
 		position: relative;
 		scrollbar-gutter: stable;
 	}
-	.spaziatore {
+	.spacer {
 		position: relative;
 	}
-	.finestra {
+	.window {
 		position: absolute;
 		inset-inline: 0;
 		top: 0;

@@ -1,687 +1,681 @@
 import type { Entry, SortKey, SortSpec } from './ipc';
-import { eArchivio, eEseguibile, nomeDi, nomePosizione } from './posizioni';
-import { RADICE_SISTEMA, SOLO_WINDOWS, SU_LINUX } from './sistema';
-import type { ModoGruppi } from './raggruppa';
-import { TAGLIE, type Vista } from './vista';
-import type { IdAccento } from './temi';
-import { COLORI_CARTELLA, type IdColore } from './stores/colori.svelte';
+import { isArchive, isExecutable, nameOf, locationName } from './locations';
+import { SYSTEM_ROOT, WINDOWS_ONLY, ON_LINUX } from './platform';
+import type { GroupMode } from './grouping';
+import { SIZES, type View } from './view';
+import type { AccentId } from './themes';
+import { FOLDER_COLORS, type ColorId } from './stores/colors.svelte';
 import { MEDIA_COLUMNS, type MediaKey } from './media';
 
-export type AzioneMenu =
-	| 'apri'
-	| 'apriNuovaScheda'
-	| 'apriNuovaFinestra'
-	| 'fissa'
-	| 'sgancia'
-	| 'suAccesso'
-	| 'giuAccesso'
-	| 'apriCon'
-	| 'apriPercorso'
-	| 'amministratore'
-	| 'rinomina'
-	| 'copia'
-	| 'taglia'
-	| 'incolla'
-	| 'cestina'
-	| 'eliminaDefinitivo'
-	| 'copiaPercorso'
-	| 'mostraInEsplora'
-	| 'terminale'
-	| 'duplicati'
-	| 'confronta'
-	| 'spazio'
-	| 'pulizia'
-	| 'confrontaFile'
-	| 'confrontaFileAltro'
-	| 'regole'
-	| 'nuovaCassaforte'
-	| 'aggiungiInCassaforte'
-	| 'eliminaDaCassaforte'
-	| 'chiudiCassaforte'
+export type MenuAction =
+	| 'open'
+	| 'openNewTab'
+	| 'openNewWindow'
+	| 'pin'
+	| 'unpin'
+	| 'quickAccessUp'
+	| 'quickAccessDown'
+	| 'openWith'
+	| 'openFileLocation'
+	| 'runAsAdmin'
+	| 'rename'
+	| 'copy'
+	| 'cut'
+	| 'paste'
+	| 'trash'
+	| 'deletePermanently'
+	| 'copyPath'
+	| 'revealInExplorer'
+	| 'terminal'
+	| 'duplicates'
+	| 'compare'
+	| 'space'
+	| 'cleanup'
+	| 'compareFiles'
+	| 'compareFileOtherPane'
+	| 'rules'
+	| 'newVault'
+	| 'addToVault'
+	| 'deleteFromVault'
+	| 'lockVault'
 	| 'checksum'
-	| 'ruotaDestra'
-	| 'ruotaSinistra'
-	| 'convertiImmagini'
-	| 'estraiQui'
-	| 'estraiIn'
-	| 'paginaIniziale'
-	| 'cartellaAvvio'
-	| 'sessione'
-	| `iniziale:${'pc' | 'c' | 'ultima' | 'attuale'}`
-	| 'nuovaCartella'
-	| 'preferito'
-	| 'comprimi'
-	| 'estrai'
-	| 'proprieta'
-	| 'altreOpzioni'
-	| 'annulla'
-	| 'aggiorna'
-	| 'ripristina'
-	| 'svuotaCestino'
-	| 'coloreCartella'
-	| 'menuNuovo'
-	| `invia:${string}`
-	| 'condividi'
-	| 'nonCondividere'
-	| 'scarica'
-	| `nuovo:${string}`
-	| `colore:${IdColore}`
-	| 'coloreNessuno'
-	// Ordina
-	| `ordina:${SortKey}`
-	| 'crescente'
-	| 'decrescente'
-	| `gruppi:${ModoGruppi}`
-	// Visualizza
-	| `vista:${Vista}`
-	| `lato:${number}`
-	| 'compatta'
+	| 'rotateRight'
+	| 'rotateLeft'
+	| 'convertImages'
+	| 'extractHere'
+	| 'extractTo'
+	| 'setStartPage'
+	| 'startupFolder'
+	| 'session'
+	| `start:${'pc' | 'c' | 'last' | 'current'}`
+	| 'newFolder'
+	| 'favorite'
+	| 'compress'
+	| 'extract'
+	| 'properties'
+	| 'moreOptions'
+	| 'undo'
+	| 'refresh'
+	| 'restore'
+	| 'emptyTrash'
+	| 'folderColor'
+	| 'newMenu'
+	| `send:${string}`
+	| 'share'
+	| 'stopSharing'
+	| 'download'
+	| `new:${string}`
+	| `color:${ColorId}`
+	| 'noColor'
+	// Sort
+	| `sort:${SortKey}`
+	| 'ascending'
+	| 'descending'
+	| `group:${GroupMode}`
+	// View
+	| `view:${View}`
+	| `side:${number}`
+	| 'compact'
 	// Media columns
 	| `media:${MediaKey}`
 	| 'mediaAuto'
 	// Workspaces
-	| `area:${string}`
-	| 'areaNuova'
-	| 'areaRinomina'
-	| 'areaElimina'
-	| 'areaEsci'
-	// Aspetto
-	| `tema:${string}`
-	| 'accento'
-	| 'animazioneAvvio'
-	| `pausa:${number}`
-	| 'editorTemi'
-	| `accento:${IdAccento}`
-	| 'colonnaTipo'
-	| 'colonnaDimensione'
-	| 'colonnaData'
-	| 'estensioni'
-	| 'nascosti'
-	| 'anteprima';
+	| `workspace:${string}`
+	| 'workspaceNew'
+	| 'workspaceRename'
+	| 'workspaceDelete'
+	| 'workspaceLeave'
+	// Appearance
+	| `theme:${string}`
+	| 'accent'
+	| 'introAnimation'
+	| `pause:${number}`
+	| 'themeEditor'
+	| `accent:${AccentId}`
+	| 'columnType'
+	| 'columnSize'
+	| 'columnDate'
+	| 'extensions'
+	| 'hidden'
+	| 'preview';
 
-export interface VoceMenu {
-	azione: AzioneMenu;
-	etichetta: string;
-	scorciatoia?: string;
-	/** Separatore prima di questa voce. */
-	stacca?: boolean;
-	pericolosa?: boolean;
-	/** Voce a spunta: presente = si può accendere e spegnere. */
-	spunta?: boolean;
-	/** Titolo di sezione mostrato sopra la voce, come «Raggruppa per». */
-	sezione?: string;
+export interface MenuItem {
+	action: MenuAction;
+	label: string;
+	shortcut?: string;
+	/** Separator before this item. */
+	separator?: boolean;
+	danger?: boolean;
+	/** Check item: present = it can be turned on and off. */
+	checked?: boolean;
+	/** Section title shown above the item, like «Raggruppa per». */
+	section?: string;
 	/**
-	 * Nome per gli screen reader quando l'etichetta da sola è ambigua:
-	 * «Tipo» sotto «Raggruppa per» non è il «Tipo» dell'ordinamento.
+	 * Name for screen readers when the label alone is ambiguous: «Tipo»
+	 * under «Raggruppa per» is not the sorting «Tipo».
 	 */
-	nomeAccessibile?: string;
-	/** Una fila di colori da scegliere al posto di una voce sola. */
-	tavolozza?: Array<{
-		azione: AzioneMenu;
-		nome: string;
-		colore: string | null;
-		attivo: boolean;
-		/** Il campione che apre il selettore di colore. */
-		personalizzato?: boolean;
+	accessibleName?: string;
+	/** A row of colours to pick from in place of a single item. */
+	palette?: Array<{
+		action: MenuAction;
+		name: string;
+		color: string | null;
+		active: boolean;
+		/** The swatch that opens the colour picker. */
+		custom?: boolean;
 	}>;
 }
 
-/** Dove si trova l'utente: ogni posizione ha le sue operazioni. */
-export type Posizione = 'normale' | 'cestino' | 'pc' | 'rete' | 'lan' | 'archivio' | 'server';
+/** Where the user is: each location has its own operations. */
+export type MenuLocation = 'normal' | 'trash' | 'pc' | 'network' | 'lan' | 'archive' | 'server';
 
-export interface ContestoMenu {
-	/** Voci selezionate al momento del clic destro. Vuoto = clic sul vuoto. */
-	selezione: readonly Entry[];
-	/** Vero se gli appunti contengono qualcosa da incollare. */
-	appuntiPieni: boolean;
-	/** Vero se tutte le voci selezionate sono già nella zona preferiti. */
-	giaPreferiti?: boolean;
-	posizione?: Posizione;
-	/** La lista mostra risultati di ricerca nelle sottocartelle. */
-	ricerca?: boolean;
-	/** Cosa disferebbe Ctrl+Z, se c'è qualcosa da disfare. */
-	annullabile?: string | null;
+export interface MenuContext {
+	/** Items selected at the moment of the right click. Empty = click on empty space. */
+	selection: readonly Entry[];
+	/** True when the clipboard holds something to paste. */
+	clipboardFull: boolean;
+	/** True when all the selected items are already in the favourites zone. */
+	alreadyFavorite?: boolean;
+	location?: MenuLocation;
+	/** The list shows search results from the subfolders. */
+	search?: boolean;
+	/** What Ctrl+Z would undo, if there is anything to undo. */
+	undoable?: string | null;
 	/** The archive view is a vault: items can be added and deleted. */
-	cassaforte?: boolean;
-	/** Colore comune delle cartelle selezionate, se ne hanno uno. */
-	coloreAttuale?: IdColore | null;
+	vault?: boolean;
+	/** Common colour of the selected folders, if they have one. */
+	currentColor?: ColorId | null;
 	/** Name the user gave each colour label. */
-	labelName?: (id: IdColore) => string;
-	/** Altri PC con Space Train in rete locale, a cui si può inviare. */
-	pari?: ReadonlyArray<{ id: string; nome: string }>;
-	/** La cartella aperta è quella che questo PC condivide in rete locale. */
-	condivisaQui?: boolean;
-	/** Path della cartella condivisa in rete locale, se ce n'è una. */
-	condivisa?: string | null;
+	labelName?: (id: ColorId) => string;
+	/** Other PCs with Space Train on the local network, that can be sent to. */
+	peers?: ReadonlyArray<{ id: string; name: string }>;
+	/** The open folder is the one this PC shares on the local network. */
+	sharedHere?: boolean;
+	/** Path of the folder shared on the local network, if there is one. */
+	shared?: string | null;
 	/**
-	 * La cartella a cui si riferisce il menu (selezionata o, sullo sfondo,
-	 * quella aperta) è nell'Accesso rapido.
+	 * The folder the menu refers to (selected or, on the background, the
+	 * open one) is in Quick access.
 	 */
-	fissata?: boolean;
+	pinned?: boolean;
 	/**
-	 * La cartella a cui si riferisce il menu è già la pagina iniziale:
-	 * la voce per sceglierla non compare.
+	 * The folder the menu refers to is already the start page: the item to
+	 * choose it does not show.
 	 */
-	iniziale?: boolean;
-	/** La cartella del menu si apre sempre all'avvio, in una scheda sua. */
-	allAvvio?: boolean;
+	isStartPage?: boolean;
+	/** The menu's folder always opens at startup, in a tab of its own. */
+	atStartup?: boolean;
 	/** Folder of the other pane when the dual pane is open: «Confronta» uses it. */
-	altroPannello?: string | null;
+	otherPane?: string | null;
 }
 
 /**
- * Voci del menu contestuale per un dato contesto.
+ * Context menu items for a given context.
  *
- * Le voci che non si possono eseguire non compaiono, invece di comparire
- * disabilitate: un menu di cinque voci tutte attive si legge più in fretta
- * di uno da nove di cui quattro grigie.
+ * Items that cannot run do not show, instead of showing disabled: a menu
+ * of five items all active reads faster than one of nine with four grey.
  */
-function voceConfronta(altro: string | null): VoceMenu {
+function compareItem(other: string | null): MenuItem {
 	return {
-		azione: 'confronta',
-		etichetta: altro ? `Confronta con «${nomePosizione(altro)}»` : 'Confronta con un’altra cartella…'
+		action: 'compare',
+		label: other ? `Confronta con «${locationName(other)}»` : 'Confronta con un’altra cartella…'
 	};
 }
 
-export function vociMenu(c: ContestoMenu, linux = SU_LINUX): VoceMenu[] {
-	const voci = vociPerPosizione(c);
-	return linux ? voci.filter((v) => !SOLO_WINDOWS.has(v.azione)) : voci;
+export function menuItems(c: MenuContext, linux = ON_LINUX): MenuItem[] {
+	const items = itemsForLocation(c);
+	return linux ? items.filter((v) => !WINDOWS_ONLY.has(v.action)) : items;
 }
 
-function vociPerPosizione(c: ContestoMenu): VoceMenu[] {
-	const posizione = c.posizione ?? 'normale';
-	if (posizione === 'cestino') return vociCestino(c);
-	if (posizione === 'archivio') return vociArchivio(c);
-	if (posizione === 'pc' || posizione === 'rete') return vociVirtuali(c, posizione);
-	if (posizione === 'lan') return vociReteLocale(c);
-	if (posizione === 'server') return vociServer(c);
-	return c.selezione.length === 0 ? vociSfondo(c) : vociElementi(c);
+function itemsForLocation(c: MenuContext): MenuItem[] {
+	const location = c.location ?? 'normal';
+	if (location === 'trash') return trashItems(c);
+	if (location === 'archive') return archiveItems(c);
+	if (location === 'pc' || location === 'network') return virtualItems(c, location);
+	if (location === 'lan') return lanItems(c);
+	if (location === 'server') return serverItems(c);
+	return c.selection.length === 0 ? backgroundItems(c) : selectionItems(c);
 }
 
-function vociSfondo({
-	appuntiPieni,
-	annullabile,
-	ricerca,
-	condivisaQui = false,
-	fissata = false,
-	iniziale = false,
-	allAvvio = false,
-	altroPannello = null
-}: ContestoMenu): VoceMenu[] {
-	const voci: VoceMenu[] = [];
-	if (!ricerca) {
-		voci.push({ azione: 'menuNuovo', etichetta: 'Nuovo…' });
-		voci.push({ azione: 'nuovaCartella', etichetta: 'Nuova cartella', scorciatoia: 'Ctrl+Maiusc+N' });
-		if (appuntiPieni) {
-			voci.push({ azione: 'incolla', etichetta: 'Incolla', scorciatoia: 'Ctrl+V', stacca: true });
+function backgroundItems({
+	clipboardFull,
+	undoable,
+	search,
+	sharedHere = false,
+	pinned = false,
+	isStartPage = false,
+	atStartup = false,
+	otherPane = null
+}: MenuContext): MenuItem[] {
+	const items: MenuItem[] = [];
+	if (!search) {
+		items.push({ action: 'newMenu', label: 'Nuovo…' });
+		items.push({ action: 'newFolder', label: 'Nuova cartella', shortcut: 'Ctrl+Maiusc+N' });
+		if (clipboardFull) {
+			items.push({ action: 'paste', label: 'Incolla', shortcut: 'Ctrl+V', separator: true });
 		}
 	}
-	if (annullabile) {
-		voci.push({
-			azione: 'annulla',
-			etichetta: `Annulla ${annullabile}`,
-			scorciatoia: 'Ctrl+Z',
-			stacca: true
+	if (undoable) {
+		items.push({
+			action: 'undo',
+			label: `Annulla ${undoable}`,
+			shortcut: 'Ctrl+Z',
+			separator: true
 		});
 	}
-	voci.push({ azione: 'aggiorna', etichetta: 'Aggiorna', scorciatoia: 'F5', stacca: true });
-	if (!ricerca) {
-		voci.push(
-			fissata
-				? { azione: 'sgancia', etichetta: 'Togli dalla barra laterale', stacca: true }
-				: { azione: 'fissa', etichetta: 'Fissa nella barra laterale', stacca: true }
+	items.push({ action: 'refresh', label: 'Aggiorna', shortcut: 'F5', separator: true });
+	if (!search) {
+		items.push(
+			pinned
+				? { action: 'unpin', label: 'Togli dalla barra laterale', separator: true }
+				: { action: 'pin', label: 'Fissa nella barra laterale', separator: true }
 		);
-		voci.push(
-			condivisaQui
-				? { azione: 'nonCondividere', etichetta: 'Smetti di condividere in rete locale' }
-				: { azione: 'condividi', etichetta: 'Condividi questa cartella in rete locale' }
+		items.push(
+			sharedHere
+				? { action: 'stopSharing', label: 'Smetti di condividere in rete locale' }
+				: { action: 'share', label: 'Condividi questa cartella in rete locale' }
 		);
-		if (!iniziale) voci.push({ azione: 'paginaIniziale', etichetta: 'Imposta come pagina iniziale' });
-		voci.push(voceAvvio(allAvvio));
-		voci.push({ azione: 'duplicati', etichetta: 'Trova duplicati qui', stacca: true });
-		voci.push(voceConfronta(altroPannello));
-		voci.push({ azione: 'spazio', etichetta: 'Analizza spazio' });
-		voci.push({ azione: 'regole', etichetta: 'Regole automatiche…' });
-		voci.push({ azione: 'terminale', etichetta: 'Apri nel terminale' });
-		voci.push({ azione: 'altreOpzioni', etichetta: 'Altre opzioni di Windows', stacca: true });
-		voci.push({ azione: 'proprieta', etichetta: 'Proprietà', scorciatoia: 'Alt+Invio' });
+		if (!isStartPage) items.push({ action: 'setStartPage', label: 'Imposta come pagina iniziale' });
+		items.push(startupItem(atStartup));
+		items.push({ action: 'duplicates', label: 'Trova duplicati qui', separator: true });
+		items.push(compareItem(otherPane));
+		items.push({ action: 'space', label: 'Analizza spazio' });
+		items.push({ action: 'rules', label: 'Regole automatiche…' });
+		items.push({ action: 'terminal', label: 'Apri nel terminale' });
+		items.push({ action: 'moreOptions', label: 'Altre opzioni di Windows', separator: true });
+		items.push({ action: 'properties', label: 'Proprietà', shortcut: 'Alt+Invio' });
 	}
-	return voci;
+	return items;
 }
 
 /** Formats the Rust image tools can read and write back. */
-const IMMAGINI_MODIFICABILI = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'];
-export function eImmagineModificabile(nome: string): boolean {
-	return IMMAGINI_MODIFICABILI.includes(nome.split('.').pop()?.toLowerCase() ?? '');
+const EDITABLE_IMAGES = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'];
+export function isEditableImage(name: string): boolean {
+	return EDITABLE_IMAGES.includes(name.split('.').pop()?.toLowerCase() ?? '');
 }
 
-function vociElementi({
-	selezione,
-	appuntiPieni,
-	giaPreferiti = false,
-	ricerca = false,
-	coloreAttuale = null,
+function selectionItems({
+	selection,
+	clipboardFull,
+	alreadyFavorite = false,
+	search = false,
+	currentColor = null,
 	labelName,
-	pari = [],
-	condivisa = null,
-	fissata = false,
-	iniziale = false,
-	allAvvio = false,
-	altroPannello = null
-}: ContestoMenu): VoceMenu[] {
-	const voci: VoceMenu[] = [];
-	const quante = selezione.length;
-	const unica = quante === 1 ? selezione[0] : null;
+	peers = [],
+	shared = null,
+	pinned = false,
+	isStartPage = false,
+	atStartup = false,
+	otherPane = null
+}: MenuContext): MenuItem[] {
+	const items: MenuItem[] = [];
+	const count = selection.length;
+	const single = count === 1 ? selection[0] : null;
 
-	// Aprire ha senso su una voce sola: aprire venti file insieme è quasi
-	// sempre un incidente, non un'intenzione.
-	if (unica) {
-		voci.push({ azione: 'apri', etichetta: 'Apri', scorciatoia: 'Invio' });
-		if (unica.kind === 'dir') {
-			voci.push({ azione: 'apriNuovaScheda', etichetta: 'Apri in una nuova scheda' });
-			voci.push({ azione: 'apriNuovaFinestra', etichetta: 'Apri in una nuova finestra' });
-			voci.push(
-				fissata
-					? { azione: 'sgancia', etichetta: 'Togli dalla barra laterale' }
-					: { azione: 'fissa', etichetta: 'Fissa nella barra laterale' }
-			);
-			if (!iniziale) voci.push({ azione: 'paginaIniziale', etichetta: 'Imposta come pagina iniziale' });
-			voci.push(voceAvvio(allAvvio));
-			voci.push({ azione: 'terminale', etichetta: 'Apri nel terminale' });
-			voci.push({ azione: 'duplicati', etichetta: 'Trova duplicati qui' });
-			voci.push(voceConfronta(altroPannello));
-			voci.push({ azione: 'spazio', etichetta: 'Analizza spazio' });
-			voci.push({ azione: 'regole', etichetta: 'Regole automatiche…' });
+	// Opening makes sense on a single item: opening twenty files together is
+	// almost always an accident, not an intention.
+	if (single) {
+		items.push({ action: 'open', label: 'Apri', shortcut: 'Invio' });
+		if (single.kind === 'dir') {
+			items.push({ action: 'openNewTab', label: 'Apri in una nuova scheda' });
+			items.push({ action: 'openNewWindow', label: 'Apri in una nuova finestra' });
+			items.push(pinned ? { action: 'unpin', label: 'Togli dalla barra laterale' } : { action: 'pin', label: 'Fissa nella barra laterale' });
+			if (!isStartPage) items.push({ action: 'setStartPage', label: 'Imposta come pagina iniziale' });
+			items.push(startupItem(atStartup));
+			items.push({ action: 'terminal', label: 'Apri nel terminale' });
+			items.push({ action: 'duplicates', label: 'Trova duplicati qui' });
+			items.push(compareItem(otherPane));
+			items.push({ action: 'space', label: 'Analizza spazio' });
+			items.push({ action: 'rules', label: 'Regole automatiche…' });
 		} else {
-			voci.push({ azione: 'apriCon', etichetta: 'Apri con…' });
-			voci.push({ azione: 'checksum', etichetta: 'Somma di controllo…' });
-			if (altroPannello) voci.push({ azione: 'confrontaFileAltro', etichetta: 'Confronta con lo stesso file nell’altro pannello' });
-			if (eEseguibile(unica.name)) {
-				voci.push({ azione: 'amministratore', etichetta: 'Esegui come amministratore' });
+			items.push({ action: 'openWith', label: 'Apri con…' });
+			items.push({ action: 'checksum', label: 'Somma di controllo…' });
+			if (otherPane) items.push({ action: 'compareFileOtherPane', label: 'Confronta con lo stesso file nell’altro pannello' });
+			if (isExecutable(single.name)) {
+				items.push({ action: 'runAsAdmin', label: 'Esegui come amministratore' });
 			}
 		}
-		if (ricerca) voci.push({ azione: 'apriPercorso', etichetta: 'Apri percorso file' });
+		if (search) items.push({ action: 'openFileLocation', label: 'Apri percorso file' });
 	}
 
-	voci.push({ azione: 'copia', etichetta: 'Copia', scorciatoia: 'Ctrl+C', stacca: true });
-	voci.push({ azione: 'taglia', etichetta: 'Taglia', scorciatoia: 'Ctrl+X' });
+	items.push({ action: 'copy', label: 'Copia', shortcut: 'Ctrl+C', separator: true });
+	items.push({ action: 'cut', label: 'Taglia', shortcut: 'Ctrl+X' });
 
-	if (appuntiPieni && !ricerca) {
-		voci.push({ azione: 'incolla', etichetta: 'Incolla', scorciatoia: 'Ctrl+V' });
+	if (clipboardFull && !search) {
+		items.push({ action: 'paste', label: 'Incolla', shortcut: 'Ctrl+V' });
 	}
 
-	if (unica) {
-		voci.push({ azione: 'rinomina', etichetta: 'Rinomina', scorciatoia: 'F2', stacca: true });
-	} else if (!ricerca) {
+	if (single) {
+		items.push({ action: 'rename', label: 'Rinomina', shortcut: 'F2', separator: true });
+	} else if (!search) {
 		// Several items in one folder: the batch rename dialog.
-		voci.push({ azione: 'rinomina', etichetta: 'Rinomina…', scorciatoia: 'F2', stacca: true });
+		items.push({ action: 'rename', label: 'Rinomina…', shortcut: 'F2', separator: true });
 	}
 
-	// I preferiti appartengono alla cartella aperta: fra i risultati di una
-	// ricerca le voci vengono da cartelle diverse e non avrebbe senso.
-	if (!ricerca) {
-		voci.push({
-			azione: 'preferito',
-			etichetta: giaPreferiti ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti',
-			scorciatoia: 'Ctrl+D',
-			// Con una voce sola il gruppo è già aperto da Rinomina.
-			stacca: quante > 1
+	// Favourites belong to the open folder: among the results of a search
+	// the items come from different folders and it would make no sense.
+	if (!search) {
+		items.push({
+			action: 'favorite',
+			label: alreadyFavorite ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti',
+			shortcut: 'Ctrl+D',
+			// With a single item the group is already opened by Rename.
+			separator: count > 1
 		});
 	}
 
 	// Folders change colour, files get a coloured label: same palette for both.
-	voci.push(tavolozzaCartelle(coloreAttuale, labelName));
+	items.push(folderPalette(currentColor, labelName));
 
-	voci.push({
-		azione: 'copiaPercorso',
-		etichetta: quante === 1 ? 'Copia percorso' : 'Copia percorsi',
-		stacca: quante > 1 && ricerca
+	items.push({
+		action: 'copyPath',
+		label: count === 1 ? 'Copia percorso' : 'Copia percorsi',
+		separator: count > 1 && search
 	});
 
-	if (unica) {
-		voci.push({ azione: 'mostraInEsplora', etichetta: 'Mostra in Esplora risorse' });
+	if (single) {
+		items.push({ action: 'revealInExplorer', label: 'Mostra in Esplora risorse' });
 	}
-	if (quante === 2 && selezione.every((e) => e.kind === 'file')) {
-		voci.push({ azione: 'confrontaFile', etichetta: 'Confronta i due file' });
-	}
-
-	if (selezione.every((e) => e.kind === 'file' && eImmagineModificabile(e.name))) {
-		voci.push({ azione: 'ruotaDestra', etichetta: 'Ruota a destra', stacca: true });
-		voci.push({ azione: 'ruotaSinistra', etichetta: 'Ruota a sinistra' });
-		voci.push({ azione: 'convertiImmagini', etichetta: 'Converti e ridimensiona…' });
+	if (count === 2 && selection.every((e) => e.kind === 'file')) {
+		items.push({ action: 'compareFiles', label: 'Confronta i due file' });
 	}
 
-	if (!ricerca) {
-		voci.push({ azione: 'comprimi', etichetta: 'Comprimi in file ZIP', stacca: true });
+	if (selection.every((e) => e.kind === 'file' && isEditableImage(e.name))) {
+		items.push({ action: 'rotateRight', label: 'Ruota a destra', separator: true });
+		items.push({ action: 'rotateLeft', label: 'Ruota a sinistra' });
+		items.push({ action: 'convertImages', label: 'Converti e ridimensiona…' });
 	}
 
-	// Un invio per ogni PC trovato in rete locale: chi riceve deve accettare.
-	pari.forEach((p, i) => {
-		voci.push({ azione: `invia:${p.id}` as AzioneMenu, etichetta: `Invia a ${p.nome}`, stacca: i === 0 });
+	if (!search) {
+		items.push({ action: 'compress', label: 'Comprimi in file ZIP', separator: true });
+	}
+
+	// One send per PC found on the local network: whoever receives must accept.
+	peers.forEach((p, i) => {
+		items.push({ action: `send:${p.id}` as MenuAction, label: `Invia a ${p.name}`, separator: i === 0 });
 	});
-	if (unica?.kind === 'dir') {
-		const giaCondivisa = condivisa !== null && condivisa.toLowerCase() === unica.path.toLowerCase();
-		voci.push(
-			giaCondivisa
-				? { azione: 'nonCondividere', etichetta: 'Smetti di condividere in rete locale', stacca: pari.length === 0 }
-				: { azione: 'condividi', etichetta: 'Condividi in rete locale', stacca: pari.length === 0 }
+	if (single?.kind === 'dir') {
+		const alreadyShared = shared !== null && shared.toLowerCase() === single.path.toLowerCase();
+		items.push(
+			alreadyShared
+				? { action: 'stopSharing', label: 'Smetti di condividere in rete locale', separator: peers.length === 0 }
+				: { action: 'share', label: 'Condividi in rete locale', separator: peers.length === 0 }
 		);
 	}
-	if (unica && eArchivio(unica.name)) {
-		voci.push({ azione: 'estrai', etichetta: 'Estrai tutto', stacca: ricerca });
+	if (single && isArchive(single.name)) {
+		items.push({ action: 'extract', label: 'Estrai tutto', separator: search });
 	}
 
-	voci.push({
-		azione: 'cestina',
-		etichetta: quante === 1 ? 'Sposta nel Cestino' : `Sposta ${quante} elementi nel Cestino`,
-		scorciatoia: 'Canc',
-		stacca: true,
-		pericolosa: true
+	items.push({
+		action: 'trash',
+		label: count === 1 ? 'Sposta nel Cestino' : `Sposta ${count} elementi nel Cestino`,
+		shortcut: 'Canc',
+		separator: true,
+		danger: true
 	});
-	voci.push({
-		azione: 'eliminaDefinitivo',
-		etichetta: 'Elimina definitivamente',
-		scorciatoia: 'Maiusc+Canc',
-		pericolosa: true
+	items.push({
+		action: 'deletePermanently',
+		label: 'Elimina definitivamente',
+		shortcut: 'Maiusc+Canc',
+		danger: true
 	});
 
-	voci.push({ azione: 'altreOpzioni', etichetta: 'Altre opzioni di Windows', stacca: true });
-	voci.push({ azione: 'proprieta', etichetta: 'Proprietà', scorciatoia: 'Alt+Invio' });
+	items.push({ action: 'moreOptions', label: 'Altre opzioni di Windows', separator: true });
+	items.push({ action: 'properties', label: 'Proprietà', shortcut: 'Alt+Invio' });
 
-	return voci;
+	return items;
 }
 
-/** Nella cartella condivisa da un altro PC si legge e si copia, non si modifica. */
-function vociReteLocale({ selezione }: ContestoMenu): VoceMenu[] {
-	if (selezione.length === 0) {
-		return [{ azione: 'aggiorna', etichetta: 'Aggiorna', scorciatoia: 'F5' }];
+/** In the folder another PC shares you read and copy, you do not change it. */
+function lanItems({ selection }: MenuContext): MenuItem[] {
+	if (selection.length === 0) {
+		return [{ action: 'refresh', label: 'Aggiorna', shortcut: 'F5' }];
 	}
-	const unica = selezione.length === 1 ? selezione[0] : null;
-	const voci: VoceMenu[] = [];
-	if (unica) voci.push({ azione: 'apri', etichetta: 'Apri', scorciatoia: 'Invio' });
-	voci.push({ azione: 'copia', etichetta: 'Copia', scorciatoia: 'Ctrl+C', stacca: unica !== null });
-	voci.push({ azione: 'scarica', etichetta: 'Scarica nella cartella Ricevuti' });
-	return voci;
+	const single = selection.length === 1 ? selection[0] : null;
+	const items: MenuItem[] = [];
+	if (single) items.push({ action: 'open', label: 'Apri', shortcut: 'Invio' });
+	items.push({ action: 'copy', label: 'Copia', shortcut: 'Ctrl+C', separator: single !== null });
+	items.push({ action: 'download', label: 'Scarica nella cartella Ricevuti' });
+	return items;
 }
 
 /** A folder on a remote server: open, copy out, paste in, rename, new folder, delete for good. */
-function vociServer({ selezione, appuntiPieni = false }: ContestoMenu): VoceMenu[] {
-	if (selezione.length === 0) {
-		const voci: VoceMenu[] = [];
-		if (appuntiPieni) voci.push({ azione: 'incolla', etichetta: 'Incolla (carica sul server)', scorciatoia: 'Ctrl+V' });
-		voci.push({ azione: 'nuovaCartella', etichetta: 'Nuova cartella', scorciatoia: 'Ctrl+Maiusc+N' });
-		voci.push({ azione: 'aggiorna', etichetta: 'Aggiorna', scorciatoia: 'F5', stacca: true });
-		return voci;
+function serverItems({ selection, clipboardFull = false }: MenuContext): MenuItem[] {
+	if (selection.length === 0) {
+		const items: MenuItem[] = [];
+		if (clipboardFull) items.push({ action: 'paste', label: 'Incolla (carica sul server)', shortcut: 'Ctrl+V' });
+		items.push({ action: 'newFolder', label: 'Nuova cartella', shortcut: 'Ctrl+Maiusc+N' });
+		items.push({ action: 'refresh', label: 'Aggiorna', shortcut: 'F5', separator: true });
+		return items;
 	}
-	const voci: VoceMenu[] = [{ azione: 'apri', etichetta: 'Apri', scorciatoia: 'Invio' }];
-	voci.push({ azione: 'copia', etichetta: 'Copia', scorciatoia: 'Ctrl+C', stacca: true });
-	voci.push({ azione: 'scarica', etichetta: 'Scarica nella cartella Ricevuti' });
-	if (selezione.length === 1) voci.push({ azione: 'rinomina', etichetta: 'Rinomina…', scorciatoia: 'F2', stacca: true });
-	voci.push({ azione: 'eliminaDefinitivo', etichetta: 'Elimina dal server', scorciatoia: 'Canc', pericolosa: true, stacca: selezione.length !== 1 });
-	voci.push({ azione: 'copiaPercorso', etichetta: 'Copia percorso', stacca: true });
-	return voci;
+	const items: MenuItem[] = [{ action: 'open', label: 'Apri', shortcut: 'Invio' }];
+	items.push({ action: 'copy', label: 'Copia', shortcut: 'Ctrl+C', separator: true });
+	items.push({ action: 'download', label: 'Scarica nella cartella Ricevuti' });
+	if (selection.length === 1) items.push({ action: 'rename', label: 'Rinomina…', shortcut: 'F2', separator: true });
+	items.push({ action: 'deletePermanently', label: 'Elimina dal server', shortcut: 'Canc', danger: true, separator: selection.length !== 1 });
+	items.push({ action: 'copyPath', label: 'Copia percorso', separator: true });
+	return items;
 }
 
-function vociCestino({ selezione }: ContestoMenu): VoceMenu[] {
-	if (selezione.length === 0) {
+function trashItems({ selection }: MenuContext): MenuItem[] {
+	if (selection.length === 0) {
 		return [
-			{ azione: 'aggiorna', etichetta: 'Aggiorna', scorciatoia: 'F5' },
-			{ azione: 'svuotaCestino', etichetta: 'Svuota Cestino', stacca: true, pericolosa: true }
+			{ action: 'refresh', label: 'Aggiorna', shortcut: 'F5' },
+			{ action: 'emptyTrash', label: 'Svuota Cestino', separator: true, danger: true }
 		];
 	}
 	return [
 		{
-			azione: 'ripristina',
-			etichetta: selezione.length === 1 ? 'Ripristina' : `Ripristina ${selezione.length} elementi`
+			action: 'restore',
+			label: selection.length === 1 ? 'Ripristina' : `Ripristina ${selection.length} elementi`
 		},
 		{
-			azione: 'eliminaDefinitivo',
-			etichetta: 'Elimina definitivamente',
-			scorciatoia: 'Canc',
-			stacca: true,
-			pericolosa: true
+			action: 'deletePermanently',
+			label: 'Elimina definitivamente',
+			shortcut: 'Canc',
+			separator: true,
+			danger: true
 		}
 	];
 }
 
 /** Inside an archive opened like a folder: open and extract, nothing that writes into it. A vault also takes files in. */
-function vociArchivio({ selezione, cassaforte = false, appuntiPieni = false }: ContestoMenu): VoceMenu[] {
-	if (cassaforte) return vociCassaforte(selezione, appuntiPieni);
-	const voci: VoceMenu[] = [];
-	if (selezione.length === 1) voci.push({ azione: 'apri', etichetta: 'Apri', scorciatoia: 'Invio' });
-	const cosa = selezione.length === 0 ? 'tutto' : selezione.length === 1 ? '' : `${selezione.length} elementi`;
-	voci.push({ azione: 'estraiQui', etichetta: `Estrai ${cosa} accanto all’archivio`.replace('  ', ' '), stacca: voci.length > 0 });
-	voci.push({ azione: 'estraiIn', etichetta: `Estrai ${cosa} in…`.replace('  ', ' ') });
-	return voci;
+function archiveItems({ selection, vault = false, clipboardFull = false }: MenuContext): MenuItem[] {
+	if (vault) return vaultItems(selection, clipboardFull);
+	const items: MenuItem[] = [];
+	if (selection.length === 1) items.push({ action: 'open', label: 'Apri', shortcut: 'Invio' });
+	const what = selection.length === 0 ? 'tutto' : selection.length === 1 ? '' : `${selection.length} elementi`;
+	items.push({ action: 'extractHere', label: `Estrai ${what} accanto all’archivio`.replace('  ', ' '), separator: items.length > 0 });
+	items.push({ action: 'extractTo', label: `Estrai ${what} in…`.replace('  ', ' ') });
+	return items;
 }
 
-function vociVirtuali({ selezione, iniziale = false }: ContestoMenu, posizione: 'pc' | 'rete'): VoceMenu[] {
-	if (selezione.length !== 1) {
-		const voci: VoceMenu[] = [{ azione: 'aggiorna', etichetta: 'Aggiorna', scorciatoia: 'F5' }];
-		if (posizione === 'pc' && selezione.length === 0 && !iniziale) {
-			voci.push({ azione: 'iniziale:pc', etichetta: 'Imposta come pagina iniziale', stacca: true });
+function virtualItems({ selection, isStartPage = false }: MenuContext, location: 'pc' | 'network'): MenuItem[] {
+	if (selection.length !== 1) {
+		const items: MenuItem[] = [{ action: 'refresh', label: 'Aggiorna', shortcut: 'F5' }];
+		if (location === 'pc' && selection.length === 0 && !isStartPage) {
+			items.push({ action: 'start:pc', label: 'Imposta come pagina iniziale', separator: true });
 		}
-		return voci;
+		return items;
 	}
-	const voci: VoceMenu[] = [
-		{ azione: 'apri', etichetta: 'Apri', scorciatoia: 'Invio' },
-		{ azione: 'apriNuovaScheda', etichetta: 'Apri in una nuova scheda' },
-		{ azione: 'copiaPercorso', etichetta: 'Copia percorso', stacca: true }
+	const items: MenuItem[] = [
+		{ action: 'open', label: 'Apri', shortcut: 'Invio' },
+		{ action: 'openNewTab', label: 'Apri in una nuova scheda' },
+		{ action: 'copyPath', label: 'Copia percorso', separator: true }
 	];
-	if (posizione === 'pc') {
-		if (selezione[0].kind === 'dir') {
-			voci.push({ azione: 'spazio', etichetta: 'Analizza spazio' });
+	if (location === 'pc') {
+		if (selection[0].kind === 'dir') {
+			items.push({ action: 'space', label: 'Analizza spazio' });
 			// Only drives carry their size: a known folder in This PC is not a drive.
-			if (selezione[0].totale != null) voci.push({ azione: 'pulizia', etichetta: 'Pulizia disco…' });
+			if (selection[0].total != null) items.push({ action: 'cleanup', label: 'Pulizia disco…' });
 		}
-		voci.push({ azione: 'altreOpzioni', etichetta: 'Altre opzioni di Windows', stacca: true });
-		voci.push({ azione: 'proprieta', etichetta: 'Proprietà', scorciatoia: 'Alt+Invio' });
+		items.push({ action: 'moreOptions', label: 'Altre opzioni di Windows', separator: true });
+		items.push({ action: 'properties', label: 'Proprietà', shortcut: 'Alt+Invio' });
 	}
-	return voci;
+	return items;
 }
 
-/** La tavolozza «Colore cartella», con il colore attuale segnato. */
-function vociCassaforte(selezione: ContestoMenu['selezione'], appuntiPieni: boolean): VoceMenu[] {
-	const voci: VoceMenu[] = [];
-	if (selezione.length === 1) voci.push({ azione: 'apri', etichetta: 'Apri', scorciatoia: 'Invio' });
-	const cosa = selezione.length === 0 ? 'tutto' : selezione.length === 1 ? '' : `${selezione.length} elementi`;
-	voci.push({ azione: 'estraiIn', etichetta: `Estrai ${cosa} in…`.replace('  ', ' '), stacca: voci.length > 0 });
-	if (appuntiPieni) voci.push({ azione: 'aggiungiInCassaforte', etichetta: 'Metti qui i file copiati', scorciatoia: 'Ctrl+V' });
-	if (selezione.length > 0) {
-		voci.push({ azione: 'eliminaDaCassaforte', etichetta: 'Elimina dalla cassaforte', scorciatoia: 'Canc', pericolosa: true, stacca: true });
+/** Inside an open vault: extract, add the copied files, delete for good, lock. */
+function vaultItems(selection: MenuContext['selection'], clipboardFull: boolean): MenuItem[] {
+	const items: MenuItem[] = [];
+	if (selection.length === 1) items.push({ action: 'open', label: 'Apri', shortcut: 'Invio' });
+	const what = selection.length === 0 ? 'tutto' : selection.length === 1 ? '' : `${selection.length} elementi`;
+	items.push({ action: 'extractTo', label: `Estrai ${what} in…`.replace('  ', ' '), separator: items.length > 0 });
+	if (clipboardFull) items.push({ action: 'addToVault', label: 'Metti qui i file copiati', shortcut: 'Ctrl+V' });
+	if (selection.length > 0) {
+		items.push({ action: 'deleteFromVault', label: 'Elimina dalla cassaforte', shortcut: 'Canc', danger: true, separator: true });
 	}
-	voci.push({ azione: 'chiudiCassaforte', etichetta: 'Chiudi la cassaforte', stacca: true });
-	return voci;
+	items.push({ action: 'lockVault', label: 'Chiudi la cassaforte', separator: true });
+	return items;
 }
 
-export function tavolozzaCartelle(
-	attuale: IdColore | null,
-	labelName: (id: IdColore) => string = (id) => COLORI_CARTELLA.find((c) => c.id === id)?.nome ?? id
-): VoceMenu {
+/** The «Colore cartella» palette, with the current colour marked. */
+export function folderPalette(
+	current: ColorId | null,
+	labelName: (id: ColorId) => string = (id) => FOLDER_COLORS.find((c) => c.id === id)?.name ?? id
+): MenuItem {
 	return {
-		azione: 'coloreCartella',
-		etichetta: 'Colore',
-		stacca: true,
-		tavolozza: [
-			{ azione: 'coloreNessuno', nome: 'Nessun colore', colore: null, attivo: attuale === null },
-			...COLORI_CARTELLA.map((c) => ({
-				azione: `colore:${c.id}` as AzioneMenu,
-				nome: labelName(c.id),
-				colore: c.esadecimale,
-				attivo: attuale === c.id
+		action: 'folderColor',
+		label: 'Colore',
+		separator: true,
+		palette: [
+			{ action: 'noColor', name: 'Nessun colore', color: null, active: current === null },
+			...FOLDER_COLORS.map((c) => ({
+				action: `color:${c.id}` as MenuAction,
+				name: labelName(c.id),
+				color: c.hex,
+				active: current === c.id
 			}))
 		]
 	};
 }
 
 /**
- * Il menu «Nuovo» di Esplora: prima la cartella, poi i tipi di file che
- * i programmi installati hanno registrato in Windows.
+ * Explorer's «Nuovo» menu: first the folder, then the file types the
+ * installed programs registered in Windows.
  */
-export function vociNuovo(tipi: ReadonlyArray<{ ext: string; nome: string }>): VoceMenu[] {
+export function newItems(types: ReadonlyArray<{ ext: string; name: string }>): MenuItem[] {
 	return [
-		{ azione: 'nuovaCartella', etichetta: 'Cartella', scorciatoia: 'Ctrl+Maiusc+N' },
-		{ azione: 'nuovaCassaforte', etichetta: 'Cassaforte…' },
-		...tipi.map((t, i) => ({
-			azione: `nuovo:${t.ext}` as AzioneMenu,
-			etichetta: t.nome,
-			stacca: i === 0
+		{ action: 'newFolder', label: 'Cartella', shortcut: 'Ctrl+Maiusc+N' },
+		{ action: 'newVault', label: 'Cassaforte…' },
+		...types.map((t, i) => ({
+			action: `new:${t.ext}` as MenuAction,
+			label: t.name,
+			separator: i === 0
 		}))
 	];
 }
 
-/** Il menu di una cartella dell'Accesso rapido nella barra laterale. */
-export function vociAccessoRapido(primo: boolean, ultimo: boolean): VoceMenu[] {
-	const voci: VoceMenu[] = [
-		{ azione: 'apriNuovaScheda', etichetta: 'Apri in una nuova scheda' },
-		{ azione: 'apriNuovaFinestra', etichetta: 'Apri in una nuova finestra' }
+/** The menu of a Quick access folder in the sidebar. */
+export function quickAccessItems(first: boolean, last: boolean): MenuItem[] {
+	const items: MenuItem[] = [
+		{ action: 'openNewTab', label: 'Apri in una nuova scheda' },
+		{ action: 'openNewWindow', label: 'Apri in una nuova finestra' }
 	];
-	if (!primo) voci.push({ azione: 'suAccesso', etichetta: 'Sposta su', stacca: true });
-	if (!ultimo) voci.push({ azione: 'giuAccesso', etichetta: 'Sposta giù', stacca: primo });
-	voci.push({ azione: 'sgancia', etichetta: 'Togli dalla barra laterale', stacca: true });
-	return voci;
+	if (!first) items.push({ action: 'quickAccessUp', label: 'Sposta su', separator: true });
+	if (!last) items.push({ action: 'quickAccessDown', label: 'Sposta giù', separator: first });
+	items.push({ action: 'unpin', label: 'Togli dalla barra laterale', separator: true });
+	return items;
 }
 
-const CHIAVI_ORDINE: Array<{ chiave: SortKey; nome: string }> = [
-	{ chiave: 'name', nome: 'Nome' },
-	{ chiave: 'modified', nome: 'Data di modifica' },
-	{ chiave: 'kind', nome: 'Tipo' },
-	{ chiave: 'size', nome: 'Dimensione' }
+const SORT_KEYS: Array<{ key: SortKey; name: string }> = [
+	{ key: 'name', name: 'Nome' },
+	{ key: 'modified', name: 'Data di modifica' },
+	{ key: 'kind', name: 'Tipo' },
+	{ key: 'size', name: 'Dimensione' }
 ];
 
-const MODI_GRUPPO: Array<{ modo: ModoGruppi; nome: string }> = [
-	{ modo: 'nessuno', nome: 'Nessuno' },
-	{ modo: 'nome', nome: 'Nome' },
-	{ modo: 'data', nome: 'Data di modifica' },
-	{ modo: 'tipo', nome: 'Tipo' },
-	{ modo: 'dimensione', nome: 'Dimensione' }
+const GROUP_MODES: Array<{ mode: GroupMode; name: string }> = [
+	{ mode: 'none', name: 'Nessuno' },
+	{ mode: 'name', name: 'Nome' },
+	{ mode: 'date', name: 'Data di modifica' },
+	{ mode: 'type', name: 'Tipo' },
+	{ mode: 'size', name: 'Dimensione' }
 ];
 
-/** Il menu «Ordina» di Esplora: colonna, verso e raggruppamento. */
-export function vociOrdina(sort: SortSpec, raggruppa: ModoGruppi): VoceMenu[] {
+/** Explorer's «Ordina» menu: column, direction and grouping. */
+export function sortItems(sort: SortSpec, grouping: GroupMode): MenuItem[] {
 	return [
-		...CHIAVI_ORDINE.map((c) => ({
-			azione: `ordina:${c.chiave}` as AzioneMenu,
-			etichetta: c.nome,
-			spunta: sort.key === c.chiave
+		...SORT_KEYS.map((c) => ({
+			action: `sort:${c.key}` as MenuAction,
+			label: c.name,
+			checked: sort.key === c.key
 		})),
-		{ azione: 'crescente', etichetta: 'Crescente', spunta: sort.ascending, stacca: true },
-		{ azione: 'decrescente', etichetta: 'Decrescente', spunta: !sort.ascending },
-		...MODI_GRUPPO.map((g, i) => ({
-			azione: `gruppi:${g.modo}` as AzioneMenu,
-			etichetta: g.nome,
-			spunta: raggruppa === g.modo,
-			nomeAccessibile: g.modo === 'nessuno' ? 'Nessun raggruppamento' : `Raggruppa per ${g.nome.toLowerCase()}`,
-			stacca: i === 0,
-			sezione: i === 0 ? 'Raggruppa per' : undefined
+		{ action: 'ascending', label: 'Crescente', checked: sort.ascending, separator: true },
+		{ action: 'descending', label: 'Decrescente', checked: !sort.ascending },
+		...GROUP_MODES.map((g, i) => ({
+			action: `group:${g.mode}` as MenuAction,
+			label: g.name,
+			checked: grouping === g.mode,
+			accessibleName: g.mode === 'none' ? 'Nessun raggruppamento' : `Raggruppa per ${g.name.toLowerCase()}`,
+			separator: i === 0,
+			section: i === 0 ? 'Raggruppa per' : undefined
 		}))
 	];
 }
 
-export interface StatoVista {
-	vista: Vista;
-	lato: number;
-	compatta: boolean;
-	colonne: { tipo: boolean; dimensione: boolean; data: boolean };
-	estensioni: boolean;
-	nascosti: boolean;
-	anteprima: boolean;
-	/** La pagina iniziale scelta: `::pc`, `::ultima` o il path di una cartella. */
-	iniziale?: string;
-	/** Le schede della volta scorsa si riaprono all'avvio. */
-	sessione?: boolean;
+export interface ViewMenuState {
+	view: View;
+	side: number;
+	compact: boolean;
+	columns: { type: boolean; size: boolean; date: boolean };
+	extensions: boolean;
+	hidden: boolean;
+	preview: boolean;
+	/** The chosen start page: `::pc`, `::ultima` or the path of a folder. */
+	startPage?: string;
+	/** The tabs of last time reopen at startup. */
+	session?: boolean;
 }
 
-/** La pagina iniziale predefinita: il disco di sistema, come prima della scelta. */
-export const INIZIALE_PREDEFINITA = RADICE_SISTEMA;
-/** Pagina iniziale speciale: riprende l'ultima cartella aperta. */
-export const INIZIALE_ULTIMA = '::ultima';
+/** The default start page: the system disk, as before the choice. */
+export const DEFAULT_START_PAGE = SYSTEM_ROOT;
+/** Special start page: resumes the last folder opened. The value is saved: it stays as it is. */
+export const LAST_FOLDER_START_PAGE = '::ultima';
 
-/** Le pagine iniziali fra cui scegliere nel menu «Visualizza». */
-/** Fissare una cartella perché si apra a ogni avvio, o smettere. */
-function voceAvvio(allAvvio: boolean): VoceMenu {
-	return allAvvio
-		? { azione: 'cartellaAvvio', etichetta: 'Non aprire più all’avvio' }
-		: { azione: 'cartellaAvvio', etichetta: 'Apri sempre all’avvio' };
+/** Pinning a folder so it opens at every startup, or stopping. */
+function startupItem(atStartup: boolean): MenuItem {
+	return atStartup
+		? { action: 'startupFolder', label: 'Non aprire più all’avvio' }
+		: { action: 'startupFolder', label: 'Apri sempre all’avvio' };
 }
 
-export function vociIniziale(iniziale: string = INIZIALE_PREDEFINITA, sessione = false): VoceMenu[] {
-	const scelte: Array<[AzioneMenu, string, string]> = [
-		['iniziale:pc', 'Questo PC', '::pc'],
-		['iniziale:c', SU_LINUX ? 'File system (/)' : 'Disco locale (C:)', INIZIALE_PREDEFINITA],
-		['iniziale:ultima', 'Ultima cartella aperta', INIZIALE_ULTIMA]
+/** The start pages to choose from in the «Visualizza» menu. */
+export function startPageItems(startPage: string = DEFAULT_START_PAGE, session = false): MenuItem[] {
+	const choices: Array<[MenuAction, string, string]> = [
+		['start:pc', 'Questo PC', '::pc'],
+		['start:c', ON_LINUX ? 'File system (/)' : 'Disco locale (C:)', DEFAULT_START_PAGE],
+		['start:last', 'Ultima cartella aperta', LAST_FOLDER_START_PAGE]
 	];
-	const voci: VoceMenu[] = scelte.map(([azione, etichetta, valore]) => ({
-		azione,
-		etichetta,
-		spunta: iniziale.toLowerCase() === valore.toLowerCase()
+	const items: MenuItem[] = choices.map(([action, label, value]) => ({
+		action,
+		label,
+		checked: startPage.toLowerCase() === value.toLowerCase()
 	}));
-	// Una cartella scelta col menu contestuale compare col suo nome.
-	if (!scelte.some(([, , v]) => v.toLowerCase() === iniziale.toLowerCase())) {
-		const nome = nomeDi(iniziale) || iniziale;
-		voci.push({ azione: 'iniziale:attuale', etichetta: nome, spunta: true, nomeAccessibile: iniziale });
+	// A folder chosen with the context menu shows with its name.
+	if (!choices.some(([, , v]) => v.toLowerCase() === startPage.toLowerCase())) {
+		const name = nameOf(startPage) || startPage;
+		items.push({ action: 'start:current', label: name, checked: true, accessibleName: startPage });
 	}
-	voci.push({ azione: 'sessione', etichetta: 'Riprendi le schede della volta scorsa', spunta: sessione });
-	return voci.map((v, i) => (i === 0 ? { ...v, stacca: true, sezione: 'All’apertura' } : v));
+	items.push({ action: 'session', label: 'Riprendi le schede della volta scorsa', checked: session });
+	return items.map((v, i) => (i === 0 ? { ...v, separator: true, section: 'All’apertura' } : v));
 }
 
-/** Il menu «Visualizza» di Esplora: viste, taglie delle icone, opzioni. */
-export function vociVista(s: StatoVista): VoceMenu[] {
-	const taglia = (lato: number) => s.vista === 'icone' && s.lato === lato;
+/** Explorer's «Visualizza» menu: views, icon sizes, options. */
+export function viewItems(s: ViewMenuState): MenuItem[] {
+	const size = (side: number) => s.view === 'icons' && s.side === side;
 	return [
-		...TAGLIE.map((t) => ({
-			azione: `lato:${t.lato}` as AzioneMenu,
-			etichetta: t.nome,
-			spunta: taglia(t.lato)
+		...SIZES.map((t) => ({
+			action: `side:${t.side}` as MenuAction,
+			label: t.name,
+			checked: size(t.side)
 		})),
-		{ azione: 'vista:elenco', etichetta: 'Elenco', spunta: s.vista === 'elenco' },
-		{ azione: 'vista:dettagli', etichetta: 'Dettagli', spunta: s.vista === 'dettagli' },
-		{ azione: 'vista:riquadri', etichetta: 'Riquadri', spunta: s.vista === 'riquadri' },
-		{ azione: 'vista:contenuto', etichetta: 'Contenuto', spunta: s.vista === 'contenuto' },
-		{ azione: 'compatta', etichetta: 'Visualizzazione compatta', spunta: s.compatta, stacca: true },
-		...vociColonne(s.colonne).map((v, i) =>
-			i === 0 ? { ...v, stacca: true, sezione: 'Colonne dei dettagli' } : v
-		),
+		{ action: 'view:list', label: 'Elenco', checked: s.view === 'list' },
+		{ action: 'view:details', label: 'Dettagli', checked: s.view === 'details' },
+		{ action: 'view:tiles', label: 'Riquadri', checked: s.view === 'tiles' },
+		{ action: 'view:content', label: 'Contenuto', checked: s.view === 'content' },
+		{ action: 'compact', label: 'Visualizzazione compatta', checked: s.compact, separator: true },
+		...columnItems(s.columns).map((v, i) => (i === 0 ? { ...v, separator: true, section: 'Colonne dei dettagli' } : v)),
 		{
-			azione: 'anteprima',
-			etichetta: 'Riquadro di anteprima',
-			spunta: s.anteprima,
-			scorciatoia: 'Alt+P',
-			stacca: true,
-			sezione: 'Mostra'
+			action: 'preview',
+			label: 'Riquadro di anteprima',
+			checked: s.preview,
+			shortcut: 'Alt+P',
+			separator: true,
+			section: 'Mostra'
 		},
-		{ azione: 'estensioni', etichetta: 'Estensioni dei nomi file', spunta: s.estensioni },
-		{ azione: 'nascosti', etichetta: 'Elementi nascosti', spunta: s.nascosti },
-		...vociIniziale(s.iniziale, s.sessione)
+		{ action: 'extensions', label: 'Estensioni dei nomi file', checked: s.extensions },
+		{ action: 'hidden', label: 'Elementi nascosti', checked: s.hidden },
+		...startPageItems(s.startPage, s.session)
 	];
 }
 
-/** Il menu delle colonne, aperto anche col clic destro sulle intestazioni. */
-export function vociColonne(
-	c: StatoVista['colonne'],
+/** The columns menu, opened also with the right click on the headers. */
+export function columnItems(
+	c: ViewMenuState['columns'],
 	media: { shown: readonly MediaKey[]; chosen: boolean } | null = null
-): VoceMenu[] {
-	const voci: VoceMenu[] = [
-		{ azione: 'colonnaTipo', etichetta: 'Tipo', spunta: c.tipo },
-		{ azione: 'colonnaDimensione', etichetta: 'Dimensione', spunta: c.dimensione },
-		{ azione: 'colonnaData', etichetta: 'Data di modifica', spunta: c.data }
+): MenuItem[] {
+	const items: MenuItem[] = [
+		{ action: 'columnType', label: 'Tipo', checked: c.type },
+		{ action: 'columnSize', label: 'Dimensione', checked: c.size },
+		{ action: 'columnDate', label: 'Data di modifica', checked: c.date }
 	];
-	if (!media) return voci;
+	if (!media) return items;
 	MEDIA_COLUMNS.forEach((m, i) =>
-		voci.push({
-			azione: `media:${m.key}` as AzioneMenu,
-			etichetta: m.label,
-			spunta: media.shown.includes(m.key),
-			sezione: i === 0 ? 'Foto, video e musica' : undefined,
-			stacca: i === 0
+		items.push({
+			action: `media:${m.key}` as MenuAction,
+			label: m.label,
+			checked: media.shown.includes(m.key),
+			section: i === 0 ? 'Foto, video e musica' : undefined,
+			separator: i === 0
 		})
 	);
-	if (media.chosen) voci.push({ azione: 'mediaAuto', etichetta: 'Colonne automatiche per questa cartella', stacca: true });
-	return voci;
+	if (media.chosen) items.push({ action: 'mediaAuto', label: 'Colonne automatiche per questa cartella', separator: true });
+	return items;
 }
 
-/** Le pause fra un passaggio e l'altro che si possono scegliere, in secondi. */
-export const PAUSE_TRENO: ReadonlyArray<[number, string]> = [
+/** The pauses between one pass and the next that can be chosen, in seconds. */
+export const TRAIN_PAUSES: ReadonlyArray<[number, string]> = [
 	[0, 'Di continuo'],
 	[15, 'Ogni 15 secondi'],
 	[30, 'Ogni 30 secondi'],
@@ -693,40 +687,40 @@ export const PAUSE_TRENO: ReadonlyArray<[number, string]> = [
 ];
 
 /**
- * Posizione del menu perché resti dentro la finestra.
+ * Position of the menu so it stays inside the window.
  *
- * Aprendolo vicino al bordo destro o in basso, un menu piazzato al puntatore
- * finirebbe fuori schermo e diventerebbe irraggiungibile.
+ * Opening it near the right or bottom edge, a menu placed at the pointer
+ * would end up off screen and become unreachable.
  */
-export function posizionaMenu(
+export function placeMenu(
 	x: number,
 	y: number,
-	menu: { larghezza: number; altezza: number },
-	finestra: { larghezza: number; altezza: number },
-	margine = 8
+	menu: { width: number; height: number },
+	window: { width: number; height: number },
+	margin = 8
 ): { x: number; y: number } {
-	const maxX = finestra.larghezza - menu.larghezza - margine;
-	const maxY = finestra.altezza - menu.altezza - margine;
+	const maxX = window.width - menu.width - margin;
+	const maxY = window.height - menu.height - margin;
 
 	return {
-		x: Math.max(margine, Math.min(x, maxX)),
-		y: Math.max(margine, Math.min(y, maxY))
+		x: Math.max(margin, Math.min(x, maxX)),
+		y: Math.max(margin, Math.min(y, maxY))
 	};
 }
 
 /** The workspace menu: every area (the current one ticked), then save, rename, delete. */
-export function vociAree(areas: ReadonlyArray<{ name: string; tabs: readonly string[] }>, current: string | null): VoceMenu[] {
-	const voci: VoceMenu[] = areas.map((a) => ({
-		azione: `area:${a.name}` as AzioneMenu,
-		etichetta: a.name,
-		scorciatoia: a.tabs.length === 1 ? '1 scheda' : `${a.tabs.length} schede`,
-		spunta: a.name === current
+export function workspaceItems(areas: ReadonlyArray<{ name: string; tabs: readonly string[] }>, current: string | null): MenuItem[] {
+	const items: MenuItem[] = areas.map((a) => ({
+		action: `workspace:${a.name}` as MenuAction,
+		label: a.name,
+		shortcut: a.tabs.length === 1 ? '1 scheda' : `${a.tabs.length} schede`,
+		checked: a.name === current
 	}));
-	voci.push({ azione: 'areaNuova', etichetta: 'Salva come nuova area…', stacca: voci.length > 0 });
+	items.push({ action: 'workspaceNew', label: 'Salva come nuova area…', separator: items.length > 0 });
 	if (current !== null) {
-		voci.push({ azione: 'areaRinomina', etichetta: `Rinomina «${current}»…` });
-		voci.push({ azione: 'areaEsci', etichetta: 'Esci dall’area', nomeAccessibile: `Esci dall’area ${current}` });
-		voci.push({ azione: 'areaElimina', etichetta: `Elimina «${current}»`, pericolosa: true, stacca: true });
+		items.push({ action: 'workspaceRename', label: `Rinomina «${current}»…` });
+		items.push({ action: 'workspaceLeave', label: 'Esci dall’area', accessibleName: `Esci dall’area ${current}` });
+		items.push({ action: 'workspaceDelete', label: `Elimina «${current}»`, danger: true, separator: true });
 	}
-	return voci;
+	return items;
 }

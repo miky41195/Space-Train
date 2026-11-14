@@ -1,67 +1,67 @@
-import type { ArchiveItem, Backend, Comparison, CriteriRicerca, Entry, FsError, Progresso, SortSpec } from '../ipc';
-import { livello } from '../archivio';
-import { stessoPath } from '../posizioni';
+import type { ArchiveItem, Backend, Comparison, SearchCriteria, Entry, FsError, Progress, SortSpec } from '../ipc';
+import { level } from '../archive';
+import { samePath } from '../locations';
 
 export interface Tab {
 	id: number;
 	path: string;
 	entries: Entry[];
 	sort: SortSpec;
-	/** Path selezionati, nell'ordine in cui compaiono nella lista. */
+	/** Selected paths, in the order they appear in the list. */
 	selection: string[];
 	/**
-	 * Punto d'ancoraggio per la selezione con Maiusc: è la voce da cui
-	 * parte l'intervallo, e non coincide con l'ultima cliccata.
+	 * Anchor point for Shift selection: the item the range starts from,
+	 * which is not the last one clicked.
 	 */
 	anchor: string | null;
-	/** Filtro di ricerca applicato alle voci già caricate. Vuoto = nessun filtro. */
+	/** Search filter applied to the items already loaded. Empty = no filter. */
 	query: string;
 	history: string[];
 	historyIndex: number;
-	/** Contatore monotono delle richieste emesse da questo tab. */
+	/** Monotonic counter of the requests issued by this tab. */
 	reqSeq: number;
-	/** Numero della richiesta il cui risultato è attualmente a schermo. */
+	/** Number of the request whose result is on screen now. */
 	lastApplied: number;
 	error: FsError | null;
 	/** The folder that failed to open, when it is not `path` (the tab stays where it was). */
 	failedPath: string | null;
 	loading: boolean;
 	/**
-	 * Risultati della ricerca nelle sottocartelle. `null` = nessuna ricerca
-	 * ricorsiva: la lista mostra il contenuto della cartella.
+	 * Results of the search in the subfolders. `null` = no recursive search:
+	 * the list shows the folder's contents.
 	 */
-	risultati: Entry[] | null;
-	cercando: boolean;
-	/** Operazione di ricerca in corso, per poterla annullare. */
-	ricercaOp: number | null;
+	results: Entry[] | null;
+	searching: boolean;
+	/** Search operation in progress, so it can be cancelled. */
+	searchOp: number | null;
 	/**
-	 * Set when `risultati` holds duplicates: one entry per group, in the
+	 * Set when `results` holds duplicates: one entry per group, in the
 	 * order of the results, plus the comparison progress.
 	 */
-	duplicati: { groups: Array<{ size: number; count: number }>; progress: Progresso } | null;
+	duplicates: { groups: Array<{ size: number; count: number }>; progress: Progress } | null;
 	/**
-	 * Set when `risultati` holds a folder comparison, in this order: only
-	 * here, different (this side's copy), only in `altro`.
+	 * Set when `results` holds a folder comparison, in this order: only
+	 * here, different (this side's copy), only in `other`.
 	 */
-	confronto: {
-		altro: string;
-		contenuto: boolean;
+	comparison: {
+		other: string;
+		content: boolean;
 		onlyHere: number;
 		onlyThere: number;
 		different: Comparison['different'];
 		/** The comparison is still running: counts are not known yet. */
-		inCorso: boolean;
+		running: boolean;
 	} | null;
-	/** Set when `risultati` lists the items carrying a colour label: the colour's name. */
-	etichetta: string | null;
+	/** Set when `results` lists the items carrying a colour label: the colour's name. */
+	label: string | null;
 	/** An archive opened like a folder: its items, and the inner folder shown ('' = root). */
-	archivio: { file: string; dentro: string; voci: ArchiveItem[]; cassaforte?: boolean } | null;
+	archive: { file: string; inner: string; items: ArchiveItem[]; vault?: boolean } | null;
 	/** «Analizza spazio»: the list is sorted by size with a bar; it stays on while browsing. */
-	spazio: boolean;
+	space: boolean;
 }
 
-/** Gli id delle ricerche stanno lontani da quelli dei trasferimenti. */
-let prossimaRicerca = 1_000_000;
+/** Search ids stay far from the transfer ones. */
+let nextSearch = 1_000_000;
 
 const SORT_DEFAULT: SortSpec = { key: 'name', ascending: true };
 
@@ -73,32 +73,31 @@ export class TabsStore {
 	#nextId = 1;
 
 	/**
-	 * Comandi di navigazione in fila, uno per scheda.
+	 * Navigation commands in a queue, one per tab.
 	 *
-	 * «Su» e «Indietro» leggono la posizione corrente e poi aspettano il
-	 * disco: premuti due volte di fila, il secondo partiva dalla cartella
-	 * vecchia e si risaliva di un livello solo. In fila, ognuno parte da
-	 * dove il precedente è arrivato.
+	 * «Up» and «Back» read the current location and then wait for the disk:
+	 * pressed twice in a row, the second started from the old folder and
+	 * went up one level only. Queued, each starts from where the previous
+	 * one arrived.
 	 */
-	#fila = new Map<number, Promise<unknown>>();
+	#queue = new Map<number, Promise<unknown>>();
 
-	#inFila<T>(id: number, lavoro: () => Promise<T>): Promise<T> {
-		const prima = this.#fila.get(id) ?? Promise.resolve();
-		const dopo = prima.catch(() => {}).then(lavoro);
-		this.#fila.set(id, dopo);
-		return dopo;
+	#queued<T>(id: number, work: () => Promise<T>): Promise<T> {
+		const before = this.#queue.get(id) ?? Promise.resolve();
+		const after = before.catch(() => {}).then(work);
+		this.#queue.set(id, after);
+		return after;
 	}
 
 	/**
-	 * `ordini` ricorda l'ordinamento scelto per ogni cartella, come fa
-	 * Esplora. Senza, l'ordinamento resta quello del tab qualunque sia la
-	 * cartella.
+	 * `sorts` remembers the sort chosen for each folder, as Explorer does.
+	 * Without it, the sort stays the tab's whatever the folder.
 	 */
 	constructor(
 		private backend: Backend,
-		private ordini?: {
-			leggi(cartella: string): SortSpec | undefined;
-			scrivi(cartella: string, spec: SortSpec): void;
+		private sorts?: {
+			read(folder: string): SortSpec | undefined;
+			write(folder: string, spec: SortSpec): void;
 		}
 	) {}
 
@@ -111,7 +110,7 @@ export class TabsStore {
 			id: this.#nextId++,
 			path,
 			entries: [],
-			sort: { ...(this.ordini?.leggi(path) ?? SORT_DEFAULT) },
+			sort: { ...(this.sorts?.read(path) ?? SORT_DEFAULT) },
 			selection: [],
 			anchor: null,
 			query: '',
@@ -122,26 +121,25 @@ export class TabsStore {
 			error: null,
 			failedPath: null,
 			loading: false,
-			risultati: null,
-			cercando: false,
-			ricercaOp: null,
-			duplicati: null,
-			confronto: null,
-			etichetta: null,
-			archivio: null,
-			spazio: false
+			results: null,
+			searching: false,
+			searchOp: null,
+			duplicates: null,
+			comparison: null,
+			label: null,
+			archive: null,
+			space: false
 		};
 		this.tabs.push(tab);
 
-		// Da qui in poi si lavora sul proxy che vive nell'array, non
-		// sull'oggetto grezzo: scrivere su quest'ultimo aggiorna il valore
-		// ma non emette alcun segnale, e l'interfaccia resta ferma su ciò
-		// che aveva letto all'inizio.
-		const vivo = this.tabs[this.tabs.length - 1];
+		// From here on we work on the proxy that lives in the array, not on
+		// the raw object: writing to the latter updates the value but emits
+		// no signal, and the interface stays on what it read at the start.
+		const live = this.tabs[this.tabs.length - 1];
 
-		this.activeId = vivo.id;
-		await this.#load(vivo, path, { pushHistory: false });
-		return vivo.id;
+		this.activeId = live.id;
+		await this.#load(live, path, { pushHistory: false });
+		return live.id;
 	}
 
 	closeTab(id: number): void {
@@ -151,31 +149,31 @@ export class TabsStore {
 		this.tabs.splice(i, 1);
 
 		if (this.activeId !== id) return;
-		const vicino = this.tabs[i - 1] ?? this.tabs[i];
-		this.activeId = vicino ? vicino.id : null;
+		const neighbour = this.tabs[i - 1] ?? this.tabs[i];
+		this.activeId = neighbour ? neighbour.id : null;
 	}
 
 	setActive(id: number): void {
 		if (this.tabs.some((t) => t.id === id)) this.activeId = id;
 	}
 
-	/** Passa al tab vicino, girando in tondo come Ctrl+Tab nei browser. */
-	attivaVicino(delta: number): void {
+	/** Goes to the neighbouring tab, wrapping around like Ctrl+Tab in browsers. */
+	activateAdjacent(delta: number): void {
 		const n = this.tabs.length;
 		if (n === 0) return;
 		const i = this.tabs.findIndex((t) => t.id === this.activeId);
 		this.activeId = this.tabs[(i + delta + n) % n].id;
 	}
 
-	/** Ctrl+1…8 vanno al tab in quella posizione; Ctrl+9 sempre all'ultimo. */
-	attivaIndice(indice: number): void {
-		const tab = indice >= 8 ? this.tabs[this.tabs.length - 1] : this.tabs[indice];
+	/** Ctrl+1…8 go to the tab in that position; Ctrl+9 always to the last. */
+	activateIndex(index: number): void {
+		const tab = index >= 8 ? this.tabs[this.tabs.length - 1] : this.tabs[index];
 		if (tab) this.activeId = tab.id;
 	}
 
 	/**
-	 * Fuori dalla fila: andare in una cartella precisa non dipende da dove
-	 * si è, e fra due clic rapidi deve vincere l'ultimo, non il primo.
+	 * Outside the queue: going to a given folder does not depend on where
+	 * you are, and between two fast clicks the last must win, not the first.
 	 */
 	async navigate(id: number, path: string): Promise<void> {
 		const tab = this.#get(id);
@@ -184,7 +182,7 @@ export class TabsStore {
 	}
 
 	goBack(id: number): Promise<void> {
-		return this.#inFila(id, async () => {
+		return this.#queued(id, async () => {
 			const tab = this.#get(id);
 			if (!tab || tab.historyIndex === 0) return;
 			const target = tab.history[tab.historyIndex - 1];
@@ -194,7 +192,7 @@ export class TabsStore {
 	}
 
 	goForward(id: number): Promise<void> {
-		return this.#inFila(id, async () => {
+		return this.#queued(id, async () => {
 			const tab = this.#get(id);
 			if (!tab || tab.historyIndex >= tab.history.length - 1) return;
 			const target = tab.history[tab.historyIndex + 1];
@@ -204,21 +202,21 @@ export class TabsStore {
 	}
 
 	goUp(id: number): Promise<void> {
-		return this.#inFila(id, async () => {
+		return this.#queued(id, async () => {
 			const tab = this.#get(id);
 			if (!tab) return;
 			try {
 				const parent = await this.backend.navigate(tab.path, 'up');
 				await this.#load(tab, parent, { pushHistory: true });
 			} catch {
-				// Siamo già a una radice: nessun parent, nessun cambiamento.
+				// Already at a root: no parent, no change.
 			}
 		});
 	}
 
 	/**
-	 * Rilegge la cartella corrente senza toccare la cronologia.
-	 * Serve dopo un'operazione che ha cambiato il contenuto sul disco.
+	 * Reads the current folder again without touching the history.
+	 * Needed after an operation that changed the contents on disk.
 	 */
 	async reload(id: number): Promise<void> {
 		const tab = this.#get(id);
@@ -227,23 +225,23 @@ export class TabsStore {
 	}
 
 	/**
-	 * Rilegge senza disturbare: selezione, ricerca e risultati restano.
-	 * È la ricarica dell'aggiornamento automatico e di F5, che non deve
-	 * far perdere all'utente ciò che stava facendo.
+	 * Reads again without disturbing: selection, search and results stay.
+	 * It is the reload of automatic refresh and of F5, which must not make
+	 * the user lose what they were doing.
 	 */
-	async aggiorna(id: number): Promise<void> {
+	async refresh(id: number): Promise<void> {
 		const tab = this.#get(id);
 		if (!tab) return;
-		await this.#load(tab, tab.path, { pushHistory: false, mantieni: true });
+		await this.#load(tab, tab.path, { pushHistory: false, keep: true });
 	}
 
-	/** Aggiorna ogni tab che mostra questa cartella. */
-	async aggiornaCartella(path: string): Promise<void> {
-		const coinvolti = this.tabs.filter((t) => stessoPath(t.path, path) && t.risultati === null);
-		await Promise.all(coinvolti.map((t) => this.aggiorna(t.id)));
+	/** Refreshes every tab that shows this folder. */
+	async refreshFolder(path: string): Promise<void> {
+		const affected = this.tabs.filter((t) => samePath(t.path, path) && t.results === null);
+		await Promise.all(affected.map((t) => this.refresh(t.id)));
 	}
 
-	selezionaPercorsi(id: number, paths: string[]): void {
+	selectPaths(id: number, paths: string[]): void {
 		const tab = this.#get(id);
 		if (!tab) return;
 		tab.selection = [...paths];
@@ -251,23 +249,23 @@ export class TabsStore {
 	}
 
 	/**
-	 * Cerca nelle sottocartelle della cartella corrente. I risultati
-	 * arrivano a lotti e si aggiungono man mano: una ricerca nuova annulla
-	 * quella in corso.
+	 * Searches the subfolders of the current folder. Results arrive in
+	 * batches and are added as they come: a new search cancels the one in
+	 * progress.
 	 */
-	async cercaRicorsivo(id: number, criteri: CriteriRicerca): Promise<void> {
+	async searchRecursive(id: number, criteria: SearchCriteria): Promise<void> {
 		const tab = this.#get(id);
 		if (!tab) return;
-		await this.fermaRicerca(id, { tieniRisultati: true });
+		await this.stopSearch(id, { keepResults: true });
 
-		const op = prossimaRicerca++;
-		tab.ricercaOp = op;
-		tab.risultati = [];
-		tab.duplicati = null;
-		tab.confronto = null;
-		tab.etichetta = null;
-		tab.archivio = null;
-		tab.cercando = true;
+		const op = nextSearch++;
+		tab.searchOp = op;
+		tab.results = [];
+		tab.duplicates = null;
+		tab.comparison = null;
+		tab.label = null;
+		tab.archive = null;
+		tab.searching = true;
 		tab.selection = [];
 		tab.anchor = null;
 
@@ -275,17 +273,17 @@ export class TabsStore {
 			await this.backend.search({
 				opId: op,
 				root: tab.path,
-				criteri,
-				onResults: (lotto) => {
-					// Un lotto in ritardo di una ricerca già sostituita non
-					// deve mescolarsi ai risultati della nuova.
-					if (tab.ricercaOp === op && tab.risultati) tab.risultati = [...tab.risultati, ...lotto];
+				criteria,
+				onResults: (batch) => {
+					// A late batch of a search already replaced must not mix
+					// with the results of the new one.
+					if (tab.searchOp === op && tab.results) tab.results = [...tab.results, ...batch];
 				}
 			});
 		} finally {
-			if (tab.ricercaOp === op) {
-				tab.cercando = false;
-				tab.ricercaOp = null;
+			if (tab.searchOp === op) {
+				tab.searching = false;
+				tab.searchOp = null;
 			}
 		}
 	}
@@ -294,19 +292,19 @@ export class TabsStore {
 	 * Looks for identical files under the tab's folder. Results replace the
 	 * list like a recursive search, grouped by copy set as they are proven.
 	 */
-	async trovaDuplicati(id: number, hidden: boolean): Promise<void> {
+	async findDuplicates(id: number, hidden: boolean): Promise<void> {
 		const tab = this.#get(id);
 		if (!tab) return;
-		await this.fermaRicerca(id, { tieniRisultati: true });
+		await this.stopSearch(id, { keepResults: true });
 
-		const op = prossimaRicerca++;
-		tab.ricercaOp = op;
-		tab.risultati = [];
-		tab.duplicati = { groups: [], progress: { transferred: 0, total: 0 } };
-		tab.confronto = null;
-		tab.etichetta = null;
-		tab.archivio = null;
-		tab.cercando = true;
+		const op = nextSearch++;
+		tab.searchOp = op;
+		tab.results = [];
+		tab.duplicates = { groups: [], progress: { transferred: 0, total: 0 } };
+		tab.comparison = null;
+		tab.label = null;
+		tab.archive = null;
+		tab.searching = true;
 		tab.query = '';
 		tab.selection = [];
 		tab.anchor = null;
@@ -317,115 +315,115 @@ export class TabsStore {
 				root: tab.path,
 				hidden,
 				onEvent: (e) => {
-					if (tab.ricercaOp !== op || !tab.risultati || !tab.duplicati) return;
-					if (e.kind === 'progress') tab.duplicati.progress = { transferred: e.done, total: e.total };
+					if (tab.searchOp !== op || !tab.results || !tab.duplicates) return;
+					if (e.kind === 'progress') tab.duplicates.progress = { transferred: e.done, total: e.total };
 					else {
-						tab.risultati = [...tab.risultati, ...e.entries];
-						tab.duplicati.groups = [...tab.duplicati.groups, { size: e.size, count: e.entries.length }];
+						tab.results = [...tab.results, ...e.entries];
+						tab.duplicates.groups = [...tab.duplicates.groups, { size: e.size, count: e.entries.length }];
 					}
 				}
 			});
 		} finally {
-			if (tab.ricercaOp === op) {
-				tab.cercando = false;
-				tab.ricercaOp = null;
+			if (tab.searchOp === op) {
+				tab.searching = false;
+				tab.searchOp = null;
 			}
 		}
 	}
 
 	/** Turns the space view on or off; on, it leaves any search or special view. */
-	async impostaSpazio(id: number, acceso: boolean): Promise<void> {
+	async setSpace(id: number, on: boolean): Promise<void> {
 		const tab = this.#get(id);
 		if (!tab) return;
-		if (acceso) await this.fermaRicerca(id);
-		tab.spazio = acceso;
+		if (on) await this.stopSearch(id);
+		tab.space = on;
 	}
 
 	/** Shows one level of an archive in place of the folder. */
-	async mostraArchivio(id: number, file: string, dentro: string, voci: ArchiveItem[], cassaforte = false): Promise<void> {
+	async showArchive(id: number, file: string, inner: string, items: ArchiveItem[], vault = false): Promise<void> {
 		const tab = this.#get(id);
 		if (!tab) return;
-		if (tab.archivio?.file !== file) await this.fermaRicerca(id);
-		tab.archivio = { file, dentro, voci, cassaforte };
-		tab.risultati = livello(voci, dentro, file);
+		if (tab.archive?.file !== file) await this.stopSearch(id);
+		tab.archive = { file, inner, items, vault };
+		tab.results = level(items, inner, file);
 		tab.query = '';
 		tab.selection = [];
 		tab.anchor = null;
 	}
 
-	/** Shows `voci` in place of the folder, as a named view (a colour label). */
-	async mostraVoci(id: number, voci: Entry[], etichetta: string): Promise<void> {
+	/** Shows `items` in place of the folder, as a named view (a colour label). */
+	async showItems(id: number, items: Entry[], label: string): Promise<void> {
 		const tab = this.#get(id);
 		if (!tab) return;
-		await this.fermaRicerca(id);
-		tab.risultati = voci;
-		tab.etichetta = etichetta;
+		await this.stopSearch(id);
+		tab.results = items;
+		tab.label = label;
 		tab.query = '';
 		tab.selection = [];
 		tab.anchor = null;
 	}
 
-	/** Compares the tab's folder with `altro`; the differences replace the list. */
-	async confronta(id: number, altro: string, contenuto: boolean, hidden: boolean): Promise<void> {
+	/** Compares the tab's folder with `other`; the differences replace the list. */
+	async compare(id: number, other: string, content: boolean, hidden: boolean): Promise<void> {
 		const tab = this.#get(id);
 		if (!tab) return;
-		await this.fermaRicerca(id);
+		await this.stopSearch(id);
 
-		const op = prossimaRicerca++;
-		tab.ricercaOp = op;
-		tab.risultati = [];
-		tab.cercando = true;
+		const op = nextSearch++;
+		tab.searchOp = op;
+		tab.results = [];
+		tab.searching = true;
 		tab.query = '';
 		tab.selection = [];
 		tab.anchor = null;
-		tab.confronto = { altro, contenuto, onlyHere: 0, onlyThere: 0, different: [], inCorso: true };
+		tab.comparison = { other, content, onlyHere: 0, onlyThere: 0, different: [], running: true };
 
 		try {
-			const c = await this.backend.compareFolders({ opId: op, here: tab.path, there: altro, content: contenuto, hidden });
-			if (tab.ricercaOp !== op) return;
-			tab.risultati = [...c.onlyHere, ...c.different.map((d) => d.here), ...c.onlyThere];
-			tab.confronto = {
-				altro,
-				contenuto,
+			const c = await this.backend.compareFolders({ opId: op, here: tab.path, there: other, content, hidden });
+			if (tab.searchOp !== op) return;
+			tab.results = [...c.onlyHere, ...c.different.map((d) => d.here), ...c.onlyThere];
+			tab.comparison = {
+				other,
+				content,
 				onlyHere: c.onlyHere.length,
 				onlyThere: c.onlyThere.length,
 				different: c.different,
-				inCorso: false
+				running: false
 			};
 		} catch (e) {
-			if (tab.ricercaOp === op) {
-				tab.risultati = null;
-				tab.confronto = null;
-				tab.etichetta = null;
-				tab.archivio = null;
+			if (tab.searchOp === op) {
+				tab.results = null;
+				tab.comparison = null;
+				tab.label = null;
+				tab.archive = null;
 			}
 			throw e;
 		} finally {
-			if (tab.ricercaOp === op) {
-				tab.cercando = false;
-				tab.ricercaOp = null;
+			if (tab.searchOp === op) {
+				tab.searching = false;
+				tab.searchOp = null;
 			}
 		}
 	}
 
-	/** Ferma la ricerca e, salvo richiesta, torna al contenuto della cartella. */
-	async fermaRicerca(id: number, opts: { tieniRisultati?: boolean } = {}): Promise<void> {
+	/** Stops the search and, unless asked otherwise, goes back to the folder's contents. */
+	async stopSearch(id: number, opts: { keepResults?: boolean } = {}): Promise<void> {
 		const tab = this.#get(id);
 		if (!tab) return;
-		const op = tab.ricercaOp;
-		tab.ricercaOp = null;
-		tab.cercando = false;
-		if (!opts.tieniRisultati) {
-			tab.risultati = null;
-			tab.duplicati = null;
-			tab.confronto = null;
-			tab.etichetta = null;
-			tab.archivio = null;
+		const op = tab.searchOp;
+		tab.searchOp = null;
+		tab.searching = false;
+		if (!opts.keepResults) {
+			tab.results = null;
+			tab.duplicates = null;
+			tab.comparison = null;
+			tab.label = null;
+			tab.archive = null;
 		}
 		if (op !== null) await this.backend.cancelTransfer(op);
 	}
 
-	/** Non tocca il backend: filtra le voci già in memoria. */
+	/** Does not touch the backend: it filters the items already in memory. */
 	setQuery(id: number, q: string): void {
 		const tab = this.#get(id);
 		if (tab) tab.query = q;
@@ -439,47 +437,40 @@ export class TabsStore {
 		const tab = this.#get(id);
 		if (!tab) return;
 		tab.sort = spec;
-		this.ordini?.scrivi(tab.path, spec);
+		this.sorts?.write(tab.path, spec);
 		await this.#load(tab, tab.path, { pushHistory: false });
 	}
 
 	/**
-	 * Applica un clic sulla voce `path` dentro l'elenco `visibili`.
+	 * Applies a click on the item `path` within the list `visible`.
 	 *
-	 * `visibili` è la lista come la vede l'utente — già filtrata dalla
-	 * ricerca — perché l'intervallo con Maiusc deve seguire ciò che è a
-	 * schermo, non l'ordine interno del tab.
+	 * `visible` is the list as the user sees it — already filtered by the
+	 * search — because the Shift range must follow what is on screen, not
+	 * the tab's internal order.
 	 *
-	 * - senza modificatori: seleziona solo quella voce
-	 * - Ctrl: aggiunge o toglie, lasciando il resto
-	 * - Maiusc: seleziona dall'ancora fino a qui
+	 * - no modifiers: selects that item only
+	 * - Ctrl: adds or removes, leaving the rest
+	 * - Shift: selects from the anchor to here
 	 */
-	seleziona(
-		id: number,
-		path: string,
-		visibili: readonly Entry[],
-		modificatori: { ctrl?: boolean; shift?: boolean } = {}
-	): void {
+	select(id: number, path: string, visible: readonly Entry[], modifiers: { ctrl?: boolean; shift?: boolean } = {}): void {
 		const tab = this.#get(id);
 		if (!tab) return;
 
-		if (modificatori.shift && tab.anchor) {
-			const da = visibili.findIndex((e) => e.path === tab.anchor);
-			const a = visibili.findIndex((e) => e.path === path);
+		if (modifiers.shift && tab.anchor) {
+			const from = visible.findIndex((e) => e.path === tab.anchor);
+			const to = visible.findIndex((e) => e.path === path);
 
-			if (da !== -1 && a !== -1) {
-				const [inizio, fine] = da <= a ? [da, a] : [a, da];
-				tab.selection = visibili.slice(inizio, fine + 1).map((e) => e.path);
-				// L'ancora resta dov'era: estendere due volte parte sempre
-				// dallo stesso capo, come in qualsiasi elenco.
+			if (from !== -1 && to !== -1) {
+				const [start, end] = from <= to ? [from, to] : [to, from];
+				tab.selection = visible.slice(start, end + 1).map((e) => e.path);
+				// The anchor stays where it was: extending twice always starts
+				// from the same end, as in any list.
 				return;
 			}
 		}
 
-		if (modificatori.ctrl) {
-			tab.selection = tab.selection.includes(path)
-				? tab.selection.filter((p) => p !== path)
-				: [...tab.selection, path];
+		if (modifiers.ctrl) {
+			tab.selection = tab.selection.includes(path) ? tab.selection.filter((p) => p !== path) : [...tab.selection, path];
 			tab.anchor = path;
 			return;
 		}
@@ -488,23 +479,23 @@ export class TabsStore {
 		tab.anchor = path;
 	}
 
-	selezionaTutto(id: number, visibili: readonly Entry[]): void {
+	selectAll(id: number, visible: readonly Entry[]): void {
 		const tab = this.#get(id);
 		if (!tab) return;
-		tab.selection = visibili.map((e) => e.path);
-		tab.anchor = visibili[0]?.path ?? null;
+		tab.selection = visible.map((e) => e.path);
+		tab.anchor = visible[0]?.path ?? null;
 	}
 
-	pulisciSelezione(id: number): void {
+	clearSelection(id: number): void {
 		const tab = this.#get(id);
 		if (!tab) return;
 		tab.selection = [];
 		tab.anchor = null;
 	}
 
-	/** Mostra o nasconde i file di sistema, ricaricando la cartella. */
-	async setShowHidden(mostra: boolean): Promise<void> {
-		this.showHidden = mostra;
+	/** Shows or hides system files, reloading the folder. */
+	async setShowHidden(show: boolean): Promise<void> {
+		this.showHidden = show;
 		if (this.activeId !== null) await this.reload(this.activeId);
 	}
 
@@ -513,28 +504,23 @@ export class TabsStore {
 	}
 
 	/**
-	 * Unico punto in cui un tab cambia contenuto.
+	 * The only place where a tab changes contents.
 	 *
-	 * Ogni richiesta riceve un numero progressivo. Al ritorno, se nel frattempo
-	 * è già stata applicata una richiesta più recente, il risultato si scarta:
-	 * senza questo controllo due click rapidi possono lasciare il tab nella
-	 * cartella sbagliata, con un bug non riproducibile a comando.
+	 * Each request gets a progressive number. On return, if a more recent
+	 * request was applied meanwhile, the result is dropped: without this
+	 * check two fast clicks can leave the tab in the wrong folder, with a
+	 * bug that cannot be reproduced on demand.
 	 *
-	 * Ritorna true se il risultato è stato applicato.
+	 * Returns true when the result was applied.
 	 */
-	async #load(
-		tab: Tab,
-		path: string,
-		opts: { pushHistory: boolean; mantieni?: boolean }
-	): Promise<boolean> {
+	async #load(tab: Tab, path: string, opts: { pushHistory: boolean; keep?: boolean }): Promise<boolean> {
 		const req = ++tab.reqSeq;
 		tab.loading = true;
 
-		// Entrando in un'altra cartella vale il suo ordinamento ricordato,
-		// o quello predefinito se l'utente non ne ha mai scelto uno.
-		const altrove = !stessoPath(path, tab.path);
-		const sort =
-			this.ordini && altrove ? (this.ordini.leggi(path) ?? { ...SORT_DEFAULT }) : tab.sort;
+		// Entering another folder its remembered sort applies, or the
+		// default one if the user never chose one.
+		const elsewhere = !samePath(path, tab.path);
+		const sort = this.sorts && elsewhere ? (this.sorts.read(path) ?? { ...SORT_DEFAULT }) : tab.sort;
 
 		try {
 			const listing = await this.backend.listDir(path, sort, this.showHidden);
@@ -549,26 +535,26 @@ export class TabsStore {
 			tab.failedPath = null;
 			tab.loading = false;
 
-			if (opts.mantieni) {
-				// Restano selezionate solo le voci che esistono ancora.
-				const presenti = new Set(listing.entries.map((e) => e.path));
-				tab.selection = tab.selection.filter((p) => presenti.has(p));
-				if (tab.anchor && !presenti.has(tab.anchor)) tab.anchor = null;
+			if (opts.keep) {
+				// Only the items that still exist stay selected.
+				const present = new Set(listing.entries.map((e) => e.path));
+				tab.selection = tab.selection.filter((p) => present.has(p));
+				if (tab.anchor && !present.has(tab.anchor)) tab.anchor = null;
 				return true;
 			}
 
 			tab.selection = [];
 			tab.anchor = null;
-			// Cartella nuova, ricerca vecchia senza senso.
+			// New folder: an old search makes no sense.
 			tab.query = '';
-			if (tab.ricercaOp !== null) void this.backend.cancelTransfer(tab.ricercaOp);
-			tab.ricercaOp = null;
-			tab.cercando = false;
-			tab.risultati = null;
-			tab.duplicati = null;
-			tab.confronto = null;
-			tab.etichetta = null;
-			tab.archivio = null;
+			if (tab.searchOp !== null) void this.backend.cancelTransfer(tab.searchOp);
+			tab.searchOp = null;
+			tab.searching = false;
+			tab.results = null;
+			tab.duplicates = null;
+			tab.comparison = null;
+			tab.label = null;
+			tab.archive = null;
 
 			if (opts.pushHistory) {
 				tab.history = tab.history.slice(0, tab.historyIndex + 1);
@@ -579,7 +565,7 @@ export class TabsStore {
 		} catch (e) {
 			if (req <= tab.lastApplied) return false;
 			tab.lastApplied = req;
-			// Il path corrente non cambia: l'utente resta dove si trova.
+			// The current path does not change: the user stays where they are.
 			tab.error = e as FsError;
 			tab.failedPath = path;
 			tab.loading = false;

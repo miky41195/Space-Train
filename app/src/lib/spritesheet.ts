@@ -1,526 +1,537 @@
 /**
- * Spritesheet: un'immagine con i fotogrammi di un personaggio. Sul foglio si
- * sceglie una zona rettangolare libera, che contiene i fotogrammi della
- * camminata in fila o in una griglia; sul binario se ne mostra uno alla volta,
- * facendo scorrere lo sfondo a scatti: è così che camminano gli sprite dei
- * giochi.
+ * Spritesheet: an image with the frames of a character. On the sheet a free
+ * rectangular zone is chosen, holding the walking frames in a row or in a
+ * grid; on the rail one is shown at a time, sliding the background in
+ * jumps: that is how game sprites walk.
  *
- * Nel corteo di un tema uno spritesheet è una voce `sprite:<json>`.
+ * In a theme's parade a spritesheet is an entry `sprite:<json>`.
  */
 
 export interface Spritesheet {
-	/** Percorso dell'immagine salvata nella cartella dell'app. */
+	/** Path of the image saved in the app's folder. */
 	src: string;
-	/** Dimensioni dell'immagine intera, in pixel. */
-	larghezza: number;
-	altezza: number;
-	/** La zona scelta sul foglio, in pixel dell'immagine. */
+	/** Size of the whole image, in pixels. */
+	sheetWidth: number;
+	sheetHeight: number;
+	/** The zone chosen on the sheet, in image pixels. */
 	x: number;
 	y: number;
 	w: number;
 	h: number;
 	/**
-	 * Quanti fotogrammi usare. Si contano da sinistra a destra e poi riga
-	 * per riga; con una riga sola la zona si divide in tante colonne.
+	 * How many frames to use. They count left to right and then row by
+	 * row; with a single row the zone splits into as many columns.
 	 */
-	fotogrammi: number;
+	frames: number;
 	/**
-	 * Griglia dentro la zona, solo se le righe sono più di una: allora le
-	 * colonne si dicono a parte e l'ultima riga può essere incompleta.
+	 * Grid inside the zone, only when there is more than one row: then the
+	 * columns are given apart and the last row may be incomplete.
 	 */
-	righe?: number;
-	colonne?: number;
-	/** Spazio vuoto fra una cella e l'altra della griglia, in pixel del foglio. */
-	spazioX?: number;
-	spazioY?: number;
+	rows?: number;
+	columns?: number;
+	/** Empty space between one grid cell and the next, in sheet pixels. */
+	gapX?: number;
+	gapY?: number;
 	/**
-	 * Fotogrammi a mano: ognuno è un riquadro suo, anche di misure diverse
-	 * (un colpo che si allunga, un'onda di energia). Se ci sono, valgono loro
-	 * e la griglia non conta.
+	 * Hand-made frames: each is a box of its own, even of different sizes
+	 * (a stretching blow, an energy wave). When present, they apply and the
+	 * grid does not count.
 	 */
-	riquadri?: Riquadro[];
+	boxes?: FrameBox[];
 	/**
-	 * In che ordine mostrarli, da 0: per una camminata da tre fotogrammi
-	 * (fermo, piede sinistro, piede destro) è `[1, 0, 2, 0]`. Senza, si
-	 * mostrano di fila.
+	 * In which order to show them, from 0: for a three-frame walk (still,
+	 * left foot, right foot) it is `[1, 0, 2, 0]`. Without it, they show in
+	 * a row.
 	 */
-	ordine?: number[];
+	order?: number[];
 	fps: number;
-	/** Pixel art: ingrandire senza sfocare. */
-	nitido: boolean;
-	/** Altezza del personaggio sul binario, in pixel; senza, `ALTEZZA_BINARIO`. */
-	alto?: number;
+	/** Pixel art: enlarge without blurring. */
+	crisp: boolean;
+	/** Height of the character on the rail, in pixels; without it, `RAIL_HEIGHT`. */
+	railHeight?: number;
 	/**
-	 * Larghezza di un fotogramma sul binario, in pixel. Senza, segue
-	 * l'altezza mantenendo le proporzioni del fotogramma.
+	 * Width of a frame on the rail, in pixels. Without it, it follows the
+	 * height keeping the frame's proportions.
 	 */
-	largo?: number;
+	railWidth?: number;
 }
 
-/** Un rettangolo sul foglio, in pixel dell'immagine. */
-export interface Riquadro {
+/** A rectangle on the sheet, in image pixels. */
+export interface FrameBox {
 	x: number;
 	y: number;
 	w: number;
 	h: number;
 }
 
-/** Quanti fotogrammi a mano al massimo. */
-export const RIQUADRI_MAX = 64;
+/** How many hand-made frames at most. */
+export const MAX_BOXES = 64;
 
-/** Limiti delle misure sul binario, in pixel. */
-export const ALTO_MIN = 12;
-export const ALTO_MAX = 240;
-export const LARGO_MIN = 4;
-export const LARGO_MAX = 480;
+/** Limits of the sizes on the rail, in pixels. */
+export const RAIL_HEIGHT_MIN = 12;
+export const RAIL_HEIGHT_MAX = 240;
+export const RAIL_WIDTH_MIN = 4;
+export const RAIL_WIDTH_MAX = 480;
 
-/** Altezza a cui si disegna un personaggio sul binario. */
-export const ALTEZZA_BINARIO = 30;
+/** Height at which a character is drawn on the rail. */
+export const RAIL_HEIGHT = 30;
 
-export const PREFISSO = 'sprite:';
+export const PREFIX = 'sprite:';
 
-export function codifica(s: Spritesheet): string {
-	return PREFISSO + JSON.stringify(s);
+// Spritesheets are saved inside themes with the names earlier versions wrote.
+const STORED_KEYS: Record<string, string> = {
+	sheetWidth: 'larghezza',
+	sheetHeight: 'altezza',
+	frames: 'fotogrammi',
+	rows: 'righe',
+	columns: 'colonne',
+	gapX: 'spazioX',
+	gapY: 'spazioY',
+	boxes: 'riquadri',
+	order: 'ordine',
+	crisp: 'nitido',
+	railHeight: 'alto',
+	railWidth: 'largo'
+};
+const KEYS_FROM_STORED = Object.fromEntries(Object.entries(STORED_KEYS).map(([k, v]) => [v, k]));
+
+export function encode(s: Spritesheet): string {
+	const stored: Record<string, unknown> = {};
+	for (const [k, v] of Object.entries(s)) stored[STORED_KEYS[k] ?? k] = v;
+	return PREFIX + JSON.stringify(stored);
 }
 
-/** I temi salvati prima della zona libera descrivevano una griglia. */
-interface Vecchio {
-	colonne?: number;
-	righe?: number;
-	riga?: number;
-	inizio?: number;
+/** Themes saved before the free zone described a grid. */
+interface Legacy {
+	columns?: number;
+	rows?: number;
+	row?: number;
+	start?: number;
 }
 
-/** Legge una voce del corteo; `null` se non è uno spritesheet valido. */
-export function decodifica(voce: string): Spritesheet | null {
-	if (!voce.startsWith(PREFISSO)) return null;
+/** Reads a parade entry; `null` when it is not a valid spritesheet. */
+export function decode(item: string): Spritesheet | null {
+	if (!item.startsWith(PREFIX)) return null;
 	try {
-		const s = JSON.parse(voce.slice(PREFISSO.length)) as Partial<Spritesheet> & Vecchio;
-		if (!s.src || !(s.larghezza! > 0) || !(s.altezza! > 0)) return null;
-		let { x, y, w, h, fotogrammi } = s;
-		if (w === undefined && s.colonne !== undefined) {
-			// Griglia di una volta: la sequenza diventa la zona equivalente.
-			const fw = s.larghezza! / Math.max(1, s.colonne);
-			const fh = s.altezza! / Math.max(1, s.righe ?? 1);
-			const inizio = s.inizio ?? 0;
-			fotogrammi = fotogrammi ?? s.colonne - inizio;
-			x = inizio * fw;
-			y = (s.riga ?? 0) * fh;
-			w = fotogrammi * fw;
+		const stored = JSON.parse(item.slice(PREFIX.length)) as Record<string, unknown>;
+		const read: Record<string, unknown> = {};
+		for (const [k, v] of Object.entries(stored)) read[KEYS_FROM_STORED[k] ?? k] = v;
+		// The old grid's own keys.
+		if (stored.riga !== undefined) read.row = stored.riga;
+		if (stored.inizio !== undefined) read.start = stored.inizio;
+		const s = read as Partial<Spritesheet> & Legacy;
+		if (!s.src || !(s.sheetWidth! > 0) || !(s.sheetHeight! > 0)) return null;
+		let { x, y, w, h, frames } = s;
+		if (w === undefined && s.columns !== undefined) {
+			// Old grid: the sequence becomes the equivalent zone.
+			const fw = s.sheetWidth! / Math.max(1, s.columns);
+			const fh = s.sheetHeight! / Math.max(1, s.rows ?? 1);
+			const start = s.start ?? 0;
+			frames = frames ?? s.columns - start;
+			x = start * fw;
+			y = (s.row ?? 0) * fh;
+			w = frames * fw;
 			h = fh;
 		}
-		return normalizza({
+		return normalize({
 			src: s.src,
-			larghezza: s.larghezza!,
-			altezza: s.altezza!,
+			sheetWidth: s.sheetWidth!,
+			sheetHeight: s.sheetHeight!,
 			x: x ?? 0,
 			y: y ?? 0,
-			w: w ?? s.larghezza!,
-			h: h ?? s.altezza!,
-			fotogrammi: fotogrammi ?? 1,
-			...(s.w !== undefined
-				? { righe: s.righe, colonne: s.colonne, spazioX: s.spazioX, spazioY: s.spazioY, riquadri: s.riquadri }
-				: {}),
-			ordine: s.ordine,
+			w: w ?? s.sheetWidth!,
+			h: h ?? s.sheetHeight!,
+			frames: frames ?? 1,
+			...(s.w !== undefined ? { rows: s.rows, columns: s.columns, gapX: s.gapX, gapY: s.gapY, boxes: s.boxes } : {}),
+			order: s.order,
 			fps: s.fps ?? 8,
-			nitido: s.nitido ?? true,
-			alto: s.alto,
-			largo: s.largo
+			crisp: s.crisp ?? true,
+			railHeight: s.railHeight,
+			railWidth: s.railWidth
 		});
 	} catch {
 		return null;
 	}
 }
 
-/** Numero finito o il valore di riserva. */
-function numero(v: unknown, riserva: number): number {
+/** A finite number or the fallback value. */
+function number(v: unknown, fallback: number): number {
 	const n = Number(v);
-	return Number.isFinite(n) ? n : riserva;
+	return Number.isFinite(n) ? n : fallback;
 }
 
 /**
- * Riporta la zona dentro l'immagine, a pixel interi e grande almeno un
- * pixel; i fotogrammi sono almeno uno e non più dei pixel della zona.
+ * Brings the zone back inside the image, at whole pixels and at least one
+ * pixel large; frames are at least one and no more than the zone's pixels.
  */
-export function normalizza(s: Spritesheet): Spritesheet {
-	const L = s.larghezza;
-	const A = s.altezza;
-	const x = Math.min(Math.max(Math.round(numero(s.x, 0)), 0), L - 1);
-	const y = Math.min(Math.max(Math.round(numero(s.y, 0)), 0), A - 1);
-	const w = Math.min(Math.max(Math.round(numero(s.w, L)), 1), L - x);
-	const h = Math.min(Math.max(Math.round(numero(s.h, A)), 1), A - y);
-	const righe = Math.min(Math.max(Math.round(numero(s.righe, 1)), 1), h);
-	const riquadri = Array.isArray(s.riquadri)
-		? s.riquadri.slice(0, RIQUADRI_MAX).map((r) => dentro(r, L, A))
-		: [];
-	const voluti = Math.max(Math.round(numero(s.fotogrammi, 1)), 1);
-	const colonne = righe > 1 ? Math.min(Math.max(Math.round(numero(s.colonne, Math.ceil(voluti / righe))), 1), w) : 0;
-	const fotogrammi = riquadri.length > 0 ? riquadri.length : Math.min(voluti, righe > 1 ? colonne * righe : w);
-	const spazioX = misura(s.spazioX, 0, w);
-	const spazioY = misura(s.spazioY, 0, h);
-	// Restano solo i fotogrammi che esistono ancora; un ordine vuoto non serve.
-	const ordine = Array.isArray(s.ordine)
-		? s.ordine.filter((k) => Number.isInteger(k) && k >= 0 && k < fotogrammi).slice(0, 64)
-		: [];
-	const alto = misura(s.alto, ALTO_MIN, ALTO_MAX);
-	const largo = misura(s.largo, LARGO_MIN, LARGO_MAX);
-	const { ordine: _o, alto: _a, largo: _l, righe: _r, colonne: _c, spazioX: _sx, spazioY: _sy, riquadri: _q, ...resto } = s;
+export function normalize(s: Spritesheet): Spritesheet {
+	const W = s.sheetWidth;
+	const H = s.sheetHeight;
+	const x = Math.min(Math.max(Math.round(number(s.x, 0)), 0), W - 1);
+	const y = Math.min(Math.max(Math.round(number(s.y, 0)), 0), H - 1);
+	const w = Math.min(Math.max(Math.round(number(s.w, W)), 1), W - x);
+	const h = Math.min(Math.max(Math.round(number(s.h, H)), 1), H - y);
+	const rows = Math.min(Math.max(Math.round(number(s.rows, 1)), 1), h);
+	const boxes = Array.isArray(s.boxes) ? s.boxes.slice(0, MAX_BOXES).map((r) => inside(r, W, H)) : [];
+	const wanted = Math.max(Math.round(number(s.frames, 1)), 1);
+	const columns = rows > 1 ? Math.min(Math.max(Math.round(number(s.columns, Math.ceil(wanted / rows))), 1), w) : 0;
+	const frames = boxes.length > 0 ? boxes.length : Math.min(wanted, rows > 1 ? columns * rows : w);
+	const gapX = measure(s.gapX, 0, w);
+	const gapY = measure(s.gapY, 0, h);
+	// Only the frames that still exist stay; an empty order is no use.
+	const order = Array.isArray(s.order) ? s.order.filter((k) => Number.isInteger(k) && k >= 0 && k < frames).slice(0, 64) : [];
+	const railHeight = measure(s.railHeight, RAIL_HEIGHT_MIN, RAIL_HEIGHT_MAX);
+	const railWidth = measure(s.railWidth, RAIL_WIDTH_MIN, RAIL_WIDTH_MAX);
+	const { order: _o, railHeight: _a, railWidth: _l, rows: _r, columns: _c, gapX: _sx, gapY: _sy, boxes: _q, ...rest } = s;
 	return {
-		...resto,
-		...(righe > 1 ? { righe, colonne } : {}),
-		...(spazioX ? { spazioX } : {}),
-		...(spazioY ? { spazioY } : {}),
-		...(riquadri.length > 0 ? { riquadri } : {}),
-		...(alto !== undefined ? { alto } : {}),
-		...(largo !== undefined ? { largo } : {}),
+		...rest,
+		...(rows > 1 ? { rows, columns } : {}),
+		...(gapX ? { gapX } : {}),
+		...(gapY ? { gapY } : {}),
+		...(boxes.length > 0 ? { boxes } : {}),
+		...(railHeight !== undefined ? { railHeight } : {}),
+		...(railWidth !== undefined ? { railWidth } : {}),
 		x,
 		y,
 		w,
 		h,
-		fotogrammi,
-		...(ordine.length > 0 ? { ordine } : {}),
-		fps: Math.min(Math.max(numero(s.fps, 8), 1), 30)
+		frames,
+		...(order.length > 0 ? { order } : {}),
+		fps: Math.min(Math.max(number(s.fps, 8), 1), 30)
 	};
 }
 
-/** Un riquadro a pixel interi, grande almeno un pixel, dentro l'immagine. */
-function dentro(r: Partial<Riquadro>, L: number, A: number): Riquadro {
-	const x = Math.min(Math.max(Math.round(numero(r.x, 0)), 0), L - 1);
-	const y = Math.min(Math.max(Math.round(numero(r.y, 0)), 0), A - 1);
+/** A box at whole pixels, at least one pixel large, inside the image. */
+function inside(r: Partial<FrameBox>, W: number, H: number): FrameBox {
+	const x = Math.min(Math.max(Math.round(number(r.x, 0)), 0), W - 1);
+	const y = Math.min(Math.max(Math.round(number(r.y, 0)), 0), H - 1);
 	return {
 		x,
 		y,
-		w: Math.min(Math.max(Math.round(numero(r.w, 1)), 1), L - x),
-		h: Math.min(Math.max(Math.round(numero(r.h, 1)), 1), A - y)
+		w: Math.min(Math.max(Math.round(number(r.w, 1)), 1), W - x),
+		h: Math.min(Math.max(Math.round(number(r.h, 1)), 1), H - y)
 	};
 }
 
 /**
- * Le celle della griglia come riquadri: il punto di partenza per i
- * fotogrammi a mano, da ritoccare uno per uno.
+ * The grid cells as boxes: the starting point for hand-made frames, to
+ * touch up one by one.
  */
-export function riquadriDellaGriglia(s: Spritesheet): Riquadro[] {
-	const lato = latoFotogramma(s);
-	const passo = passoFotogramma(s);
-	return Array.from({ length: Math.min(s.fotogrammi, RIQUADRI_MAX) }, (_, k) => {
-		const c = cella(s, k);
-		return dentro(
-			{ x: s.x + c.colonna * passo.x, y: s.y + c.riga * passo.y, w: lato.larghezza, h: lato.altezza },
-			s.larghezza,
-			s.altezza
-		);
+export function gridBoxes(s: Spritesheet): FrameBox[] {
+	const side = frameSize(s);
+	const step = frameStep(s);
+	return Array.from({ length: Math.min(s.frames, MAX_BOXES) }, (_, k) => {
+		const c = cell(s, k);
+		return inside({ x: s.x + c.column * step.x, y: s.y + c.row * step.y, w: side.width, h: side.height }, s.sheetWidth, s.sheetHeight);
 	});
 }
 
-/** Una misura in pixel interi dentro i limiti; `undefined` se non c'è. */
-function misura(v: unknown, min: number, max: number): number | undefined {
+/** A size in whole pixels within the limits; `undefined` when missing. */
+function measure(v: unknown, min: number, max: number): number | undefined {
 	if (v === undefined || v === null) return undefined;
 	const n = Number(v);
 	return Number.isFinite(n) ? Math.min(Math.max(Math.round(n), min), max) : undefined;
 }
 
-/** Colonne e righe in cui è divisa la zona. */
-export function griglia(s: Spritesheet): { colonne: number; righe: number } {
-	const righe = s.righe ?? 1;
-	return righe > 1 ? { colonne: s.colonne ?? Math.ceil(s.fotogrammi / righe), righe } : { colonne: s.fotogrammi, righe: 1 };
+/** Columns and rows the zone is split into. */
+export function grid(s: Spritesheet): { columns: number; rows: number } {
+	const rows = s.rows ?? 1;
+	return rows > 1 ? { columns: s.columns ?? Math.ceil(s.frames / rows), rows } : { columns: s.frames, rows: 1 };
 }
 
-/** Colonna e riga del fotogramma `k`, da 0. */
-export function cella(s: Spritesheet, k: number): { colonna: number; riga: number } {
-	const { colonne } = griglia(s);
-	return { colonna: k % colonne, riga: Math.floor(k / colonne) };
+/** Column and row of frame `k`, from 0. */
+export function cell(s: Spritesheet, k: number): { column: number; row: number } {
+	const { columns } = grid(s);
+	return { column: k % columns, row: Math.floor(k / columns) };
 }
 
-/** Quanto è grande un fotogramma sul binario, in pixel. */
-export function misuraBinario(s: Spritesheet): { larghezza: number; altezza: number } {
-	const altezza = s.alto ?? ALTEZZA_BINARIO;
-	const lato = latoFotogramma(s);
-	return { larghezza: s.largo ?? (lato.larghezza / lato.altezza) * altezza, altezza };
+/** How large a frame is on the rail, in pixels. */
+export function railSize(s: Spritesheet): { width: number; height: number } {
+	const height = s.railHeight ?? RAIL_HEIGHT;
+	const side = frameSize(s);
+	return { width: s.railWidth ?? (side.width / side.height) * height, height };
 }
 
-/** I fotogrammi nell'ordine in cui si mostrano, da 0. */
-export function sequenza(s: Spritesheet): number[] {
-	return s.ordine?.length ? s.ordine : Array.from({ length: s.fotogrammi }, (_, k) => k);
+/** The frames in the order they show, from 0. */
+export function sequence(s: Spritesheet): number[] {
+	return s.order?.length ? s.order : Array.from({ length: s.frames }, (_, k) => k);
 }
 
 /**
- * L'ordine scritto dall'utente, contando da 1: "2, 1, 3, 1" o "2 1 3 1".
- * Numeri fuori dai fotogrammi e parole si ignorano.
+ * The order written by the user, counting from 1: "2, 1, 3, 1" or "2 1 3 1".
+ * Numbers outside the frames and words are ignored.
  */
-export function leggiOrdine(testo: string, fotogrammi: number): number[] {
-	return (testo.match(/\d+/g) ?? [])
-		.map((t) => Number(t) - 1)
-		.filter((k) => k >= 0 && k < fotogrammi);
+export function parseOrder(text: string, frames: number): number[] {
+	return (text.match(/\d+/g) ?? []).map((t) => Number(t) - 1).filter((k) => k >= 0 && k < frames);
 }
 
-export function scriviOrdine(s: Spritesheet): string {
-	return sequenza(s)
+export function formatOrder(s: Spritesheet): string {
+	return sequence(s)
 		.map((k) => k + 1)
 		.join(', ');
 }
 
-/** Il passo classico: il primo fotogramma (fermo) tra ognuno degli altri. */
-export function alternaConPrimo(fotogrammi: number): number[] {
-	return Array.from({ length: fotogrammi - 1 }, (_, k) => [k + 1, 0]).flat();
+/** The classic step: the first frame (still) between each of the others. */
+export function alternateWithFirst(frames: number): number[] {
+	return Array.from({ length: frames - 1 }, (_, k) => [k + 1, 0]).flat();
 }
 
-/** Avanti fino all'ultimo e indietro, senza ripetere gli estremi. */
-export function avantiIndietro(fotogrammi: number): number[] {
-	const avanti = Array.from({ length: fotogrammi }, (_, k) => k);
-	return [...avanti, ...avanti.slice(1, -1).reverse()];
+/** Forward to the last and back, without repeating the ends. */
+export function pingPong(frames: number): number[] {
+	const forward = Array.from({ length: frames }, (_, k) => k);
+	return [...forward, ...forward.slice(1, -1).reverse()];
 }
 
 /**
- * Il nome dell'animazione per una sequenza. Il CSS non sa mostrare i
- * fotogrammi in un ordine qualsiasi con `steps()`: ogni sequenza ha i suoi
- * keyframes, uno per fotogramma, aggiunti alla pagina la prima volta che
- * servono. Le misure arrivano dalle variabili dell'elemento, così la stessa
- * animazione va bene sul binario e nell'anteprima.
+ * The animation name for a sequence. CSS cannot show frames in any order
+ * with `steps()`: each sequence has its own keyframes, one per frame, added
+ * to the page the first time they are needed. Sizes come from the element's
+ * variables, so the same animation works on the rail and in the preview.
  */
-export function animazione(seq: number[], colonne = Infinity): string {
-	// In una griglia lo stesso numero è un'altra cella: le colonne entrano nel nome.
-	const nome = Number.isFinite(colonne) ? `sprite-g${colonne}-${seq.join('-')}` : `sprite-${seq.join('-')}`;
-	if (typeof document === 'undefined' || registrate.has(nome)) return nome;
-	registrate.add(nome);
-	const passo = (k: number) =>
-		Number.isFinite(colonne)
-			? `background-position:calc(var(--x) - var(--passo) * ${k % colonne}) calc(var(--y) - var(--passo-y) * ${Math.floor(k / colonne)})`
-			: `background-position:calc(var(--x) - var(--passo) * ${k}) var(--y)`;
-	const fermate = seq.map((k, i) => `${((i / seq.length) * 100).toFixed(4)}%{${passo(k)}}`);
+export function animation(seq: number[], columns = Infinity): string {
+	// In a grid the same number is another cell: columns go into the name.
+	const name = Number.isFinite(columns) ? `sprite-g${columns}-${seq.join('-')}` : `sprite-${seq.join('-')}`;
+	if (typeof document === 'undefined' || registered.has(name)) return name;
+	registered.add(name);
+	const step = (k: number) =>
+		Number.isFinite(columns)
+			? `background-position:calc(var(--x) - var(--step) * ${k % columns}) calc(var(--y) - var(--step-y) * ${Math.floor(k / columns)})`
+			: `background-position:calc(var(--x) - var(--step) * ${k}) var(--y)`;
+	const stops = seq.map((k, i) => `${((i / seq.length) * 100).toFixed(4)}%{${step(k)}}`);
 	const el = document.createElement('style');
-	el.dataset.sprite = nome;
-	el.textContent = `@keyframes ${nome}{${fermate.join('')}100%{${passo(seq[seq.length - 1])}}}`;
+	el.dataset.sprite = name;
+	el.textContent = `@keyframes ${name}{${stops.join('')}100%{${step(seq[seq.length - 1])}}}`;
 	document.head.appendChild(el);
-	return nome;
+	return name;
 }
-const registrate = new Set<string>();
+const registered = new Set<string>();
 
 /**
- * L'animazione dei fotogrammi a mano: ogni tappa dice dove sta il riquadro
- * sul foglio e quanto è grande, moltiplicato per la scala dell'elemento
- * (`--sx`, `--sy`), così la stessa animazione serve anteprima e binario.
+ * The animation of hand-made frames: each stop says where the box is on
+ * the sheet and how large, multiplied by the element's scale (`--sx`,
+ * `--sy`), so the same animation serves preview and rail.
  */
-export function animazioneRiquadri(riquadri: Riquadro[], seq: number[]): string {
-	const testo = JSON.stringify([riquadri.map((r) => [r.x, r.y, r.w, r.h]), seq]);
+export function boxAnimation(boxes: FrameBox[], seq: number[]): string {
+	const text = JSON.stringify([boxes.map((r) => [r.x, r.y, r.w, r.h]), seq]);
 	let h = 5381;
-	for (let i = 0; i < testo.length; i++) h = ((h * 33) ^ testo.charCodeAt(i)) >>> 0;
-	const nome = `sprite-r${h.toString(36)}`;
-	if (typeof document === 'undefined' || registrate.has(nome)) return nome;
-	registrate.add(nome);
-	const tappa = (k: number) => {
-		const r = riquadri[k];
+	for (let i = 0; i < text.length; i++) h = ((h * 33) ^ text.charCodeAt(i)) >>> 0;
+	const name = `sprite-r${h.toString(36)}`;
+	if (typeof document === 'undefined' || registered.has(name)) return name;
+	registered.add(name);
+	const stop = (k: number) => {
+		const r = boxes[k];
 		return (
 			`background-position:calc(var(--sx) * ${-r.x}px) calc(var(--sy) * ${-r.y}px);` +
 			`width:calc(var(--sx) * ${r.w}px);height:calc(var(--sy) * ${r.h}px)`
 		);
 	};
-	const fermate = seq.map((k, i) => `${((i / seq.length) * 100).toFixed(4)}%{${tappa(k)}}`);
+	const stops = seq.map((k, i) => `${((i / seq.length) * 100).toFixed(4)}%{${stop(k)}}`);
 	const el = document.createElement('style');
-	el.dataset.sprite = nome;
-	el.textContent = `@keyframes ${nome}{${fermate.join('')}100%{${tappa(seq[seq.length - 1])}}}`;
+	el.dataset.sprite = name;
+	el.textContent = `@keyframes ${name}{${stops.join('')}100%{${stop(seq[seq.length - 1])}}}`;
 	document.head.appendChild(el);
-	return nome;
+	return name;
 }
 
 /**
- * Proposta iniziale per un'immagine appena caricata. Una striscia
- * orizzontale con fotogrammi quadrati è il caso più comune: si contano i
- * quadrati. Altrimenti si parte da un fotogramma solo e l'utente corregge.
+ * First guess for an image just loaded. A horizontal strip with square
+ * frames is the most common case: the squares are counted. Otherwise it
+ * starts from a single frame and the user corrects it.
  */
-export function indovina(src: string, larghezza: number, altezza: number): Spritesheet {
-	const quadrati = Math.round(larghezza / altezza);
-	const striscia = larghezza > altezza && Math.abs(larghezza / altezza - quadrati) < 0.05;
+export function guess(src: string, sheetWidth: number, sheetHeight: number): Spritesheet {
+	const squares = Math.round(sheetWidth / sheetHeight);
+	const strip = sheetWidth > sheetHeight && Math.abs(sheetWidth / sheetHeight - squares) < 0.05;
 	return {
 		src,
-		larghezza,
-		altezza,
+		sheetWidth,
+		sheetHeight,
 		x: 0,
 		y: 0,
-		w: larghezza,
-		h: altezza,
-		fotogrammi: striscia ? quadrati : 1,
+		w: sheetWidth,
+		h: sheetHeight,
+		frames: strip ? squares : 1,
 		fps: 8,
-		nitido: true
+		crisp: true
 	};
 }
 
 /**
- * Lato di un fotogramma in pixel dell'immagine originale: nella griglia
- * tolti gli spazi fra le celle; coi fotogrammi a mano, il più grande.
+ * Side of a frame in pixels of the original image: in the grid without the
+ * gaps between cells; with hand-made frames, the largest.
  */
-export function latoFotogramma(s: Spritesheet): { larghezza: number; altezza: number } {
-	if (s.riquadri?.length) {
+export function frameSize(s: Spritesheet): { width: number; height: number } {
+	if (s.boxes?.length) {
 		return {
-			larghezza: Math.max(...s.riquadri.map((r) => r.w)),
-			altezza: Math.max(...s.riquadri.map((r) => r.h))
+			width: Math.max(...s.boxes.map((r) => r.w)),
+			height: Math.max(...s.boxes.map((r) => r.h))
 		};
 	}
-	const { colonne, righe } = griglia(s);
-	const gx = s.spazioX ?? 0;
-	const gy = s.spazioY ?? 0;
+	const { columns, rows } = grid(s);
+	const gx = s.gapX ?? 0;
+	const gy = s.gapY ?? 0;
 	return {
-		larghezza: Math.max(1, (s.w - (colonne - 1) * gx) / colonne),
-		altezza: Math.max(1, (s.h - (righe - 1) * gy) / righe)
+		width: Math.max(1, (s.w - (columns - 1) * gx) / columns),
+		height: Math.max(1, (s.h - (rows - 1) * gy) / rows)
 	};
 }
 
-/** Di quanto ci si sposta sul foglio da una cella alla successiva: lato più spazio. */
-export function passoFotogramma(s: Spritesheet): { x: number; y: number } {
-	const lato = latoFotogramma(s);
-	return { x: lato.larghezza + (s.spazioX ?? 0), y: lato.altezza + (s.spazioY ?? 0) };
+/** How far the sheet moves from one cell to the next: side plus gap. */
+export function frameStep(s: Spritesheet): { x: number; y: number } {
+	const side = frameSize(s);
+	return { x: side.width + (s.gapX ?? 0), y: side.height + (s.gapY ?? 0) };
 }
 
-/** Una zona nuova sul foglio, riportata dentro l'immagine. */
-export function zona(s: Spritesheet, x: number, y: number, w: number, h: number): Spritesheet {
-	return normalizza({ ...s, x, y, w, h });
+/** A new zone on the sheet, brought back inside the image. */
+export function withZone(s: Spritesheet, x: number, y: number, w: number, h: number): Spritesheet {
+	return normalize({ ...s, x, y, w, h });
 }
 
-export interface Disegno {
-	/** Dimensioni del fotogramma a schermo. */
-	larghezza: number;
-	altezza: number;
-	/** Dimensioni dell'immagine intera a schermo, per `background-size`. */
-	foglioL: number;
-	foglioA: number;
-	/** Spostamento dello sfondo per mostrare il primo fotogramma. */
+export interface Drawing {
+	/** Size of the frame on screen. */
+	width: number;
+	height: number;
+	/** Size of the whole image on screen, for `background-size`. */
+	sheetWidth: number;
+	sheetHeight: number;
+	/** Background offset to show the first frame. */
 	x: number;
 	y: number;
-	/** Di quanto scorre lo sfondo in un giro d'animazione. */
-	corsa: number;
-	/** Di quanto scorre lo sfondo da una cella alla successiva, spazio compreso. */
-	passoX: number;
-	passoY: number;
-	/** Pixel a schermo per ogni pixel del foglio. */
-	scalaX: number;
-	scalaY: number;
-	/** Durata di un giro, in secondi. */
-	durata: number;
-	passi: number;
+	/** How far the background slides in one animation round. */
+	travel: number;
+	/** How far the background slides from one cell to the next, gap included. */
+	stepX: number;
+	stepY: number;
+	/** Screen pixels for each sheet pixel. */
+	scaleX: number;
+	scaleY: number;
+	/** Duration of one round, in seconds. */
+	duration: number;
+	steps: number;
 }
 
 /**
- * Misure per disegnare lo spritesheet: com'è sul binario, oppure in
- * piccolo all'altezza `alto` (l'anteprima) con le stesse proporzioni.
- * Larghezza e altezza possono scalare in modo diverso: lo sprite si stira.
+ * Sizes to draw the spritesheet: as it is on the rail, or small at height
+ * `height` (the preview) with the same proportions. Width and height can
+ * scale differently: the sprite stretches.
  */
-export function disegno(s: Spritesheet, alto?: number): Disegno {
-	const binario = misuraBinario(s);
-	const fattore = alto === undefined ? 1 : alto / binario.altezza;
-	const larghezza = binario.larghezza * fattore;
-	const altezza = binario.altezza * fattore;
-	const lato = latoFotogramma(s);
-	const scalaX = larghezza / lato.larghezza;
-	const scalaY = altezza / lato.altezza;
+export function drawing(s: Spritesheet, height?: number): Drawing {
+	const rail = railSize(s);
+	const factor = height === undefined ? 1 : height / rail.height;
+	const width = rail.width * factor;
+	const h = rail.height * factor;
+	const side = frameSize(s);
+	const scaleX = width / side.width;
+	const scaleY = h / side.height;
 	return {
-		larghezza,
-		altezza,
-		foglioL: s.larghezza * scalaX,
-		foglioA: s.altezza * scalaY,
-		x: -s.x * scalaX,
-		y: -s.y * scalaY,
-		corsa: s.w * scalaX,
-		passoX: passoFotogramma(s).x * scalaX,
-		passoY: passoFotogramma(s).y * scalaY,
-		scalaX,
-		scalaY,
-		durata: sequenza(s).length / s.fps,
-		passi: sequenza(s).length
+		width,
+		height: h,
+		sheetWidth: s.sheetWidth * scaleX,
+		sheetHeight: s.sheetHeight * scaleY,
+		x: -s.x * scaleX,
+		y: -s.y * scaleY,
+		travel: s.w * scaleX,
+		stepX: frameStep(s).x * scaleX,
+		stepY: frameStep(s).y * scaleY,
+		scaleX,
+		scaleY,
+		duration: sequence(s).length / s.fps,
+		steps: sequence(s).length
 	};
 }
 
-/** Lo stile in linea per l'elemento che mostra lo sprite. */
-export function stile(s: Spritesheet, src: string, alto?: number): string {
-	const d = disegno(s, alto);
-	// Dentro url("…") backslash e virgolette sono caratteri speciali del CSS:
-	// un percorso Windows non protetto diventerebbe un indirizzo rotto.
-	const protetto = src.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-	if (s.riquadri?.length) {
-		// Fotogrammi a mano: ogni passo cambia anche larghezza e altezza.
-		const seq = sequenza(s);
-		const primo = s.riquadri[seq[0]];
+/** The inline style for the element that shows the sprite. */
+export function style(s: Spritesheet, src: string, height?: number): string {
+	const d = drawing(s, height);
+	// Inside url("…") backslashes and quotes are special CSS characters: an
+	// unprotected Windows path would become a broken address.
+	const safe = src.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+	if (s.boxes?.length) {
+		// Hand-made frames: each step also changes width and height.
+		const seq = sequence(s);
+		const first = s.boxes[seq[0]];
 		return [
-			`width:${primo.w * d.scalaX}px`,
-			`height:${primo.h * d.scalaY}px`,
-			`background-image:url("${protetto}")`,
-			`background-size:${d.foglioL}px ${d.foglioA}px`,
-			`background-position:${-primo.x * d.scalaX}px ${-primo.y * d.scalaY}px`,
-			`--sx:${d.scalaX}`,
-			`--sy:${d.scalaY}`,
-			`animation-name:${animazioneRiquadri(s.riquadri, seq)}`,
-			`animation-duration:${d.durata}s`,
+			`width:${first.w * d.scaleX}px`,
+			`height:${first.h * d.scaleY}px`,
+			`background-image:url("${safe}")`,
+			`background-size:${d.sheetWidth}px ${d.sheetHeight}px`,
+			`background-position:${-first.x * d.scaleX}px ${-first.y * d.scaleY}px`,
+			`--sx:${d.scaleX}`,
+			`--sy:${d.scaleY}`,
+			`animation-name:${boxAnimation(s.boxes, seq)}`,
+			`animation-duration:${d.duration}s`,
 			`animation-timing-function:step-end`,
-			`image-rendering:${s.nitido ? 'pixelated' : 'auto'}`
+			`image-rendering:${s.crisp ? 'pixelated' : 'auto'}`
 		].join(';');
 	}
 	return [
-		`width:${d.larghezza}px`,
-		`height:${d.altezza}px`,
-		`background-image:url("${protetto}")`,
-		`background-size:${d.foglioL}px ${d.foglioA}px`,
+		`width:${d.width}px`,
+		`height:${d.height}px`,
+		`background-image:url("${safe}")`,
+		`background-size:${d.sheetWidth}px ${d.sheetHeight}px`,
 		`background-position:${d.x}px ${d.y}px`,
 		`--x:${d.x}px`,
-		`--fine:${d.x - d.corsa}px`,
+		`--end:${d.x - d.travel}px`,
 		`--y:${d.y}px`,
-		`--passo:${d.passoX}px`,
-		`--passo-y:${d.passoY}px`,
-		`animation-name:${animazione(sequenza(s), (s.righe ?? 1) > 1 ? griglia(s).colonne : Infinity)}`,
-		`animation-duration:${d.durata}s`,
-		// Ogni fotogramma resta fermo fino al successivo, senza scorrere.
+		`--step:${d.stepX}px`,
+		`--step-y:${d.stepY}px`,
+		`animation-name:${animation(sequence(s), (s.rows ?? 1) > 1 ? grid(s).columns : Infinity)}`,
+		`animation-duration:${d.duration}s`,
+		// Each frame stays still until the next, without sliding.
 		`animation-timing-function:step-end`,
-		`image-rendering:${s.nitido ? 'pixelated' : 'auto'}`
+		`image-rendering:${s.crisp ? 'pixelated' : 'auto'}`
 	].join(';');
 }
 
-/** I lati che si stanno tirando in un riquadro. */
-export interface LatiTirati {
+/** The sides being dragged on a box. */
+export interface DraggedSides {
 	n: boolean;
 	s: boolean;
 	e: boolean;
-	o: boolean;
+	w: boolean;
 }
 
-/** Lo scarto più piccolo, entro `soglia`, che porta un valore su uno dei bersagli. */
-function scartoMinimo(valori: number[], bersagli: number[], soglia: number): number {
-	let migliore = 0;
-	let distanza = soglia + 1;
-	for (const v of valori) {
-		for (const b of bersagli) {
+/** The smallest offset, within `threshold`, that brings a value onto one of the targets. */
+function smallestOffset(values: number[], targets: number[], threshold: number): number {
+	let best = 0;
+	let distance = threshold + 1;
+	for (const v of values) {
+		for (const b of targets) {
 			const d = b - v;
-			if (Math.abs(d) <= soglia && Math.abs(d) < distanza) {
-				migliore = d;
-				distanza = Math.abs(d);
+			if (Math.abs(d) <= threshold && Math.abs(d) < distance) {
+				best = d;
+				distance = Math.abs(d);
 			}
 		}
 	}
-	return distanza <= soglia ? migliore : 0;
+	return distance <= threshold ? best : 0;
 }
 
 /**
- * Aggancia un fotogramma a mano ai bordi degli altri quando ci passa vicino,
- * come le guide magnetiche dei programmi di disegno: messi in fila, i
- * fotogrammi restano allineati al pixel.
+ * Snaps a hand-made frame to the edges of the others when it passes near
+ * them, like the magnetic guides of drawing programs: put in a row, frames
+ * stay aligned to the pixel.
  *
- * Spostando, il riquadro scorre intero perché un suo lato tocchi o
- * allinei un lato vicino; tirando i lati, si aggancia solo il lato tirato.
- * `soglia` è in pixel del foglio.
+ * Moving, the whole box slides so one of its sides touches or lines up
+ * with a nearby side; dragging sides, only the dragged side snaps.
+ * `threshold` is in sheet pixels.
  */
-export function agganciaRiquadro(r: Riquadro, altri: Riquadro[], soglia: number, lati?: LatiTirati): Riquadro {
-	const xs = altri.flatMap((a) => [a.x, a.x + a.w]);
-	const ys = altri.flatMap((a) => [a.y, a.y + a.h]);
-	if (!lati) {
-		const dx = scartoMinimo([r.x, r.x + r.w], xs, soglia);
-		const dy = scartoMinimo([r.y, r.y + r.h], ys, soglia);
+export function snapBox(r: FrameBox, others: FrameBox[], threshold: number, sides?: DraggedSides): FrameBox {
+	const xs = others.flatMap((a) => [a.x, a.x + a.w]);
+	const ys = others.flatMap((a) => [a.y, a.y + a.h]);
+	if (!sides) {
+		const dx = smallestOffset([r.x, r.x + r.w], xs, threshold);
+		const dy = smallestOffset([r.y, r.y + r.h], ys, threshold);
 		return { x: r.x + dx, y: r.y + dy, w: r.w, h: r.h };
 	}
-	let sinistra = r.x;
-	let destra = r.x + r.w;
-	let alto = r.y;
-	let basso = r.y + r.h;
-	if (lati.o) sinistra += scartoMinimo([sinistra], xs, soglia);
-	if (lati.e) destra += scartoMinimo([destra], xs, soglia);
-	if (lati.n) alto += scartoMinimo([alto], ys, soglia);
-	if (lati.s) basso += scartoMinimo([basso], ys, soglia);
-	// L'aggancio non deve mai capovolgere o annullare il riquadro.
-	if (destra - sinistra < 1 || basso - alto < 1) return r;
-	return { x: sinistra, y: alto, w: destra - sinistra, h: basso - alto };
+	let left = r.x;
+	let right = r.x + r.w;
+	let top = r.y;
+	let bottom = r.y + r.h;
+	if (sides.w) left += smallestOffset([left], xs, threshold);
+	if (sides.e) right += smallestOffset([right], xs, threshold);
+	if (sides.n) top += smallestOffset([top], ys, threshold);
+	if (sides.s) bottom += smallestOffset([bottom], ys, threshold);
+	// Snapping must never flip or cancel the box.
+	if (right - left < 1 || bottom - top < 1) return r;
+	return { x: left, y: top, w: right - left, h: bottom - top };
 }

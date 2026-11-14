@@ -1,7 +1,7 @@
 import type { Entry } from './ipc';
 import { categoryFor } from './icons';
-import { estensione, nomeDi } from './posizioni';
-import { COLORI_CARTELLA, type IdColore } from './stores/colori.svelte';
+import { extension, nameOf } from './locations';
+import { FOLDER_COLORS, type ColorId } from './stores/colors.svelte';
 
 /** When a rule looks at the folder. */
 export type When = 'arrival' | 'daily';
@@ -19,7 +19,7 @@ export type Category = 'image' | 'video' | 'audio' | 'doc' | 'archive' | 'exec';
 export type Action =
 	| { type: 'move'; dest: string }
 	| { type: 'copy'; dest: string }
-	| { type: 'label'; color: IdColore }
+	| { type: 'label'; color: ColorId }
 	| { type: 'trash' };
 
 /** «When · if · then», on the files (never folders) of one folder. */
@@ -47,7 +47,7 @@ const PARTIAL = new Set(['crdownload', 'part', 'partial', 'download', 'tmp', 'op
 const DAY = 24 * 60 * 60 * 1000;
 
 export function isPartial(name: string): boolean {
-	return PARTIAL.has(estensione(name).toLowerCase()) || name.startsWith('~$');
+	return PARTIAL.has(extension(name).toLowerCase()) || name.startsWith('~$');
 }
 
 /** Extensions typed by the user, «PDF, .docx» → ['pdf', 'docx']. */
@@ -62,11 +62,11 @@ export function matches(c: Condition, e: Entry, now: number): boolean {
 			return true;
 		case 'category': {
 			const cat = categoryFor(e.name);
-			if (c.category === 'doc') return ['doc', 'sheet', 'slide', 'text'].includes(cat) || estensione(e.name).toLowerCase() === 'pdf';
+			if (c.category === 'doc') return ['doc', 'sheet', 'slide', 'text'].includes(cat) || extension(e.name).toLowerCase() === 'pdf';
 			return cat === c.category;
 		}
 		case 'ext':
-			return c.exts.includes(estensione(e.name).toLowerCase());
+			return c.exts.includes(extension(e.name).toLowerCase());
 		case 'name':
 			return c.text.trim() !== '' && e.name.toLowerCase().includes(c.text.trim().toLowerCase());
 		case 'olderThan':
@@ -109,12 +109,12 @@ export function describeCondition(c: Condition): string {
 	}
 }
 
-export function describeAction(a: Action, labelName: (id: IdColore) => string = defaultLabel): string {
+export function describeAction(a: Action, labelName: (id: ColorId) => string = defaultLabel): string {
 	switch (a.type) {
 		case 'move':
-			return `spostalo in ${nomeDi(a.dest) || a.dest}`;
+			return `spostalo in ${nameOf(a.dest) || a.dest}`;
 		case 'copy':
-			return `copialo in ${nomeDi(a.dest) || a.dest}`;
+			return `copialo in ${nameOf(a.dest) || a.dest}`;
 		case 'label':
 			return `dagli l’etichetta ${labelName(a.color)}`;
 		case 'trash':
@@ -122,13 +122,13 @@ export function describeAction(a: Action, labelName: (id: IdColore) => string = 
 	}
 }
 
-export function describeRule(r: Rule, labelName?: (id: IdColore) => string): string {
+export function describeRule(r: Rule, labelName?: (id: ColorId) => string): string {
 	const when = r.when === 'arrival' ? 'Quando arriva un file' : 'Ogni giorno';
 	return `${when}, se ${describeCondition(r.if)}, ${describeAction(r.then, labelName)}`;
 }
 
-function defaultLabel(id: IdColore): string {
-	return COLORI_CARTELLA.find((c) => c.id === id)?.nome ?? id;
+function defaultLabel(id: ColorId): string {
+	return FOLDER_COLORS.find((c) => c.id === id)?.name ?? id;
 }
 
 export function samePath(a: string, b: string): boolean {

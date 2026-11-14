@@ -3,303 +3,285 @@
 	 * Where each list was scrolled, by content key: the dual pane remounts a
 	 * list when you switch side, and going back to a folder finds it as you left it.
 	 */
-	const scrollSalvati = new Map<string, number>();
-	const MASSIMO_SALVATI = 200;
+	const savedScrolls = new Map<string, number>();
+	const MAX_SAVED = 200;
 </script>
 
 <script lang="ts">
 	import type { FolderStyle } from '../icons';
 	import type { MediaKey } from '../media';
-	import type { Crescita } from '../crescita';
-	import { selezioneRettangolo, type OpzioniRettangolo } from '../rettangolo';
+	import type { Growth } from '../growth';
+	import { marqueeSelection, type MarqueeOptions } from '../marquee';
 	import type { Entry, GitMark, MediaProps, SortKey, SortSpec } from '../ipc';
-	import Intestazioni from './Intestazioni.svelte';
-	import {
-		impaginaZone,
-		finestraZona,
-		cimaVoce,
-		ROW_HEIGHT,
-		OVERSCAN,
-		ZONA_TESTATA
-	} from '../virtual';
+	import ColumnHeaders from './ColumnHeaders.svelte';
+	import { layoutZones, zoneWindow, itemTop, ROW_HEIGHT, OVERSCAN, ZONE_HEADER } from '../virtual';
 	import Row from './Row.svelte';
-	import TestataZona from './TestataZona.svelte';
-	import type { IconeStore } from '../stores/icone.svelte';
-	import type { Colonne } from '../stores/impostazioni.svelte';
-	import type { Zona } from '../raggruppa';
+	import ZoneHeader from './ZoneHeader.svelte';
+	import type { IconsStore } from '../stores/icons.svelte';
+	import type { Columns } from '../stores/settings.svelte';
+	import type { Zone } from '../grouping';
 
 	let {
 		entries,
-		zone = [],
-		chiave = undefined,
-		colonne = undefined,
-		nascondiEstensione = false,
-		cartellaDi = undefined,
-		coloreDi = undefined,
-		quotaDi = undefined,
-		crescitaDi = undefined,
-		altezzaRiga = ROW_HEIGHT,
-		bersaglio = null,
+		zones = [],
+		contentKey = undefined,
+		columns = undefined,
+		hideExtension = false,
+		folderOf = undefined,
+		colorOf = undefined,
+		shareOf = undefined,
+		growthOf = undefined,
+		rowHeight = ROW_HEIGHT,
+		dropTarget = null,
 		selection = undefined,
 		matches = undefined,
 		activeIndex = null,
 		renamingPath = null,
 		cutPaths = undefined,
-		icone = undefined,
+		icons = undefined,
 		sort = undefined,
 		onsort = undefined,
 		onactivate,
-		unClic = false,
+		singleClick = false,
 		folderStyle = 'windows',
-		dimensioni = {},
-		oncalcola = undefined,
+		sizes = {},
+		oncompute = undefined,
 		onselect,
 		oncontext = undefined,
-		oncontextvuoto = undefined,
+		oncontextempty = undefined,
 		onrename = undefined,
 		oncancelrename = undefined,
-		ontrascina = undefined,
-		rettangolo = undefined,
-		oncolonne = undefined,
-		mediaDi = undefined,
-		gitDi = undefined,
-		regoleDi = undefined,
+		ondrag = undefined,
+		marquee = undefined,
+		oncolumns = undefined,
+		mediaOf = undefined,
+		gitOf = undefined,
+		rulesOf = undefined,
 		mediaSort = null,
 		onsortmedia = undefined
 	}: {
 		entries: Entry[];
 		/**
-		 * Zone in cui è divisa la lista, nell'ordine di `entries`.
-		 * Vuoto = lista non divisa, nessuna testata.
+		 * Zones the list is divided into, in the order of `entries`.
+		 * Empty = undivided list, no headers.
 		 */
-		zone?: Zona[];
+		zones?: Zone[];
 		/**
-		 * Identità del contenuto: lo scroll torna in cima solo quando cambia.
-		 * Senza, ogni aggiornamento automatico riporterebbe la lista in cima.
+		 * Identity of the contents: the scroll goes back to the top only when
+		 * it changes. Without it, every automatic refresh would bring the list
+		 * back to the top.
 		 */
-		chiave?: string;
-		colonne?: Colonne;
-		nascondiEstensione?: boolean;
-		/** Cartella da mostrare accanto al nome di una voce, se serve. */
-		cartellaDi?: (e: Entry) => string | undefined;
-		/** Colore scelto per una cartella, se ne ha uno. */
-		coloreDi?: (e: Entry) => string | undefined;
+		contentKey?: string;
+		columns?: Columns;
+		hideExtension?: boolean;
+		/** Folder to show next to an item's name, when needed. */
+		folderOf?: (e: Entry) => string | undefined;
+		/** Colour chosen for a folder, if it has one. */
+		colorOf?: (e: Entry) => string | undefined;
 		/** Space view: share of the largest item, for the bar. */
-		quotaDi?: (e: Entry) => number | undefined;
-		crescitaDi?: (e: Entry) => Crescita | undefined;
-		/** Altezza delle righe: più bassa nella visualizzazione compatta. */
-		altezzaRiga?: number;
-		/** Cartella sopra cui passa un trascinamento. */
-		bersaglio?: string | null;
+		shareOf?: (e: Entry) => number | undefined;
+		growthOf?: (e: Entry) => Growth | undefined;
+		/** Row height: lower in the compact view. */
+		rowHeight?: number;
+		/** Folder a drag is passing over. */
+		dropTarget?: string | null;
 		selection?: ReadonlySet<string>;
-		/** Posizioni da evidenziare per path, quando la ricerca è attiva. */
+		/** Positions to highlight by path, when the search is active. */
 		matches?: Map<string, number[]>;
-		/** Indice che lo scroll deve tenere visibile, per la navigazione da tastiera. */
+		/** Index the scroll must keep visible, for keyboard navigation. */
 		activeIndex?: number | null;
-		/** Path della voce in fase di rinomina, se ce n'è una. */
+		/** Path of the item being renamed, if there is one. */
 		renamingPath?: string | null;
-		/** Path negli appunti in modalità taglia, da mostrare sbiaditi. */
+		/** Paths in the clipboard in cut mode, to show faded. */
 		cutPaths?: string[];
-		/** Cache di icone e miniature, passata alle righe visibili. */
-		icone?: IconeStore;
-		/** Ordinamento corrente. Senza, le intestazioni non compaiono. */
+		/** Cache of icons and thumbnails, passed to the visible rows. */
+		icons?: IconsStore;
+		/** Current sort. Without it, the headers do not show. */
 		sort?: SortSpec;
-		onsort?: (chiave: SortKey) => void;
+		onsort?: (key: SortKey) => void;
 		onactivate: (e: Entry) => void;
-		/** Apre con un clic, come l'opzione di Esplora; il doppio clic non serve più. */
-		unClic?: boolean;
+		/** Opens with one click, like Explorer's option; the double click is no longer needed. */
+		singleClick?: boolean;
 		/** How the theme draws folders. */
 		folderStyle?: FolderStyle;
-		/** Dimensioni delle cartelle già calcolate (o in calcolo), per path. */
-		dimensioni?: Record<string, number | 'calcolo'>;
-		oncalcola?: (e: Entry) => void;
-		onselect: (e: Entry, modificatori: { ctrl?: boolean; shift?: boolean }) => void;
-		oncontext?: (e: Entry, evento: MouseEvent) => void;
-		/** Clic destro sullo spazio vuoto della lista. */
-		oncontextvuoto?: (evento: MouseEvent) => void;
-		onrename?: (e: Entry, nuovoNome: string) => void;
+		/** Folder sizes already computed (or being computed), by path. */
+		sizes?: Record<string, number | 'computing'>;
+		oncompute?: (e: Entry) => void;
+		onselect: (e: Entry, modifiers: { ctrl?: boolean; shift?: boolean }) => void;
+		oncontext?: (e: Entry, event: MouseEvent) => void;
+		/** Right click on the list's empty space. */
+		oncontextempty?: (event: MouseEvent) => void;
+		onrename?: (e: Entry, newName: string) => void;
 		oncancelrename?: () => void;
-		ontrascina?: (e: Entry) => void;
-		/** Clic sul vuoto e selezione col rettangolo. */
-		rettangolo?: OpzioniRettangolo;
-		/** Clic destro sulle intestazioni: scelta delle colonne. */
-		oncolonne?: (evento: MouseEvent) => void;
+		ondrag?: (e: Entry) => void;
+		/** Click on empty space and marquee selection. */
+		marquee?: MarqueeOptions;
+		/** Right click on the headers: choice of columns. */
+		oncolumns?: (event: MouseEvent) => void;
 		/** Photo/video/music details of an entry, for the media columns. */
-		mediaDi?: (e: Entry) => MediaProps | null | undefined;
+		mediaOf?: (e: Entry) => MediaProps | null | undefined;
 		/** Git mark of an entry, inside a repository. */
-		gitDi?: (e: Entry) => GitMark | undefined;
+		gitOf?: (e: Entry) => GitMark | undefined;
 		/** The folder has automatic rules. */
-		regoleDi?: (e: Entry) => boolean;
+		rulesOf?: (e: Entry) => boolean;
 		mediaSort?: { key: MediaKey; ascending: boolean } | null;
 		onsortmedia?: (key: MediaKey) => void;
 	} = $props();
 
-	const SENZA_RETTANGOLO: OpzioniRettangolo = { oncambia: () => {}, onvuoto: () => {} };
+	const NO_MARQUEE: MarqueeOptions = { onchange: () => {}, onempty: () => {} };
 
 	let scrollTop = $state(0);
 	let viewportHeight = $state(600);
 	let viewport = $state<HTMLDivElement | null>(null);
 
-	let tagliati = $derived(new Set(cutPaths ?? []));
+	let cut = $derived(new Set(cutPaths ?? []));
 
 	/**
-	 * Le miniature si chiedono solo a scorrimento fermo.
+	 * Thumbnails are asked for only when scrolling stops.
 	 *
-	 * Chiederle a ogni frame di scroll accoda estrazioni per righe già
-	 * uscite dallo schermo: il lavoro utile finisce in fondo alla fila e
-	 * la lista scatta. 120 ms è il tempo tipico fra due colpi di rotella.
+	 * Asking at every scroll frame queues extractions for rows already off
+	 * screen: the useful work ends at the back of the line and the list
+	 * stutters. 120 ms is the typical time between two wheel notches.
 	 */
 	$effect(() => {
-		if (!icone) return;
+		if (!icons) return;
 
-		const visibili = visible;
-		const attesa = setTimeout(() => icone.richiedi(visibili), 120);
+		const shown = visible;
+		const wait = setTimeout(() => icons.request(shown), 120);
 
-		return () => clearTimeout(attesa);
+		return () => clearTimeout(wait);
 	});
-	let diviso = $derived(zone.length > 0);
-	let impaginato = $derived(
-		impaginaZone(
-			diviso ? zone.map((z) => z.quante) : [entries.length],
-			1,
-			altezzaRiga,
-			diviso ? ZONA_TESTATA : 0
-		)
-	);
-	let finestre = $derived(
-		impaginato.zone.map((zona) => {
-			const f = finestraZona(zona, scrollTop, viewportHeight, 1, altezzaRiga, OVERSCAN);
-			return { zona, top: f.top, voci: entries.slice(f.start, f.start + f.count) };
+	let divided = $derived(zones.length > 0);
+	let layout = $derived(layoutZones(divided ? zones.map((z) => z.count) : [entries.length], 1, rowHeight, divided ? ZONE_HEADER : 0));
+	let windows = $derived(
+		layout.zones.map((zone) => {
+			const f = zoneWindow(zone, scrollTop, viewportHeight, 1, rowHeight, OVERSCAN);
+			return { zone, top: f.top, items: entries.slice(f.start, f.start + f.count) };
 		})
 	);
-	let visible = $derived(finestre.flatMap((f) => f.voci));
+	let visible = $derived(windows.flatMap((f) => f.items));
 
-	// Tornare in cima quando cambia il contenuto: senza questo, entrando in una
-	// cartella più corta si resta a uno scroll che non esiste più. A contenuto
-	// già visto si torna dove si era.
+	// Back to the top when the contents change: without this, entering a
+	// shorter folder leaves a scroll that no longer exists. With contents
+	// already seen it goes back to where it was.
 	$effect(() => {
-		if (chiave === undefined) entries;
-		const salvato = chiave !== undefined ? (scrollSalvati.get(chiave) ?? 0) : 0;
-		if (viewport) viewport.scrollTop = salvato;
-		scrollTop = viewport?.scrollTop ?? salvato;
+		if (contentKey === undefined) entries;
+		const saved = contentKey !== undefined ? (savedScrolls.get(contentKey) ?? 0) : 0;
+		if (viewport) viewport.scrollTop = saved;
+		scrollTop = viewport?.scrollTop ?? saved;
 	});
 
-	function salvaScroll(top: number) {
+	function saveScroll(top: number) {
 		scrollTop = top;
-		if (chiave === undefined) return;
-		scrollSalvati.delete(chiave);
-		scrollSalvati.set(chiave, top);
-		if (scrollSalvati.size > MASSIMO_SALVATI) scrollSalvati.delete(scrollSalvati.keys().next().value!);
+		if (contentKey === undefined) return;
+		savedScrolls.delete(contentKey);
+		savedScrolls.set(contentKey, top);
+		if (savedScrolls.size > MAX_SAVED) savedScrolls.delete(savedScrolls.keys().next().value!);
 	}
 
-	// La riga scelta da tastiera può stare fuori dalla finestra visibile:
-	// con le righe virtualizzate non esiste un elemento su cui chiamare
-	// scrollIntoView, quindi lo scroll si calcola dall'indice.
+	// The row chosen by keyboard may be outside the visible window: with
+	// virtualised rows there is no element to call scrollIntoView on, so the
+	// scroll is computed from the index.
 	$effect(() => {
 		if (activeIndex === null || activeIndex < 0 || !viewport) return;
 
-		const alto = cimaVoce(impaginato.zone, activeIndex, 1, altezzaRiga);
-		const basso = alto + altezzaRiga;
+		const top = itemTop(layout.zones, activeIndex, 1, rowHeight);
+		const bottom = top + rowHeight;
 
-		if (alto < viewport.scrollTop) {
-			viewport.scrollTop = alto;
-		} else if (basso > viewport.scrollTop + viewportHeight) {
-			viewport.scrollTop = basso - viewportHeight;
+		if (top < viewport.scrollTop) {
+			viewport.scrollTop = top;
+		} else if (bottom > viewport.scrollTop + viewportHeight) {
+			viewport.scrollTop = bottom - viewportHeight;
 		}
 	});
 </script>
 
-<div class="lista">
+<div class="list">
 	{#if sort && onsort}
-		<Intestazioni {sort} {onsort} {colonne} {oncolonne} {mediaSort} {onsortmedia} />
+		<ColumnHeaders {sort} {onsort} {columns} {oncolumns} {mediaSort} {onsortmedia} />
 	{/if}
 
 	<div
 		class="viewport"
 		bind:this={viewport}
-		onscroll={(e) => salvaScroll(e.currentTarget.scrollTop)}
+		onscroll={(e) => saveScroll(e.currentTarget.scrollTop)}
 		bind:clientHeight={viewportHeight}
 		role="presentation"
 		oncontextmenu={(e) => {
-			// Le righe fermano l'evento: qui arriva solo il clic sul vuoto.
+			// Rows stop the event: only the click on empty space arrives here.
 			e.preventDefault();
-			oncontextvuoto?.(e);
+			oncontextempty?.(e);
 		}}
-		use:selezioneRettangolo={rettangolo ?? SENZA_RETTANGOLO}
+		use:marqueeSelection={marquee ?? NO_MARQUEE}
 	>
-	<div class="spacer" style:height="{impaginato.altezzaTotale}px">
-		{#each finestre as f, z (z)}
-		{#if diviso}
-			<TestataZona
-				etichetta={zone[z].etichetta}
-				tono={zone[z].tono}
-				quante={f.zona.quante}
-				top={f.zona.alto}
-			/>
-		{/if}
-		<div class="window" style:transform="translateY({f.top}px)">
-			{#each f.voci as entry (entry.path)}
-				<Row
-					{entry}
-					selected={selection?.has(entry.path) ?? false}
-					positions={matches?.get(entry.path)}
-					renaming={entry.path === renamingPath}
-					tagliato={tagliati.has(entry.path)}
-					{icone}
-					{colonne}
-					{nascondiEstensione}
-					cartella={cartellaDi?.(entry)}
-					colore={coloreDi?.(entry)}
-					quota={quotaDi?.(entry)}
-					crescita={crescitaDi?.(entry)}
-					media={mediaDi?.(entry)}
-					git={gitDi?.(entry)}
-					conRegole={entry.kind === 'dir' && (regoleDi?.(entry) ?? false)}
-					altezza={altezzaRiga}
-					bersaglio={entry.path === bersaglio}
-					{ontrascina}
-					{onactivate}
-					{unClic}
-					{folderStyle}
-					peso={dimensioni[entry.path]}
-					{oncalcola}
-					{onselect}
-					{oncontext}
-					{onrename}
-					{oncancelrename}
-				/>
+		<div class="spacer" style:height="{layout.totalHeight}px">
+			{#each windows as f, z (z)}
+				{#if divided}
+					<ZoneHeader label={zones[z].label} tone={zones[z].tone} count={f.zone.count} top={f.zone.top} />
+				{/if}
+				<div class="window" style:transform="translateY({f.top}px)">
+					{#each f.items as entry (entry.path)}
+						<Row
+							{entry}
+							selected={selection?.has(entry.path) ?? false}
+							positions={matches?.get(entry.path)}
+							renaming={entry.path === renamingPath}
+							cut={cut.has(entry.path)}
+							{icons}
+							{columns}
+							{hideExtension}
+							folder={folderOf?.(entry)}
+							color={colorOf?.(entry)}
+							share={shareOf?.(entry)}
+							growth={growthOf?.(entry)}
+							media={mediaOf?.(entry)}
+							git={gitOf?.(entry)}
+							hasRules={entry.kind === 'dir' && (rulesOf?.(entry) ?? false)}
+							height={rowHeight}
+							dropTarget={entry.path === dropTarget}
+							{ondrag}
+							{onactivate}
+							{singleClick}
+							{folderStyle}
+							folderSize={sizes[entry.path]}
+							{oncompute}
+							{onselect}
+							{oncontext}
+							{onrename}
+							{oncancelrename}
+						/>
+					{/each}
+				</div>
 			{/each}
-		</div>
-		{/each}
 		</div>
 	</div>
 </div>
 
 <style>
-	/* Intestazioni e lista nella stessa scatola: è ciò che tiene le colonne
-	   allineate alle righe. */
-	.lista {
+	/* Headers and list in the same box: it is what keeps the columns aligned
+	   with the rows. */
+	.list {
 		display: flex;
 		flex-direction: column;
 		flex: 1;
 		min-height: 0;
 	}
 
-	/* Fondo opaco: nessun backdrop-filter su un contenitore che scorre. */
+	/* Opaque background: no backdrop-filter on a scrolling container. */
 	.viewport {
 		flex: 1;
 		overflow-y: auto;
 		overflow-x: hidden;
 		background: var(--surface);
-		/* Lo sfondo decorativo dei temi mondo: fiocchi, foglie, zampette. */
-		background-image: var(--motivo, none);
+		/* The decorative background of world themes: flakes, leaves, paws. */
+		background-image: var(--pattern, none);
 		background-size: 96px 96px;
 		background-attachment: local;
 		padding: 4px;
-		/* Il rettangolo di selezione si posa dentro, e scorre col contenuto. */
+		/* The selection marquee rests inside, and scrolls with the contents. */
 		position: relative;
-		/* Il solco resta riservato anche con lista corta: senza, la comparsa
-		   della barra sposterebbe le righe scollegandole dalle intestazioni. */
+		/* The gutter stays reserved even with a short list: without it, the
+		   scrollbar appearing would shift the rows out of line with the headers. */
 		scrollbar-gutter: stable;
 	}
 	.spacer {

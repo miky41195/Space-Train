@@ -7,7 +7,7 @@
 		taken,
 		onconfirm,
 		oncancel,
-		mediaDi = () => undefined
+		mediaOf = () => undefined
 	}: {
 		/** The selected items, in list order: the counter follows it. */
 		entries: Entry[];
@@ -16,7 +16,7 @@
 		onconfirm: (plan: ReturnType<typeof planRename>) => void;
 		oncancel: () => void;
 		/** Photo and music details, for the placeholders. */
-		mediaDi?: (e: Entry) => MediaProps | null | undefined;
+		mediaOf?: (e: Entry) => MediaProps | null | undefined;
 	} = $props();
 
 	let mode = $state<'pattern' | 'replace'>('pattern');
@@ -33,16 +33,16 @@
 			: { mode, find, replace, matchCase, keepExtension }
 	);
 	let items = $derived(
-		entries.map((e) => ({ path: e.path, name: e.name, isDir: e.kind === 'dir', media: mediaDi(e), modified: e.modified }))
+		entries.map((e) => ({ path: e.path, name: e.name, isDir: e.kind === 'dir', media: mediaOf(e), modified: e.modified }))
 	);
 	let plan = $derived(planRename(items, rule, taken));
-	let segnaposti = $derived(availablePlaceholders(items));
+	let placeholders = $derived(availablePlaceholders(items));
 	/** The pattern cut into text and placeholders, drawn under the field so the placeholders show as labels. */
-	let parti = $derived(pattern.split(/(\[(?:Data|Ora|Anno|Fotocamera|Artista|Album|Titolo|Traccia|Nome)\])/).filter(Boolean));
-	let specchio = $state<HTMLSpanElement | null>(null);
+	let parts = $derived(pattern.split(/(\[(?:Data|Ora|Anno|Fotocamera|Artista|Album|Titolo|Traccia|Nome)\])/).filter(Boolean));
+	let mirror = $state<HTMLSpanElement | null>(null);
 
 	/** Puts a placeholder where the cursor is, then the cursor after it. */
-	function inserisci(tag: Placeholder) {
+	function insert(tag: Placeholder) {
 		const i = first?.selectionStart ?? pattern.length;
 		const j = first?.selectionEnd ?? i;
 		pattern = pattern.slice(0, i) + tag + pattern.slice(j);
@@ -83,7 +83,7 @@
 </script>
 
 <div
-	class="sfondo"
+	class="backdrop"
 	role="presentation"
 	onclick={(e) => e.target === e.currentTarget && oncancel()}
 	onkeydown={(e) => {
@@ -91,11 +91,11 @@
 		if (e.key === 'Escape') oncancel();
 	}}
 >
-	<div class="finestra" role="dialog" aria-modal="true" aria-labelledby="batch-title">
+	<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="batch-title">
 	<form onsubmit={submit}>
 		<header>
 			<h2 id="batch-title">Rinomina {entries.length} elementi</h2>
-			<div class="modi" role="tablist" aria-label="Modo di rinomina">
+			<div class="modes" role="tablist" aria-label="Modo di rinomina">
 				<button type="button" role="tab" aria-selected={mode === 'pattern'} class:on={mode === 'pattern'} onclick={() => (mode = 'pattern')}
 					>Schema</button
 				>
@@ -106,12 +106,12 @@
 		</header>
 
 		{#if mode === 'pattern'}
-			<div class="campi">
-				<label class="largo">
+			<div class="fields">
+				<label class="wide">
 					<span>Nome</span>
-					<span class="campo-segnaposti">
-						<span class="specchio" aria-hidden="true" bind:this={specchio}
-							>{#each parti as p, i (i)}{#if p.startsWith('[') && p.endsWith(']')}<mark>{p}</mark>{:else}{p}{/if}{/each}</span
+					<span class="placeholder-field">
+						<span class="mirror" aria-hidden="true" bind:this={mirror}
+							>{#each parts as p, i (i)}{#if p.startsWith('[') && p.endsWith(']')}<mark>{p}</mark>{:else}{p}{/if}{/each}</span
 						>
 						<input
 							bind:this={first}
@@ -119,7 +119,7 @@
 							placeholder="Vacanze_###"
 							spellcheck="false"
 							autocomplete="off"
-							onscroll={(e) => specchio && (specchio.scrollLeft = e.currentTarget.scrollLeft)}
+							onscroll={(e) => mirror && (mirror.scrollLeft = e.currentTarget.scrollLeft)}
 						/>
 					</span>
 				</label>
@@ -128,14 +128,14 @@
 					<input type="number" min="0" bind:value={start} />
 				</label>
 			</div>
-			<p class="aiuto">Ogni <kbd>#</kbd> è una cifra del contatore: <b>###</b> diventa 001, 002, 003…</p>
-			<div class="segnaposti" aria-label="Dati dei file da inserire nel nome">
-				{#each segnaposti as t (t)}
-					<button type="button" onclick={() => inserisci(t)}>{t.slice(1, -1)}</button>
+			<p class="help">Ogni <kbd>#</kbd> è una cifra del contatore: <b>###</b> diventa 001, 002, 003…</p>
+			<div class="placeholders" aria-label="Dati dei file da inserire nel nome">
+				{#each placeholders as t (t)}
+					<button type="button" onclick={() => insert(t)}>{t.slice(1, -1)}</button>
 				{/each}
 			</div>
 		{:else}
-			<div class="campi">
+			<div class="fields">
 				<label>
 					<span>Trova</span>
 					<input bind:this={first} bind:value={find} spellcheck="false" autocomplete="off" />
@@ -147,35 +147,35 @@
 			</div>
 		{/if}
 
-		<div class="opzioni">
-			<label class="spunta"><input type="checkbox" bind:checked={keepExtension} />Lascia com’è l’estensione</label>
+		<div class="options">
+			<label class="check"><input type="checkbox" bind:checked={keepExtension} />Lascia com’è l’estensione</label>
 			{#if mode === 'replace'}
-				<label class="spunta"><input type="checkbox" bind:checked={matchCase} />Maiuscole e minuscole</label>
+				<label class="check"><input type="checkbox" bind:checked={matchCase} />Maiuscole e minuscole</label>
 			{/if}
 		</div>
 
-		<ol class="anteprima" aria-label="Anteprima dei nuovi nomi">
+		<ol class="preview" aria-label="Anteprima dei nuovi nomi">
 			{#each plan as p (p.item.path)}
-				{@const [prima, nuovo, dopo] = changed(p.item.name, p.newName)}
-				<li class:problema={p.problem} class:uguale={!p.problem && p.newName === p.item.name}>
-					<span class="vecchio" title={p.item.name}>{p.item.name}</span>
+				{@const [before, middle, after] = changed(p.item.name, p.newName)}
+				<li class:problem={p.problem} class:same={!p.problem && p.newName === p.item.name}>
+					<span class="old" title={p.item.name}>{p.item.name}</span>
 					<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"
 						><path d="M2 8h11M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" /></svg
 					>
-					<span class="nuovo" title={p.newName}>
-						{#if p.problem}{p.newName} · {p.problem}{:else if p.newName === p.item.name}{p.note ?? 'invariato'}{:else}{prima}<b>{nuovo}</b>{dopo}{#if p.note}<i>{` · ${p.note}`}</i>{/if}{/if}
+					<span class="new" title={p.newName}>
+						{#if p.problem}{p.newName} · {p.problem}{:else if p.newName === p.item.name}{p.note ?? 'invariato'}{:else}{before}<b>{middle}</b>{after}{#if p.note}<i>{` · ${p.note}`}</i>{/if}{/if}
 					</span>
 				</li>
 			{/each}
 		</ol>
 
 		<footer>
-			<span class="stato" aria-live="polite">
+			<span class="status" aria-live="polite">
 				{#if problems > 0}{problems === 1 ? '1 nome non va bene' : `${problems} nomi non vanno bene`}{:else if changes > 0}{changes === 1 ? '1 nome cambia' : `${changes} nomi cambiano`}{/if}
 			</span>
-			<span class="azioni">
+			<span class="actions">
 				<button type="button" onclick={oncancel}>Annulla</button>
-				<button type="submit" class="primario" disabled={!ready}>Rinomina</button>
+				<button type="submit" class="primary" disabled={!ready}>Rinomina</button>
 			</span>
 		</footer>
 	</form>
@@ -183,7 +183,7 @@
 </div>
 
 <style>
-	.sfondo {
+	.backdrop {
 		position: fixed;
 		inset: 0;
 		z-index: 10;
@@ -192,7 +192,7 @@
 		justify-content: center;
 		background: color-mix(in srgb, var(--bg) 72%, transparent);
 	}
-	.finestra {
+	.dialog {
 		width: min(560px, 92vw);
 		max-height: calc(100vh - 64px);
 		padding: 20px;
@@ -200,8 +200,8 @@
 		color: var(--text);
 		border: 1px solid var(--border);
 		border-radius: var(--radius);
-		clip-path: var(--forma, none);
-		mask: var(--maschera, none);
+		clip-path: var(--shape, none);
+		mask: var(--mask, none);
 		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
 	}
 	form {
@@ -217,46 +217,46 @@
 	}
 	h2 {
 		margin: 0;
-		font-size: calc(15px * var(--scala-testo, 1));
+		font-size: calc(15px * var(--text-scale, 1));
 		font-weight: 600;
 	}
-	.modi {
+	.modes {
 		display: flex;
 		gap: 4px;
 	}
-	.modi button {
+	.modes button {
 		height: 26px;
 		padding: 0 10px;
 		border: none;
 		border-radius: var(--radius-sm);
-		clip-path: var(--forma-sm, none);
-		mask: var(--maschera-sm, none);
+		clip-path: var(--shape-sm, none);
+		mask: var(--mask-sm, none);
 		background: transparent;
 		color: var(--text-dim);
 		font: inherit;
 		cursor: default;
 	}
-	.modi button:hover {
+	.modes button:hover {
 		background: var(--row-hover);
 		color: var(--text);
 	}
-	.modi button.on {
+	.modes button.on {
 		background: var(--accent-soft);
 		color: var(--text);
 	}
-	.campi {
+	.fields {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
 		gap: 8px;
 	}
-	.campi:has(.largo) {
+	.fields:has(.wide) {
 		grid-template-columns: minmax(0, 1fr) 96px;
 	}
-	label > span:not(.campo-segnaposti) {
+	label > span:not(.placeholder-field) {
 		display: block;
 		margin-bottom: 4px;
 		font-family: var(--font-display);
-		font-size: calc(10px * var(--scala-testo, 1));
+		font-size: calc(10px * var(--text-scale, 1));
 		font-weight: 600;
 		letter-spacing: 0.16em;
 		text-transform: uppercase;
@@ -268,8 +268,8 @@
 		padding: 0 10px;
 		border: 1px solid var(--accent);
 		border-radius: var(--radius-sm);
-		clip-path: var(--forma-sm, none);
-		mask: var(--maschera-sm, none);
+		clip-path: var(--shape-sm, none);
+		mask: var(--mask-sm, none);
 		background: var(--bg);
 		color: var(--text);
 		font: inherit;
@@ -278,12 +278,12 @@
 		font-family: var(--font-display);
 		font-variant-numeric: tabular-nums;
 	}
-	.aiuto {
+	.help {
 		margin: -4px 0 0;
 		color: var(--text-dim);
-		font-size: calc(12px * var(--scala-testo, 1));
+		font-size: calc(12px * var(--text-scale, 1));
 	}
-	.aiuto b {
+	.help b {
 		font-family: var(--font-display);
 		font-weight: 400;
 		color: var(--text);
@@ -296,23 +296,23 @@
 		background: var(--bg);
 		font-family: var(--font-display);
 	}
-	.opzioni {
+	.options {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 16px;
 	}
-	.spunta {
+	.check {
 		display: inline-flex;
 		align-items: center;
 		gap: 6px;
 		color: var(--text-dim);
-		font-size: calc(12px * var(--scala-testo, 1));
+		font-size: calc(12px * var(--text-scale, 1));
 	}
-	.spunta input {
+	.check input {
 		accent-color: var(--accent);
 		margin: 0;
 	}
-	.anteprima {
+	.preview {
 		min-height: 0;
 		max-height: 260px;
 		margin: 0;
@@ -320,9 +320,9 @@
 		overflow-y: auto;
 		list-style: none;
 		border-top: 1px solid var(--border);
-		font-size: calc(12px * var(--scala-testo, 1));
+		font-size: calc(12px * var(--text-scale, 1));
 	}
-	.anteprima li {
+	.preview li {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) 12px minmax(0, 1fr);
 		align-items: center;
@@ -331,21 +331,21 @@
 		padding: 0 6px;
 		border-radius: var(--radius-sm);
 	}
-	.anteprima span {
+	.preview span {
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
-	.vecchio,
-	.anteprima svg {
+	.old,
+	.preview svg {
 		color: var(--text-dim);
 	}
-	.campo-segnaposti {
+	.placeholder-field {
 		position: relative;
 		display: block;
 	}
 	/* Same box and font as the field: the text lines up under the transparent input text. */
-	.specchio {
+	.mirror {
 		position: absolute;
 		inset: 0;
 		display: block;
@@ -361,32 +361,32 @@
 		letter-spacing: normal;
 		text-transform: none;
 	}
-	.specchio mark {
+	.mirror mark {
 		border-radius: 3px;
 		background: var(--accent-soft);
 		color: var(--text);
 		box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent);
 	}
-	.campo-segnaposti input {
+	.placeholder-field input {
 		position: relative;
 		background: transparent !important;
 		color: transparent !important;
 		caret-color: var(--text);
 	}
-	.campo-segnaposti input::placeholder {
+	.placeholder-field input::placeholder {
 		color: var(--text-dim);
 	}
-	.campo-segnaposti input::selection {
+	.placeholder-field input::selection {
 		background: color-mix(in srgb, var(--accent) 45%, transparent);
 		color: transparent;
 	}
-	.segnaposti {
+	.placeholders {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 6px;
 		margin-top: -4px;
 	}
-	.segnaposti button {
+	.placeholders button {
 		height: 24px;
 		padding: 0 10px;
 		border: 1px solid var(--border);
@@ -394,33 +394,33 @@
 		background: transparent;
 		color: var(--text);
 		font: inherit;
-		font-size: calc(12px * var(--scala-testo, 1));
+		font-size: calc(12px * var(--text-scale, 1));
 		cursor: default;
 	}
-	.segnaposti button:hover {
+	.placeholders button:hover {
 		border-color: var(--accent);
 		background: var(--accent-soft);
 	}
-	.segnaposti button:focus-visible {
+	.placeholders button:focus-visible {
 		outline: 2px solid var(--accent);
 		outline-offset: 2px;
 	}
-	.nuovo i {
+	.new i {
 		font-style: normal;
 		color: var(--signal, #ffb454);
 	}
-	.nuovo b {
+	.new b {
 		color: var(--current);
 		font-weight: 600;
 	}
-	.uguale .nuovo {
+	.same .new {
 		color: var(--text-dim);
 	}
-	.problema {
+	.problem {
 		background: rgba(196, 43, 28, 0.16);
 	}
-	.problema .nuovo {
-		color: var(--errore-testo, #ffb4ab);
+	.problem .new {
+		color: var(--error-text, #ffb4ab);
 	}
 	footer {
 		display: flex;
@@ -429,11 +429,11 @@
 		justify-content: space-between;
 		gap: 8px;
 	}
-	.stato {
+	.status {
 		color: var(--text-dim);
-		font-size: calc(12px * var(--scala-testo, 1));
+		font-size: calc(12px * var(--text-scale, 1));
 	}
-	.azioni {
+	.actions {
 		display: flex;
 		gap: 8px;
 	}
@@ -442,8 +442,8 @@
 		padding: 0 14px;
 		border: 1px solid var(--border);
 		border-radius: var(--radius-sm);
-		clip-path: var(--forma-sm, none);
-		mask: var(--maschera-sm, none);
+		clip-path: var(--shape-sm, none);
+		mask: var(--mask-sm, none);
 		background: transparent;
 		color: var(--text);
 		font: inherit;
@@ -452,16 +452,16 @@
 	footer button:hover {
 		background: var(--row-hover);
 	}
-	.primario {
+	.primary {
 		border-color: transparent;
 		background: var(--accent);
 		color: #fff;
 	}
-	.primario:hover:not(:disabled) {
+	.primary:hover:not(:disabled) {
 		background: var(--accent);
 		filter: brightness(1.1);
 	}
-	.primario:disabled {
+	.primary:disabled {
 		opacity: 0.45;
 	}
 </style>

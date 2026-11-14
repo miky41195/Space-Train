@@ -1,7 +1,7 @@
 import type { Entry, MediaProps } from '../ipc';
 import { autoMediaColumns, isMedia, MEDIA_COLUMNS, type MediaKey } from '../media';
-import type { Archivio } from './preferiti.svelte';
-import { alCambioDi } from './sincronizza';
+import type { KeyValueStore } from './favorites.svelte';
+import { onChangeOf } from './sync';
 
 const KEY = 'space-train.colonne-media';
 const BATCH = 200;
@@ -23,10 +23,10 @@ export class MediaStore {
 
 	constructor(
 		private fetch: Fetch,
-		private archivio: Archivio | null = defaultStorage()
+		private storage: KeyValueStore | null = defaultStorage()
 	) {
-		this.#read(archivio?.getItem(KEY) ?? null);
-		alCambioDi(KEY, (v) => this.#read(v));
+		this.#read(storage?.getItem(KEY) ?? null);
+		onChangeOf(KEY, (v) => this.#read(v));
 	}
 
 	/** Details of a file: undefined while unknown, null when it has none. */
@@ -97,7 +97,7 @@ export class MediaStore {
 	#write(next: Record<string, MediaKey[]>): void {
 		this.#chosen = next;
 		try {
-			this.archivio?.setItem(KEY, JSON.stringify(next));
+			this.storage?.setItem(KEY, JSON.stringify(next));
 		} catch {
 			// Storage denied: choices last for this session.
 		}
@@ -109,7 +109,7 @@ function cacheKey(e: Entry): string {
 	return `${e.path.toLowerCase()}|${e.modified ?? ''}|${e.size}`;
 }
 
-function defaultStorage(): Archivio | null {
+function defaultStorage(): KeyValueStore | null {
 	try {
 		return typeof localStorage === 'undefined' ? null : localStorage;
 	} catch {

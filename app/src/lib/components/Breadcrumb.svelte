@@ -1,125 +1,125 @@
 <script lang="ts">
 	import type { TabsStore } from '../stores/tabs.svelte';
-	import { briciole, eVirtuale, nomeDi, nomePosizione } from '../posizioni';
+	import { breadcrumbs, isVirtual, nameOf, locationName } from '../locations';
 
-	const DUPLICATES_STOP = '::duplicati';
+	const DUPLICATES_STOP = '::duplicates';
 
 	let {
 		store,
-		inModifica = $bindable(false),
-		onindirizzo = undefined,
-		onvai = undefined,
-		oncerca = undefined,
-		bersaglio = null,
-		ramo = null,
-		chiusura = null,
-		onchiudi = undefined,
-		fermata = null,
-		onfermata = undefined
+		editing = $bindable(false),
+		onaddress = undefined,
+		ongo = undefined,
+		onsearch = undefined,
+		dropTarget = null,
+		branchInfo = null,
+		lockIn = null,
+		onlock = undefined,
+		stop = null,
+		onstop = undefined
 	}: {
 		store: TabsStore;
-		/** La barra mostra il campo di testo invece delle stazioni. */
-		inModifica?: boolean;
-		/** L'utente ha scritto un indirizzo e premuto Invio. */
-		onindirizzo?: (testo: string) => void;
-		/** Clic su una stazione: porta direttamente a quella cartella. */
-		onvai?: (path: string) => void;
-		/** Il pulsante di ricerca accanto all'indirizzo, come in Esplora. */
-		oncerca?: () => void;
-		/** Cartella sopra cui passa un trascinamento. */
-		bersaglio?: string | null;
+		/** The bar shows the text field instead of the stations. */
+		editing?: boolean;
+		/** The user typed an address and pressed Enter. */
+		onaddress?: (text: string) => void;
+		/** Click on a station: goes straight to that folder. */
+		ongo?: (path: string) => void;
+		/** The search button next to the address, as in Explorer. */
+		onsearch?: () => void;
+		/** Folder a drag is passing over. */
+		dropTarget?: string | null;
 		/** Git branch of the open folder, with commits to push and to pull. */
-		ramo?: { branch: string; ahead: number; behind: number } | null;
+		branchInfo?: { branch: string; ahead: number; behind: number } | null;
 		/** Time left before the open vault locks itself, as shown («4:52»). */
-		chiusura?: string | null;
+		lockIn?: string | null;
 		/** Locks the open vault now. */
-		onchiudi?: () => void;
+		onlock?: () => void;
 		/** An extra last stop set by the page (disk cleanup), and how to leave it. */
-		fermata?: string | null;
-		onfermata?: () => void;
+		stop?: string | null;
+		onstop?: () => void;
 	} = $props();
 
-	let titoloRamo = $derived(
-		ramo
+	let branchTitle = $derived(
+		branchInfo
 			? [
-					`Ramo git ${ramo.branch}`,
-					ramo.ahead ? `${ramo.ahead} commit da inviare` : '',
-					ramo.behind ? `${ramo.behind} da ricevere` : ''
+					`Ramo git ${branchInfo.branch}`,
+					branchInfo.ahead ? `${branchInfo.ahead} commit da inviare` : '',
+					branchInfo.behind ? `${branchInfo.behind} da ricevere` : ''
 				]
 					.filter(Boolean)
 					.join(', ')
 			: ''
 	);
 
-	let percorso = $derived(store.activeTab?.path ?? '');
+	let currentPath = $derived(store.activeTab?.path ?? '');
 	// Duplicates and folder comparison are one more stop after their folder: clicking the folder goes back to it.
-	let fermataExtra = $derived(
-		fermata ?? (store.activeTab?.duplicati
+	let extraStop = $derived(
+		stop ?? (store.activeTab?.duplicates
 			? 'Duplicati'
-			: store.activeTab?.confronto
-				? `Confronto con ${nomePosizione(store.activeTab.confronto.altro)}`
-				: store.activeTab?.archivio
-					? [nomeDi(store.activeTab.archivio.file), ...store.activeTab.archivio.dentro.split('/').filter(Boolean)].join(' › ')
-					: store.activeTab?.etichetta
-					? `Etichetta ${store.activeTab.etichetta}`
-					: store.activeTab?.spazio
+			: store.activeTab?.comparison
+				? `Confronto con ${locationName(store.activeTab.comparison.other)}`
+				: store.activeTab?.archive
+					? [nameOf(store.activeTab.archive.file), ...store.activeTab.archive.inner.split('/').filter(Boolean)].join(' › ')
+					: store.activeTab?.label
+					? `Etichetta ${store.activeTab.label}`
+					: store.activeTab?.space
 						? 'Spazio'
 						: null)
 	);
-	let stazioni = $derived(
-		fermataExtra ? [...briciole(percorso), { nome: fermataExtra, path: DUPLICATES_STOP }] : briciole(percorso)
+	let stations = $derived(
+		extraStop ? [...breadcrumbs(currentPath), { name: extraStop, path: DUPLICATES_STOP }] : breadcrumbs(currentPath)
 	);
-	let campo = $state<HTMLInputElement | null>(null);
-	let linea = $state<HTMLDivElement | null>(null);
+	let field = $state<HTMLInputElement | null>(null);
+	let line = $state<HTMLDivElement | null>(null);
 
-	// Un percorso più lungo della barra mostra la sua fine, come Esplora: la
-	// stazione che conta è quella in cui ti trovi, non la radice.
-	// Anche quando cambia la larghezza delle stazioni: un tema con un altro
-	// carattere o una finestra stretta spostano la fine fuori vista.
+	// A path longer than the bar shows its end, like Explorer: the
+	// station that matters is the one you are at, not the root.
+	// Also when the width of the stations changes: a theme with another
+	// font or a narrow window push the end out of view.
 	$effect(() => {
-		stazioni;
-		const l = linea;
+		stations;
+		const l = line;
 		if (!l) return;
-		const allaFine = () => (l.scrollLeft = l.scrollWidth);
-		allaFine();
+		const toEnd = () => (l.scrollLeft = l.scrollWidth);
+		toEnd();
 		if (typeof ResizeObserver === 'undefined') return;
-		const osserva = new ResizeObserver(allaFine);
-		osserva.observe(l);
-		for (const figlio of l.children) osserva.observe(figlio);
-		return () => osserva.disconnect();
+		const observer = new ResizeObserver(toEnd);
+		observer.observe(l);
+		for (const child of l.children) observer.observe(child);
+		return () => observer.disconnect();
 	});
 
-	/** Le posizioni virtuali si scrivono col loro nome, non con `::pc`. */
-	let testoCampo = $derived(eVirtuale(percorso) ? nomePosizione(percorso) : percorso);
+	/** Virtual locations are written with their name, not with `::pc`. */
+	let fieldText = $derived(isVirtual(currentPath) ? locationName(currentPath) : currentPath);
 
 	$effect(() => {
-		if (!inModifica || !campo) return;
-		campo.focus();
-		campo.select();
+		if (!editing || !field) return;
+		field.focus();
+		field.select();
 	});
 
-	function conferma() {
-		const testo = campo?.value.trim() ?? '';
-		inModifica = false;
-		if (testo !== '' && testo !== testoCampo) onindirizzo?.(testo);
+	function submitAddress() {
+		const text = field?.value.trim() ?? '';
+		editing = false;
+		if (text !== '' && text !== fieldText) onaddress?.(text);
 	}
 
 	let id = $derived(store.activeId);
 
-	function vaiA(path: string) {
+	function goTo(path: string) {
 		if (id === null || path === DUPLICATES_STOP) return;
-		if (path === percorso) {
-			if (fermata) onfermata?.();
-			else if (store.activeTab?.spazio) void store.impostaSpazio(id, false);
-			else if (fermataExtra) void store.fermaRicerca(id);
+		if (path === currentPath) {
+			if (stop) onstop?.();
+			else if (store.activeTab?.space) void store.setSpace(id, false);
+			else if (extraStop) void store.stopSearch(id);
 			return;
 		}
-		if (onvai) onvai(path);
+		if (ongo) ongo(path);
 		else store.navigate(id, path);
 	}
 </script>
 
-<div class="barra">
+<div class="bar">
 	<button
 		class="nav"
 		disabled={!store.activeTab || store.activeTab.historyIndex === 0}
@@ -134,82 +134,82 @@
 	>
 	<button class="nav" onclick={() => id !== null && store.goUp(id)} aria-label="Su"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.5" /></svg></button>
 
-	<!-- Mappa della linea: ogni cartella è una stazione, l'ultima è dove ti
-	     trovi. Il tracciato che le unisce è lo stesso percorso che hai fatto
-	     per arrivare qui. -->
-	{#if inModifica}
+	<!-- Line map: every folder is a station, the last one is where you
+	     are. The track joining them is the same route you took
+	     to get here. -->
+	{#if editing}
 		<input
-			class="indirizzo"
-			bind:this={campo}
-			value={testoCampo}
+			class="address"
+			bind:this={field}
+			value={fieldText}
 			spellcheck="false"
 			autocomplete="off"
 			aria-label="Indirizzo"
 			onkeydown={(e) => {
 				e.stopPropagation();
-				if (e.key === 'Enter') conferma();
-				else if (e.key === 'Escape') inModifica = false;
+				if (e.key === 'Enter') submitAddress();
+				else if (e.key === 'Escape') editing = false;
 			}}
-			onblur={() => (inModifica = false)}
+			onblur={() => (editing = false)}
 		/>
 	{:else}
-		<!-- Il clic sullo spazio libero della linea apre il campo, come in
-		     Esplora: le stazioni fermano l'evento perché portano altrove. -->
+		<!-- A click on the free space of the line opens the field, as in
+		     Explorer: the stations stop the event because they lead elsewhere. -->
 		<div
-			class="linea"
-			bind:this={linea}
+			class="line"
+			bind:this={line}
 			role="button"
 			tabindex="-1"
 			aria-label="Modifica l'indirizzo"
-			onclick={() => (inModifica = true)}
-			onkeydown={(e) => e.key === 'Enter' && (inModifica = true)}
+			onclick={() => (editing = true)}
+			onkeydown={(e) => e.key === 'Enter' && (editing = true)}
 		>
-			{#each stazioni as s, i (s.path)}
+			{#each stations as s, i (s.path)}
 				<button
-					class="stazione"
-					class:capolinea={i === stazioni.length - 1}
-					class:bersaglio={bersaglio === s.path}
-					data-cartella={eVirtuale(s.path) || s.path === DUPLICATES_STOP ? undefined : s.path}
+					class="station"
+					class:terminus={i === stations.length - 1}
+					class:drop-target={dropTarget === s.path}
+					data-folder={isVirtual(s.path) || s.path === DUPLICATES_STOP ? undefined : s.path}
 					onclick={(e) => {
 						e.stopPropagation();
-						vaiA(s.path);
+						goTo(s.path);
 					}}
-					aria-current={i === stazioni.length - 1 ? 'location' : undefined}
+					aria-current={i === stations.length - 1 ? 'location' : undefined}
 				>
-					<span class="nodo"></span>
-					<span class="nome">{s.nome}</span>
+					<span class="node"></span>
+					<span class="name">{s.name}</span>
 				</button>
 			{/each}
 		</div>
 	{/if}
 
-	{#if chiusura && !inModifica}
-		<button class="chiusura" onclick={onchiudi} title="La cassaforte si chiude da sola. Premi per chiuderla adesso."
-			>si chiude fra {chiusura}</button
+	{#if lockIn && !editing}
+		<button class="lock-in" onclick={onlock} title="La cassaforte si chiude da sola. Premi per chiuderla adesso."
+			>si chiude fra {lockIn}</button
 		>
 	{/if}
 
-	{#if ramo && !inModifica}
-		<span class="ramo" title={titoloRamo}
-			><span class="ramo-nodo" aria-hidden="true"></span><span class="ramo-nome">{ramo.branch}</span
-			>{#if ramo.ahead}<span class="conta">↑{ramo.ahead}</span>{/if}{#if ramo.behind}<span class="conta">↓{ramo.behind}</span>{/if}</span
+	{#if branchInfo && !editing}
+		<span class="branch" title={branchTitle}
+			><span class="branch-node" aria-hidden="true"></span><span class="branch-name">{branchInfo.branch}</span
+			>{#if branchInfo.ahead}<span class="count">↑{branchInfo.ahead}</span>{/if}{#if branchInfo.behind}<span class="count">↓{branchInfo.behind}</span>{/if}</span
 		>
 	{/if}
 
-	{#if oncerca}
-		<button class="cerca" onclick={oncerca} title="Cerca (Ctrl+F)">
+	{#if onsearch}
+		<button class="search" onclick={onsearch} title="Cerca (Ctrl+F)">
 			<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
 				<circle cx="6.5" cy="6.5" r="4.5" fill="none" stroke="currentColor" stroke-width="1.4" />
 				<path d="M10 10l4 4" stroke="currentColor" stroke-width="1.4" />
 			</svg>
-			Cerca in {stazioni[stazioni.length - 1]?.nome ?? ''}
+			Cerca in {stations[stations.length - 1]?.name ?? ''}
 		</button>
 	{/if}
 </div>
 
 <style>
 	/* Git branch: a route sign after the last stop, outlined in rail metal. */
-	.ramo {
+	.branch {
 		flex: none;
 		display: inline-flex;
 		align-items: center;
@@ -221,11 +221,11 @@
 		border-radius: 11px;
 		color: var(--text);
 		font-family: var(--font-display);
-		font-size: calc(11px * var(--scala-testo, 1));
+		font-size: calc(11px * var(--text-scale, 1));
 		letter-spacing: 0.04em;
 		font-variant-numeric: tabular-nums;
 	}
-	.chiusura {
+	.lock-in {
 		flex: none;
 		height: 22px;
 		padding: 0 9px;
@@ -234,30 +234,30 @@
 		background: transparent;
 		color: var(--signal, #ffb454);
 		font-family: var(--font-display);
-		font-size: calc(11px * var(--scala-testo, 1));
+		font-size: calc(11px * var(--text-scale, 1));
 		font-variant-numeric: tabular-nums;
 		cursor: default;
 	}
-	.chiusura:hover {
+	.lock-in:hover {
 		background: var(--row-hover);
 	}
-	.ramo-nome {
+	.branch-name {
 		overflow: hidden;
 		white-space: nowrap;
 		text-overflow: ellipsis;
 	}
-	.ramo-nodo {
+	.branch-node {
 		flex: none;
 		width: 6px;
 		height: 6px;
 		border-radius: 50%;
-		background: var(--in-linea, #22c55e);
+		background: var(--online, #22c55e);
 	}
-	.conta {
+	.count {
 		flex: none;
 		color: var(--text-dim);
 	}
-	.barra {
+	.bar {
 		display: flex;
 		align-items: center;
 		gap: 4px;
@@ -275,8 +275,8 @@
 		height: 28px;
 		border: none;
 		border-radius: var(--radius-sm);
-		clip-path: var(--forma-sm, none);
-		mask: var(--maschera-sm, none);
+		clip-path: var(--shape-sm, none);
+		mask: var(--mask-sm, none);
 		background: transparent;
 		color: var(--text-dim);
 		cursor: default;
@@ -288,7 +288,7 @@
 	.nav:disabled {
 		opacity: 0.3;
 	}
-	.linea {
+	.line {
 		display: flex;
 		align-items: center;
 		align-self: stretch;
@@ -297,21 +297,21 @@
 		flex: 1;
 		cursor: text;
 	}
-	.indirizzo {
+	.address {
 		flex: 1;
 		height: 28px;
 		margin-left: 10px;
 		padding: 0 10px;
 		border: 1px solid var(--accent);
 		border-radius: var(--radius-sm);
-		clip-path: var(--forma-sm, none);
-		mask: var(--maschera-sm, none);
+		clip-path: var(--shape-sm, none);
+		mask: var(--mask-sm, none);
 		background: var(--bg);
 		color: var(--text);
 		font: inherit;
 		outline: none;
 	}
-	.cerca {
+	.search {
 		display: flex;
 		align-items: center;
 		gap: 8px;
@@ -320,8 +320,8 @@
 		padding: 0 10px;
 		border: 1px solid var(--border);
 		border-radius: var(--radius-sm);
-		clip-path: var(--forma-sm, none);
-		mask: var(--maschera-sm, none);
+		clip-path: var(--shape-sm, none);
+		mask: var(--mask-sm, none);
 		background: var(--bg);
 		color: var(--text-dim);
 		font: inherit;
@@ -332,14 +332,14 @@
 		cursor: text;
 		flex-shrink: 0;
 	}
-	.cerca:hover {
+	.search:hover {
 		border-color: var(--text-dim);
 	}
-	.stazione.bersaglio {
+	.station.drop-target {
 		color: var(--current);
 	}
 
-	.stazione {
+	.station {
 		display: flex;
 		align-items: center;
 		gap: 6px;
@@ -353,11 +353,11 @@
 		cursor: default;
 	}
 
-	/* Il tratto di binario che collega questa stazione alla precedente. */
-	.stazione + .stazione {
+	/* The stretch of rail joining this station to the previous one. */
+	.station + .station {
 		padding-left: 18px;
 	}
-	.stazione + .stazione::before {
+	.station + .station::before {
 		content: '';
 		position: absolute;
 		left: 0;
@@ -367,8 +367,8 @@
 		background: var(--rail-metal);
 	}
 
-	/* Nodi tondi, come le fermate della barra laterale. */
-	.nodo {
+	/* Round nodes, like the sidebar stops. */
+	.node {
 		width: 6px;
 		height: 6px;
 		flex-shrink: 0;
@@ -376,28 +376,28 @@
 		background: var(--rail-metal);
 	}
 
-	.stazione:hover {
+	.station:hover {
 		color: var(--text);
 	}
-	.stazione:hover .nodo {
+	.station:hover .node {
 		background: var(--plasma);
 	}
 
-	/* Dove ti trovi adesso: nodo acceso e nome in chiaro. */
-	.capolinea {
+	/* Where you are now: lit node and name in full. */
+	.terminus {
 		color: var(--text);
 	}
-	.capolinea .nome {
+	.terminus .name {
 		font-weight: 600;
 	}
-	.capolinea .nodo {
+	.terminus .node {
 		width: 8px;
 		height: 8px;
 		background: var(--current);
 		box-shadow: 0 0 0 3px color-mix(in srgb, var(--current) 20%, transparent);
 	}
-	/* L'ultimo tratto, quello che arriva dove sei, porta la corrente. */
-	.capolinea.stazione::before {
+	/* The last stretch, the one reaching where you are, carries the current. */
+	.terminus.station::before {
 		height: 2px;
 		margin-top: -0.5px;
 		background: linear-gradient(90deg, var(--plasma), var(--current));

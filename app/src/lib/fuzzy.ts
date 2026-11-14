@@ -1,46 +1,47 @@
 export interface Match {
 	score: number;
-	/** Indici dei caratteri del nome che corrispondono alla query. */
+	/** Indices of the name's characters that match the query. */
 	positions: number[];
 }
 
-/** Il carattere continua la catena iniziata dal precedente. */
-const BONUS_CATENA = 16;
-/** Il carattere apre una parola: dopo un separatore o su maiuscola camelCase. */
-const BONUS_INIZIO_PAROLA = 10;
-/** Il match parte dal primo carattere del nome. */
-const BONUS_PRIMO_CARATTERE = 8;
-/** Il nome coincide esattamente con la query. */
-const BONUS_ESATTO = 50;
+/** The character continues the chain started by the previous one. */
+const CHAIN_BONUS = 16;
+/** The character opens a word: after a separator or on a camelCase capital. */
+const WORD_START_BONUS = 10;
+/** The match starts from the name's first character. */
+const FIRST_CHAR_BONUS = 8;
+/** The name matches the query exactly. */
+const EXACT_BONUS = 50;
 
-const PENALITA_SALTO = 1;
-/** Oltre questa soglia i salti non peggiorano più: un nome lungo non è un errore. */
-const PENALITA_SALTO_MAX = 20;
+const GAP_PENALTY = 1;
+/** Past this threshold gaps make it no worse: a long name is not a mistake. */
+const MAX_GAP_PENALTY = 20;
 
-const SEPARATORI = new Set(['_', '-', '.', ' ', '(', ')', '[', ']']);
+const SEPARATORS = new Set(['_', '-', '.', ' ', '(', ')', '[', ']']);
 
-function inizioParola(target: string, i: number): boolean {
+function wordStart(target: string, i: number): boolean {
 	if (i === 0) return true;
 
-	const prec = target[i - 1];
-	if (SEPARATORI.has(prec)) return true;
+	const prev = target[i - 1];
+	if (SEPARATORS.has(prev)) return true;
 
-	// camelCase: minuscola seguita da maiuscola.
+	// camelCase: lowercase followed by uppercase.
 	const cur = target[i];
-	const precMinuscola = prec === prec.toLowerCase() && prec !== prec.toUpperCase();
-	const curMaiuscola = cur === cur.toUpperCase() && cur !== cur.toLowerCase();
-	return precMinuscola && curMaiuscola;
+	const prevLower = prev === prev.toLowerCase() && prev !== prev.toUpperCase();
+	const curUpper = cur === cur.toUpperCase() && cur !== cur.toLowerCase();
+	return prevLower && curUpper;
 }
 
 /**
- * Cerca `query` dentro `target` come sottosequenza, dal primo carattere utile.
+ * Looks for `query` inside `target` as a subsequence, from the first useful
+ * character.
  *
- * La scansione è greedy: prende sempre la prima occorrenza disponibile invece
- * di esplorare tutte le combinazioni. Per nomi di file — corti e con
- * separatori chiari — dà lo stesso risultato di una ricerca esaustiva a una
- * frazione del costo, e resta sotto il millisecondo su migliaia di voci.
+ * The scan is greedy: it always takes the first available occurrence
+ * instead of exploring every combination. For file names — short and with
+ * clear separators — it gives the same result as an exhaustive search at a
+ * fraction of the cost, and stays under a millisecond over thousands of items.
  *
- * Restituisce `null` se i caratteri non ci sono, o non nell'ordine giusto.
+ * Returns `null` when the characters are not there, or not in the right order.
  */
 export function fuzzyMatch(query: string, target: string): Match | null {
 	if (query === '') return { score: 0, positions: [] };
@@ -50,61 +51,58 @@ export function fuzzyMatch(query: string, target: string): Match | null {
 
 	const positions: number[] = [];
 	let score = 0;
-	let da = 0;
-	let saltati = 0;
-	let precedente = -2;
+	let from = 0;
+	let skipped = 0;
+	let previous = -2;
 
-	for (const carattere of q) {
-		const trovato = t.indexOf(carattere, da);
-		if (trovato === -1) return null;
+	for (const char of q) {
+		const found = t.indexOf(char, from);
+		if (found === -1) return null;
 
-		saltati += trovato - da;
+		skipped += found - from;
 
-		if (trovato === precedente + 1) score += BONUS_CATENA;
-		if (inizioParola(target, trovato)) score += BONUS_INIZIO_PAROLA;
-		if (trovato === 0) score += BONUS_PRIMO_CARATTERE;
+		if (found === previous + 1) score += CHAIN_BONUS;
+		if (wordStart(target, found)) score += WORD_START_BONUS;
+		if (found === 0) score += FIRST_CHAR_BONUS;
 
-		positions.push(trovato);
-		precedente = trovato;
-		da = trovato + 1;
+		positions.push(found);
+		previous = found;
+		from = found + 1;
 	}
 
-	score -= Math.min(saltati * PENALITA_SALTO, PENALITA_SALTO_MAX);
-	if (t === q) score += BONUS_ESATTO;
+	score -= Math.min(skipped * GAP_PENALTY, MAX_GAP_PENALTY);
+	if (t === q) score += EXACT_BONUS;
 
 	return { score, positions };
 }
 
-export interface Risultato<T> {
+export interface FilterResult<T> {
 	item: T;
 	positions: number[];
 }
 
 /**
- * Filtra e riordina per pertinenza. A parità di punteggio vince il nome più
- * corto: fra due match equivalenti, quello che "riempie" meglio la query.
+ * Filters and reorders by relevance. With equal scores the shorter name
+ * wins: between two equivalent matches, the one that «fills» the query best.
  *
- * Con query vuota restituisce tutto nell'ordine originale — cioè quello
- * deciso da Rust, cartelle prima.
+ * With an empty query it returns everything in the original order — that
+ * is the one Rust decided, folders first.
  */
-export function filterEntries<T extends { name: string }>(
-	entries: T[],
-	query: string
-): Risultato<T>[] {
+export function filterEntries<T extends { name: string }>(entries: T[], query: string): FilterResult<T>[] {
 	if (query.trim() === '') {
 		return entries.map((item) => ({ item, positions: [] }));
 	}
 
-	const trovati: Array<Risultato<T> & { score: number }> = [];
+	const found: Array<FilterResult<T> & { score: number }> = [];
 
 	for (const item of entries) {
 		const m = fuzzyMatch(query, item.name);
 		if (m !== null) {
-			trovati.push({ item, positions: m.positions, score: m.score });
+			found.push({ item, positions: m.positions, score: m.score });
 		}
 	}
 
-	trovati.sort((a, b) => b.score - a.score || a.item.name.length - b.item.name.length);
+	found.sort((a, b) => b.score - a.score || a.item.name.length - b.item.name.length);
 
-	return trovati.map(({ item, positions }) => ({ item, positions }));
+	return found.map(({ item, positions }) => ({ item, positions }));
 }

@@ -1,9 +1,9 @@
 <script lang="ts">
 	import type { Entry } from '../ipc';
 	import { iconFor, categoryFor, folderIcon, drawnFolder, type FolderStyle } from '../icons';
-	import type { IconeStore } from '../stores/icone.svelte';
-	import type { Colonne } from '../stores/impostazioni.svelte';
-	import { grigliaColonne, descriviTipo } from '../colonne';
+	import type { IconsStore } from '../stores/icons.svelte';
+	import type { Columns } from '../stores/settings.svelte';
+	import { columnsGrid, describeType } from '../columns';
 	import { formatMedia, MEDIA_COLUMNS } from '../media';
 	import type { GitMark, MediaProps } from '../ipc';
 
@@ -13,184 +13,184 @@
 		conflict: { letter: '!', label: 'In conflitto' },
 		ignored: { letter: '', label: 'Ignorato da git' }
 	};
-	import { byte, senzaEstensione, estensione } from '../posizioni';
-	import { testoCrescita, type Crescita } from '../crescita';
-	import { seTrascina, hoverSelect, cancelHoverSelect } from '../trascina';
+	import { formatBytes, withoutExtension, extension } from '../locations';
+	import { growthText, type Growth } from '../growth';
+	import { onDrag, hoverSelect, cancelHoverSelect } from '../drag';
 
 	let {
 		entry,
 		selected = false,
 		positions = undefined,
 		renaming = false,
-		tagliato = false,
-		icone = undefined,
-		colonne = { dimensione: true, data: true, tipo: false },
-		nascondiEstensione = false,
-		cartella = undefined,
-		colore = undefined,
-		quota = undefined,
-		crescita = undefined,
-		altezza = 32,
-		bersaglio = false,
-		peso = undefined,
-		oncalcola = undefined,
+		cut = false,
+		icons = undefined,
+		columns = { size: true, date: true, type: false },
+		hideExtension = false,
+		folder = undefined,
+		color = undefined,
+		share = undefined,
+		growth = undefined,
+		height = 32,
+		dropTarget = false,
+		folderSize = undefined,
+		oncompute = undefined,
 		onactivate,
-		unClic = false,
+		singleClick = false,
 		folderStyle = 'windows',
 		onselect,
 		oncontext = undefined,
 		onrename = undefined,
 		oncancelrename = undefined,
-		ontrascina = undefined,
+		ondrag = undefined,
 		media = undefined,
 		git = undefined,
-		conRegole = false
+		hasRules = false
 	}: {
 		entry: Entry;
 		selected?: boolean;
-		/** Indici dei caratteri trovati dalla ricerca, da evidenziare. */
+		/** Indices of the characters found by the search, to highlight. */
 		positions?: number[];
-		/** La riga mostra un campo di testo al posto del nome. */
+		/** The row shows a text field in place of the name. */
 		renaming?: boolean;
-		/** L'elemento è negli appunti in modalità taglia: si mostra sbiadito. */
-		tagliato?: boolean;
-		/** Cache di icone e miniature. Assente = si usano i glifi interni. */
-		icone?: IconeStore;
-		colonne?: Colonne;
-		/** Mostra il nome senza estensione, come Esplora con l'opzione predefinita. */
-		nascondiEstensione?: boolean;
-		/** Cartella da mostrare accanto al nome: risultati di ricerca, Cestino. */
-		cartella?: string;
-		/** Colore scelto dall'utente per questa cartella. */
-		colore?: string;
+		/** The item is on the clipboard in cut mode: it is shown faded. */
+		cut?: boolean;
+		/** Cache of icons and thumbnails. Absent = the built-in glyphs are used. */
+		icons?: IconsStore;
+		columns?: Columns;
+		/** Shows the name without extension, like Explorer with the default option. */
+		hideExtension?: boolean;
+		/** Folder to show next to the name: search results, Recycle Bin. */
+		folder?: string;
+		/** Colour the user picked for this folder. */
+		color?: string;
 		/** Space view: this item's share of the largest one (0–1), drawn as a bar. */
-		quota?: number;
+		share?: number;
 		/** Space view: how much the folder grew since an earlier day. */
-		crescita?: Crescita;
-		/** Altezza della riga in pixel: deve coincidere con quella della lista. */
-		altezza?: number;
-		/** Un trascinamento sta passando sopra questa cartella. */
-		bersaglio?: boolean;
-		/** Dimensione calcolata di una cartella, o `calcolo` mentre la si legge. */
-		peso?: number | 'calcolo';
-		/** Presente quando la dimensione delle cartelle si calcola a richiesta. */
-		oncalcola?: (e: Entry) => void;
+		growth?: Growth;
+		/** Row height in pixels: must match the list's. */
+		height?: number;
+		/** A drag is passing over this folder. */
+		dropTarget?: boolean;
+		/** Computed size of a folder, or `computing` while it is being read. */
+		folderSize?: number | 'computing';
+		/** Present when folder sizes are computed on request. */
+		oncompute?: (e: Entry) => void;
 		onactivate: (e: Entry) => void;
-		/** Apre con un clic, come l'opzione di Esplora; il doppio clic non serve più. */
-		unClic?: boolean;
+		/** Opens with one click, like the Explorer option; double click is no longer needed. */
+		singleClick?: boolean;
 		/** How the theme draws folders. */
 		folderStyle?: FolderStyle;
-		onselect: (e: Entry, modificatori: { ctrl?: boolean; shift?: boolean }) => void;
-		oncontext?: (e: Entry, evento: MouseEvent) => void;
-		onrename?: (e: Entry, nuovoNome: string) => void;
+		onselect: (e: Entry, modifiers: { ctrl?: boolean; shift?: boolean }) => void;
+		oncontext?: (e: Entry, event: MouseEvent) => void;
+		onrename?: (e: Entry, newName: string) => void;
 		oncancelrename?: () => void;
-		/** Il puntatore è partito trascinando questa voce. */
-		ontrascina?: (e: Entry) => void;
+		/** The pointer started dragging this item. */
+		ondrag?: (e: Entry) => void;
 		/** Photo/video/music details for the media columns. */
 		media?: MediaProps | null;
 		/** How git sees this item, inside a repository. */
 		git?: GitMark;
 		/** The folder has automatic rules. */
-		conRegole?: boolean;
+		hasRules?: boolean;
 	} = $props();
 
-	let nascosta = $derived(nascondiEstensione && entry.kind !== 'dir' && estensione(entry.name) !== '');
-	let nomeMostrato = $derived(nascosta ? senzaEstensione(entry.name) : entry.name);
+	let hidden = $derived(hideExtension && entry.kind !== 'dir' && extension(entry.name) !== '');
+	let shownName = $derived(hidden ? withoutExtension(entry.name) : entry.name);
 
-	// Sola lettura della cache: nessuna richiesta parte da qui. Se ne occupa
-	// FileList a scorrimento fermo. La miniatura vince sull'icona di tipo;
-	// finché non c'è nessuna delle due resta il glifo interno, così la riga
-	// non lampeggia mai vuota mentre si scorre.
-	let drawn = $derived(drawnFolder(entry, colore, folderStyle));
-	let immagine = $derived(
-		drawn ? null : icone ? icone.miniatura(entry) || icone.icona(entry) : null
+	// Read-only access to the cache: no request starts from here. FileList
+	// takes care of it once scrolling stops. The thumbnail wins over the type icon;
+	// until neither is there the built-in glyph stays, so the row
+	// never flashes empty while scrolling.
+	let drawn = $derived(drawnFolder(entry, color, folderStyle));
+	let image = $derived(
+		drawn ? null : icons ? icons.thumbnail(entry) || icons.icon(entry) : null
 	);
 
-	let campo = $state<HTMLInputElement | null>(null);
+	let field = $state<HTMLInputElement | null>(null);
 
 	/**
-	 * La conferma può arrivare due volte per lo stesso campo: premendo Invio
-	 * il campo viene smontato, e lo smontaggio scatena a sua volta `blur`.
-	 * Senza questa guardia la seconda chiamata ripete la rinomina e fallisce
-	 * contro il file appena creato dalla prima.
+	 * Confirmation can arrive twice for the same field: pressing Enter
+	 * unmounts the field, and the unmount in turn fires `blur`.
+	 * Without this guard the second call repeats the rename and fails
+	 * against the file the first one just created.
 	 */
-	let inviato = false;
+	let submitted = false;
 
 	$effect(() => {
-		if (!renaming || !campo) return;
-		inviato = false;
-		campo.focus();
-		// Seleziona il nome ma non l'estensione: rinominare di solito
-		// significa cambiare il nome, non il tipo di file.
-		const punto = nomeMostrato.lastIndexOf('.');
-		const fine = entry.kind === 'dir' || punto <= 0 || nascosta ? nomeMostrato.length : punto;
-		campo.setSelectionRange(0, fine);
+		if (!renaming || !field) return;
+		submitted = false;
+		field.focus();
+		// Selects the name but not the extension: renaming usually
+		// means changing the name, not the file type.
+		const dot = shownName.lastIndexOf('.');
+		const end = entry.kind === 'dir' || dot <= 0 || hidden ? shownName.length : dot;
+		field.setSelectionRange(0, end);
 	});
 
-	function conferma() {
-		if (inviato) return;
-		inviato = true;
+	function confirmRename() {
+		if (submitted) return;
+		submitted = true;
 
-		const scritto = campo?.value ?? '';
-		// Con l'estensione nascosta si modifica solo il nome: l'estensione
-		// torna in coda da sola, e il tipo del file non cambia per sbaglio.
-		const valore = nascosta && scritto.trim() !== '' ? `${scritto}.${estensione(entry.name)}` : scritto;
-		if (valore === entry.name || scritto.trim() === '') oncancelrename?.();
-		else onrename?.(entry, valore);
+		const typed = field?.value ?? '';
+		// With the extension hidden only the name is edited: the extension
+		// goes back on the end by itself, and the file type never changes by mistake.
+		const value = hidden && typed.trim() !== '' ? `${typed}.${extension(entry.name)}` : typed;
+		if (value === entry.name || typed.trim() === '') oncancelrename?.();
+		else onrename?.(entry, value);
 	}
 
-	function annulla() {
-		if (inviato) return;
-		inviato = true;
+	function cancelRename() {
+		if (submitted) return;
+		submitted = true;
 		oncancelrename?.();
 	}
 
 	/** Content search: the found line split around the match (code points, as Rust counts them). */
-	let frammento = $derived.by(() => {
+	let snippet = $derived.by(() => {
 		const s = entry.snippet;
 		if (!s) return null;
 		const c = Array.from(s.text);
 		return {
-			prima: c.slice(0, s.at).join(''),
-			trovato: c.slice(s.at, s.at + s.len).join(''),
-			dopo: c.slice(s.at + s.len).join('')
+			before: c.slice(0, s.at).join(''),
+			found: c.slice(s.at, s.at + s.len).join(''),
+			after: c.slice(s.at + s.len).join('')
 		};
 	});
 
 	/**
-	 * Spezza il nome in tratti evidenziati e non. Senza posizioni restituisce
-	 * un tratto unico: il rendering resta identico a prima della ricerca.
+	 * Splits the name into highlighted and plain spans. Without positions it returns
+	 * a single span: rendering stays identical to before the search.
 	 */
-	function segmenti(nome: string, pos: number[] | undefined) {
-		if (!pos || pos.length === 0) return [{ testo: nome, forte: false }];
+	function segments(name: string, pos: number[] | undefined) {
+		if (!pos || pos.length === 0) return [{ text: name, strong: false }];
 
 		const set = new Set(pos);
-		const out: Array<{ testo: string; forte: boolean }> = [];
+		const out: Array<{ text: string; strong: boolean }> = [];
 
-		for (let i = 0; i < nome.length; i++) {
-			const forte = set.has(i);
-			const ultimo = out[out.length - 1];
-			if (ultimo && ultimo.forte === forte) ultimo.testo += nome[i];
-			else out.push({ testo: nome[i], forte });
+		for (let i = 0; i < name.length; i++) {
+			const strong = set.has(i);
+			const last = out[out.length - 1];
+			if (last && last.strong === strong) last.text += name[i];
+			else out.push({ text: name[i], strong });
 		}
 
 		return out;
 	}
 
-	let tratti = $derived(segmenti(nomeMostrato, positions));
+	let spans = $derived(segments(shownName, positions));
 
-	function dimensione(e: Entry): string {
-		if (e.libero !== undefined) return `${byte(e.libero)} liberi`;
+	function sizeText(e: Entry): string {
+		if (e.free !== undefined) return `${formatBytes(e.free)} liberi`;
 		if (e.kind === 'dir') return '—';
-		return byte(e.size);
+		return formatBytes(e.size);
 	}
 
-	/** Quota occupata del disco, per la barretta sotto il nome. */
-	let occupato = $derived(
-		entry.totale && entry.libero !== undefined ? 1 - entry.libero / entry.totale : null
+	/** Used share of the drive, for the small bar under the name. */
+	let used = $derived(
+		entry.total && entry.free !== undefined ? 1 - entry.free / entry.total : null
 	);
 
-	function data(e: Entry): string {
+	function formatDate(e: Entry): string {
 		if (e.modified === null) return '';
 		return new Date(e.modified).toLocaleString('it-IT', {
 			day: '2-digit',
@@ -205,32 +205,32 @@
 <div
 	class="row"
 	class:selected
-	class:tagliato
-	class:bersaglio
-	class:ignorato={git === 'ignored'}
+	class:cut
+	class:drop-target={dropTarget}
+	class:ignored={git === 'ignored'}
 	role="row"
 	tabindex="-1"
-	style:grid-template-columns={grigliaColonne(colonne)}
-	style:height="{altezza}px"
+	style:grid-template-columns={columnsGrid(columns)}
+	style:height="{height}px"
 	data-category={entry.kind === 'dir' ? 'dir' : categoryFor(entry.name)}
-	data-cartella={entry.kind === 'dir' ? entry.path : undefined}
-	data-voce={entry.path}
+	data-folder={entry.kind === 'dir' ? entry.path : undefined}
+	data-item={entry.path}
 	onmousedown={(e) => {
-		// La riga si prende da qualsiasi punto; il campo della rinomina no,
-		// lì si seleziona il testo.
-		if (ontrascina && !(e.target as HTMLElement).closest('input')) seTrascina(e, () => ontrascina(entry));
+		// The row can be grabbed from any point; the rename field cannot,
+		// there you select text.
+		if (ondrag && !(e.target as HTMLElement).closest('input')) onDrag(e, () => ondrag(entry));
 	}}
 	onmouseenter={(e) => {
 		// An item already selected stays as is: passing over it must not undo a multiple selection.
-		if (unClic && !selected && !renaming) hoverSelect(e, () => onselect(entry, {}));
+		if (singleClick && !selected && !renaming) hoverSelect(e, () => onselect(entry, {}));
 	}}
 	onmouseleave={cancelHoverSelect}
-	ondblclick={() => !unClic && onactivate(entry)}
+	ondblclick={() => !singleClick && onactivate(entry)}
 	onclick={(e) => {
 		cancelHoverSelect();
 		onselect(entry, { ctrl: e.ctrlKey, shift: e.shiftKey });
-		// Con Ctrl o Maiusc si sta selezionando, non aprendo.
-		if (unClic && !e.ctrlKey && !e.shiftKey) onactivate(entry);
+		// With Ctrl or Shift you are selecting, not opening.
+		if (singleClick && !e.ctrlKey && !e.shiftKey) onactivate(entry);
 	}}
 	oncontextmenu={(e) => {
 		e.preventDefault();
@@ -247,45 +247,45 @@
 				>{GIT_LETTER[git].letter}</span
 			>{/if}
 		{#if drawn}
-			<span class="cartella-disegnata" class:cartella-colorata={colore}>{@html folderIcon(drawn, colore ?? 'var(--folder, var(--accent))')}</span>
-		{:else if immagine}
-			<img src={immagine} alt="" draggable="false" />
+			<span class="drawn-folder" class:colored-folder={color}>{@html folderIcon(drawn, color ?? 'var(--folder, var(--accent))')}</span>
+		{:else if image}
+			<img src={image} alt="" draggable="false" />
 		{:else}
 			{@html iconFor(entry)}
 		{/if}
 	</span>
 	{#if renaming}
 		<input
-			class="rinomina"
-			bind:this={campo}
+			class="rename-field"
+			bind:this={field}
 			type="text"
-			value={nomeMostrato}
+			value={shownName}
 			spellcheck="false"
 			autocomplete="off"
 			aria-label="Nuovo nome"
 			onclick={(e) => e.stopPropagation()}
 			ondblclick={(e) => e.stopPropagation()}
-			onblur={conferma}
+			onblur={confirmRename}
 			onkeydown={(e) => {
 				e.stopPropagation();
-				if (e.key === 'Enter') conferma();
-				else if (e.key === 'Escape') annulla();
+				if (e.key === 'Enter') confirmRename();
+				else if (e.key === 'Escape') cancelRename();
 			}}
 		/>
 	{:else}
-		<span class="nome-blocco" class:con-frammento={frammento}>
-			{#if colore && entry.kind !== 'dir'}<span class="etichetta-colore" style:background={colore} aria-hidden="true"></span>{/if}
+		<span class="name-block" class:with-snippet={snippet}>
+			{#if color && entry.kind !== 'dir'}<span class="color-label" style:background={color} aria-hidden="true"></span>{/if}
 			<span class="name" title={entry.name}
-				>{#each tratti as t, i (i)}{#if t.forte}<mark>{t.testo}</mark>{:else}{t.testo}{/if}{/each}</span
+				>{#each spans as t, i (i)}{#if t.strong}<mark>{t.text}</mark>{:else}{t.text}{/if}{/each}</span
 			>
-			{#if crescita}<span
-					class="crescita"
-					class:giu={crescita.delta < 0}
-					class:ferma={testoCrescita(crescita.delta, byte) === '='}
-					title="Dal {new Date(crescita.dal).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}"
-					>{testoCrescita(crescita.delta, byte)}</span
+			{#if growth}<span
+					class="growth"
+					class:down={growth.delta < 0}
+					class:flat={growthText(growth.delta, formatBytes) === '='}
+					title="Dal {new Date(growth.since).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}"
+					>{growthText(growth.delta, formatBytes)}</span
 				>{/if}
-			{#if conRegole}<span class="con-regole" title="Ha regole automatiche" aria-label="Ha regole automatiche"
+			{#if hasRules}<span class="has-rules" title="Ha regole automatiche" aria-label="Ha regole automatiche"
 					><svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"
 						><path d="M13 6.5A5 5 0 0 0 3.6 5M3 9.5A5 5 0 0 0 12.4 11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /><path
 							d="M3.4 2.4 3.6 5l2.6-.3M12.6 13.6l-.2-2.6-2.6.3"
@@ -297,53 +297,53 @@
 						/></svg
 					></span
 				>{/if}
-			{#if cartella}<span class="cartella" title={cartella}>{cartella}</span>{/if}
-			{#if frammento && entry.snippet}
-				<span class="frammento" title={entry.snippet.text}
-					><span class="riga-num">{entry.snippet.line}</span>{frammento.prima}<mark>{frammento.trovato}</mark
-					>{frammento.dopo}{#if entry.snippet.more > 0}<span class="altre"
+			{#if folder}<span class="folder-hint" title={folder}>{folder}</span>{/if}
+			{#if snippet && entry.snippet}
+				<span class="snippet" title={entry.snippet.text}
+					><span class="line-num">{entry.snippet.line}</span>{snippet.before}<mark>{snippet.found}</mark
+					>{snippet.after}{#if entry.snippet.more > 0}<span class="more"
 							>+{entry.snippet.more} {entry.snippet.more === 1 ? 'altra riga' : 'altre righe'}</span
 						>{/if}</span
 				>
 			{/if}
-			{#if quota !== undefined}
-				<span class="riempimento quota"
-					><span style:width="{Math.max(1, Math.round(quota * 100))}%"
-						>{#if crescita && crescita.parte > 0 && testoCrescita(crescita.delta, byte) !== '='}<em style:width="{Math.round(crescita.parte * 100)}%"></em>{/if}</span
+			{#if share !== undefined}
+				<span class="fill share"
+					><span style:width="{Math.max(1, Math.round(share * 100))}%"
+						>{#if growth && growth.share > 0 && growthText(growth.delta, formatBytes) !== '='}<em style:width="{Math.round(growth.share * 100)}%"></em>{/if}</span
 					></span
 				>
 			{/if}
-			{#if occupato !== null}
-				<span class="riempimento" class:pieno={occupato > 0.9}
-					><span style:width="{Math.round(occupato * 100)}%"></span></span
+			{#if used !== null}
+				<span class="fill" class:full={used > 0.9}
+					><span style:width="{Math.round(used * 100)}%"></span></span
 				>
 			{/if}
 		</span>
 	{/if}
-	{#if colonne.tipo}<span class="tipo">{descriviTipo(entry)}</span>{/if}
-	{#if colonne.dimensione}
+	{#if columns.type}<span class="type">{describeType(entry)}</span>{/if}
+	{#if columns.size}
 		<span class="size">
-			{#if entry.kind === 'dir' && entry.libero === undefined && peso === 'calcolo'}
-				<span class="calcolo" role="img" aria-label="Calcolo della dimensione"></span>
-			{:else if entry.kind === 'dir' && entry.libero === undefined && typeof peso === 'number'}
-				{byte(peso)}
-			{:else if entry.kind === 'dir' && entry.libero === undefined && oncalcola}
+			{#if entry.kind === 'dir' && entry.free === undefined && folderSize === 'computing'}
+				<span class="computing" role="img" aria-label="Calcolo della dimensione"></span>
+			{:else if entry.kind === 'dir' && entry.free === undefined && typeof folderSize === 'number'}
+				{formatBytes(folderSize)}
+			{:else if entry.kind === 'dir' && entry.free === undefined && oncompute}
 				<button
-					class="calcola"
+					class="compute"
 					onclick={(e) => {
 						e.stopPropagation();
-						oncalcola(entry);
+						oncompute(entry);
 					}}
 					ondblclick={(e) => e.stopPropagation()}>Calcola</button
 				>
 			{:else}
-				{dimensione(entry)}
+				{sizeText(entry)}
 			{/if}
 		</span>
 	{/if}
-	{#if colonne.data}<span class="date">{data(entry)}</span>{/if}
-	{#each colonne.media ?? [] as k (k)}
-		<span class="media" class:destra={MEDIA_COLUMNS.find((m) => m.key === k)?.right}>{formatMedia(k, media)}</span>
+	{#if columns.date}<span class="date">{formatDate(entry)}</span>{/if}
+	{#each columns.media ?? [] as k (k)}
+		<span class="media" class:right={MEDIA_COLUMNS.find((m) => m.key === k)?.right}>{formatMedia(k, media)}</span>
 	{/each}
 </div>
 
@@ -355,42 +355,42 @@
 		padding: 0 12px;
 		gap: 8px;
 		border-radius: var(--radius-sm);
-		clip-path: var(--forma-sm, none);
-		mask: var(--maschera-sm, none);
+		clip-path: var(--shape-sm, none);
+		mask: var(--mask-sm, none);
 		cursor: default;
 		color: var(--text);
-		font-size: calc(13px * var(--scala-testo, 1));
+		font-size: calc(13px * var(--text-scale, 1));
 		user-select: none;
 	}
 	.row:hover {
 		background: var(--row-hover);
 	}
-	.row.tagliato {
+	.row.cut {
 		opacity: 0.45;
 	}
 	.row.selected {
 		background: var(--accent-soft);
 	}
-	/* Cartella su cui si sta per rilasciare: il binario si accende. */
-	.row.bersaglio {
+	/* Folder about to be dropped on: the rail lights up. */
+	.row.drop-target {
 		background: color-mix(in srgb, var(--current) 14%, transparent);
 		box-shadow: inset 0 0 0 1px var(--current);
 	}
-	.nome-blocco {
+	.name-block {
 		display: flex;
 		align-items: baseline;
 		gap: 10px;
 		min-width: 0;
 		position: relative;
 	}
-	.con-regole {
+	.has-rules {
 		display: inline-flex;
 		flex: none;
 		align-self: center;
 		color: var(--text-dim);
 	}
 	/* Colour label on a file: a dot before the name, as on the sidebar stops. */
-	.etichetta-colore {
+	.color-label {
 		flex: none;
 		align-self: center;
 		width: 8px;
@@ -399,47 +399,47 @@
 		border-radius: 50%;
 	}
 	/* Content search: the found line goes on a second line under the name. */
-	.nome-blocco.con-frammento {
+	.name-block.with-snippet {
 		flex-wrap: wrap;
 		row-gap: 0;
 	}
-	.frammento {
+	.snippet {
 		flex-basis: 100%;
 		min-width: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		color: var(--text-dim);
-		font-size: calc(11.5px * var(--scala-testo, 1));
+		font-size: calc(11.5px * var(--text-scale, 1));
 	}
-	.riga-num,
-	.altre {
+	.line-num,
+	.more {
 		font-family: var(--font-display);
 		font-variant-numeric: tabular-nums;
 	}
-	.riga-num {
+	.line-num {
 		margin-right: 6px;
 	}
-	.altre {
+	.more {
 		margin-left: 8px;
 	}
 	/* The folder hint gives way first: the name is what the row is about. */
-	.cartella {
+	.folder-hint {
 		flex-shrink: 100;
 		min-width: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		color: var(--text-dim);
-		font-size: calc(11px * var(--scala-testo, 1));
+		font-size: calc(11px * var(--text-scale, 1));
 	}
-	.tipo {
+	.type {
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		color: var(--text-dim);
 	}
-	.riempimento {
+	.fill {
 		position: absolute;
 		left: 0;
 		right: 40%;
@@ -449,41 +449,41 @@
 		background: var(--border);
 		overflow: hidden;
 	}
-	.riempimento span {
+	.fill span {
 		display: block;
 		height: 100%;
 		background: var(--current);
 	}
 	/* Space view: the same bar as the drives, in the current's plasma-to-cyan. */
-	.riempimento.quota span {
+	.fill.share span {
 		background: linear-gradient(90deg, var(--plasma, var(--accent)), var(--current));
 	}
 	/* The part that is new since the baseline, at the bar's end. */
-	.riempimento.quota span {
+	.fill.share span {
 		display: flex;
 		justify-content: flex-end;
 	}
-	.riempimento.quota em {
+	.fill.share em {
 		display: block;
 		height: 100%;
 		background: var(--signal, #ffb454);
 	}
-	.crescita {
+	.growth {
 		order: 9;
 		margin-left: auto;
 		flex: none;
 		font-family: var(--font-ui);
-		font-size: calc(12px * var(--scala-testo, 1));
+		font-size: calc(12px * var(--text-scale, 1));
 		font-variant-numeric: tabular-nums;
 		color: var(--signal, #ffb454);
 	}
-	.crescita.giu {
-		color: var(--in-linea, #22c55e);
+	.growth.down {
+		color: var(--online, #22c55e);
 	}
-	.crescita.ferma {
+	.growth.flat {
 		color: var(--text-dim);
 	}
-	.riempimento.pieno span {
+	.fill.full span {
 		background: #ff5f6e;
 	}
 	.name {
@@ -491,7 +491,7 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
-	.rinomina {
+	.rename-field {
 		width: 100%;
 		height: 24px;
 		padding: 0 6px;
@@ -503,15 +503,15 @@
 		outline: none;
 	}
 
-	/* Solo colore e peso: nessun cambio di dimensione, la riga resta 32px. */
+	/* Only colour and weight: no size change, the row stays 32px. */
 	.name :global(mark),
-	.frammento mark {
+	.snippet mark {
 		background: transparent;
 		color: var(--accent);
 		font-weight: 600;
 	}
-	/* Testo secondario: carattere del corpo, non quello dei titoli (che il
-	   tema può cambiare). Cifre tabellari perché le colonne restino in fila. */
+	/* Secondary text: the body font, not the heading one (which the
+	   theme can change). Tabular figures so the columns stay in line. */
 	/* Git mark: a signal letter hung on the icon's left edge, so the grid stays put. */
 	.icon {
 		position: relative;
@@ -524,7 +524,7 @@
 		width: 10px;
 		text-align: center;
 		font-family: var(--font-display);
-		font-size: calc(10.5px * var(--scala-testo, 1));
+		font-size: calc(10.5px * var(--text-scale, 1));
 		font-weight: 600;
 		line-height: 1;
 	}
@@ -532,12 +532,12 @@
 		color: var(--signal, #ffb454);
 	}
 	.git.new {
-		color: var(--in-linea, #22c55e);
+		color: var(--online, #22c55e);
 	}
 	.git.conflict {
 		color: var(--lamp-red, #ff5f6e);
 	}
-	.row.ignorato > :not(.media) {
+	.row.ignored > :not(.media) {
 		opacity: 0.45;
 	}
 	.media {
@@ -546,7 +546,7 @@
 		white-space: nowrap;
 		color: var(--text-dim);
 	}
-	.media.destra {
+	.media.right {
 		font-family: var(--font-display);
 		font-variant-numeric: tabular-nums;
 		text-align: right;
@@ -557,8 +557,8 @@
 		font-variant-numeric: tabular-nums;
 		text-align: right;
 	}
-	/* La cartella si sta pesando: un tratto di binario con la corrente che passa. */
-	.calcolo {
+	/* The folder is being weighed: a stretch of rail with the current running. */
+	.computing {
 		display: inline-block;
 		width: 30px;
 		height: 3px;
@@ -567,16 +567,16 @@
 		background: linear-gradient(90deg, var(--rail-metal), var(--current), var(--rail-metal)) 0 0 / 200% 100%;
 	}
 	@media (prefers-reduced-motion: no-preference) {
-		.calcolo {
-			animation: pesa 1.4s linear infinite;
+		.computing {
+			animation: weigh 1.4s linear infinite;
 		}
 	}
-	@keyframes pesa {
+	@keyframes weigh {
 		to {
 			background-position: -200% 0;
 		}
 	}
-	.calcola {
+	.compute {
 		padding: 0;
 		border: none;
 		background: none;
@@ -586,7 +586,7 @@
 		text-underline-offset: 2px;
 		cursor: default;
 	}
-	.calcola:hover {
+	.compute:hover {
 		color: var(--text);
 	}
 	.icon {
@@ -595,7 +595,7 @@
 		justify-content: center;
 		color: var(--text-dim);
 	}
-	.cartella-disegnata {
+	.drawn-folder {
 		display: flex;
 		width: 20px;
 		height: 18px;
@@ -607,7 +607,7 @@
 		border-radius: 3px;
 	}
 
-	/* La categoria colora l'icona: differenziazione visiva senza secondo glifo. */
+	/* The category colours the icon: visual distinction without a second glyph. */
 	.row[data-category='dir'] .icon {
 		color: var(--folder, var(--accent));
 	}

@@ -1,145 +1,145 @@
 <script lang="ts">
-	import Icona from './Icona.svelte';
-	import { DATE, PESI, TIPI, filtriAttivi, type Filtri } from '../filtri';
+	import Icon from './Icon.svelte';
+	import { DATES, SIZES, TYPES, filtersActive, type Filters } from '../filters';
 	let {
 		query,
-		risultati,
-		totale,
-		posizione,
+		results,
+		total,
+		position,
 		onchange,
 		onclose,
-		sottocartelle = false,
-		contenuto = false,
-		cercando = false,
-		ontogglesottocartelle = undefined,
-		ontogglecontenuto = undefined,
-		filtri = undefined,
-		onfiltri = undefined,
-		onsalva = undefined
+		subfolders = false,
+		content = false,
+		searching = false,
+		ontogglesubfolders = undefined,
+		ontogglecontent = undefined,
+		filters = undefined,
+		onfilters = undefined,
+		onsave = undefined
 	}: {
 		query: string;
-		risultati: number;
-		totale: number;
-		/** Indice 1-based della voce selezionata fra i risultati. */
-		posizione: number;
+		results: number;
+		total: number;
+		/** 1-based index of the selected item among the results. */
+		position: number;
 		onchange: (q: string) => void;
 		onclose: () => void;
-		/** Cerca in tutte le sottocartelle invece di filtrare quella aperta. */
-		sottocartelle?: boolean;
-		/** Cerca il testo anche dentro i file (solo con le sottocartelle). */
-		contenuto?: boolean;
-		/** Una ricerca nelle sottocartelle è ancora in corso. */
-		cercando?: boolean;
-		ontogglesottocartelle?: () => void;
-		ontogglecontenuto?: () => void;
+		/** Searches all subfolders instead of filtering the open one. */
+		subfolders?: boolean;
+		/** Also searches the text inside files (only with subfolders). */
+		content?: boolean;
+		/** A subfolder search is still running. */
+		searching?: boolean;
+		ontogglesubfolders?: () => void;
+		ontogglecontent?: () => void;
 		/** Smart folder filters (subfolder search only). */
-		filtri?: Filtri;
-		onfiltri?: (f: Filtri) => void;
+		filters?: Filters;
+		onfilters?: (f: Filters) => void;
 		/** Keeps this search as a stop in the sidebar. */
-		onsalva?: () => void;
+		onsave?: () => void;
 	} = $props();
 
-	let filtriAperti = $state(false);
-	let conFiltri = $derived(!!filtri && filtriAttivi(filtri));
+	let filtersOpen = $state(false);
+	let hasFilters = $derived(!!filters && filtersActive(filters));
 
 	/** Picks one value of a filter group; picking it again clears it. */
-	function scegli<K extends keyof Filtri>(chiave: K, valore: Filtri[K]) {
-		if (!filtri || !onfiltri) return;
-		onfiltri({ ...filtri, [chiave]: filtri[chiave] === valore ? null : valore });
+	function pick<K extends keyof Filters>(key: K, value: Filters[K]) {
+		if (!filters || !onfilters) return;
+		onfilters({ ...filters, [key]: filters[key] === value ? null : value });
 	}
 
-	let campo = $state<HTMLInputElement | null>(null);
+	let field = $state<HTMLInputElement | null>(null);
 
 	$effect(() => {
-		campo?.focus();
-		campo?.select();
+		field?.focus();
+		field?.select();
 	});
 </script>
 
-<div class="ricerca">
-	<span class="lente" aria-hidden="true">⌕</span>
+<div class="search">
+	<span class="magnifier" aria-hidden="true">⌕</span>
 
 	<input
-		bind:this={campo}
+		bind:this={field}
 		type="text"
 		value={query}
-		placeholder={sottocartelle ? 'Cerca in tutte le sottocartelle…' : 'Filtra in questa cartella…'}
+		placeholder={subfolders ? 'Cerca in tutte le sottocartelle…' : 'Filtra in questa cartella…'}
 		spellcheck="false"
 		autocomplete="off"
 		aria-label="Filtra i file in questa cartella"
 		oninput={(e) => onchange(e.currentTarget.value)}
 	/>
 
-	<span class="conteggio" class:vuoto={query !== '' && risultati === 0}>
-		{#if sottocartelle && cercando}
-			{risultati} trovati, ricerca in corso…
-		{:else if sottocartelle && query !== ''}
-			{risultati === 0 ? 'nessun risultato' : `${risultati} trovati`}
+	<span class="counter" class:empty={query !== '' && results === 0}>
+		{#if subfolders && searching}
+			{results} trovati, ricerca in corso…
+		{:else if subfolders && query !== ''}
+			{results === 0 ? 'nessun risultato' : `${results} trovati`}
 		{:else if query === ''}
-			{totale} elementi
-		{:else if risultati === 0}
+			{total} elementi
+		{:else if results === 0}
 			nessun risultato
 		{:else}
-			{posizione} di {risultati}
+			{position} di {results}
 		{/if}
 	</span>
 
-	{#if ontogglesottocartelle}
+	{#if ontogglesubfolders}
 		<button
-			class="opzione"
-			class:accesa={sottocartelle}
-			aria-pressed={sottocartelle}
-			onclick={ontogglesottocartelle}
+			class="option"
+			class:on={subfolders}
+			aria-pressed={subfolders}
+			onclick={ontogglesubfolders}
 			title="Cerca anche nelle sottocartelle">Sottocartelle</button
 		>
 	{/if}
-	{#if ontogglecontenuto && sottocartelle}
+	{#if ontogglecontent && subfolders}
 		<button
-			class="opzione"
-			class:accesa={contenuto}
-			aria-pressed={contenuto}
-			onclick={ontogglecontenuto}
+			class="option"
+			class:on={content}
+			aria-pressed={content}
+			onclick={ontogglecontent}
 			title="Cerca il testo anche dentro i file">Contenuto</button
 		>
 	{/if}
-	{#if onfiltri && sottocartelle}
+	{#if onfilters && subfolders}
 		<button
-			class="opzione"
-			class:accesa={filtriAperti || conFiltri}
-			aria-pressed={filtriAperti}
-			aria-expanded={filtriAperti}
-			onclick={() => (filtriAperti = !filtriAperti)}
+			class="option"
+			class:on={filtersOpen || hasFilters}
+			aria-pressed={filtersOpen}
+			aria-expanded={filtersOpen}
+			onclick={() => (filtersOpen = !filtersOpen)}
 			title="Filtra per tipo, peso e data">Filtri</button
 		>
 	{/if}
-	{#if onsalva && sottocartelle && (query.trim() !== '' || conFiltri)}
-		<button class="opzione" onclick={onsalva} title="Tieni questa ricerca nella barra laterale">Salva ricerca</button>
+	{#if onsave && subfolders && (query.trim() !== '' || hasFilters)}
+		<button class="option" onclick={onsave} title="Tieni questa ricerca nella barra laterale">Salva ricerca</button>
 	{/if}
-	<button onclick={onclose} aria-label="Chiudi la ricerca"><Icona nome="chiudi" /></button>
+	<button onclick={onclose} aria-label="Chiudi la ricerca"><Icon name="close" /></button>
 </div>
-{#if filtri && onfiltri && sottocartelle && (filtriAperti || conFiltri)}
-	<div class="filtri" role="group" aria-label="Filtri">
-		<span class="gruppo-filtri">
-			<span class="nome-filtro">Tipo</span>
-			{#each TIPI as t (t.id)}
-				<button class="opzione" class:accesa={filtri.tipo === t.id} aria-pressed={filtri.tipo === t.id} onclick={() => scegli('tipo', t.id)}
-					>{t.nome}</button
+{#if filters && onfilters && subfolders && (filtersOpen || hasFilters)}
+	<div class="filters" role="group" aria-label="Filtri">
+		<span class="filter-group">
+			<span class="filter-name">Tipo</span>
+			{#each TYPES as t (t.id)}
+				<button class="option" class:on={filters.type === t.id} aria-pressed={filters.type === t.id} onclick={() => pick('type', t.id)}
+					>{t.name}</button
 				>
 			{/each}
 		</span>
-		<span class="gruppo-filtri">
-			<span class="nome-filtro">Peso</span>
-			{#each PESI as p (p.id)}
-				<button class="opzione" class:accesa={filtri.peso === p.id} aria-pressed={filtri.peso === p.id} onclick={() => scegli('peso', p.id)}
-					>{p.nome}</button
+		<span class="filter-group">
+			<span class="filter-name">Peso</span>
+			{#each SIZES as p (p.id)}
+				<button class="option" class:on={filters.size === p.id} aria-pressed={filters.size === p.id} onclick={() => pick('size', p.id)}
+					>{p.name}</button
 				>
 			{/each}
 		</span>
-		<span class="gruppo-filtri">
-			<span class="nome-filtro">Modificati</span>
-			{#each DATE as d (d.id)}
-				<button class="opzione" class:accesa={filtri.data === d.id} aria-pressed={filtri.data === d.id} onclick={() => scegli('data', d.id)}
-					>{d.nome}</button
+		<span class="filter-group">
+			<span class="filter-name">Modificati</span>
+			{#each DATES as d (d.id)}
+				<button class="option" class:on={filters.date === d.id} aria-pressed={filters.date === d.id} onclick={() => pick('date', d.id)}
+					>{d.name}</button
 				>
 			{/each}
 		</span>
@@ -147,7 +147,7 @@
 {/if}
 
 <style>
-	.ricerca {
+	.search {
 		display: flex;
 		align-items: center;
 		gap: 8px;
@@ -157,9 +157,9 @@
 		border-bottom: 1px solid var(--border);
 		flex-shrink: 0;
 	}
-	.lente {
+	.magnifier {
 		color: var(--text-dim);
-		font-size: calc(15px * var(--scala-testo, 1));
+		font-size: calc(15px * var(--text-scale, 1));
 	}
 	input {
 		flex: 1;
@@ -174,13 +174,13 @@
 	input::placeholder {
 		color: var(--text-dim);
 	}
-	.conteggio {
+	.counter {
 		color: var(--text-dim);
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
 	}
-	.conteggio.vuoto {
-		color: var(--errore-testo);
+	.counter.empty {
+		color: var(--error-text);
 	}
 	button {
 		width: 24px;
@@ -189,26 +189,26 @@
 		border-radius: 6px;
 		background: transparent;
 		color: var(--text-dim);
-		font-size: calc(15px * var(--scala-testo, 1));
+		font-size: calc(15px * var(--text-scale, 1));
 		cursor: default;
 	}
 	button:hover {
 		background: var(--row-hover);
 		color: var(--text);
 	}
-	.opzione {
+	.option {
 		width: auto;
 		padding: 0 8px;
 		font: inherit;
-		font-size: calc(12px * var(--scala-testo, 1));
+		font-size: calc(12px * var(--text-scale, 1));
 		border: 1px solid var(--border);
 	}
-	.opzione.accesa {
+	.option.on {
 		border-color: var(--current);
 		color: var(--current);
 	}
 	/* Smart folder filters: a second row of chip groups under the search field. */
-	.filtri {
+	.filters {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 6px 20px;
@@ -216,22 +216,22 @@
 		background: var(--surface);
 		border-bottom: 1px solid var(--border);
 	}
-	.gruppo-filtri {
+	.filter-group {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
 		gap: 4px;
 	}
-	.nome-filtro {
+	.filter-name {
 		margin-right: 4px;
 		color: var(--text-dim);
 		font-family: var(--font-display);
-		font-size: calc(10px * var(--scala-testo, 1));
+		font-size: calc(10px * var(--text-scale, 1));
 		font-weight: 600;
 		letter-spacing: 0.16em;
 		text-transform: uppercase;
 	}
-	.filtri .opzione {
+	.filters .option {
 		height: 24px;
 	}
 </style>

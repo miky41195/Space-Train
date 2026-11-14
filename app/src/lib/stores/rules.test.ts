@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import type { Entry, Esito, TransferOpts } from '../ipc';
+import type { Entry, CopyOutcome, TransferOpts } from '../ipc';
 import type { Rule } from '../rules';
 import { RulesStore, type RuleDeps } from './rules.svelte';
-import type { IdColore } from './colori.svelte';
+import type { ColorId } from './colors.svelte';
 
 const NOW = Date.UTC(2026, 10, 11, 12);
 const DAY = 86_400_000;
@@ -14,7 +14,7 @@ function storage() {
 
 /** A tiny disk: folder → files. */
 function setup(files: Record<string, Entry[]>) {
-	const labels = new Map<string, IdColore>();
+	const labels = new Map<string, ColorId>();
 	const moved: TransferOpts[] = [];
 	const trashed: string[] = [];
 	const deps: RuleDeps = {
@@ -26,11 +26,11 @@ function setup(files: Record<string, Entry[]>) {
 				const name = src.split('\\').pop()!;
 				const from = Object.keys(files).find((k) => files[k].some((e) => e.path === src))!;
 				const dest = `${opts.dest}\\${name}`;
-				if ((files[opts.dest] ?? []).some((e) => e.path === dest)) return { copiati: 0, saltati: 1, annullato: false, coppie: [] } satisfies Esito;
+				if ((files[opts.dest] ?? []).some((e) => e.path === dest)) return { copied: 0, skipped: 1, cancelled: false, pairs: [] } satisfies CopyOutcome;
 				const entry = files[from].find((e) => e.path === src)!;
 				if (opts.mode === 'move') files[from] = files[from].filter((e) => e.path !== src);
 				files[opts.dest] = [...(files[opts.dest] ?? []), { ...entry, path: dest }];
-				return { copiati: 1, saltati: 0, annullato: false, coppie: [[src, dest]] };
+				return { copied: 1, skipped: 0, cancelled: false, pairs: [[src, dest]] };
 			},
 			moveToTrash: async (paths) => void trashed.push(...paths),
 			navigate: async (p) => p.split('\\').slice(0, -1).join('\\'),

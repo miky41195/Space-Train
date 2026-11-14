@@ -1,11 +1,11 @@
-pub mod amici;
-pub mod avvio;
+pub mod friends;
+pub mod startup;
 pub mod backup;
-pub mod finestre;
+pub mod app_windows;
 pub mod fs;
 pub mod ipc;
 pub mod lan;
-pub mod osserva;
+pub mod watcher;
 #[cfg(windows)]
 pub mod registry;
 pub mod shell;
@@ -18,104 +18,104 @@ pub mod server;
 /// Not `Ctrl+Alt+E`: on Windows AltGr is Ctrl+Alt, so that hotkey swallowed
 /// AltGr+E (é, €) everywhere and popped the app up instead of typing.
 /// A combination with the Win key never produces a character.
-const SCORCIATOIA: &str = "super+shift+e";
+const SHORTCUT: &str = "super+shift+e";
 
-/// Registra [`SCORCIATOIA`] per riportare la finestra in primo piano.
+/// Registers [`SHORTCUT`] to bring the window to the front.
 ///
-/// Un fallimento non è fatale e non deve esserlo: la scorciatoia è già
-/// occupata se un'altra copia dell'app è in esecuzione o se un altro
-/// programma se l'è presa. Dichiararla nel builder faceva invece abortire
-/// l'avvio, cioè un file manager che non si apre per via di una comodità.
-fn registra_scorciatoia(app: &tauri::AppHandle) {
+/// A failure is not fatal and must not be: the shortcut is already
+/// taken if another copy of the app is running or if another
+/// program took it. Declaring it in the builder instead aborted
+/// startup, that is a file manager that does not open because of a convenience.
+fn register_shortcut(app: &tauri::AppHandle) {
     use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
-    let esito = app.global_shortcut().on_shortcut(SCORCIATOIA, |app, _, event| {
+    let outcome = app.global_shortcut().on_shortcut(SHORTCUT, |app, _, event| {
         if event.state() != ShortcutState::Pressed {
             return;
         }
-        let w = finestre::ultima(app);
+        let w = app_windows::last(app);
         let _ = w.show();
         let _ = w.unminimize();
         let _ = w.set_focus();
     });
 
-    if let Err(e) = esito {
-        eprintln!("Scorciatoia globale non disponibile, l'app parte comunque: {e}");
+    if let Err(e) = outcome {
+        eprintln!("Global shortcut unavailable, the app starts anyway: {e}");
     }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        // Per primo, come chiede il plugin: una seconda copia avviata da
-        // Windows (doppio clic su una cartella) consegna il percorso a quella
-        // già aperta e si chiude, invece di aprire un'altra finestra.
+        // First, as the plugin asks: a second copy started by Windows
+        // (double click on a folder) hands the path to the one already open
+        // and closes, instead of opening another window.
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             use tauri::Emitter;
-            let argomenti: Vec<String> = argv.into_iter().skip(1).collect();
-            // Arriva all'ultima finestra usata, come scheda nuova: con più
-            // finestre aperte sarebbe strano vederla comparire in tutte.
-            let destinataria = finestre::ultima(app);
-            if let Some(dest) = avvio::destinazione(&argomenti) {
+            let args: Vec<String> = argv.into_iter().skip(1).collect();
+            // It goes to the last window used, as a new tab: with several
+            // windows open it would be odd to see it appear in all of them.
+            let recipient = app_windows::last(app);
+            if let Some(dest) = startup::destination(&args) {
                 let _ = app.emit(
-                    "apri-percorso",
-                    serde_json::json!({ "finestra": destinataria.label(), "dest": dest }),
+                    "open-path",
+                    serde_json::json!({ "window": recipient.label(), "dest": dest }),
                 );
             }
-            let _ = destinataria.show();
-            let _ = destinataria.unminimize();
-            let _ = destinataria.set_focus();
+            let _ = recipient.show();
+            let _ = recipient.unminimize();
+            let _ = recipient.set_focus();
         }))
-        .manage(transfer::Operazioni::default())
-        .manage(finestre::Finestre::default())
-        .on_window_event(finestre::evento)
-        .manage(osserva::Osservatore::default())
+        .manage(transfer::Operations::default())
+        .manage(app_windows::AppWindows::default())
+        .on_window_event(app_windows::on_event)
+        .manage(watcher::FolderWatcher::default())
         .manage(std::sync::Arc::new(vault::Vaults::default()))
         .plugin(tauri_plugin_opener::init())
-        // Aggiornamenti dalle release di GitHub, firmati: il frontend
-        // controlla all'avvio e riavvia l'app dopo l'installazione.
+        // Updates from the GitHub releases, signed: the frontend checks at
+        // startup and restarts the app after the installation.
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
             use tauri::Manager;
-            registra_scorciatoia(app.handle());
+            register_shortcut(app.handle());
             // Files opened from a vault last at most until the next start.
             let _ = std::fs::remove_dir_all(std::env::temp_dir().join("space-train-cassaforte"));
             // Without the Windows Shell the folder picker comes from the
             // desktop (GTK or the portal), through the dialog plugin.
             #[cfg(not(windows))]
             app.handle().plugin(tauri_plugin_dialog::init())?;
-            // Chi aveva scelto Space Train come predefinito lo ritrova anche
-            // dopo un aggiornamento: fuori dal thread della finestra, il
-            // registro può essere lento.
-            // Solo nelle build di release: in sviluppo il registro finirebbe
-            // a puntare all'eseguibile di prova.
+            // Whoever had chosen Space Train as the default finds it again
+            // even after an update: off the window's thread, the registry
+            // can be slow.
+            // Only in release builds: in development the registry would end
+            // up pointing to the test executable.
             #[cfg(all(windows, not(debug_assertions)))]
             std::thread::spawn(|| {
-                if let (Ok(exe), Ok(classi)) = (std::env::current_exe(), registry::classi_utente()) {
-                    if let Ok(true) = registry::riallinea(&classi, &exe.to_string_lossy()) {
-                        registry::avvisa_shell();
+                if let (Ok(exe), Ok(classes)) = (std::env::current_exe(), registry::user_classes()) {
+                    if let Ok(true) = registry::realign(&classes, &exe.to_string_lossy()) {
+                        registry::notify_shell();
                     }
                 }
             });
-            // La rete locale parte con l'app: annunci e server restano in
-            // ascolto finché l'utente non rende invisibile questo PC.
-            let dati = app
+            // The lan starts with the app: announcements and server stay
+            // listening until the user makes this PC invisible.
+            let data = app
                 .path()
                 .app_local_data_dir()
                 .unwrap_or_else(|_| std::env::temp_dir().join("space-train"));
-            let lan = lan::Lan::avvia(app.handle().clone(), dati.clone());
-            let servers = std::sync::Arc::new(server::Servers::load(dati.join("server.json")));
+            let lan = lan::Lan::start(app.handle().clone(), data.clone());
+            let servers = std::sync::Arc::new(server::Servers::load(data.join("server.json")));
             server::install(servers.clone());
             app.manage(servers);
-            // Gli amici usano la stessa cartella condivisa e lo stesso nome
-            // della rete locale, ma viaggiano su internet, cifrati.
-            app.manage(amici::Amici::avvia(
+            // Friends use the same shared folder and the same name as the
+            // lan, but travel over the internet, encrypted.
+            app.manage(friends::Friends::start(
                 tauri::async_runtime::handle().inner().clone(),
-                dati,
+                data,
                 lan.clone(),
-                lan::avvisi_app(app.handle().clone()),
+                lan::app_notifier(app.handle().clone()),
             ));
             app.manage(lan);
             Ok(())
@@ -123,12 +123,12 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             ipc::list_dir,
             ipc::open_entry,
-            ipc::dimensione_cartella,
+            ipc::folder_size,
             ipc::cleanup_round,
             ipc::cleanup_scan,
             ipc::programs_list,
             ipc::program_uninstall,
-            ipc::turno_dimensioni,
+            ipc::size_turn,
             ipc::navigate,
             ipc::drives,
             ipc::known_folders,
@@ -162,32 +162,32 @@ pub fn run() {
             ipc::show_properties,
             ipc::open_with,
             ipc::run_as_admin,
-            ipc::scegli_cartella,
+            ipc::pick_folder,
             ipc::new_file_types,
             ipc::create_new_file,
             ipc::initial_path,
             ipc::new_window,
-            ipc::apri_editor_temi,
+            ipc::open_theme_editor,
             ipc::save_theme_image,
             ipc::read_theme_image,
-            ipc::lan_stato,
-            ipc::lan_imposta,
-            ipc::lan_pari,
-            ipc::lan_rispondi,
-            ipc::lan_apri,
-            ipc::lan_annulla_ricezione,
-            ipc::lan_prepara_trascina,
-            ipc::amici_stato,
-            ipc::amici_aggiungi,
-            ipc::amici_accetta,
-            ipc::amici_rimuovi,
-            ipc::amici_condividi,
-            ipc::amici_qr,
-            ipc::amici_backup,
-            ipc::amici_backup_ora,
-            ipc::amici_rispondi_backup,
-            transfer::lan_invia,
-            transfer::lan_scarica,
+            ipc::lan_status,
+            ipc::lan_configure,
+            ipc::lan_peers,
+            ipc::lan_respond,
+            ipc::lan_open,
+            ipc::lan_cancel_receive,
+            ipc::lan_prepare_drag,
+            ipc::friends_status,
+            ipc::friends_add,
+            ipc::friends_accept,
+            ipc::friends_remove,
+            ipc::friends_share,
+            ipc::friends_qr,
+            ipc::friends_backup,
+            ipc::friends_backup_now,
+            ipc::friends_answer_backup,
+            transfer::lan_send,
+            transfer::lan_download,
             transfer::search,
             transfer::find_duplicates,
             transfer::compare_folders,
@@ -222,7 +222,7 @@ pub fn run() {
             transfer::delete_items,
         ])
         .run(tauri::generate_context!())
-        .expect("errore durante l'avvio dell'applicazione");
+        .expect("error while starting the application");
 }
 
 #[cfg(test)]
@@ -231,7 +231,7 @@ mod tests {
 
     #[test]
     fn the_hotkey_uses_win_not_altgr() {
-        let s: Shortcut = super::SCORCIATOIA.parse().unwrap();
+        let s: Shortcut = super::SHORTCUT.parse().unwrap();
         assert_eq!(s, Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyE));
         // AltGr is Ctrl+Alt on Windows: a hotkey on it eats typed characters.
         assert!(!s.mods.contains(Modifiers::CONTROL | Modifiers::ALT));

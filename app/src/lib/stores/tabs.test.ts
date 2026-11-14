@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { TabsStore } from './tabs.svelte';
 import type { Backend, Listing, SortSpec } from '../ipc';
-import { backendFinto as backendComune } from '../test-doppi';
+import { fakeBackend as sharedFakeBackend } from '../test-doubles';
 
-/** Backend finto: risponde con voci sintetiche e latenza controllabile. */
+/** Fake backend: answers with synthetic items and controllable latency. */
 function fakeBackend(opts: { delays?: Record<string, number> } = {}): Backend {
 	return {
-		...backendComune(),
+		...sharedFakeBackend(),
 		async listDir(path: string, _sort: SortSpec): Promise<Listing> {
 			const d = opts.delays?.[path] ?? 0;
 			if (d > 0) await new Promise((r) => setTimeout(r, d));
@@ -14,7 +14,7 @@ function fakeBackend(opts: { delays?: Record<string, number> } = {}): Backend {
 				path,
 				entries: [
 					{
-						name: `file-di-${path}`,
+						name: `file-in-${path}`,
 						path: `${path}#f`,
 						kind: 'file',
 						size: 1,
@@ -52,7 +52,7 @@ function fakeBackend(opts: { delays?: Record<string, number> } = {}): Backend {
 			return [];
 		},
 		async transfer() {
-			return { copiati: 0, saltati: 0, annullato: false, coppie: [] };
+			return { copied: 0, skipped: 0, cancelled: false, pairs: [] };
 		},
 		async cancelTransfer() {
 			return true;
@@ -61,28 +61,28 @@ function fakeBackend(opts: { delays?: Record<string, number> } = {}): Backend {
 }
 
 describe('TabsStore', () => {
-	it('apre un tab e ne carica il contenuto', async () => {
+	it('opens a tab and loads its contents', async () => {
 		const s = new TabsStore(fakeBackend());
 		const id = await s.openTab('C:\\uno');
 
 		expect(s.tabs.length).toBe(1);
 		expect(s.activeTab?.id).toBe(id);
 		expect(s.activeTab?.path).toBe('C:\\uno');
-		expect(s.activeTab?.entries[0].name).toBe('file-di-C:\\uno');
+		expect(s.activeTab?.entries[0].name).toBe('file-in-C:\\uno');
 	});
 
-	it('chiude un tab e attiva il precedente', async () => {
+	it('closes a tab and activates the previous one', async () => {
 		const s = new TabsStore(fakeBackend());
-		const primo = await s.openTab('C:\\uno');
-		const secondo = await s.openTab('C:\\due');
+		const first = await s.openTab('C:\\uno');
+		const second = await s.openTab('C:\\due');
 
-		s.closeTab(secondo);
+		s.closeTab(second);
 
 		expect(s.tabs.length).toBe(1);
-		expect(s.activeTab?.id).toBe(primo);
+		expect(s.activeTab?.id).toBe(first);
 	});
 
-	it('chiudere l ultimo tab lascia la lista vuota', async () => {
+	it('closing the last tab leaves the list empty', async () => {
 		const s = new TabsStore(fakeBackend());
 		const id = await s.openTab('C:\\uno');
 
@@ -92,7 +92,7 @@ describe('TabsStore', () => {
 		expect(s.activeTab).toBeUndefined();
 	});
 
-	it('naviga indietro e avanti nella cronologia', async () => {
+	it('goes back and forward in the history', async () => {
 		const s = new TabsStore(fakeBackend());
 		const id = await s.openTab('C:\\uno');
 		await s.navigate(id, 'C:\\due');
@@ -108,7 +108,7 @@ describe('TabsStore', () => {
 		expect(s.activeTab?.path).toBe('C:\\due');
 	});
 
-	it('indietro dal primo elemento non fa niente', async () => {
+	it('back from the first entry does nothing', async () => {
 		const s = new TabsStore(fakeBackend());
 		const id = await s.openTab('C:\\uno');
 
@@ -117,7 +117,7 @@ describe('TabsStore', () => {
 		expect(s.activeTab?.path).toBe('C:\\uno');
 	});
 
-	it('navigare dopo essere tornato indietro tronca la cronologia futura', async () => {
+	it('navigating after going back cuts the forward history', async () => {
 		const s = new TabsStore(fakeBackend());
 		const id = await s.openTab('C:\\uno');
 		await s.navigate(id, 'C:\\due');
@@ -128,40 +128,40 @@ describe('TabsStore', () => {
 		expect(s.activeTab?.path).toBe('C:\\tre');
 	});
 
-	it('scarta la risposta lenta arrivata dopo una navigazione più recente', async () => {
-		const s = new TabsStore(fakeBackend({ delays: { 'C:\\lento': 50 } }));
+	it('drops the slow answer that arrives after a more recent navigation', async () => {
+		const s = new TabsStore(fakeBackend({ delays: { 'C:\\slow': 50 } }));
 		const id = await s.openTab('C:\\uno');
 
-		const lenta = s.navigate(id, 'C:\\lento');
-		await s.navigate(id, 'C:\\veloce');
-		await lenta;
+		const slow = s.navigate(id, 'C:\\slow');
+		await s.navigate(id, 'C:\\fast');
+		await slow;
 
-		expect(s.activeTab?.path).toBe('C:\\veloce');
-		expect(s.activeTab?.entries[0].name).toBe('file-di-C:\\veloce');
+		expect(s.activeTab?.path).toBe('C:\\fast');
+		expect(s.activeTab?.entries[0].name).toBe('file-in-C:\\fast');
 	});
 
-	it('la risposta scartata non entra in cronologia', async () => {
-		const s = new TabsStore(fakeBackend({ delays: { 'C:\\lento': 50 } }));
+	it('the dropped answer does not enter the history', async () => {
+		const s = new TabsStore(fakeBackend({ delays: { 'C:\\slow': 50 } }));
 		const id = await s.openTab('C:\\uno');
 
-		const lenta = s.navigate(id, 'C:\\lento');
-		await s.navigate(id, 'C:\\veloce');
-		await lenta;
+		const slow = s.navigate(id, 'C:\\slow');
+		await s.navigate(id, 'C:\\fast');
+		await slow;
 
 		await s.goBack(id);
 		expect(s.activeTab?.path).toBe('C:\\uno');
 	});
 
-	it('a caricamento finito il tab non risulta più in lettura', async () => {
+	it('once loading is done the tab is no longer reading', async () => {
 		const s = new TabsStore(fakeBackend());
 		await s.openTab('C:\\uno');
 
-		// Se resta true, tutto ciò che dipende da `loading` — i binari
-		// elettrici — resta acceso per sempre.
+		// If it stays true, everything that depends on `loading` — the
+		// electric rails — stays on forever.
 		expect(s.activeTab?.loading).toBe(false);
 	});
 
-	it('anche dopo una navigazione il caricamento si chiude', async () => {
+	it('loading also ends after a navigation', async () => {
 		const s = new TabsStore(fakeBackend());
 		const id = await s.openTab('C:\\uno');
 		await s.navigate(id, 'C:\\due');
@@ -169,37 +169,37 @@ describe('TabsStore', () => {
 		expect(s.activeTab?.loading).toBe(false);
 	});
 
-	it('reload rilegge senza allungare la cronologia', async () => {
+	it('reload reads again without lengthening the history', async () => {
 		const s = new TabsStore(fakeBackend());
 		const id = await s.openTab('C:\\uno');
 		await s.navigate(id, 'C:\\due');
-		const lunghezzaPrima = s.activeTab!.history.length;
+		const lengthBefore = s.activeTab!.history.length;
 
 		await s.reload(id);
 
 		expect(s.activeTab?.path).toBe('C:\\due');
-		expect(s.activeTab?.history.length).toBe(lunghezzaPrima);
+		expect(s.activeTab?.history.length).toBe(lengthBefore);
 	});
 
-	it('un tab nuovo nasce senza filtro di ricerca', async () => {
+	it('a new tab starts without a search filter', async () => {
 		const s = new TabsStore(fakeBackend());
 		await s.openTab('C:\\uno');
 
 		expect(s.activeTab?.query).toBe('');
 	});
 
-	it('impostare la query non ricarica la cartella', async () => {
+	it('setting the query does not reload the folder', async () => {
 		const s = new TabsStore(fakeBackend());
 		const id = await s.openTab('C:\\uno');
-		const richiestePrima = s.activeTab!.reqSeq;
+		const requestsBefore = s.activeTab!.reqSeq;
 
 		s.setQuery(id, 'cargo');
 
 		expect(s.activeTab?.query).toBe('cargo');
-		expect(s.activeTab?.reqSeq).toBe(richiestePrima);
+		expect(s.activeTab?.reqSeq).toBe(requestsBefore);
 	});
 
-	it('navigare azzera la query', async () => {
+	it('navigating clears the query', async () => {
 		const s = new TabsStore(fakeBackend());
 		const id = await s.openTab('C:\\uno');
 		s.setQuery(id, 'cargo');
@@ -209,7 +209,7 @@ describe('TabsStore', () => {
 		expect(s.activeTab?.query).toBe('');
 	});
 
-	it('clearQuery svuota il filtro', async () => {
+	it('clearQuery empties the filter', async () => {
 		const s = new TabsStore(fakeBackend());
 		const id = await s.openTab('C:\\uno');
 		s.setQuery(id, 'cargo');
@@ -219,7 +219,7 @@ describe('TabsStore', () => {
 		expect(s.activeTab?.query).toBe('');
 	});
 
-	it('un errore lascia il tab dove si trova', async () => {
+	it('an error leaves the tab where it is', async () => {
 		const backend = fakeBackend();
 		backend.listDir = async () => {
 			throw { kind: 'accessDenied' };
@@ -240,18 +240,18 @@ describe('TabsStore', () => {
 			error: null,
 			failedPath: null,
 			loading: false,
-			risultati: null,
-			cercando: false,
-			ricercaOp: null,
-			duplicati: null,
-			confronto: null,
-			etichetta: null,
-			archivio: null,
-			spazio: false
+			results: null,
+			searching: false,
+			searchOp: null,
+			duplicates: null,
+			comparison: null,
+			label: null,
+			archive: null,
+			space: false
 		});
 		s.setActive(1);
 
-		await s.navigate(1, 'C:\\vietato');
+		await s.navigate(1, 'C:\\denied');
 
 		expect(s.activeTab?.path).toBe('C:\\uno');
 		expect(s.activeTab?.error).toEqual({ kind: 'accessDenied' });

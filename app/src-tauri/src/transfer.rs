@@ -1,4 +1,4 @@
-use crate::fs::copy::{self, Esito, Politica};
+use crate::fs::copy::{self, CopyOutcome, ConflictPolicy};
 use crate::fs::error::FsError;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -7,49 +7,49 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::ipc::Channel;
 
-/// Ogni quanto al massimo si notifica il frontend. Copiare mille file
-/// piccoli produrrebbe altrimenti mille messaggi IPC al secondo, che costano
-/// più della copia stessa.
-const INTERVALLO_AVANZAMENTO: Duration = Duration::from_millis(80);
+/// How often at most the frontend is notified. Copying a thousand small
+/// files would otherwise produce a thousand IPC messages a second, which
+/// cost more than the copy itself.
+const PROGRESS_INTERVAL: Duration = Duration::from_millis(80);
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Progresso {
+pub struct Progress {
     pub transferred: u64,
     pub total: u64,
 }
 
-/// Operazioni in corso, per poterle annullare da un altro comando.
+/// Running operations, to be able to cancel them from another command.
 ///
-/// È l'unico stato che il backend conserva fra una chiamata e l'altra.
-/// Riguarda l'esecuzione, non la navigazione: la regola "Rust è stateless"
-/// nasce per tenere fuori lo stato dei tab, e resta valida lì.
+/// It is the only state the backend keeps between one call and the next.
+/// It concerns execution, not navigation: the rule "Rust is stateless"
+/// exists to keep the tabs' state out, and it still holds there.
 #[derive(Default)]
-pub struct Operazioni(Mutex<HashMap<u64, Arc<AtomicBool>>>);
+pub struct Operations(Mutex<HashMap<u64, Arc<AtomicBool>>>);
 
-impl Operazioni {
-    pub(crate) fn registra(&self, id: u64) -> Arc<AtomicBool> {
+impl Operations {
+    pub(crate) fn register(&self, id: u64) -> Arc<AtomicBool> {
         let flag = Arc::new(AtomicBool::new(false));
-        if let Ok(mut mappa) = self.0.lock() {
-            mappa.insert(id, flag.clone());
+        if let Ok(mut map) = self.0.lock() {
+            map.insert(id, flag.clone());
         }
         flag
     }
 
-    pub(crate) fn dimentica(&self, id: u64) {
-        if let Ok(mut mappa) = self.0.lock() {
-            if let Some(flag) = mappa.remove(&id) {
-                crate::fs::pausa::dimentica(&flag);
+    pub(crate) fn forget(&self, id: u64) {
+        if let Ok(mut map) = self.0.lock() {
+            if let Some(flag) = map.remove(&id) {
+                crate::fs::pause::forget(&flag);
             }
         }
     }
 
     /// Pauses or resumes a running job. False if the id is unknown.
-    fn pausa(&self, id: u64, in_pausa: bool) -> bool {
+    fn pause(&self, id: u64, paused: bool) -> bool {
         match self.0.lock() {
-            Ok(mappa) => match mappa.get(&id) {
+            Ok(map) => match map.get(&id) {
                 Some(flag) => {
-                    crate::fs::pausa::imposta(flag, in_pausa);
+                    crate::fs::pause::set(flag, paused);
                     true
                 }
                 None => false,
@@ -58,9 +58,9 @@ impl Operazioni {
         }
     }
 
-    fn annulla(&self, id: u64) -> bool {
+    fn cancel(&self, id: u64) -> bool {
         match self.0.lock() {
-            Ok(mappa) => match mappa.get(&id) {
+            Ok(map) => match map.get(&id) {
                 Some(flag) => {
                     flag.store(true, Ordering::Relaxed);
                     true
@@ -72,36 +72,36 @@ impl Operazioni {
     }
 }
 
-/// Copia o sposta `sources` dentro `dest`.
+/// Copies or moves `sources` into `dest`.
 ///
-/// Il lavoro gira su un thread dedicato: il filesystem è bloccante e
-/// terrebbe fermo l'event loop, congelando la finestra per tutta la durata.
+/// The work runs on a dedicated thread: the filesystem is blocking and
+/// would hold the event loop still, freezing the window for the whole duration.
 #[tauri::command]
 pub async fn transfer(
-    state: tauri::State<'_, Operazioni>,
+    state: tauri::State<'_, Operations>,
     op_id: u64,
     sources: Vec<String>,
     dest: String,
     mode: String,
-    policy: Politica,
-    on_progress: Channel<Progresso>,
-) -> Result<Esito, FsError> {
-    let annulla = state.registra(op_id);
-    let sposta = mode == "move";
+    policy: ConflictPolicy,
+    on_progress: Channel<Progress>,
+) -> Result<CopyOutcome, FsError> {
+    let cancel = state.register(op_id);
+    let is_move = mode == "move";
 
-    let lavoro = tauri::async_runtime::spawn_blocking(move || {
+    let work = tauri::async_runtime::spawn_blocking(move || {
         let total = copy::total_bytes(&sources);
-        let _ = on_progress.send(Progresso {
+        let _ = on_progress.send(Progress {
             transferred: 0,
             total,
         });
 
-        let mut ultimo = Instant::now();
-        let mut avanzamento = |fatti: u64| {
-            if ultimo.elapsed() >= INTERVALLO_AVANZAMENTO {
-                ultimo = Instant::now();
-                let _ = on_progress.send(Progresso {
-                    transferred: fatti,
+        let mut last = Instant::now();
+        let mut progress = |done: u64| {
+            if last.elapsed() >= PROGRESS_INTERVAL {
+                last = Instant::now();
+                let _ = on_progress.send(Progress {
+                    transferred: done,
                     total,
                 });
             }
@@ -109,66 +109,66 @@ pub async fn transfer(
 
         // Into a server: an upload. Moving copies there (the originals stay): a
         // network failure halfway must not lose anything.
-        let esito = if crate::server::is_server(&dest) {
+        let outcome = if crate::server::is_server(&dest) {
             crate::server::servers().and_then(|s| {
-                let coppie = s.upload(&sources, &dest, &annulla, &mut |fatti, _| avanzamento(fatti))?;
-                Ok(copy::Esito { copiati: coppie.len() as u64, saltati: 0, annullato: false, coppie })
+                let pairs = s.upload(&sources, &dest, &cancel, &mut |done, _| progress(done))?;
+                Ok(copy::CopyOutcome { copied: pairs.len() as u64, skipped: 0, cancelled: false, pairs })
             })
-        } else if sposta {
-            copy::move_all(&sources, &dest, policy, &annulla, &mut avanzamento)
+        } else if is_move {
+            copy::move_all(&sources, &dest, policy, &cancel, &mut progress)
         } else {
-            copy::copy_all(&sources, &dest, policy, &annulla, &mut avanzamento)
+            copy::copy_all(&sources, &dest, policy, &cancel, &mut progress)
         };
 
-        // Ultimo colpo sempre inviato: senza, la barra resterebbe ferma
-        // all'ultimo campione utile invece di chiudere a fondo scala.
-        if esito.is_ok() {
-            let _ = on_progress.send(Progresso {
+        // Last tick always sent: without it, the bar would stay stuck at the
+        // last useful sample instead of closing at full scale.
+        if outcome.is_ok() {
+            let _ = on_progress.send(Progress {
                 transferred: total,
                 total,
             });
         }
 
-        esito
+        outcome
     })
     .await;
 
-    state.dimentica(op_id);
+    state.forget(op_id);
 
-    match lavoro {
-        Ok(esito) => esito,
+    match work {
+        Ok(outcome) => outcome,
         Err(e) => Err(FsError::Io {
             message: format!("Operazione interrotta: {}", e),
         }),
     }
 }
 
-/// Nomi già presenti a destinazione. Il frontend lo chiama prima di
-/// `transfer` per sapere se deve chiedere una politica all'utente.
+/// Names already present at the destination. The frontend calls it before
+/// `transfer` to know whether it must ask the user for a policy.
 #[tauri::command]
 pub fn scan_conflicts(sources: Vec<String>, dest: String) -> Vec<String> {
     copy::scan_conflicts(&sources, &dest)
 }
 
-/// Cerca nelle sottocartelle di `root`, consegnando i risultati a lotti.
-/// Si annulla con `cancel_transfer` passando lo stesso `op_id`.
+/// Searches the subfolders of `root`, delivering the results in batches.
+/// Cancelled with `cancel_transfer` passing the same `op_id`.
 #[tauri::command]
 pub async fn search(
-    state: tauri::State<'_, Operazioni>,
+    state: tauri::State<'_, Operations>,
     op_id: u64,
     root: String,
-    criteri: crate::fs::cerca::Criteri,
+    criteria: crate::fs::search::SearchCriteria,
     on_results: Channel<Vec<crate::fs::entry::Entry>>,
 ) -> Result<usize, FsError> {
-    let annulla = state.registra(op_id);
-    let lavoro = tauri::async_runtime::spawn_blocking(move || {
-        crate::fs::cerca::cerca(&root, &criteri, &annulla, &mut |lotto| {
-            let _ = on_results.send(lotto);
+    let cancel = state.register(op_id);
+    let work = tauri::async_runtime::spawn_blocking(move || {
+        crate::fs::search::search(&root, &criteria, &cancel, &mut |batch| {
+            let _ = on_results.send(batch);
         })
     })
     .await;
-    state.dimentica(op_id);
-    lavoro.map_err(|e| FsError::Io {
+    state.forget(op_id);
+    work.map_err(|e| FsError::Io {
         message: format!("Ricerca interrotta: {}", e),
     })
 }
@@ -177,20 +177,20 @@ pub async fn search(
 /// Cancelled with `cancel_transfer` and the same `op_id`, like a search.
 #[tauri::command]
 pub async fn find_duplicates(
-    state: tauri::State<'_, Operazioni>,
+    state: tauri::State<'_, Operations>,
     op_id: u64,
     root: String,
     hidden: bool,
     on_event: Channel<crate::fs::duplicates::DuplicateEvent>,
 ) -> Result<usize, FsError> {
-    let cancel = state.registra(op_id);
+    let cancel = state.register(op_id);
     let work = tauri::async_runtime::spawn_blocking(move || {
         crate::fs::duplicates::find(&root, hidden, &cancel, &mut |ev| {
             let _ = on_event.send(ev);
         })
     })
     .await;
-    state.dimentica(op_id);
+    state.forget(op_id);
     work.map_err(|e| FsError::Io {
         message: format!("Ricerca dei duplicati interrotta: {}", e),
     })
@@ -199,106 +199,106 @@ pub async fn find_duplicates(
 /// Checksum of one file (hex), `None` if cancelled with `cancel_transfer` and the same `op_id`.
 #[tauri::command]
 pub async fn file_checksum(
-    state: tauri::State<'_, Operazioni>,
+    state: tauri::State<'_, Operations>,
     op_id: u64,
     path: String,
     algorithm: crate::fs::checksum::Algorithm,
 ) -> Result<Option<String>, FsError> {
-    let cancel = state.registra(op_id);
+    let cancel = state.register(op_id);
     let work = tauri::async_runtime::spawn_blocking(move || crate::fs::checksum::checksum(&path, algorithm, &cancel)).await;
-    state.dimentica(op_id);
+    state.forget(op_id);
     work.map_err(|e| FsError::Io { message: format!("Calcolo interrotto: {}", e) })?
 }
 
 /// Compares two folder trees. Cancelled with `cancel_transfer` and the same `op_id`.
 #[tauri::command]
 pub async fn compare_folders(
-    state: tauri::State<'_, Operazioni>,
+    state: tauri::State<'_, Operations>,
     op_id: u64,
     here: String,
     there: String,
     content: bool,
     hidden: bool,
 ) -> Result<crate::fs::compare::Comparison, FsError> {
-    let cancel = state.registra(op_id);
+    let cancel = state.register(op_id);
     let work = tauri::async_runtime::spawn_blocking(move || {
         let opts = crate::fs::compare::Options { content, hidden };
         crate::fs::compare::compare(&here, &there, &opts, &cancel)
     })
     .await;
-    state.dimentica(op_id);
+    state.forget(op_id);
     work.map_err(|e| FsError::Io { message: format!("Confronto interrotto: {}", e) })?
 }
 
-/// Esegue un lavoro lungo su archivi con barra d'avanzamento e annullamento.
-async fn con_avanzamento<T: Send + 'static>(
-    state: &Operazioni,
+/// Runs a long archive job with a progress bar and cancellation.
+async fn with_progress<T: Send + 'static>(
+    state: &Operations,
     op_id: u64,
-    totale: impl FnOnce() -> u64 + Send + 'static,
-    on_progress: Channel<Progresso>,
-    lavoro: impl FnOnce(&AtomicBool, &mut dyn FnMut(u64)) -> Result<T, FsError>
+    compute_total: impl FnOnce() -> u64 + Send + 'static,
+    on_progress: Channel<Progress>,
+    work: impl FnOnce(&AtomicBool, &mut dyn FnMut(u64)) -> Result<T, FsError>
         + Send
         + 'static,
 ) -> Result<T, FsError> {
-    let annulla = state.registra(op_id);
-    let esito = tauri::async_runtime::spawn_blocking(move || {
-        let total = totale();
-        let _ = on_progress.send(Progresso { transferred: 0, total });
-        let mut ultimo = Instant::now();
-        let mut avanzamento = |fatti: u64| {
-            if ultimo.elapsed() >= INTERVALLO_AVANZAMENTO {
-                ultimo = Instant::now();
-                let _ = on_progress.send(Progresso { transferred: fatti, total });
+    let cancel = state.register(op_id);
+    let outcome = tauri::async_runtime::spawn_blocking(move || {
+        let total = compute_total();
+        let _ = on_progress.send(Progress { transferred: 0, total });
+        let mut last = Instant::now();
+        let mut progress = |done: u64| {
+            if last.elapsed() >= PROGRESS_INTERVAL {
+                last = Instant::now();
+                let _ = on_progress.send(Progress { transferred: done, total });
             }
         };
-        let r = lavoro(&annulla, &mut avanzamento);
-        let _ = on_progress.send(Progresso { transferred: total, total });
+        let r = work(&cancel, &mut progress);
+        let _ = on_progress.send(Progress { transferred: total, total });
         r
     })
     .await;
-    state.dimentica(op_id);
-    esito.map_err(|e| FsError::Io {
+    state.forget(op_id);
+    outcome.map_err(|e| FsError::Io {
         message: format!("Operazione interrotta: {}", e),
     })?
 }
 
-/// Comprime in un nuovo ZIP dentro `dest`. Ritorna il path dell'archivio.
+/// Compresses into a new ZIP inside `dest`. Returns the archive's path.
 #[tauri::command]
 pub async fn compress(
-    state: tauri::State<'_, Operazioni>,
+    state: tauri::State<'_, Operations>,
     op_id: u64,
     sources: Vec<String>,
     dest: String,
-    on_progress: Channel<Progresso>,
+    on_progress: Channel<Progress>,
 ) -> Result<String, FsError> {
-    let per_peso = sources.clone();
-    con_avanzamento(
+    let for_size = sources.clone();
+    with_progress(
         &state,
         op_id,
-        move || copy::total_bytes(&per_peso),
+        move || copy::total_bytes(&for_size),
         on_progress,
-        move |annulla, avanza| crate::fs::archivi::comprimi(&sources, &dest, annulla, avanza),
+        move |cancel, advance| crate::fs::archives::compress(&sources, &dest, cancel, advance),
     )
     .await
 }
 
-/// Estrae l'archivio in una cartella nuova accanto. Ritorna la cartella.
+/// Extracts the archive into a new folder next to it. Returns the folder.
 #[tauri::command]
 pub async fn extract(
-    state: tauri::State<'_, Operazioni>,
+    state: tauri::State<'_, Operations>,
     op_id: u64,
     archive: String,
-    on_progress: Channel<Progresso>,
+    on_progress: Channel<Progress>,
 ) -> Result<String, FsError> {
-    let per_peso = archive.clone();
-    con_avanzamento(
+    let for_size = archive.clone();
+    with_progress(
         &state,
         op_id,
-        move || crate::fs::archive_formats::unpacked_size(&per_peso),
+        move || crate::fs::archive_formats::unpacked_size(&for_size),
         on_progress,
-        move |annulla, avanza| match crate::fs::archive_formats::format_of(&archive) {
-            Some(crate::fs::archive_formats::Format::Zip) | None => crate::fs::archivi::estrai(&archive, annulla, avanza),
-            Some(_) => crate::fs::archive_formats::extract_beside(&archive, annulla, avanza),
+        move |cancel, advance| match crate::fs::archive_formats::format_of(&archive) {
+            Some(crate::fs::archive_formats::Format::Zip) | None => crate::fs::archives::extract(&archive, cancel, advance),
+            Some(_) => crate::fs::archive_formats::extract_beside(&archive, cancel, advance),
         },
     )
     .await
@@ -315,15 +315,15 @@ pub async fn archive_list(archive: String) -> Result<Vec<crate::fs::archive_form
 /// Extracts chosen items of an archive into `dest`, with progress. Folders bring their contents.
 #[tauri::command]
 pub async fn archive_extract(
-    state: tauri::State<'_, Operazioni>,
+    state: tauri::State<'_, Operations>,
     op_id: u64,
     archive: String,
     items: Vec<String>,
     dest: String,
-    on_progress: Channel<Progresso>,
+    on_progress: Channel<Progress>,
 ) -> Result<(), FsError> {
     let for_size = (archive.clone(), items.clone());
-    con_avanzamento(
+    with_progress(
         &state,
         op_id,
         move || {
@@ -365,7 +365,7 @@ pub async fn archive_open_item(archive: String, item: String) -> Result<String, 
 #[tauri::command]
 pub async fn image_rotate(paths: Vec<String>, clockwise: bool) -> Result<(), FsError> {
     tauri::async_runtime::spawn_blocking(move || {
-        paths.iter().try_for_each(|p| crate::fs::immagini::rotate(p, clockwise))
+        paths.iter().try_for_each(|p| crate::fs::images::rotate(p, clockwise))
     })
     .await
     .map_err(|e| FsError::Io { message: e.to_string() })?
@@ -374,17 +374,17 @@ pub async fn image_rotate(paths: Vec<String>, clockwise: bool) -> Result<(), FsE
 /// Converts and resizes images into new files beside them. Progress counts files.
 #[tauri::command]
 pub async fn image_convert(
-    state: tauri::State<'_, Operazioni>,
+    state: tauri::State<'_, Operations>,
     op_id: u64,
     paths: Vec<String>,
-    target: crate::fs::immagini::Target,
+    target: crate::fs::images::Target,
     max_side: Option<u32>,
     quality: u8,
-    on_progress: Channel<Progresso>,
+    on_progress: Channel<Progress>,
 ) -> Result<Vec<String>, FsError> {
     let total = paths.len() as u64;
-    con_avanzamento(&state, op_id, move || total, on_progress, move |cancel, progress| {
-        crate::fs::immagini::convert(&paths, target, max_side, quality, cancel, progress)
+    with_progress(&state, op_id, move || total, on_progress, move |cancel, progress| {
+        crate::fs::images::convert(&paths, target, max_side, quality, cancel, progress)
     })
     .await
 }
@@ -392,15 +392,15 @@ pub async fn image_convert(
 /// What a deletion with progress removes.
 #[derive(serde::Deserialize, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
-pub enum ModoElimina {
+pub enum DeleteMode {
     /// To the Trash: recoverable.
-    Cestino,
+    Trash,
     /// From disk, skipping the Trash.
-    Disco,
+    Permanent,
     /// Selected items already in the Trash, for good.
-    DalCestino,
+    FromTrash,
     /// Everything in the Trash.
-    Svuota,
+    EmptyTrash,
 }
 
 /// Deletes with a progress bar counted in items. Can be cancelled between
@@ -409,105 +409,105 @@ pub enum ModoElimina {
 /// those. The user's confirmation happens in the frontend, before this.
 #[tauri::command]
 pub async fn delete_items(
-    state: tauri::State<'_, Operazioni>,
+    state: tauri::State<'_, Operations>,
     op_id: u64,
-    mode: ModoElimina,
+    mode: DeleteMode,
     paths: Vec<String>,
-    on_progress: Channel<Progresso>,
-) -> Result<crate::fs::elimina::Eliminati, FsError> {
-    use crate::fs::elimina;
-    let per_conto = paths.clone();
-    con_avanzamento(
+    on_progress: Channel<Progress>,
+) -> Result<crate::fs::delete::Deleted, FsError> {
+    use crate::fs::delete;
+    let for_count = paths.clone();
+    with_progress(
         &state,
         op_id,
         move || match mode {
-            ModoElimina::Cestino => per_conto.len() as u64,
-            ModoElimina::Disco => elimina::conta_tutti(&per_conto),
-            ModoElimina::DalCestino => elimina::conta_nel_cestino(Some(&per_conto)),
-            ModoElimina::Svuota => elimina::conta_nel_cestino(None),
+            DeleteMode::Trash => for_count.len() as u64,
+            DeleteMode::Permanent => delete::count_all(&for_count),
+            DeleteMode::FromTrash => delete::count_in_trash(Some(&for_count)),
+            DeleteMode::EmptyTrash => delete::count_in_trash(None),
         },
         on_progress,
-        move |annulla, avanza| match mode {
-            ModoElimina::Cestino => elimina::cestina(&paths, annulla, avanza),
-            ModoElimina::Disco => elimina::elimina_disco(&paths, annulla, avanza),
-            ModoElimina::DalCestino => elimina::elimina_dal_cestino(Some(&paths), annulla, avanza),
-            ModoElimina::Svuota => elimina::elimina_dal_cestino(None, annulla, avanza),
+        move |cancel, advance| match mode {
+            DeleteMode::Trash => delete::trash(&paths, cancel, advance),
+            DeleteMode::Permanent => delete::delete_from_disk(&paths, cancel, advance),
+            DeleteMode::FromTrash => delete::delete_from_trash(Some(&paths), cancel, advance),
+            DeleteMode::EmptyTrash => delete::delete_from_trash(None, cancel, advance),
         },
     )
     .await
 }
 
-/// Invia file locali a un altro PC della rete locale. Attende il suo consenso.
+/// Sends local files to another PC on the lan. Waits for its consent.
 #[tauri::command]
-pub async fn lan_invia(
-    state: tauri::State<'_, Operazioni>,
+pub async fn lan_send(
+    state: tauri::State<'_, Operations>,
     lan: tauri::State<'_, Arc<crate::lan::Lan>>,
-    amici: tauri::State<'_, Arc<crate::amici::Amici>>,
+    friends: tauri::State<'_, Arc<crate::friends::Friends>>,
     op_id: u64,
     peer: String,
     paths: Vec<String>,
-    on_progress: Channel<Progresso>,
+    on_progress: Channel<Progress>,
 ) -> Result<(), FsError> {
-    let annulla = state.registra(op_id);
+    let cancel = state.register(op_id);
     let lan = lan.inner().clone();
-    let amici = amici.inner().clone();
-    let esito = tauri::async_runtime::spawn_blocking(move || {
-        let mut ultimo = Instant::now();
-        let mut avanza = |fatti, total| {
-            if ultimo.elapsed() >= INTERVALLO_AVANZAMENTO {
-                ultimo = Instant::now();
-                let _ = on_progress.send(Progresso { transferred: fatti, total });
+    let friends = friends.inner().clone();
+    let outcome = tauri::async_runtime::spawn_blocking(move || {
+        let mut last = Instant::now();
+        let mut advance = |done, total| {
+            if last.elapsed() >= PROGRESS_INTERVAL {
+                last = Instant::now();
+                let _ = on_progress.send(Progress { transferred: done, total });
             }
         };
-        // Un amico arriva come `@codice`, un PC della rete locale col suo id.
-        match peer.strip_prefix(crate::amici::PREFISSO_INVIO) {
-            Some(amico) => amici.invia(amico, &paths, &annulla, &mut avanza),
-            None => crate::lan::invia(&lan, &peer, &paths, &annulla, &mut avanza),
+        // A friend arrives as `@code`, a PC on the lan with its id.
+        match peer.strip_prefix(crate::friends::SEND_PREFIX) {
+            Some(friend) => friends.send(friend, &paths, &cancel, &mut advance),
+            None => crate::lan::send(&lan, &peer, &paths, &cancel, &mut advance),
         }
     })
     .await;
-    state.dimentica(op_id);
-    esito.map_err(|e| FsError::Io { message: format!("Invio interrotto: {}", e) })?
+    state.forget(op_id);
+    outcome.map_err(|e| FsError::Io { message: format!("Invio interrotto: {}", e) })?
 }
 
-/// Copia elementi dalla cartella condivisa di un altro PC dentro `dest`.
+/// Copies items from another PC's shared folder into `dest`.
 #[tauri::command]
-pub async fn lan_scarica(
-    state: tauri::State<'_, Operazioni>,
+pub async fn lan_download(
+    state: tauri::State<'_, Operations>,
     lan: tauri::State<'_, Arc<crate::lan::Lan>>,
-    amici: tauri::State<'_, Arc<crate::amici::Amici>>,
+    friends: tauri::State<'_, Arc<crate::friends::Friends>>,
     op_id: u64,
     sources: Vec<String>,
     dest: String,
-    on_progress: Channel<Progresso>,
-) -> Result<Esito, FsError> {
-    let annulla = state.registra(op_id);
+    on_progress: Channel<Progress>,
+) -> Result<CopyOutcome, FsError> {
+    let cancel = state.register(op_id);
     let lan = lan.inner().clone();
-    let amici = amici.inner().clone();
-    let esito = tauri::async_runtime::spawn_blocking(move || {
-        let mut ultimo = Instant::now();
-        let coppie = crate::ipc::scarica_remoto(&lan, &amici, &sources, &dest, &annulla, &mut |fatti, total| {
-            if ultimo.elapsed() >= INTERVALLO_AVANZAMENTO {
-                ultimo = Instant::now();
-                let _ = on_progress.send(Progresso { transferred: fatti, total });
+    let friends = friends.inner().clone();
+    let outcome = tauri::async_runtime::spawn_blocking(move || {
+        let mut last = Instant::now();
+        let pairs = crate::ipc::download_remote(&lan, &friends, &sources, &dest, &cancel, &mut |done, total| {
+            if last.elapsed() >= PROGRESS_INTERVAL {
+                last = Instant::now();
+                let _ = on_progress.send(Progress { transferred: done, total });
             }
         })?;
-        Ok::<_, FsError>(Esito { copiati: coppie.len() as u64, saltati: 0, annullato: false, coppie })
+        Ok::<_, FsError>(CopyOutcome { copied: pairs.len() as u64, skipped: 0, cancelled: false, pairs })
     })
     .await;
-    state.dimentica(op_id);
-    esito.map_err(|e| FsError::Io { message: format!("Copia interrotta: {}", e) })?
+    state.forget(op_id);
+    outcome.map_err(|e| FsError::Io { message: format!("Copia interrotta: {}", e) })?
 }
 
 #[tauri::command]
-pub fn cancel_transfer(state: tauri::State<'_, Operazioni>, op_id: u64) -> bool {
-    state.annulla(op_id)
+pub fn cancel_transfer(state: tauri::State<'_, Operations>, op_id: u64) -> bool {
+    state.cancel(op_id)
 }
 
 /// Pauses (or resumes) a job between one item and the next.
 #[tauri::command]
-pub fn pause_transfer(state: tauri::State<'_, Operazioni>, op_id: u64, paused: bool) -> bool {
-    state.pausa(op_id, paused)
+pub fn pause_transfer(state: tauri::State<'_, Operations>, op_id: u64, paused: bool) -> bool {
+    state.pause(op_id, paused)
 }
 
 #[cfg(test)]
@@ -515,26 +515,26 @@ mod tests {
     use super::*;
 
     #[test]
-    fn annullare_alza_la_bandiera_dell_operazione() {
-        let ops = Operazioni::default();
-        let flag = ops.registra(7);
+    fn cancelling_raises_the_operation_flag() {
+        let ops = Operations::default();
+        let flag = ops.register(7);
 
-        assert!(ops.annulla(7));
+        assert!(ops.cancel(7));
         assert!(flag.load(Ordering::Relaxed));
     }
 
     #[test]
-    fn annullare_un_id_sconosciuto_dice_di_no() {
-        let ops = Operazioni::default();
-        assert!(!ops.annulla(99));
+    fn cancelling_an_unknown_id_says_no() {
+        let ops = Operations::default();
+        assert!(!ops.cancel(99));
     }
 
     #[test]
-    fn dopo_dimentica_l_operazione_non_e_piu_annullabile() {
-        let ops = Operazioni::default();
-        ops.registra(3);
-        ops.dimentica(3);
+    fn after_forget_the_operation_is_no_longer_cancellable() {
+        let ops = Operations::default();
+        ops.register(3);
+        ops.forget(3);
 
-        assert!(!ops.annulla(3));
+        assert!(!ops.cancel(3));
     }
 }

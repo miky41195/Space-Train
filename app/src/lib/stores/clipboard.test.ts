@@ -2,37 +2,37 @@ import { describe, it, expect } from 'vitest';
 import { ClipboardStore } from './clipboard.svelte';
 
 describe('ClipboardStore', () => {
-	it('nasce vuoto', () => {
+	it('starts empty', () => {
 		const c = new ClipboardStore();
-		expect(c.vuoto).toBe(true);
+		expect(c.empty).toBe(true);
 		expect(c.mode).toBeNull();
 	});
 
-	it('copiare registra i path in modalità copia', () => {
+	it('copy records the paths in copy mode', () => {
 		const c = new ClipboardStore();
 		c.copy(['C:\\a.txt', 'C:\\b.txt']);
 
 		expect(c.mode).toBe('copy');
 		expect(c.paths).toEqual(['C:\\a.txt', 'C:\\b.txt']);
-		expect(c.vuoto).toBe(false);
+		expect(c.empty).toBe(false);
 	});
 
-	it('tagliare registra i path in modalità taglia', () => {
+	it('cut records the paths in cut mode', () => {
 		const c = new ClipboardStore();
 		c.cut(['C:\\a.txt']);
 
 		expect(c.mode).toBe('cut');
-		expect(c.tagliato('C:\\a.txt')).toBe(true);
+		expect(c.isCut('C:\\a.txt')).toBe(true);
 	});
 
-	it('un elemento copiato non risulta tagliato', () => {
+	it('a copied item is not cut', () => {
 		const c = new ClipboardStore();
 		c.copy(['C:\\a.txt']);
 
-		expect(c.tagliato('C:\\a.txt')).toBe(false);
+		expect(c.isCut('C:\\a.txt')).toBe(false);
 	});
 
-	it('una nuova copia sostituisce la precedente', () => {
+	it('a new copy replaces the previous one', () => {
 		const c = new ClipboardStore();
 		c.copy(['C:\\a.txt']);
 		c.cut(['C:\\b.txt']);
@@ -41,28 +41,28 @@ describe('ClipboardStore', () => {
 		expect(c.paths).toEqual(['C:\\b.txt']);
 	});
 
-	it('svuotare azzera modalità e path', () => {
+	it('clearing resets mode and paths', () => {
 		const c = new ClipboardStore();
 		c.copy(['C:\\a.txt']);
 		c.clear();
 
-		expect(c.vuoto).toBe(true);
+		expect(c.empty).toBe(true);
 		expect(c.paths).toEqual([]);
 		expect(c.mode).toBeNull();
 	});
 
-	it('copiare una lista vuota lascia gli appunti vuoti', () => {
+	it('copying an empty list leaves the clipboard empty', () => {
 		const c = new ClipboardStore();
 		c.copy([]);
 
-		expect(c.vuoto).toBe(true);
+		expect(c.empty).toBe(true);
 	});
 
-	it('copia i path invece di tenere il riferimento all array', () => {
+	it('copies the paths instead of keeping a reference to the array', () => {
 		const c = new ClipboardStore();
-		const originale = ['C:\\a.txt'];
-		c.copy(originale);
-		originale.push('C:\\intruso.txt');
+		const original = ['C:\\a.txt'];
+		c.copy(original);
+		original.push('C:\\intruder.txt');
 
 		expect(c.paths).toEqual(['C:\\a.txt']);
 	});

@@ -2,77 +2,77 @@ import { describe, it, expect } from 'vitest';
 import { fuzzyMatch, filterEntries } from './fuzzy';
 
 describe('fuzzyMatch', () => {
-	it('trova una sottostringa contigua', () => {
+	it('finds a contiguous substring', () => {
 		const m = fuzzyMatch('cargo', 'Cargo.toml');
 		expect(m).not.toBeNull();
 		expect(m!.positions).toEqual([0, 1, 2, 3, 4]);
 	});
 
-	it('trova una sottosequenza con buchi', () => {
+	it('finds a subsequence with gaps', () => {
 		const m = fuzzyMatch('crgo', 'Cargo.toml');
 		expect(m).not.toBeNull();
 		expect(m!.positions).toEqual([0, 2, 3, 4]);
 	});
 
-	it('ignora le maiuscole', () => {
+	it('ignores case', () => {
 		expect(fuzzyMatch('CARGO', 'cargo.toml')).not.toBeNull();
 		expect(fuzzyMatch('cargo', 'CARGO.TOML')).not.toBeNull();
 	});
 
-	it('restituisce null quando i caratteri non ci sono', () => {
+	it('returns null when the characters are not there', () => {
 		expect(fuzzyMatch('xyz', 'Cargo.toml')).toBeNull();
 	});
 
-	it('restituisce null quando i caratteri ci sono ma nell ordine sbagliato', () => {
+	it('returns null when the characters are there but in the wrong order', () => {
 		expect(fuzzyMatch('ograc', 'Cargo')).toBeNull();
 	});
 
-	it('una query vuota corrisponde a tutto senza evidenziare niente', () => {
+	it('an empty query matches everything without highlighting anything', () => {
 		const m = fuzzyMatch('', 'qualsiasi.txt');
 		expect(m).not.toBeNull();
 		expect(m!.positions).toEqual([]);
 	});
 
-	it('premia il match contiguo rispetto a quello sparso', () => {
-		const contiguo = fuzzyMatch('abc', 'abc.txt')!;
-		const sparso = fuzzyMatch('abc', 'a_b_c.txt')!;
-		expect(contiguo.score).toBeGreaterThan(sparso.score);
+	it('rewards the contiguous match over the scattered one', () => {
+		const contiguous = fuzzyMatch('abc', 'abc.txt')!;
+		const scattered = fuzzyMatch('abc', 'a_b_c.txt')!;
+		expect(contiguous.score).toBeGreaterThan(scattered.score);
 	});
 
-	it('premia il match a inizio parola', () => {
-		const inizioParola = fuzzyMatch('mt', 'main.ts')!;
-		const dentroParola = fuzzyMatch('mt', 'formatter')!;
-		expect(inizioParola.score).toBeGreaterThan(dentroParola.score);
+	it('rewards the match at the start of a word', () => {
+		const wordStart = fuzzyMatch('mt', 'main.ts')!;
+		const insideWord = fuzzyMatch('mt', 'formatter')!;
+		expect(wordStart.score).toBeGreaterThan(insideWord.score);
 	});
 
-	it('premia il prefisso rispetto al match a metà nome', () => {
-		const prefisso = fuzzyMatch('log', 'logger.ts')!;
-		const interno = fuzzyMatch('log', 'catalogo.ts')!;
-		expect(prefisso.score).toBeGreaterThan(interno.score);
+	it('rewards the prefix over a match in the middle of the name', () => {
+		const prefix = fuzzyMatch('log', 'logger.ts')!;
+		const inner = fuzzyMatch('log', 'catalogo.ts')!;
+		expect(prefix.score).toBeGreaterThan(inner.score);
 	});
 
-	it('il nome identico alla query prende il punteggio più alto', () => {
-		const identico = fuzzyMatch('readme', 'readme')!;
+	it('the name identical to the query gets the highest score', () => {
+		const identical = fuzzyMatch('readme', 'readme')!;
 		const parziale = fuzzyMatch('readme', 'readme.md')!;
-		expect(identico.score).toBeGreaterThan(parziale.score);
+		expect(identical.score).toBeGreaterThan(parziale.score);
 	});
 
-	it('riconosce l inizio parola su maiuscola in camelCase', () => {
+	it('recognises the word start on a camelCase capital', () => {
 		const m = fuzzyMatch('fb', 'fooBar.ts')!;
 		expect(m.positions).toEqual([0, 3]);
 	});
 });
 
 describe('filterEntries', () => {
-	const voci = [
+	const items = [
 		{ name: 'Cargo.toml' },
 		{ name: 'catalogo.ts' },
 		{ name: 'README.md' },
 		{ name: 'src' }
 	];
 
-	it('una query vuota restituisce tutto nell ordine originale', () => {
-		const r = filterEntries(voci, '');
+	it('an empty query returns everything in the original order', () => {
+		const r = filterEntries(items, '');
 		expect(r.map((x) => x.item.name)).toEqual([
 			'Cargo.toml',
 			'catalogo.ts',
@@ -81,23 +81,23 @@ describe('filterEntries', () => {
 		]);
 	});
 
-	it('scarta le voci che non corrispondono', () => {
-		const r = filterEntries(voci, 'md');
+	it('drops the items that do not match', () => {
+		const r = filterEntries(items, 'md');
 		expect(r.map((x) => x.item.name)).toEqual(['README.md']);
 	});
 
-	it('ordina per punteggio decrescente', () => {
-		const r = filterEntries(voci, 'ca');
+	it('sorts by descending score', () => {
+		const r = filterEntries(items, 'ca');
 		expect(r[0].item.name).toBe('Cargo.toml');
 		expect(r.map((x) => x.item.name)).toContain('catalogo.ts');
 	});
 
-	it('restituisce le posizioni da evidenziare per ogni voce', () => {
-		const r = filterEntries(voci, 'car');
+	it('returns the positions to highlight for each item', () => {
+		const r = filterEntries(items, 'car');
 		expect(r[0].positions).toEqual([0, 1, 2]);
 	});
 
-	it('nessun risultato quando niente corrisponde', () => {
-		expect(filterEntries(voci, 'zzzz')).toEqual([]);
+	it('no result when nothing matches', () => {
+		expect(filterEntries(items, 'zzzz')).toEqual([]);
 	});
 });

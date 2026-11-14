@@ -1,0 +1,544 @@
+<script lang="ts">
+	import { onDestroy, untrack } from 'svelte';
+	import { tauriBackend, type CleanupCategory, type Program, type CleanupCandidate } from '../ipc';
+	import { formatBytes } from '../locations';
+	import { CATEGORIES, KIND_LABELS, shortPath, age, plan, preselection, type Plan } from '../cleanup';
+
+	let {
+		drive,
+		roots,
+		onroots,
+		onfree,
+		onclose,
+		describeError,
+		onfound = undefined
+	}: {
+		/** Drive root, like `C:\`. */
+		drive: string;
+		/** Folders where projects are looked for. */
+		roots: string[];
+		onroots: (r: string[]) => void;
+		/** Runs the deletions with the progress bar. */
+		onfree: (p: Plan) => Promise<void>;
+		onclose: () => void;
+		/** Backend errors in words. */
+		describeError: (e: unknown) => string;
+		/** Total found once every category is weighed. */
+		onfound?: (bytes: number) => void;
+	} = $props();
+
+	/** `undefined` while being weighed. */
+	let found = $state<Partial<Record<CleanupCategory, CleanupCandidate[]>>>({});
+	let chosen = $state<Partial<Record<CleanupCategory, string[]>>>({});
+	let expanded = $state<Set<CleanupCategory>>(new Set());
+	let programs = $state<Program[] | null>(null);
+	let confirming = $state(false);
+	let freeing = $state(false);
+	let error = $state<string | null>(null);
+	let round = 0;
+
+	async function search(ids: CleanupCategory[]) {
+		const mine = ++round;
+		await tauriBackend.cleanupRound(mine).catch(() => {});
+		for (const id of ids) {
+			delete found[id];
+			const c = CATEGORIES.find((c) => c.id === id)!;
+			void tauriBackend
+				.cleanupScan(id, drive, roots, mine)
+				.then((items) => {
+					if (!items || mine !== round) return;
+					found[id] = items;
+					chosen[id] = preselection(c.kind, items, Date.now());
+				})
+				.catch(() => {
+					if (mine === round) found[id] = [];
+				});
+		}
+	}
+
+	function searchPrograms() {
+		programs = null;
+		void tauriBackend
+			.programsList(drive)
+			.then((p) => (programs = p))
+			.catch(() => (programs = []));
+	}
+
+	// Everything again when the drive changes; only projects when their folders do.
+	let lastRoots = '';
+	$effect(() => {
+		void drive;
+		lastRoots = JSON.stringify(roots);
+		void search(CATEGORIES.map((c) => c.id));
+		searchPrograms();
+	});
+	$effect(() => {
+		const r = JSON.stringify(roots);
+		if (r !== lastRoots) {
+			lastRoots = r;
+			void search(['projects']);
+		}
+	});
+	onDestroy(() => void tauriBackend.cleanupRound(++round).catch(() => {}));
+
+	const weight = (items: CleanupCandidate[] | undefined) => (items ?? []).reduce((n, v) => n + v.size, 0);
+	let max = $derived(Math.max(1, ...CATEGORIES.map((c) => weight(found[c.id]))));
+	let total = $derived(CATEGORIES.reduce((n, c) => n + weight(found[c.id]), 0));
+	let toDo = $derived(plan(found, chosen));
+	let running = $derived(CATEGORIES.filter((c) => !found[c.id]).length);
+	$effect(() => {
+		if (running === 0) untrack(() => onfound?.(total));
+	});
+
+	function toggleCategory(id: CleanupCategory) {
+		const items = found[id] ?? [];
+		chosen[id] = (chosen[id]?.length ?? 0) === items.length ? [] : items.map((v) => v.path);
+	}
+	function toggleItem(id: CleanupCategory, path: string) {
+		const s = chosen[id] ?? [];
+		chosen[id] = s.includes(path) ? s.filter((p) => p !== path) : [...s, path];
+	}
+	function toggleOpen(id: CleanupCategory) {
+		const n = new Set(expanded);
+		if (!n.delete(id)) n.add(id);
+		expanded = n;
+	}
+
+	async function addRoot() {
+		const c = await tauriBackend.pickFolder('Cerca progetti in…', roots[0] ?? null).catch(() => null);
+		if (c && !roots.some((r) => r.toLowerCase() === c.toLowerCase())) onroots([...roots, c]);
+	}
+
+	async function free() {
+		confirming = false;
+		freeing = true;
+		error = null;
+		try {
+			await onfree(toDo);
+		} catch (e) {
+			error = describeError(e);
+		} finally {
+			freeing = false;
+			void search(CATEGORIES.map((c) => c.id));
+		}
+	}
+
+	async function uninstall(p: Program) {
+		error = null;
+		try {
+			await tauriBackend.programUninstall(p.id);
+		} catch (e) {
+			error = `«${p.name}»: ${describeError(e)}`;
+		}
+	}
+
+	let cancelButton = $state<HTMLButtonElement | null>(null);
+	$effect(() => {
+		if (confirming) cancelButton?.focus();
+	});
+</script>
+
+<div class="cleanup">
+	<div class="band" role="status">
+		<span><b>{formatBytes(toDo.bytes)}</b> scelti su <b>{formatBytes(total)}</b> trovati</span>
+		{#if running > 0}<span class="weighing">pesando {running} {running === 1 ? 'categoria' : 'categorie'}…</span>{/if}
+		<span class="spacer"></span>
+		<button onclick={onclose}>Chiudi</button>
+		<button class="primary" disabled={toDo.bytes === 0 || freeing} onclick={() => (confirming = true)}>
+			Libera {formatBytes(toDo.bytes)}
+		</button>
+	</div>
+	{#if error}<div class="error">{error}</div>{/if}
+
+	<div class="list">
+		{#each CATEGORIES as c (c.id)}
+			{@const items = found[c.id]}
+			{@const picked = chosen[c.id]?.length ?? 0}
+			{@const isOpen = expanded.has(c.id)}
+			<div class="cat" class:empty={items?.length === 0}>
+				<input
+					type="checkbox"
+					aria-label={c.name}
+					disabled={!items?.length}
+					checked={!!items?.length && picked === items.length}
+					indeterminate={picked > 0 && picked < (items?.length ?? 0)}
+					onchange={() => toggleCategory(c.id)}
+				/>
+				<div class="text">
+					<div class="name">
+						{#if items?.length && c.kind !== 'trash'}
+							<button class="open" aria-expanded={isOpen} onclick={() => toggleOpen(c.id)}>
+								{c.name}<span class="arrow" class:down={isOpen}>▸</span>
+							</button>
+						{:else}
+							<span>{c.name}</span>
+						{/if}
+						<span class="pill {c.kind}">{KIND_LABELS[c.kind]}</span>
+					</div>
+					<div class="detail">
+						{#if !items}pesando…{:else if c.kind === 'trash'}{items.length} {items.length === 1 ? 'item' : 'items'}{:else if items.length === 0}niente da togliere{:else}{c.detail}{/if}
+					</div>
+					<div class="track"><span style:width="{(weight(items) / max) * 100}%"></span></div>
+				</div>
+				<span class="weight">{items ? formatBytes(weight(items)) : '—'}</span>
+			</div>
+			{#if c.id === 'projects'}
+				<div class="roots">
+					<span class="sig">Cerca progetti in</span>
+					{#each roots as r (r)}
+						<span class="chip"
+							>{r}<button aria-label="Togli {r}" onclick={() => onroots(roots.filter((x) => x !== r))}>×</button></span
+						>
+					{/each}
+					<button class="chip add" onclick={addRoot}>+ Aggiungi cartella</button>
+				</div>
+			{/if}
+			{#if isOpen && items}
+				{#each items as v (v.path)}
+					<label class="cat sub">
+						<input type="checkbox" checked={chosen[c.id]?.includes(v.path)} onchange={() => toggleItem(c.id, v.path)} />
+						<div class="text">
+							<div class="name ellipsis" title={v.path}>{c.id === 'projects' ? shortPath(v.path, roots) : v.path}</div>
+							{#if v.used > 0}<div class="detail">usata {age(v.used, Date.now())}</div>{/if}
+						</div>
+						<span class="weight">{formatBytes(v.size)}</span>
+					</label>
+				{/each}
+			{/if}
+		{/each}
+
+		{#if programs === null || programs.length > 0}
+			<div class="section sig">Programmi più grandi</div>
+			<p class="note">Space Train non li tocca: «Disinstalla» avvia il programma di disinstallazione ufficiale.</p>
+			{#if programs === null}
+				<div class="prog"><span class="detail">pesando…</span></div>
+			{:else}
+				{#each programs as p (p.id)}
+					<div class="prog">
+						<span class="ellipsis">{p.name}{#if p.publisher}<span class="detail">{` · ${p.publisher}`}</span>{/if}</span>
+						<span class="weight">{formatBytes(p.size)}</span>
+						<button onclick={() => void uninstall(p)}>Disinstalla</button>
+					</div>
+				{/each}
+			{/if}
+		{/if}
+	</div>
+</div>
+
+{#if confirming}
+	<div
+		class="backdrop"
+		role="presentation"
+		onclick={(e) => e.target === e.currentTarget && (confirming = false)}
+		onkeydown={(e) => e.key === 'Escape' && (confirming = false)}
+	>
+		<div class="dialog" role="dialog" aria-modal="true" aria-label="Conferma pulizia">
+			<h2>Liberare {formatBytes(toDo.bytes)}?</h2>
+			{#if toDo.permanent.length > 0}
+				<p><b>{toDo.permanent.length}</b> {toDo.permanent.length === 1 ? 'elemento si ricrea' : 'elementi si ricreano'} da soli: eliminati per sempre.</p>
+			{/if}
+			{#if toDo.trash.length > 0}
+				<p><b>{toDo.trash.length}</b> da guardare: {toDo.trash.length === 1 ? 'va' : 'vanno'} nel Cestino.</p>
+			{/if}
+			{#if toDo.emptyTrash}<p>Il Cestino si svuota.</p>{/if}
+			<ul>
+				{#each [...toDo.permanent, ...toDo.trash].slice(0, 6) as p (p)}<li>{p}</li>{/each}
+				{#if toDo.permanent.length + toDo.trash.length > 6}<li class="rest">e altri {toDo.permanent.length + toDo.trash.length - 6}…</li>{/if}
+			</ul>
+			<p class="note">I file in uso si saltano e te lo dico.</p>
+			<div class="actions">
+				<button bind:this={cancelButton} onclick={() => (confirming = false)}>Annulla</button>
+				<button class="danger" onclick={() => void free()}>Libera</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<style>
+	.cleanup {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		min-height: 0;
+	}
+	.band {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px 16px;
+		min-height: 40px;
+		padding: 4px 12px 4px 16px;
+		background: var(--surface);
+		border-bottom: 1px solid var(--border);
+		color: var(--text-dim);
+	}
+	.band b {
+		color: var(--text);
+		font-family: var(--font-display);
+		font-weight: 400;
+		font-size: calc(15px * var(--text-scale, 1));
+		font-variant-numeric: tabular-nums;
+	}
+	.spacer {
+		flex: 1;
+	}
+	.error {
+		padding: 8px 16px;
+		color: var(--error-text, #ffb4ab);
+		border-bottom: 1px solid var(--border);
+	}
+	.list {
+		flex: 1;
+		overflow-y: auto;
+		padding-bottom: 24px;
+	}
+	.cat {
+		display: grid;
+		grid-template-columns: 18px minmax(0, 1fr) 90px;
+		gap: 10px;
+		align-items: center;
+		padding: 8px 16px;
+		border-bottom: 1px solid var(--border);
+	}
+	.cat:hover {
+		background: var(--row-hover);
+	}
+	.cat.sub {
+		padding-left: 44px;
+		background: color-mix(in srgb, var(--bg) 40%, transparent);
+	}
+	.cat.empty {
+		color: var(--text-dim);
+	}
+	input[type='checkbox'] {
+		margin: 0;
+		accent-color: var(--accent);
+	}
+	.text {
+		display: grid;
+		gap: 2px;
+		min-width: 0;
+	}
+	.name {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		flex-wrap: wrap;
+	}
+	.open {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		padding: 0;
+		border: 0;
+		background: none;
+		color: inherit;
+		font: inherit;
+		cursor: default;
+	}
+	.arrow {
+		color: var(--text-dim);
+		font-size: calc(10px * var(--text-scale, 1));
+		transition: transform 0.12s ease-out;
+	}
+	.arrow.down {
+		transform: rotate(90deg);
+	}
+	.detail {
+		color: var(--text-dim);
+		font-size: calc(11.5px * var(--text-scale, 1));
+	}
+	.track {
+		height: 4px;
+		margin-top: 3px;
+		border-radius: 2px;
+		background: var(--border);
+		overflow: hidden;
+	}
+	.track span {
+		display: block;
+		height: 100%;
+		background: linear-gradient(90deg, var(--plasma, var(--accent)), var(--current, var(--accent)));
+	}
+	.weight {
+		text-align: right;
+		font-family: var(--font-display);
+		font-variant-numeric: tabular-nums;
+	}
+	.pill {
+		padding: 1px 7px;
+		border-radius: 9px;
+		font-size: calc(9.5px * var(--text-scale, 1));
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		white-space: nowrap;
+	}
+	.pill.rebuilt,
+	.pill.trash {
+		color: var(--online, #22c55e);
+		background: color-mix(in srgb, var(--online, #22c55e) 12%, transparent);
+	}
+	.pill.review {
+		color: var(--signal, #ffb454);
+		background: color-mix(in srgb, var(--signal, #ffb454) 12%, transparent);
+	}
+	.pill.projects {
+		color: var(--current, var(--accent));
+		background: color-mix(in srgb, var(--current, var(--accent)) 10%, transparent);
+	}
+	.roots {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 6px;
+		padding: 6px 16px 8px 44px;
+		border-bottom: 1px solid var(--border);
+	}
+	.sig {
+		color: var(--text-dim);
+		font-family: var(--font-display);
+		font-size: calc(10.5px * var(--text-scale, 1));
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+	}
+	.chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		height: 24px;
+		padding: 0 4px 0 10px;
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		background: transparent;
+		color: var(--text);
+		font: inherit;
+		font-size: calc(12px * var(--text-scale, 1));
+		white-space: nowrap;
+	}
+	.chip button {
+		width: 18px;
+		height: 18px;
+		padding: 0;
+		border: 0;
+		border-radius: 50%;
+		background: none;
+		color: var(--text-dim);
+		font: inherit;
+	}
+	.chip button:hover {
+		background: var(--row-hover);
+		color: var(--text);
+	}
+	.chip.add {
+		padding: 0 10px;
+		color: var(--text-dim);
+	}
+	.section {
+		padding: 20px 16px 4px;
+	}
+	.note {
+		margin: 0;
+		padding: 0 16px 8px;
+		color: var(--text-dim);
+	}
+	.prog {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 90px auto;
+		gap: 10px;
+		align-items: center;
+		padding: 6px 16px;
+		border-bottom: 1px solid var(--border);
+	}
+	.ellipsis {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.band button,
+	.prog button,
+	.actions button {
+		height: 26px;
+		padding: 0 12px;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		clip-path: var(--shape-sm, none);
+		mask: var(--mask-sm, none);
+		background: transparent;
+		color: var(--text);
+		font: inherit;
+		cursor: default;
+	}
+	.band button:hover,
+	.prog button:hover,
+	.actions button:hover {
+		background: var(--row-hover);
+	}
+	button:focus-visible,
+	input:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+	.primary {
+		background: var(--accent) !important;
+		border-color: var(--accent) !important;
+		color: #fff !important;
+	}
+	.primary:disabled {
+		opacity: 0.45;
+	}
+	.backdrop {
+		position: fixed;
+		inset: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: color-mix(in srgb, var(--bg) 72%, transparent);
+		z-index: 10;
+	}
+	.dialog {
+		width: min(480px, 90vw);
+		padding: 20px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		clip-path: var(--shape, none);
+		mask: var(--mask, none);
+		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+	}
+	.dialog h2 {
+		margin: 0 0 10px;
+		font-size: calc(15px * var(--text-scale, 1));
+		font-weight: 600;
+	}
+	.dialog p {
+		margin: 0 0 8px;
+		line-height: 1.5;
+	}
+	.dialog ul {
+		margin: 0 0 10px;
+		padding-left: 18px;
+		max-height: 130px;
+		overflow-y: auto;
+		color: var(--text-dim);
+		word-break: break-all;
+	}
+	.rest {
+		list-style: none;
+		margin-left: -18px;
+	}
+	.dialog .note {
+		padding: 0;
+	}
+	.actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 8px;
+		margin-top: 16px;
+	}
+	.danger {
+		border-color: transparent !important;
+		background: #c42b1c !important;
+		color: #fff;
+	}
+</style>

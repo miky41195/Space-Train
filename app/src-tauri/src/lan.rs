@@ -1,15 +1,15 @@
-//! Rete locale fra copie di Space Train: trovarsi, scambiarsi file,
-//! sfogliare la cartella che un altro PC ha deciso di condividere.
+//! Lan between copies of Space Train: finding each other, exchanging files,
+//! browsing the folder another PC decided to share.
 //!
-//! - Scoperta: ogni copia visibile annuncia sé stessa in broadcast UDP e
-//!   ascolta gli annunci delle altre.
-//! - Dati: un server TCP risponde a tre richieste — elenca una cartella
-//!   condivisa, scarica da lì, ricevi file inviati. Ricevere chiede sempre
-//!   il consenso dell'utente; la condivisione è in sola lettura.
+//! - Discovery: every visible copy announces itself over UDP broadcast and
+//!   listens to the announcements of the others.
+//! - Data: a TCP server answers three requests — list a shared
+//!   folder, download from it, receive sent files. Receiving always asks
+//!   for the user's consent; sharing is read-only.
 //!
-//! Il traffico non è cifrato: è pensato per la rete di casa o dell'ufficio,
-//! non per reti pubbliche. Nessun path che arriva dalla rete può uscire
-//! dalla cartella condivisa o da quella dei ricevuti.
+//! The traffic is not encrypted: it is meant for the home or office network,
+//! not for public networks. No path that arrives from the network can leave
+//! the shared folder or the received one.
 
 use crate::fs::copy::unique_name;
 use crate::fs::entry::{Entry, EntryKind};
@@ -25,211 +25,275 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::time::{Duration, Instant, UNIX_EPOCH};
 use tauri::Emitter;
 
-/// Come il servizio avvisa il frontend. Nell'app è `AppHandle::emit`; nei
-/// test una funzione qualsiasi, così il server gira senza una finestra.
-pub type Avvisi = Arc<dyn Fn(&str, serde_json::Value) + Send + Sync>;
+/// How the service notifies the frontend. In the app it is `AppHandle::emit`; in
+/// tests any function, so the server runs without a window.
+pub type Notifier = Arc<dyn Fn(&str, serde_json::Value) + Send + Sync>;
 
-pub(crate) fn avvisa<T: Serialize>(avvisi: &Avvisi, nome: &str, dato: T) {
-    if let Ok(v) = serde_json::to_value(dato) {
-        avvisi(nome, v);
+pub(crate) fn notify<T: Serialize>(notifier: &Notifier, name: &str, payload: T) {
+    if let Ok(v) = serde_json::to_value(payload) {
+        notifier(name, v);
     }
 }
 
-pub const RADICE: &str = "::lan";
-pub const PORTA_ANNUNCI: u16 = 47820;
-pub const PORTA_DATI: u16 = 47821;
+pub const ROOT: &str = "::lan";
+pub const ANNOUNCE_PORT: u16 = 47820;
+pub const DATA_PORT: u16 = 47821;
 
-const OGNI: Duration = Duration::from_secs(3);
-/// Un PC che non si annuncia da così tanto si considera spento.
-const SCADENZA: Duration = Duration::from_secs(12);
-/// Quanti PC si ricordano insieme: una casa o un ufficio ne hanno molti meno.
-const MASSIMO_PARI: usize = 64;
-/// Quanto aspetta chi invia che l'altro accetti o rifiuti.
-const ATTESA_CONSENSO: Duration = Duration::from_secs(120);
-const MASSIMO_INTESTAZIONE: usize = 16 * 1024 * 1024;
+const EVERY: Duration = Duration::from_secs(3);
+/// A PC that has not announced itself for this long is considered off.
+const EXPIRY: Duration = Duration::from_secs(12);
+/// How many PCs are remembered at once: a home or an office has far fewer.
+const MAX_PEERS: usize = 64;
+/// How long the sender waits for the other to accept or refuse.
+const CONSENT_WAIT: Duration = Duration::from_secs(120);
+const MAX_HEADER: usize = 16 * 1024 * 1024;
 
-// ── Dati condivisi con il frontend ──────────────────────────────────
+// ── Data shared with the frontend ───────────────────────────────────
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
-    /// Questo PC si annuncia e risponde agli altri.
-    pub visibile: bool,
-    /// Cartella che gli altri possono sfogliare e da cui possono copiare.
-    pub condivisa: Option<String>,
-    /// Dove finiscono i file ricevuti. Assente = Download\Space Train.
-    pub ricevuti: Option<String>,
-    /// PC da raggiungere per indirizzo, oltre a quelli trovati in casa: un IP
-    /// o un nome, come quelli di Tailscale o di un'altra VPN, che non
-    /// trasportano gli annunci a tutta la rete.
+    /// This PC announces itself and answers the others.
+    #[serde(rename = "visibile")]
+    pub visible: bool,
+    /// Folder the others can browse and copy from.
+    #[serde(rename = "condivisa")]
+    pub shared: Option<String>,
+    /// Where received files end up. Missing = Download\Space Train.
+    #[serde(rename = "ricevuti")]
+    pub received: Option<String>,
+    /// PCs to reach by address, besides those found at home: an IP
+    /// or a name, like those of Tailscale or another VPN, which do not
+    /// carry the announcements to the whole network.
+    #[serde(default, rename = "indirizzi")]
+    pub addresses: Vec<String>,
+}
+
+/// The same settings as the webview sees them: `Config` keeps the Italian
+/// keys of `lan.json`.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct LanSettings {
+    pub visible: bool,
+    pub shared: Option<String>,
+    pub received: Option<String>,
     #[serde(default)]
-    pub indirizzi: Vec<String>,
+    pub addresses: Vec<String>,
+}
+
+impl From<Config> for LanSettings {
+    fn from(c: Config) -> Self {
+        LanSettings { visible: c.visible, shared: c.shared, received: c.received, addresses: c.addresses }
+    }
+}
+
+impl From<LanSettings> for Config {
+    fn from(s: LanSettings) -> Self {
+        Config { visible: s.visible, shared: s.shared, received: s.received, addresses: s.addresses }
+    }
 }
 
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct Stato {
+pub struct LanStatus {
     pub id: String,
-    pub nome: String,
-    /// La cartella dei ricevuti effettiva, anche quando è quella predefinita.
-    pub cartella_ricevuti: String,
+    pub name: String,
+    /// The actual received folder, even when it is the default one.
+    pub received_folder: String,
     #[serde(flatten)]
-    pub config: Config,
+    pub config: LanSettings,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct Pari {
+pub struct Peer {
     pub id: String,
-    pub nome: String,
+    pub name: String,
     pub ip: String,
-    pub porta: u16,
-    /// Nome della cartella che condivide, se ne condivide una.
-    pub condivisa: Option<String>,
+    pub port: u16,
+    /// Name of the folder it shares, if it shares one.
+    pub shared: Option<String>,
 }
 
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct RichiestaInvio {
+pub struct SendRequest {
     pub id: u64,
-    pub da: String,
-    pub quanti: usize,
-    pub totale: u64,
-    /// I primi nomi, per far capire all'utente che cosa sta arrivando.
-    pub nomi: Vec<String>,
+    pub from: String,
+    pub count: usize,
+    pub total: u64,
+    /// The first names, to let the user understand what is arriving.
+    pub names: Vec<String>,
 }
 
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct Ricezione {
+pub struct ReceiveProgress {
     pub id: u64,
-    pub fatti: u64,
-    pub totale: u64,
+    pub done: u64,
+    pub total: u64,
 }
 
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct Ricevuto {
+pub struct Received {
     pub id: u64,
-    pub da: String,
-    pub cartella: String,
-    pub quanti: usize,
-    pub errore: Option<String>,
-    /// Chi riceveva l'ha fermata: non è un errore da segnalare.
-    pub annullato: bool,
-    /// Avviso sui file fermati dall'antivirus, se ce ne sono.
-    pub bloccati: Option<String>,
+    pub from: String,
+    pub folder: String,
+    pub count: usize,
+    pub error: Option<String>,
+    /// The receiver stopped it: not an error to report.
+    pub cancelled: bool,
+    /// Notice about the files stopped by the antivirus, if there are any.
+    pub blocked: Option<String>,
 }
 
 // ── Protocollo ───────────────────────────────────────────────────────
 
 #[derive(Serialize, Deserialize, Debug)]
-struct Annuncio {
+struct Announcement {
     app: String,
     v: u32,
     id: String,
-    nome: String,
-    porta: u16,
-    condivisa: Option<String>,
+    #[serde(rename = "nome")]
+    name: String,
+    #[serde(rename = "porta")]
+    port: u16,
+    #[serde(rename = "condivisa")]
+    shared: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "tipo", rename_all = "camelCase")]
-pub(crate) enum Richiesta {
-    Elenca { path: String },
-    Scarica { path: String },
-    Invia { da: String, voci: Vec<Voce>, totale: u64 },
-    /// Fra amici: «ci sei?», con il nome con cui ci si presenta.
-    Ciao { nome: String },
-    /// Fra amici: chiedere l'amicizia, o accettarla chiedendola a propria volta.
-    Amicizia { nome: String },
-    /// Fra amici: chi la manda ci ha tolti dai suoi amici.
-    Rimuovi,
-    /// Between friends: what of our backup folder `cartella` the friend holds.
-    BackupElenco { cartella: String },
+pub(crate) enum Request {
+    #[serde(rename = "elenca")]
+    List { path: String },
+    #[serde(rename = "scarica")]
+    Download { path: String },
+    #[serde(rename = "invia")]
+    Send {
+        #[serde(rename = "da")]
+        from: String,
+        #[serde(rename = "voci")]
+        items: Vec<Item>,
+        #[serde(rename = "totale")]
+        total: u64,
+    },
+    /// Between friends: «are you there?», with the name one introduces oneself with.
+    #[serde(rename = "ciao")]
+    Hello {
+        #[serde(rename = "nome")]
+        name: String,
+    },
+    /// Between friends: asking for the friendship, or accepting it by asking in turn.
+    #[serde(rename = "amicizia")]
+    Friendship {
+        #[serde(rename = "nome")]
+        name: String,
+    },
+    /// Between friends: whoever sends it removed us from their friends.
+    #[serde(rename = "rimuovi")]
+    Remove,
+    /// Between friends: what of our backup folder `folder` the friend holds.
+    #[serde(rename = "backupElenco")]
+    BackupList {
+        #[serde(rename = "cartella")]
+        folder: String,
+    },
     /// Between friends: these files of the backup follow, replace older copies.
-    Backup { cartella: String, voci: Vec<crate::backup::VoceBackup> },
+    Backup {
+        #[serde(rename = "cartella")]
+        folder: String,
+        #[serde(rename = "voci")]
+        items: Vec<crate::backup::BackupItem>,
+    },
 }
 
-/// Un elemento in viaggio. `rel` usa `/` come separatore e parte dal nome
-/// dell'elemento scelto, così la destinazione ricostruisce l'albero.
+/// An item travelling. `rel` uses `/` as separator and starts from the
+/// name of the chosen item, so the destination rebuilds the tree.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct Voce {
+pub(crate) struct Item {
     pub(crate) rel: String,
-    pub(crate) dimensione: u64,
-    pub(crate) cartella: bool,
+    #[serde(rename = "dimensione")]
+    pub(crate) size: u64,
+    #[serde(rename = "cartella")]
+    pub(crate) folder: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct VoceRemota {
-    pub(crate) nome: String,
-    pub(crate) cartella: bool,
-    pub(crate) dimensione: u64,
-    pub(crate) modificato: Option<i64>,
+pub(crate) struct RemoteItem {
+    #[serde(rename = "nome")]
+    pub(crate) name: String,
+    #[serde(rename = "cartella")]
+    pub(crate) folder: bool,
+    #[serde(rename = "dimensione")]
+    pub(crate) size: u64,
+    #[serde(rename = "modificato")]
+    pub(crate) modified: Option<i64>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct Risposta {
+pub(crate) struct Response {
     pub(crate) ok: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) errore: Option<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub(crate) voci: Vec<VoceRemota>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub(crate) contenuto: Vec<Voce>,
-    /// Fra amici: il nome con cui si presenta chi risponde.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) nome: Option<String>,
-    /// Fra amici: l'amicizia è confermata da entrambe le parti.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub(crate) confermato: bool,
+    #[serde(default, rename = "errore", skip_serializing_if = "Option::is_none")]
+    pub(crate) error: Option<String>,
+    #[serde(default, rename = "voci", skip_serializing_if = "Vec::is_empty")]
+    pub(crate) items: Vec<RemoteItem>,
+    #[serde(default, rename = "contenuto", skip_serializing_if = "Vec::is_empty")]
+    pub(crate) content: Vec<Item>,
+    /// Between friends: the name the responder introduces itself with.
+    #[serde(default, rename = "nome", skip_serializing_if = "Option::is_none")]
+    pub(crate) name: Option<String>,
+    /// Between friends: the friendship is confirmed by both sides.
+    #[serde(default, rename = "confermato", skip_serializing_if = "std::ops::Not::not")]
+    pub(crate) confirmed: bool,
     /// Between friends: the files of a backup the friend already holds.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub(crate) backup: Vec<crate::backup::VoceBackup>,
+    pub(crate) backup: Vec<crate::backup::BackupItem>,
 }
 
-impl Risposta {
-    pub(crate) fn errore(msg: impl Into<String>) -> Self {
-        Risposta { ok: false, errore: Some(msg.into()), ..Default::default() }
+impl Response {
+    pub(crate) fn error(msg: impl Into<String>) -> Self {
+        Response { ok: false, error: Some(msg.into()), ..Default::default() }
     }
 }
 
-pub(crate) fn scrivi_json<T: Serialize>(s: &mut impl Write, v: &T) -> io::Result<()> {
-    let dati = serde_json::to_vec(v).map_err(io::Error::other)?;
-    s.write_all(&(dati.len() as u32).to_be_bytes())?;
-    s.write_all(&dati)?;
+pub(crate) fn write_json<T: Serialize>(s: &mut impl Write, v: &T) -> io::Result<()> {
+    let data = serde_json::to_vec(v).map_err(io::Error::other)?;
+    s.write_all(&(data.len() as u32).to_be_bytes())?;
+    s.write_all(&data)?;
     s.flush()
 }
 
-pub(crate) fn leggi_json<T: for<'de> Deserialize<'de>>(s: &mut impl Read) -> io::Result<T> {
-    let mut lunghezza = [0u8; 4];
-    s.read_exact(&mut lunghezza)?;
-    let n = u32::from_be_bytes(lunghezza) as usize;
-    if n > MASSIMO_INTESTAZIONE {
+pub(crate) fn read_json<T: for<'de> Deserialize<'de>>(s: &mut impl Read) -> io::Result<T> {
+    let mut length = [0u8; 4];
+    s.read_exact(&mut length)?;
+    let n = u32::from_be_bytes(length) as usize;
+    if n > MAX_HEADER {
         return Err(io::Error::new(io::ErrorKind::InvalidData, "intestazione troppo grande"));
     }
-    // La lunghezza la dichiara l'altro capo: il buffer cresce con i byte che
-    // arrivano davvero, invece di riservarne 16 MiB su quattro byte di
-    // promessa (bastavano poche connessioni per esaurire la memoria).
-    let mut dati = Vec::with_capacity(n.min(64 * 1024));
-    s.take(n as u64).read_to_end(&mut dati)?;
-    if dati.len() != n {
+    // The length is declared by the other end: the buffer grows with the
+    // bytes that actually arrive, instead of reserving 16 MiB on four bytes
+    // of promise (a few connections were enough to exhaust the memory).
+    let mut data = Vec::with_capacity(n.min(64 * 1024));
+    s.take(n as u64).read_to_end(&mut data)?;
+    if data.len() != n {
         return Err(io::ErrorKind::UnexpectedEof.into());
     }
-    serde_json::from_slice(&dati).map_err(io::Error::other)
+    serde_json::from_slice(&data).map_err(io::Error::other)
 }
 
-/// Un nome che Windows non tratta come un file qualunque: i dispositivi
-/// (`CON`, `NUL`, `COM1`…, anche con un'estensione) e i nomi che finiscono
-/// con un punto o uno spazio.
-fn riservato(parte: &str) -> bool {
-    if parte.ends_with(['.', ' ']) {
+/// A name Windows does not treat as an ordinary file: the devices (`CON`,
+/// `NUL`, `COM1`…, also with an extension) and the names ending with a dot
+/// or a space.
+fn reserved(part: &str) -> bool {
+    if part.ends_with(['.', ' ']) {
         return true;
     }
-    let base = parte.split('.').next().unwrap_or(parte).trim_end().to_ascii_uppercase();
+    let base = part.split('.').next().unwrap_or(part).trim_end().to_ascii_uppercase();
     matches!(base.as_str(), "CON" | "PRN" | "AUX" | "NUL")
         || ((base.starts_with("COM") || base.starts_with("LPT"))
             && base.len() == 4
@@ -237,76 +301,76 @@ fn riservato(parte: &str) -> bool {
             && base.as_bytes()[3] != b'0')
 }
 
-/// Un path relativo arrivato dalla rete, solo se non può uscire dalla
-/// cartella a cui verrà attaccato: niente `..`, radici o lettere di unità.
-pub(crate) fn rel_sicuro(rel: &str) -> Option<PathBuf> {
+/// A relative path arrived from the network, only if it cannot get out of
+/// the folder it will be attached to: no `..`, roots or drive letters.
+pub(crate) fn safe_rel(rel: &str) -> Option<PathBuf> {
     let mut out = PathBuf::new();
-    for parte in rel.split(['/', '\\']).filter(|p| !p.is_empty()) {
-        if parte == "." || parte == ".." || parte.contains(':') || riservato(parte) {
+    for part in rel.split(['/', '\\']).filter(|p| !p.is_empty()) {
+        if part == "." || part == ".." || part.contains(':') || reserved(part) {
             return None;
         }
-        let p = Path::new(parte);
+        let p = Path::new(part);
         if !matches!(p.components().next(), Some(Component::Normal(_))) || p.components().count() != 1 {
             return None;
         }
-        out.push(parte);
+        out.push(part);
     }
     Some(out)
 }
 
-/// `rel` dentro `radice`, verificato anche dopo aver risolto i collegamenti.
-fn dentro(radice: &Path, rel: &str) -> Option<PathBuf> {
-    let unito = radice.join(rel_sicuro(rel)?);
-    let base = std::fs::canonicalize(paths::extended(radice)).ok()?;
-    let reale = std::fs::canonicalize(paths::extended(&unito)).ok()?;
-    reale.starts_with(&base).then_some(unito)
+/// `rel` inside `root`, checked also after resolving the links.
+fn inside(root: &Path, rel: &str) -> Option<PathBuf> {
+    let joined = root.join(safe_rel(rel)?);
+    let base = std::fs::canonicalize(paths::extended(root)).ok()?;
+    let real = std::fs::canonicalize(paths::extended(&joined)).ok()?;
+    real.starts_with(&base).then_some(joined)
 }
 
-/// Nascosto o di sistema: fuori da ciò che si condivide.
-fn nascosto(p: &Path) -> bool {
+/// Hidden or system: outside what is shared.
+fn hidden(p: &Path) -> bool {
     std::fs::symlink_metadata(paths::extended(p)).is_ok_and(|m| crate::fs::entry::is_hidden(&m))
 }
 
-/// Come `dentro`, ma per ciò che si dà agli altri PC: nessun tratto del
-/// path sotto la cartella condivisa può essere nascosto. L'elenco già non li
-/// mostrava; senza questo controllo chi conosceva il path li scaricava.
-fn condiviso(radice: &Path, rel: &str) -> Option<PathBuf> {
-    let p = dentro(radice, rel)?;
-    let mut tratto = radice.to_path_buf();
-    for parte in rel_sicuro(rel)?.components() {
-        tratto.push(parte);
-        if nascosto(&tratto) {
+/// Like `inside`, but for what is given to the other PCs: no segment of the
+/// path under the shared folder may be hidden. The listing already did not
+/// show them; without this check whoever knew the path downloaded them.
+fn shared_path(root: &Path, rel: &str) -> Option<PathBuf> {
+    let p = inside(root, rel)?;
+    let mut walked = root.to_path_buf();
+    for part in safe_rel(rel)?.components() {
+        walked.push(part);
+        if hidden(&walked) {
             return None;
         }
     }
     Some(p)
 }
 
-/// Il piano di ciò che si scarica dalla cartella condivisa, senza i nascosti.
-fn piano_condiviso(sorgente: &Path) -> Vec<Voce> {
-    piano_con(sorgente, true)
+/// The plan of what is downloaded from the shared folder, without the hidden ones.
+fn shared_plan(source: &Path) -> Vec<Item> {
+    plan_with(source, true)
 }
 
-pub(crate) fn errore_io(e: io::Error) -> FsError {
+pub(crate) fn io_error(e: io::Error) -> FsError {
     FsError::Io { message: format!("Rete locale: {}", e) }
 }
 
-// ── Stato del servizio ───────────────────────────────────────────────
+// ── Service state ────────────────────────────────────────────────────
 
 pub struct Lan {
     pub id: String,
-    pub nome: String,
+    pub name: String,
     config: Mutex<Config>,
     file_config: PathBuf,
-    pari: Mutex<HashMap<String, (Pari, Instant)>>,
-    /// Chi aspetta il consenso: `None` è un rifiuto, altrimenti dove salvare.
-    richieste: Mutex<HashMap<u64, mpsc::Sender<Option<PathBuf>>>>,
-    prossima: AtomicU64,
-    /// Chi ci ha annunciato di persona, non in broadcast: gli si risponde
-    /// allo stesso modo, così basta che uno solo dei due aggiunga l'altro.
-    ritorni: Mutex<HashMap<IpAddr, Instant>>,
-    /// Le ricezioni in corso, per poterle fermare da questo lato.
-    ricezioni: Mutex<HashMap<u64, Arc<AtomicBool>>>,
+    peers: Mutex<HashMap<String, (Peer, Instant)>>,
+    /// Who is waiting for consent: `None` is a refusal, otherwise where to save.
+    requests: Mutex<HashMap<u64, mpsc::Sender<Option<PathBuf>>>>,
+    next: AtomicU64,
+    /// Who announced to us in person, not over broadcast: we answer them the
+    /// same way, so it is enough for one of the two to add the other.
+    replies: Mutex<HashMap<IpAddr, Instant>>,
+    /// The receptions in progress, so they can be stopped from this side.
+    receivings: Mutex<HashMap<u64, Arc<AtomicBool>>>,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -317,63 +381,63 @@ struct FileConfig {
 }
 
 impl Lan {
-    /// Carica identità e preferenze e avvia i thread di rete.
-    pub fn avvia(app: tauri::AppHandle, cartella_dati: PathBuf) -> Arc<Lan> {
-        let file_config = cartella_dati.join("lan.json");
-        let salvato: FileConfig = std::fs::read(&file_config)
+    /// Loads identity and preferences and starts the network threads.
+    pub fn start(app: tauri::AppHandle, data_dir: PathBuf) -> Arc<Lan> {
+        let file_config = data_dir.join("lan.json");
+        let saved: FileConfig = std::fs::read(&file_config)
             .ok()
             .and_then(|d| serde_json::from_slice(&d).ok())
             .unwrap_or_default();
 
-        let nome = std::env::var("COMPUTERNAME").unwrap_or_else(|_| "PC".to_string());
-        // L'id è leggibile — nome del PC più un suffisso — perché compare
-        // nella barra degli indirizzi quando si sfoglia l'altro PC.
-        let id = salvato.id.clone().unwrap_or_else(|| {
-            let casuale = std::time::SystemTime::now()
+        let name = std::env::var("COMPUTERNAME").unwrap_or_else(|_| "PC".to_string());
+        // The id is readable — PC name plus a suffix — because it shows up
+        // in the address bar when browsing the other PC.
+        let id = saved.id.clone().unwrap_or_else(|| {
+            let random = std::time::SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .map(|d| d.subsec_nanos() ^ std::process::id())
                 .unwrap_or(0);
-            format!("{}-{:04x}", nome.replace(['\\', '/', ' '], "-"), casuale & 0xffff)
+            format!("{}-{:04x}", name.replace(['\\', '/', ' '], "-"), random & 0xffff)
         });
 
-        let lan = Arc::new(Lan::nuovo(id, nome, salvato.config, file_config));
-        lan.salva();
+        let lan = Arc::new(Lan::new(id, name, saved.config, file_config));
+        lan.save();
 
-        let avvisi = avvisi_app(app);
-        avvia_scoperta(avvisi.clone(), lan.clone());
-        if let Ok(server) = TcpListener::bind(("0.0.0.0", PORTA_DATI)) {
-            avvia_server(avvisi, lan.clone(), server);
+        let notifier = app_notifier(app);
+        start_discovery(notifier.clone(), lan.clone());
+        if let Ok(server) = TcpListener::bind(("0.0.0.0", DATA_PORT)) {
+            start_server(notifier, lan.clone(), server);
         } else {
-            eprintln!("Rete locale: porta {} occupata, server disattivato", PORTA_DATI);
+            eprintln!("Lan: port {} taken, server disabled", DATA_PORT);
         }
         lan
     }
 
-    /// Il nome con cui questo PC si presenta agli altri.
-    pub fn nome(&self) -> &str {
-        &self.nome
+    /// The name this PC introduces itself to the others with.
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
-    pub(crate) fn nuovo(id: String, nome: String, config: Config, file_config: PathBuf) -> Lan {
+    pub(crate) fn new(id: String, name: String, config: Config, file_config: PathBuf) -> Lan {
         Lan {
             id,
-            nome,
+            name,
             config: Mutex::new(config),
             file_config,
-            pari: Mutex::new(HashMap::new()),
-            richieste: Mutex::new(HashMap::new()),
-            prossima: AtomicU64::new(1),
-            ritorni: Mutex::new(HashMap::new()),
-            ricezioni: Mutex::new(HashMap::new()),
+            peers: Mutex::new(HashMap::new()),
+            requests: Mutex::new(HashMap::new()),
+            next: AtomicU64::new(1),
+            replies: Mutex::new(HashMap::new()),
+            receivings: Mutex::new(HashMap::new()),
         }
     }
 
-    pub fn stato(&self) -> Stato {
-        Stato {
+    pub fn status(&self) -> LanStatus {
+        LanStatus {
             id: self.id.clone(),
-            nome: self.nome.clone(),
-            cartella_ricevuti: paths::display(&self.cartella_ricevuti()),
-            config: self.config(),
+            name: self.name.clone(),
+            received_folder: paths::display(&self.received_folder()),
+            config: self.config().into(),
         }
     }
 
@@ -381,14 +445,14 @@ impl Lan {
         self.config.lock().map(|c| c.clone()).unwrap_or_default()
     }
 
-    pub fn imposta(&self, nuova: Config) {
+    pub fn set(&self, new: Config) {
         if let Ok(mut c) = self.config.lock() {
-            *c = nuova;
+            *c = new;
         }
-        self.salva();
+        self.save();
     }
 
-    fn salva(&self) {
+    fn save(&self) {
         let f = FileConfig { id: Some(self.id.clone()), config: self.config() };
         if let Some(dir) = self.file_config.parent() {
             let _ = std::fs::create_dir_all(dir);
@@ -398,64 +462,64 @@ impl Lan {
         }
     }
 
-    /// Un PC appena annunciato. Il primo indirizzo da cui si è fatto sentire
-    /// resta il suo finché non tace: chiunque in rete poteva annunciarsi con
-    /// l'id di un altro e prendersi le sue cartelle e i file mandati a lui.
-    /// Le voci scadute si tolgono, e la lista ha un tetto.
-    fn registra(&self, p: Pari) {
-        let Ok(mut m) = self.pari.lock() else { return };
-        m.retain(|_, (_, visto)| visto.elapsed() < SCADENZA);
+    /// A PC just announced. The first address it was heard from
+    /// stays its own until it goes quiet: anyone on the network could announce itself with
+    /// the id of another and take its folders and the files sent to it.
+    /// Expired entries are removed, and the list has a cap.
+    fn register(&self, p: Peer) {
+        let Ok(mut m) = self.peers.lock() else { return };
+        m.retain(|_, (_, seen)| seen.elapsed() < EXPIRY);
         match m.get(&p.id) {
-            Some((noto, _)) if noto.ip != p.ip => {}
+            Some((known, _)) if known.ip != p.ip => {}
             Some(_) => {
                 m.insert(p.id.clone(), (p, Instant::now()));
             }
-            None if m.len() < MASSIMO_PARI => {
+            None if m.len() < MAX_PEERS => {
                 m.insert(p.id.clone(), (p, Instant::now()));
             }
             None => {}
         }
     }
 
-    /// I PC sentiti di recente, ordinati per nome.
-    pub fn pari(&self) -> Vec<Pari> {
-        let mut v: Vec<Pari> = self
-            .pari
+    /// The PCs heard recently, sorted by name.
+    pub fn peers(&self) -> Vec<Peer> {
+        let mut v: Vec<Peer> = self
+            .peers
             .lock()
             .map(|m| {
                 m.values()
-                    .filter(|(_, visto)| visto.elapsed() < SCADENZA)
+                    .filter(|(_, seen)| seen.elapsed() < EXPIRY)
                     .map(|(p, _)| p.clone())
                     .collect()
             })
             .unwrap_or_default();
-        v.sort_by(|a, b| a.nome.to_lowercase().cmp(&b.nome.to_lowercase()));
+        v.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
         v
     }
 
-    fn indirizzo(&self, id: &str) -> Result<SocketAddr, FsError> {
-        self.pari()
+    fn address(&self, id: &str) -> Result<SocketAddr, FsError> {
+        self.peers()
             .into_iter()
             .find(|p| p.id == id)
-            .and_then(|p| p.ip.parse::<IpAddr>().ok().map(|ip| SocketAddr::new(ip, p.porta)))
+            .and_then(|p| p.ip.parse::<IpAddr>().ok().map(|ip| SocketAddr::new(ip, p.port)))
             .ok_or_else(|| FsError::Io {
                 message: "Questo PC non è più raggiungibile in rete locale.".to_string(),
             })
     }
 
-    pub(crate) fn cartella_ricevuti(&self) -> PathBuf {
+    pub(crate) fn received_folder(&self) -> PathBuf {
         self.config()
-            .ricevuti
+            .received
             .map(PathBuf::from)
             .unwrap_or_else(|| {
-                let casa = crate::fs::paths::casa().unwrap_or_else(|| ".".into());
-                Path::new(&casa).join("Downloads").join("Space Train")
+                let home = crate::fs::paths::home().unwrap_or_else(|| ".".into());
+                Path::new(&home).join("Downloads").join("Space Train")
             })
     }
 
-    /// Ferma una ricezione in corso. Ritorna falso se era già finita.
-    pub fn annulla_ricezione(&self, id: u64) -> bool {
-        match self.ricezioni.lock().ok().and_then(|m| m.get(&id).cloned()) {
+    /// Stops a reception in progress. Returns false if it had already ended.
+    pub fn cancel_receive(&self, id: u64) -> bool {
+        match self.receivings.lock().ok().and_then(|m| m.get(&id).cloned()) {
             Some(f) => {
                 f.store(true, Ordering::Relaxed);
                 true
@@ -464,141 +528,141 @@ impl Lan {
         }
     }
 
-    /// La risposta dell'utente a una richiesta d'invio, con la cartella
-    /// scelta per salvare. Una cartella che non è un path assoluto su disco
-    /// (vuota, virtuale, relativa) vale come nessuna scelta.
-    pub fn rispondi(&self, id: u64, accetta: bool, cartella: Option<String>) {
-        if let Some(tx) = self.richieste.lock().ok().and_then(|mut m| m.remove(&id)) {
-            let dest = accetta.then(|| {
-                cartella
+    /// The user's answer to a send request, with the folder chosen to save
+    /// in. A folder that is not an absolute path on disk (empty, virtual,
+    /// relative) counts as no choice.
+    pub fn respond(&self, id: u64, accept: bool, folder: Option<String>) {
+        if let Some(tx) = self.requests.lock().ok().and_then(|mut m| m.remove(&id)) {
+            let dest = accept.then(|| {
+                folder
                     .map(PathBuf::from)
                     .filter(|c| c.is_absolute())
-                    .unwrap_or_else(|| self.cartella_ricevuti())
+                    .unwrap_or_else(|| self.received_folder())
             });
             let _ = tx.send(dest);
         }
     }
 }
 
-/// Come i servizi di rete avvisano il frontend. Il consenso e l'avanzamento
-/// di una ricezione si mostrano in una finestra sola, l'ultima usata; le
-/// liste di PC e di amici valgono per tutte.
-pub fn avvisi_app(app: tauri::AppHandle) -> Avvisi {
-    Arc::new(move |nome: &str, dato: serde_json::Value| {
-        if nome == "lan-pari" || nome == "amici" {
-            let _ = app.emit(nome, dato);
+/// How the network services notify the frontend. The consent and the
+/// progress of a reception are shown in one window only, the last used;
+/// the lists of PCs and friends apply to all of them.
+pub fn app_notifier(app: tauri::AppHandle) -> Notifier {
+    Arc::new(move |name: &str, payload: serde_json::Value| {
+        if name == "lan-peers" || name == "friends" {
+            let _ = app.emit(name, payload);
         } else {
-            let w = crate::finestre::ultima(&app);
-            let _ = app.emit_to(w.label(), nome, dato);
+            let w = crate::app_windows::last(&app);
+            let _ = app.emit_to(w.label(), name, payload);
         }
     })
 }
 
 // ── Scoperta ─────────────────────────────────────────────────────────
 
-fn avvia_scoperta(avvisi: Avvisi, lan: Arc<Lan>) {
-    let Ok(socket) = UdpSocket::bind(("0.0.0.0", PORTA_ANNUNCI)) else {
-        eprintln!("Rete locale: porta {} occupata, scoperta disattivata", PORTA_ANNUNCI);
+fn start_discovery(notifier: Notifier, lan: Arc<Lan>) {
+    let Ok(socket) = UdpSocket::bind(("0.0.0.0", ANNOUNCE_PORT)) else {
+        eprintln!("Lan: port {} taken, discovery disabled", ANNOUNCE_PORT);
         return;
     };
     let _ = socket.set_broadcast(true);
     let _ = socket.set_read_timeout(Some(Duration::from_secs(1)));
-    let Ok(invio) = socket.try_clone() else { return };
+    let Ok(sender) = socket.try_clone() else { return };
 
-    // Annunci periodici, solo se l'utente ha reso visibile questo PC: a tutta
-    // la rete di casa, e uno per uno ai PC aggiunti per indirizzo.
+    // Periodic announcements, only if the user made this PC visible: to the
+    // whole home network, and one by one to the PCs added by address.
     let lan_a = lan.clone();
     std::thread::Builder::new()
-        .name("lan-annunci".into())
+        .name("lan-announce".into())
         .spawn(move || loop {
             let c = lan_a.config();
-            if c.visibile {
-                if let Ok(d) = serde_json::to_vec(&annuncio(&lan_a, &c)) {
-                    let _ = invio.send_to(&d, ("255.255.255.255", PORTA_ANNUNCI));
-                    for destinazione in destinazioni_dirette(&lan_a, &c) {
-                        let _ = invio.send_to(&d, destinazione);
+            if c.visible {
+                if let Ok(d) = serde_json::to_vec(&announcement(&lan_a, &c)) {
+                    let _ = sender.send_to(&d, ("255.255.255.255", ANNOUNCE_PORT));
+                    for destination in direct_destinations(&lan_a, &c) {
+                        let _ = sender.send_to(&d, destination);
                     }
                 }
             }
-            std::thread::sleep(OGNI);
+            std::thread::sleep(EVERY);
         })
         .ok();
 
     std::thread::Builder::new()
-        .name("lan-ascolto".into())
+        .name("lan-listen".into())
         .spawn(move || {
             let mut buf = [0u8; 2048];
-            let mut ultimi: Vec<Pari> = Vec::new();
+            let mut latest: Vec<Peer> = Vec::new();
             loop {
-                if let Ok((n, da)) = socket.recv_from(&mut buf) {
-                    if let Ok(a) = serde_json::from_slice::<Annuncio>(&buf[..n]) {
+                if let Ok((n, from)) = socket.recv_from(&mut buf) {
+                    if let Ok(a) = serde_json::from_slice::<Announcement>(&buf[..n]) {
                         if a.app == "space-train" && a.id != lan.id {
-                            // Gli si risponde di persona finché si fa sentire:
-                            // un annuncio arrivato dalla VPN non tornerebbe
-                            // indietro col broadcast.
-                            if let Ok(mut r) = lan.ritorni.lock() {
-                                r.retain(|_, visto| visto.elapsed() < SCADENZA);
-                                if r.len() < MASSIMO_PARI || r.contains_key(&da.ip()) {
-                                    r.insert(da.ip(), Instant::now());
+                            // We answer them in person as long as they make
+                            // themselves heard: an announcement arrived from
+                            // the VPN would not come back over broadcast.
+                            if let Ok(mut r) = lan.replies.lock() {
+                                r.retain(|_, seen| seen.elapsed() < EXPIRY);
+                                if r.len() < MAX_PEERS || r.contains_key(&from.ip()) {
+                                    r.insert(from.ip(), Instant::now());
                                 }
                             }
-                            lan.registra(Pari {
+                            lan.register(Peer {
                                 id: a.id,
-                                nome: a.nome,
-                                ip: da.ip().to_string(),
-                                porta: a.porta,
-                                condivisa: a.condivisa,
+                                name: a.name,
+                                ip: from.ip().to_string(),
+                                port: a.port,
+                                shared: a.shared,
                             });
                         }
                     }
                 }
-                // Avvisa il frontend solo quando la lista cambia davvero.
-                let ora = lan.pari();
-                if ora != ultimi {
-                    avvisa(&avvisi, "lan-pari", &ora);
-                    ultimi = ora;
+                // Notifies the frontend only when the list really changes.
+                let now = lan.peers();
+                if now != latest {
+                    notify(&notifier, "lan-peers", &now);
+                    latest = now;
                 }
             }
         })
         .ok();
 }
 
-fn annuncio(lan: &Lan, c: &Config) -> Annuncio {
-    Annuncio {
+fn announcement(lan: &Lan, c: &Config) -> Announcement {
+    Announcement {
         app: "space-train".into(),
         v: 1,
         id: lan.id.clone(),
-        nome: lan.nome.clone(),
-        porta: PORTA_DATI,
-        condivisa: c.condivisa.as_deref().map(crate::shell::nome_di),
+        name: lan.name.clone(),
+        port: DATA_PORT,
+        shared: c.shared.as_deref().map(crate::shell::name_of),
     }
 }
 
-/// Un indirizzo scritto dall'utente nella forma che serve all'annuncio:
-/// `100.64.0.2`, `pc-di-casa` o `pc-di-casa.tail1234.ts.net`, anche con una
-/// porta. `None` se non si risolve (nome sconosciuto, rete assente).
-fn indirizzo_annunci(testo: &str) -> Option<SocketAddr> {
+/// An address typed by the user in the form the announcement needs:
+/// `100.64.0.2`, `home-pc` or `home-pc.tail1234.ts.net`, also with a port.
+/// `None` if it does not resolve (unknown name, no network).
+fn announce_address(text: &str) -> Option<SocketAddr> {
     use std::net::ToSocketAddrs;
-    let t = testo.trim();
+    let t = text.trim();
     if t.is_empty() {
         return None;
     }
     if let Ok(a) = t.parse::<SocketAddr>() {
-        return Some(SocketAddr::new(a.ip(), PORTA_ANNUNCI));
+        return Some(SocketAddr::new(a.ip(), ANNOUNCE_PORT));
     }
-    (t, PORTA_ANNUNCI)
+    (t, ANNOUNCE_PORT)
         .to_socket_addrs()
         .ok()?
         .find(|a| a.is_ipv4())
 }
 
-/// A chi mandare l'annuncio di persona: i PC aggiunti per indirizzo e chi ci
-/// ha annunciato di recente da fuori della rete di casa.
-fn destinazioni_dirette(lan: &Lan, c: &Config) -> Vec<SocketAddr> {
-    let mut out: Vec<SocketAddr> = c.indirizzi.iter().filter_map(|t| indirizzo_annunci(t)).collect();
-    if let Ok(mut r) = lan.ritorni.lock() {
-        r.retain(|_, visto| visto.elapsed() < SCADENZA);
-        out.extend(r.keys().map(|ip| SocketAddr::new(*ip, PORTA_ANNUNCI)));
+/// Whom to send the announcement to in person: the PCs added by address and
+/// those who recently announced to us from outside the home network.
+fn direct_destinations(lan: &Lan, c: &Config) -> Vec<SocketAddr> {
+    let mut out: Vec<SocketAddr> = c.addresses.iter().filter_map(|t| announce_address(t)).collect();
+    if let Ok(mut r) = lan.replies.lock() {
+        r.retain(|_, seen| seen.elapsed() < EXPIRY);
+        out.extend(r.keys().map(|ip| SocketAddr::new(*ip, ANNOUNCE_PORT)));
     }
     out.sort();
     out.dedup();
@@ -607,159 +671,159 @@ fn destinazioni_dirette(lan: &Lan, c: &Config) -> Vec<SocketAddr> {
 
 // ── Server ───────────────────────────────────────────────────────────
 
-/// Quante connessioni si servono insieme. Ognuna ha il suo thread: senza un
-/// tetto, chiunque in rete poteva aprirne migliaia e fermare il PC.
-const MASSIMO_CONNESSIONI: usize = 32;
+/// How many connections are served at once. Each has its own thread:
+/// without a cap, anyone on the network could open thousands and stop the PC.
+const MAX_CONNECTIONS: usize = 32;
 
-/// Un posto fra le connessioni servite; lo libera chi lo lascia cadere.
-struct Posto(Arc<std::sync::atomic::AtomicUsize>);
+/// A slot among the served connections; whoever drops it frees it.
+struct Slot(Arc<std::sync::atomic::AtomicUsize>);
 
-impl Posto {
-    fn prendi(occupati: &Arc<std::sync::atomic::AtomicUsize>) -> Option<Posto> {
-        occupati
-            .try_update(Ordering::AcqRel, Ordering::Acquire, |n| (n < MASSIMO_CONNESSIONI).then_some(n + 1))
+impl Slot {
+    fn take_slot(in_use: &Arc<std::sync::atomic::AtomicUsize>) -> Option<Slot> {
+        in_use
+            .try_update(Ordering::AcqRel, Ordering::Acquire, |n| (n < MAX_CONNECTIONS).then_some(n + 1))
             .ok()
-            .map(|_| Posto(occupati.clone()))
+            .map(|_| Slot(in_use.clone()))
     }
 }
 
-impl Drop for Posto {
+impl Drop for Slot {
     fn drop(&mut self) {
         self.0.fetch_sub(1, Ordering::AcqRel);
     }
 }
 
-fn avvia_server(avvisi: Avvisi, lan: Arc<Lan>, server: TcpListener) {
+fn start_server(notifier: Notifier, lan: Arc<Lan>, server: TcpListener) {
     std::thread::Builder::new()
         .name("lan-server".into())
         .spawn(move || {
-            let occupati = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let in_use = Arc::new(std::sync::atomic::AtomicUsize::new(0));
             for conn in server.incoming().flatten() {
-                // Pieno: la connessione si chiude subito, chi la apriva riproverà.
-                let Some(posto) = Posto::prendi(&occupati) else {
+                // Full: the connection closes right away, whoever opened it will retry.
+                let Some(slot) = Slot::take_slot(&in_use) else {
                     continue;
                 };
-                let avvisi = avvisi.clone();
+                let notifier = notifier.clone();
                 let lan = lan.clone();
                 std::thread::spawn(move || {
-                    let _posto = posto;
-                    let _ = servi(avvisi, lan, conn);
+                    let _slot = slot;
+                    let _ = serve(notifier, lan, conn);
                 });
             }
         })
         .ok();
 }
 
-fn servi(avvisi: Avvisi, lan: Arc<Lan>, mut s: TcpStream) -> io::Result<()> {
-    let visibile = lan.config().visibile;
-    // Da invisibile si aspetta poco: basta leggere la richiesta per dire di no.
-    let _ = s.set_read_timeout(Some(Duration::from_secs(if visibile { 60 } else { 5 })));
-    let richiesta: Richiesta = leggi_json(&mut s)?;
+fn serve(notifier: Notifier, lan: Arc<Lan>, mut s: TcpStream) -> io::Result<()> {
+    let visible = lan.config().visible;
+    // When invisible we wait briefly: reading the request is enough to say no.
+    let _ = s.set_read_timeout(Some(Duration::from_secs(if visible { 60 } else { 5 })));
+    let request: Request = read_json(&mut s)?;
 
-    // Un PC non visibile non risponde a nessuno: invisibile davvero.
-    if !visibile {
-        return scrivi_json(&mut s, &Risposta::errore("Questo PC non è visibile in rete locale."));
+    // A PC that is not visible answers nobody: truly invisible.
+    if !visible {
+        return write_json(&mut s, &Response::error("Questo PC non è visibile in rete locale."));
     }
-    let esito = match richiesta {
-        // Le richieste degli amici non passano dalla rete di casa.
-        Richiesta::Ciao { .. }
-        | Richiesta::Amicizia { .. }
-        | Richiesta::Rimuovi
-        | Richiesta::BackupElenco { .. }
-        | Richiesta::Backup { .. } => {
-            scrivi_json(&mut s, &Risposta::errore("Richiesta non valida."))
+    let outcome = match request {
+        // The friends' requests do not go through the home network.
+        Request::Hello { .. }
+        | Request::Friendship { .. }
+        | Request::Remove
+        | Request::BackupList { .. }
+        | Request::Backup { .. } => {
+            write_json(&mut s, &Response::error("Richiesta non valida."))
         }
-        r => servi_richiesta(&avvisi, &lan, &mut s, r, &Permessi { condivisione: true, mittente: None }),
+        r => serve_request(&notifier, &lan, &mut s, r, &Permissions { sharing: true, sender: None }),
     };
-    // Chiudere la connessione è il modo in cui chi invia sa dell'annullamento.
+    // Closing the connection is how the sender learns about the cancellation.
     let _ = s.shutdown(std::net::Shutdown::Both);
-    esito
+    outcome
 }
 
-/// Chi chiede, e cosa può avere.
-pub(crate) struct Permessi {
-    /// Può sfogliare e scaricare la cartella condivisa.
-    pub(crate) condivisione: bool,
-    /// Il nome sicuro di chi chiede (un amico, riconosciuto dalla sua
-    /// chiave): vale al posto di quello che dichiara nella richiesta.
-    pub(crate) mittente: Option<String>,
+/// Who is asking, and what they can have.
+pub(crate) struct Permissions {
+    /// Can browse and download the shared folder.
+    pub(crate) sharing: bool,
+    /// The safe name of the requester (a friend, recognized by their key):
+    /// it applies instead of the one declared in the request.
+    pub(crate) sender: Option<String>,
 }
 
-/// Risponde a una richiesta di cartella condivisa o d'invio, su qualsiasi
-/// connessione: un socket della rete di casa o un flusso cifrato fra amici.
-pub(crate) fn servi_richiesta<S: Read + Write>(
-    avvisi: &Avvisi,
+/// Answers a shared folder or send request, on any connection: a socket of
+/// the home network or an encrypted stream between friends.
+pub(crate) fn serve_request<S: Read + Write>(
+    notifier: &Notifier,
     lan: &Arc<Lan>,
     s: &mut S,
-    richiesta: Richiesta,
-    permessi: &Permessi,
+    request: Request,
+    permissions: &Permissions,
 ) -> io::Result<()> {
     let config = lan.config();
-    let condivisa = config.condivisa.as_deref().map(PathBuf::from).filter(|_| permessi.condivisione);
-    match richiesta {
-        Richiesta::Elenca { path } => {
-            let Some(radice) = condivisa else {
-                return scrivi_json(s, &Risposta::errore("Questo PC non condivide nessuna cartella."));
+    let shared = config.shared.as_deref().map(PathBuf::from).filter(|_| permissions.sharing);
+    match request {
+        Request::List { path } => {
+            let Some(root) = shared else {
+                return write_json(s, &Response::error("Questo PC non condivide nessuna cartella."));
             };
-            let Some(cartella) = condiviso(&radice, &path) else {
-                return scrivi_json(s, &Risposta::errore("Cartella non trovata."));
+            let Some(folder) = shared_path(&root, &path) else {
+                return write_json(s, &Response::error("Cartella non trovata."));
             };
-            let voci = elenca_locale(&cartella);
-            scrivi_json(s, &Risposta { ok: true, voci, ..Default::default() })
+            let items = list_local(&folder);
+            write_json(s, &Response { ok: true, items, ..Default::default() })
         }
-        Richiesta::Scarica { path } => {
-            let Some(radice) = condivisa else {
-                return scrivi_json(s, &Risposta::errore("Questo PC non condivide nessuna cartella."));
+        Request::Download { path } => {
+            let Some(root) = shared else {
+                return write_json(s, &Response::error("Questo PC non condivide nessuna cartella."));
             };
-            let Some(sorgente) = condiviso(&radice, &path) else {
-                return scrivi_json(s, &Risposta::errore("Elemento non trovato."));
+            let Some(source) = shared_path(&root, &path) else {
+                return write_json(s, &Response::error("Elemento non trovato."));
             };
-            let contenuto = piano_condiviso(&sorgente);
-            scrivi_json(s, &Risposta { ok: true, contenuto: contenuto.clone(), ..Default::default() })?;
-            let base = sorgente.parent().unwrap_or(&sorgente).to_path_buf();
-            manda_file(s, &base, &contenuto, &AtomicBool::new(false), &mut |_| {})
+            let content = shared_plan(&source);
+            write_json(s, &Response { ok: true, content: content.clone(), ..Default::default() })?;
+            let base = source.parent().unwrap_or(&source).to_path_buf();
+            send_files(s, &base, &content, &AtomicBool::new(false), &mut |_| {})
         }
-        Richiesta::Invia { da, voci, totale } => {
-            let da = permessi.mittente.clone().unwrap_or(da);
-            ricevi(avvisi.clone(), lan.clone(), s, da, voci, totale)
+        Request::Send { from, items, total } => {
+            let from = permissions.sender.clone().unwrap_or(from);
+            receive(notifier.clone(), lan.clone(), s, from, items, total)
         }
-        Richiesta::Ciao { .. }
-        | Richiesta::Amicizia { .. }
-        | Richiesta::Rimuovi
-        | Richiesta::BackupElenco { .. }
-        | Richiesta::Backup { .. } => {
-            scrivi_json(s, &Risposta::errore("Richiesta non valida."))
+        Request::Hello { .. }
+        | Request::Friendship { .. }
+        | Request::Remove
+        | Request::BackupList { .. }
+        | Request::Backup { .. } => {
+            write_json(s, &Response::error("Richiesta non valida."))
         }
     }
 }
 
-fn elenca_locale(cartella: &Path) -> Vec<VoceRemota> {
-    let Ok(rd) = std::fs::read_dir(paths::extended(cartella)) else { return Vec::new() };
+fn list_local(folder: &Path) -> Vec<RemoteItem> {
+    let Ok(rd) = std::fs::read_dir(paths::extended(folder)) else { return Vec::new() };
     rd.filter_map(|d| d.ok())
         .filter_map(|d| crate::fs::entry::entry_from_dir_entry(&d))
         .filter(|e| !e.hidden)
-        .map(|e| VoceRemota {
-            nome: e.name,
-            cartella: e.kind == EntryKind::Dir,
-            dimensione: e.size,
-            modificato: e.modified,
+        .map(|e| RemoteItem {
+            name: e.name,
+            folder: e.kind == EntryKind::Dir,
+            size: e.size,
+            modified: e.modified,
         })
         .collect()
 }
 
-/// Tutto ciò che va spedito per `sorgente`: lei stessa e, se è una
-/// cartella, il suo contenuto. I path partono dal nome di `sorgente`.
-pub(crate) fn piano(sorgente: &Path) -> Vec<Voce> {
-    piano_con(sorgente, false)
+/// Everything to be sent for `source`: itself and, if it is a folder, its
+/// content. The paths start from the name of `source`.
+pub(crate) fn plan(source: &Path) -> Vec<Item> {
+    plan_with(source, false)
 }
 
-fn piano_con(sorgente: &Path, salta_nascosti: bool) -> Vec<Voce> {
-    let base = sorgente.parent().unwrap_or(sorgente);
+fn plan_with(source: &Path, skip_hidden: bool) -> Vec<Item> {
+    let base = source.parent().unwrap_or(source);
     let mut out = Vec::new();
-    let mut pila = vec![sorgente.to_path_buf()];
-    while let Some(p) = pila.pop() {
+    let mut stack = vec![source.to_path_buf()];
+    while let Some(p) = stack.pop() {
         let Ok(meta) = std::fs::symlink_metadata(paths::extended(&p)) else { continue };
-        if salta_nascosti && crate::fs::entry::is_hidden(&meta) {
+        if skip_hidden && crate::fs::entry::is_hidden(&meta) {
             continue;
         }
         let rel = p
@@ -767,40 +831,40 @@ fn piano_con(sorgente: &Path, salta_nascosti: bool) -> Vec<Voce> {
             .map(|r| r.to_string_lossy().replace('\\', "/"))
             .unwrap_or_default();
         if meta.is_dir() {
-            out.push(Voce { rel, dimensione: 0, cartella: true });
+            out.push(Item { rel, size: 0, folder: true });
             if let Ok(rd) = std::fs::read_dir(paths::extended(&p)) {
-                let mut figli: Vec<PathBuf> = rd.filter_map(|d| d.ok()).map(|d| d.path()).collect();
-                figli.sort();
-                for f in figli.into_iter().rev() {
-                    pila.push(PathBuf::from(paths::display(&f)));
+                let mut children: Vec<PathBuf> = rd.filter_map(|d| d.ok()).map(|d| d.path()).collect();
+                children.sort();
+                for f in children.into_iter().rev() {
+                    stack.push(PathBuf::from(paths::display(&f)));
                 }
             }
-        } else if meta.is_file() && leggibile(&p) {
-            // Un file che l'antivirus trattiene qui non si annuncia: non si
-            // potrebbe spedirlo, e il trasferimento si fermerebbe a metà.
-            out.push(Voce { rel, dimensione: meta.len(), cartella: false });
+        } else if meta.is_file() && readable(&p) {
+            // A file the antivirus holds back here is not announced: it could
+            // not be sent, and the transfer would stop halfway.
+            out.push(Item { rel, size: meta.len(), folder: false });
         }
     }
     out
 }
 
-/// Spedisce i byte dei file del piano, uno dopo l'altro, nella stessa
-/// misura annunciata: chi riceve legge esattamente `dimensione` byte.
-pub(crate) fn manda_file(
+/// Sends the bytes of the plan's files, one after the other, in the same
+/// size announced: the receiver reads exactly `size` bytes.
+pub(crate) fn send_files(
     s: &mut impl Write,
     base: &Path,
-    voci: &[Voce],
-    annulla: &AtomicBool,
-    avanzamento: &mut dyn FnMut(u64),
+    items: &[Item],
+    cancel: &AtomicBool,
+    progress: &mut dyn FnMut(u64),
 ) -> io::Result<()> {
-    let mut fatti = 0u64;
+    let mut done = 0u64;
     let mut buf = vec![0u8; 256 * 1024];
-    for v in voci.iter().filter(|v| !v.cartella) {
-        let path = base.join(rel_sicuro(&v.rel).unwrap_or_default());
-        let mut f = std::fs::File::open(paths::extended(&path))?.take(v.dimensione);
-        let mut mandati = 0u64;
+    for v in items.iter().filter(|v| !v.folder) {
+        let path = base.join(safe_rel(&v.rel).unwrap_or_default());
+        let mut f = std::fs::File::open(paths::extended(&path))?.take(v.size);
+        let mut sent = 0u64;
         loop {
-            if annulla.load(Ordering::Relaxed) {
+            if cancel.load(Ordering::Relaxed) {
                 return Err(io::Error::new(io::ErrorKind::Interrupted, "annullato"));
             }
             let n = f.read(&mut buf)?;
@@ -808,239 +872,239 @@ pub(crate) fn manda_file(
                 break;
             }
             s.write_all(&buf[..n])?;
-            mandati += n as u64;
-            fatti += n as u64;
-            avanzamento(fatti);
+            sent += n as u64;
+            done += n as u64;
+            progress(done);
         }
-        // Un file accorciato nel frattempo: si completa con zeri per non
-        // sfasare tutti quelli che seguono.
-        // Gli zeri si generano mentre si scrivono: un file da 4 GB svuotato
-        // durante l'invio non chiede 4 GB di memoria.
-        if mandati < v.dimensione {
-            io::copy(&mut io::repeat(0).take(v.dimensione - mandati), s)?;
+        // A file shortened in the meantime: it is padded with zeros so as
+        // not to shift all the ones that follow.
+        // The zeros are generated while being written: a 4 GB file emptied
+        // during the send does not ask for 4 GB of memory.
+        if sent < v.size {
+            io::copy(&mut io::repeat(0).take(v.size - sent), s)?;
         }
     }
     s.flush()
 }
 
-/// Cosa è arrivato da un altro PC.
+/// What arrived from another PC.
 #[derive(Debug, Default)]
-pub(crate) struct Arrivo {
-    /// I path di primo livello creati, già con il nome libero scelto.
-    pub(crate) creati: Vec<PathBuf>,
-    /// I file (path relativi come annunciati) che l'antivirus ha fermato.
-    pub(crate) bloccati: Vec<String>,
+pub(crate) struct Arrival {
+    /// The top-level paths created, already with the free name chosen.
+    pub(crate) created: Vec<PathBuf>,
+    /// The files (relative paths as announced) the antivirus stopped.
+    pub(crate) blocked: Vec<String>,
 }
 
-/// Il messaggio per chi ha scaricato file e se n'è visto fermare qualcuno.
-pub(crate) fn avviso_bloccati(bloccati: &[String]) -> Option<String> {
-    let primo = bloccati.first()?;
-    let nome = primo.rsplit('/').next().unwrap_or(primo);
-    Some(match bloccati.len() {
-        1 => format!("L'antivirus di Windows ha fermato «{}»: non è stato salvato. Il resto è arrivato.", nome),
-        n => format!("L'antivirus di Windows ha fermato {} file (fra cui «{}»): non sono stati salvati. Il resto è arrivato.", n, nome),
+/// The message for whoever downloaded files and had some of them stopped.
+pub(crate) fn blocked_notice(blocked: &[String]) -> Option<String> {
+    let first = blocked.first()?;
+    let name = first.rsplit('/').next().unwrap_or(first);
+    Some(match blocked.len() {
+        1 => format!("L'antivirus di Windows ha fermato «{}»: non è stato salvato. Il resto è arrivato.", name),
+        n => format!("L'antivirus di Windows ha fermato {} file (fra cui «{}»): non sono stati salvati. Il resto è arrivato.", n, name),
     })
 }
 
-/// Legge i byte annunciati e li scrive sotto `dest`.
+/// Reads the announced bytes and writes them under `dest`.
 ///
-/// Ogni file arrivato passa dall'antivirus e viene segnato come venuto da
-/// internet (vedi `fs::provenienza`). Un file che l'antivirus ferma si salta
-/// leggendone comunque i byte, così quelli dopo arrivano lo stesso.
+/// Every arrived file goes through the antivirus and is marked as coming from
+/// the internet (see `fs::origin`). A file the antivirus stops is skipped
+/// while still reading its bytes, so the ones after it arrive anyway.
 ///
-/// Se si interrompe (annullato, rete caduta) toglie ciò che aveva iniziato
-/// a scrivere: un file a metà sembrerebbe buono e non lo è.
-pub(crate) fn prendi_file(
+/// If it is interrupted (cancelled, network down) it removes what it had started
+/// writing: a half file would look good and is not.
+pub(crate) fn receive_files(
     s: &mut impl Read,
     dest: &Path,
-    voci: &[Voce],
-    annulla: &AtomicBool,
-    avanzamento: &mut dyn FnMut(u64),
-) -> io::Result<Arrivo> {
-    let mut arrivo = Arrivo::default();
-    let esito = prendi_file_in(s, dest, voci, annulla, avanzamento, &mut arrivo);
-    if esito.is_err() {
-        for c in &arrivo.creati {
-            let _ = crate::fs::copy::rimuovi(c);
+    items: &[Item],
+    cancel: &AtomicBool,
+    progress: &mut dyn FnMut(u64),
+) -> io::Result<Arrival> {
+    let mut arrival = Arrival::default();
+    let outcome = receive_files_into(s, dest, items, cancel, progress, &mut arrival);
+    if outcome.is_err() {
+        for c in &arrival.created {
+            let _ = crate::fs::copy::remove(c);
         }
     }
-    // Un file singolo fermato dall'antivirus non è stato creato davvero.
-    arrivo.creati.retain(|c| paths::extended(c).exists());
-    esito.map(|_| arrivo)
+    // A single file stopped by the antivirus was not really created.
+    arrival.created.retain(|c| paths::extended(c).exists());
+    outcome.map(|_| arrival)
 }
 
-fn prendi_file_in(
+fn receive_files_into(
     s: &mut impl Read,
     dest: &Path,
-    voci: &[Voce],
-    annulla: &AtomicBool,
-    avanzamento: &mut dyn FnMut(u64),
-    esito: &mut Arrivo,
+    items: &[Item],
+    cancel: &AtomicBool,
+    progress: &mut dyn FnMut(u64),
+    outcome: &mut Arrival,
 ) -> io::Result<()> {
-    use crate::fs::provenienza::{e_virus, esamina, Esame};
-    let creati = &mut esito.creati;
+    use crate::fs::origin::{is_virus, scan, Scan};
+    let created = &mut outcome.created;
     std::fs::create_dir_all(paths::extended(dest))?;
-    // Ogni elemento di primo livello riceve un nome libero a destinazione;
-    // tutto ciò che sta sotto segue il nome scelto.
-    let mut rinomine: HashMap<String, String> = HashMap::new();
-    let mut fatti = 0u64;
+    // Every top-level item gets a free name at the destination; everything
+    // below it follows the chosen name.
+    let mut renames: HashMap<String, String> = HashMap::new();
+    let mut done = 0u64;
     let mut buf = vec![0u8; 256 * 1024];
 
-    for v in voci {
-        let rel = rel_sicuro(&v.rel)
+    for v in items {
+        let rel = safe_rel(&v.rel)
             .filter(|r| r.components().count() > 0)
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "path non valido"))?;
-        let primo = rel.components().next().map(|c| c.as_os_str().to_string_lossy().into_owned()).unwrap_or_default();
-        let scelto = rinomine.entry(primo.clone()).or_insert_with(|| {
-            let n = unique_name(dest, &primo);
-            creati.push(dest.join(&n));
+        let first = rel.components().next().map(|c| c.as_os_str().to_string_lossy().into_owned()).unwrap_or_default();
+        let chosen = renames.entry(first.clone()).or_insert_with(|| {
+            let n = unique_name(dest, &first);
+            created.push(dest.join(&n));
             n
         });
-        let mut arrivo = dest.join(scelto.as_str());
+        let mut arrival = dest.join(chosen.as_str());
         for c in rel.components().skip(1) {
-            arrivo.push(c);
+            arrival.push(c);
         }
 
-        if v.cartella {
-            std::fs::create_dir_all(paths::extended(&arrivo))?;
+        if v.folder {
+            std::fs::create_dir_all(paths::extended(&arrival))?;
             continue;
         }
-        if let Some(g) = arrivo.parent() {
+        if let Some(g) = arrival.parent() {
             std::fs::create_dir_all(paths::extended(g))?;
         }
-        // Senza file aperto i byte si leggono e si buttano: l'antivirus ha
-        // fermato questo, non quelli che vengono dopo nel flusso.
-        let mut out = match std::fs::File::create(paths::extended(&arrivo)) {
+        // Without an open file the bytes are read and thrown away: the
+        // antivirus stopped this one, not the ones that come after in the stream.
+        let mut out = match std::fs::File::create(paths::extended(&arrival)) {
             Ok(f) => Some(f),
-            Err(e) if e_virus(&e) => None,
+            Err(e) if is_virus(&e) => None,
             Err(e) => return Err(e),
         };
-        let mut resto = v.dimensione;
-        while resto > 0 {
-            if annulla.load(Ordering::Relaxed) {
+        let mut rest = v.size;
+        while rest > 0 {
+            if cancel.load(Ordering::Relaxed) {
                 return Err(io::Error::new(io::ErrorKind::Interrupted, "annullato"));
             }
-            let quanto = (resto as usize).min(buf.len());
-            s.read_exact(&mut buf[..quanto])?;
+            let chunk = (rest as usize).min(buf.len());
+            s.read_exact(&mut buf[..chunk])?;
             if let Some(f) = out.as_mut() {
-                match f.write_all(&buf[..quanto]) {
+                match f.write_all(&buf[..chunk]) {
                     Ok(()) => {}
-                    Err(e) if e_virus(&e) => {
+                    Err(e) if is_virus(&e) => {
                         out = None;
-                        let _ = std::fs::remove_file(paths::extended(&arrivo));
+                        let _ = std::fs::remove_file(paths::extended(&arrival));
                     }
                     Err(e) => return Err(e),
                 }
             }
-            resto -= quanto as u64;
-            fatti += quanto as u64;
-            avanzamento(fatti);
+            rest -= chunk as u64;
+            done += chunk as u64;
+            progress(done);
         }
-        let scritto = out.take().is_some();
-        if !scritto || esamina(&arrivo) == Esame::Bloccato {
-            let _ = std::fs::remove_file(paths::extended(&arrivo));
-            esito.bloccati.push(v.rel.clone());
+        let written = out.take().is_some();
+        if !written || scan(&arrival) == Scan::Blocked {
+            let _ = std::fs::remove_file(paths::extended(&arrival));
+            outcome.blocked.push(v.rel.clone());
         }
     }
     Ok(())
 }
 
-/// Il file si può leggere per spedirlo: l'antivirus non lo trattiene.
-fn leggibile(path: &Path) -> bool {
+/// The file can be read to send it: the antivirus is not holding it back.
+fn readable(path: &Path) -> bool {
     match std::fs::File::open(paths::extended(path)) {
         Ok(_) => true,
-        Err(e) => !crate::fs::provenienza::e_virus(&e),
+        Err(e) => !crate::fs::origin::is_virus(&e),
     }
 }
 
-/// Quante richieste di invio possono aspettare insieme una risposta.
-const MASSIMO_IN_ATTESA: usize = 8;
+/// How many send requests can wait for an answer at once.
+const MAX_PENDING: usize = 8;
 
-/// I nomi di primo livello (in ordine, senza doppioni) e i byte totali di
-/// ciò che un invio annuncia, contati da chi riceve.
-pub(crate) fn riepilogo(voci: &[Voce]) -> (Vec<String>, u64) {
-    let mut primi: Vec<String> = Vec::new();
-    for v in voci {
-        let primo = rel_sicuro(&v.rel)
+/// The top-level names (in order, without duplicates) and the total bytes
+/// of what a send announces, counted by the receiver.
+pub(crate) fn summary(items: &[Item]) -> (Vec<String>, u64) {
+    let mut top_level: Vec<String> = Vec::new();
+    for v in items {
+        let first = safe_rel(&v.rel)
             .and_then(|r| r.components().next().map(|c| c.as_os_str().to_string_lossy().into_owned()));
-        if let Some(p) = primo.filter(|p| !primi.contains(p)) {
-            primi.push(p);
+        if let Some(p) = first.filter(|p| !top_level.contains(p)) {
+            top_level.push(p);
         }
     }
-    let totale = voci.iter().filter(|v| !v.cartella).fold(0u64, |t, v| t.saturating_add(v.dimensione));
-    (primi, totale)
+    let total = items.iter().filter(|v| !v.folder).fold(0u64, |t, v| t.saturating_add(v.size));
+    (top_level, total)
 }
 
-fn ricevi<S: Read + Write>(
-    avvisi: Avvisi,
+fn receive<S: Read + Write>(
+    notifier: Notifier,
     lan: Arc<Lan>,
     s: &mut S,
-    da: String,
-    voci: Vec<Voce>,
-    // Quello che chi invia dichiara: non lo si usa, vedi `riepilogo`.
-    _dichiarato: u64,
+    from: String,
+    items: Vec<Item>,
+    // What the sender declares: it is not used, see `summary`.
+    _declared: u64,
 ) -> io::Result<()> {
-    // Tutti i path vengono controllati prima di chiedere il consenso.
-    if voci.iter().any(|v| rel_sicuro(&v.rel).is_none_or(|r| r.as_os_str().is_empty())) {
-        return scrivi_json(s, &Risposta::errore("Richiesta non valida."));
+    // All the paths are checked before asking for consent.
+    if items.iter().any(|v| safe_rel(&v.rel).is_none_or(|r| r.as_os_str().is_empty())) {
+        return write_json(s, &Response::error("Richiesta non valida."));
     }
 
-    // Il nome e il totale li decide chi invia: nel riquadro del consenso va
-    // ciò che arriva davvero, e un nome senza caratteri che lo travestano.
-    let (primi, totale) = riepilogo(&voci);
-    let da = crate::amici::nome_sicuro(&da, "PC sconosciuto");
+    // The name and the total are decided by the sender: the consent box
+    // gets what really arrives, and a name without characters disguising it.
+    let (first, total) = summary(&items);
+    let from = crate::friends::safe_name(&from, "PC sconosciuto");
 
-    let id = lan.prossima.fetch_add(1, Ordering::Relaxed);
+    let id = lan.next.fetch_add(1, Ordering::Relaxed);
     let (tx, rx) = mpsc::channel();
-    // Ogni richiesta in attesa tiene un thread per due minuti: non se ne
-    // accumulano più di qualcuna.
-    let accolta = lan.richieste.lock().is_ok_and(|mut m| {
-        (m.len() < MASSIMO_IN_ATTESA).then(|| m.insert(id, tx)).is_some()
+    // Every pending request holds a thread for two minutes: no more than a
+    // few of them pile up.
+    let accepted = lan.requests.lock().is_ok_and(|mut m| {
+        (m.len() < MAX_PENDING).then(|| m.insert(id, tx)).is_some()
     });
-    if !accolta {
-        return scrivi_json(s, &Risposta::errore("Il destinatario ha già troppe richieste in attesa."));
+    if !accepted {
+        return write_json(s, &Response::error("Il destinatario ha già troppe richieste in attesa."));
     }
-    avvisa(
-        &avvisi,
-        "lan-richiesta",
-        RichiestaInvio { id, da: da.clone(), quanti: primi.len(), totale, nomi: primi.iter().take(8).cloned().collect() },
+    notify(
+        &notifier,
+        "lan-request",
+        SendRequest { id, from: from.clone(), count: first.len(), total, names: first.iter().take(8).cloned().collect() },
     );
 
-    let scelta = rx.recv_timeout(ATTESA_CONSENSO).ok().flatten();
-    if let Ok(mut m) = lan.richieste.lock() {
+    let choice = rx.recv_timeout(CONSENT_WAIT).ok().flatten();
+    if let Ok(mut m) = lan.requests.lock() {
         m.remove(&id);
     }
-    let Some(dest) = scelta else {
-        return scrivi_json(s, &Risposta::errore("Il destinatario ha rifiutato."));
+    let Some(dest) = choice else {
+        return write_json(s, &Response::error("Il destinatario ha rifiutato."));
     };
-    scrivi_json(s, &Risposta { ok: true, ..Default::default() })?;
+    write_json(s, &Response { ok: true, ..Default::default() })?;
 
-    let mut ultimo = Instant::now();
-    let annulla = Arc::new(AtomicBool::new(false));
-    if let Ok(mut m) = lan.ricezioni.lock() {
-        m.insert(id, annulla.clone());
+    let mut last = Instant::now();
+    let cancel = Arc::new(AtomicBool::new(false));
+    if let Ok(mut m) = lan.receivings.lock() {
+        m.insert(id, cancel.clone());
     }
-    let esito = prendi_file(s, &dest, &voci, &annulla, &mut |fatti| {
-        if ultimo.elapsed() >= Duration::from_millis(100) {
-            ultimo = Instant::now();
-            avvisa(&avvisi, "lan-ricezione", Ricezione { id, fatti, totale });
+    let outcome = receive_files(s, &dest, &items, &cancel, &mut |done| {
+        if last.elapsed() >= Duration::from_millis(100) {
+            last = Instant::now();
+            notify(&notifier, "lan-receiving", ReceiveProgress { id, done, total });
         }
     });
 
-    avvisa(
-        &avvisi,
-        "lan-ricevuto",
-        Ricevuto {
+    notify(
+        &notifier,
+        "lan-received",
+        Received {
             id,
-            da,
-            cartella: paths::display(&dest),
-            quanti: esito.as_ref().map(|a| a.creati.len()).unwrap_or(0),
-            errore: if annulla.load(Ordering::Relaxed) { None } else { esito.as_ref().err().map(|e| e.to_string()) },
-            annullato: annulla.load(Ordering::Relaxed),
-            bloccati: esito.as_ref().ok().and_then(|a| avviso_bloccati(&a.bloccati)),
+            from,
+            folder: paths::display(&dest),
+            count: outcome.as_ref().map(|a| a.created.len()).unwrap_or(0),
+            error: if cancel.load(Ordering::Relaxed) { None } else { outcome.as_ref().err().map(|e| e.to_string()) },
+            cancelled: cancel.load(Ordering::Relaxed),
+            blocked: outcome.as_ref().ok().and_then(|a| blocked_notice(&a.blocked)),
         },
     );
-    if let Ok(mut m) = lan.ricezioni.lock() {
+    if let Ok(mut m) = lan.receivings.lock() {
         m.remove(&id);
     }
     Ok(())
@@ -1049,158 +1113,158 @@ fn ricevi<S: Read + Write>(
 // ── Lato client ──────────────────────────────────────────────────────
 
 /// Separa `::lan\<id>\a\b` in id e path relativo `a/b`.
-pub fn dividi(path: &str) -> Option<(String, String)> {
-    let resto = path.strip_prefix(RADICE)?.strip_prefix('\\')?;
-    let mut parti = resto.splitn(2, '\\');
-    let id = parti.next().filter(|s| !s.is_empty())?.to_string();
-    let rel = parti.next().unwrap_or("").replace('\\', "/");
+pub fn split(path: &str) -> Option<(String, String)> {
+    let rest = path.strip_prefix(ROOT)?.strip_prefix('\\')?;
+    let mut parts = rest.splitn(2, '\\');
+    let id = parts.next().filter(|s| !s.is_empty())?.to_string();
+    let rel = parts.next().unwrap_or("").replace('\\', "/");
     Some((id, rel))
 }
 
-/// Il genitore dentro la rete locale: cartella → PC → Rete locale.
-pub fn genitore(path: &str) -> Option<String> {
-    let (id, rel) = dividi(path)?;
+/// The parent inside the lan: folder → PC → Lan.
+pub fn parent_of(path: &str) -> Option<String> {
+    let (id, rel) = split(path)?;
     if rel.is_empty() {
-        return Some(RADICE.to_string());
+        return Some(ROOT.to_string());
     }
     match rel.rsplit_once('/') {
-        Some((su, _)) => Some(format!("{}\\{}\\{}", RADICE, id, su.replace('/', "\\"))),
-        None => Some(format!("{}\\{}", RADICE, id)),
+        Some((up, _)) => Some(format!("{}\\{}\\{}", ROOT, id, up.replace('/', "\\"))),
+        None => Some(format!("{}\\{}", ROOT, id)),
     }
 }
 
-fn connetti(lan: &Lan, id: &str) -> Result<TcpStream, FsError> {
-    let indirizzo = lan.indirizzo(id)?;
-    let s = TcpStream::connect_timeout(&indirizzo, Duration::from_secs(5)).map_err(errore_io)?;
+fn connect(lan: &Lan, id: &str) -> Result<TcpStream, FsError> {
+    let address = lan.address(id)?;
+    let s = TcpStream::connect_timeout(&address, Duration::from_secs(5)).map_err(io_error)?;
     let _ = s.set_read_timeout(Some(Duration::from_secs(30)));
     Ok(s)
 }
 
-pub(crate) fn controlla(r: Risposta) -> Result<Risposta, FsError> {
+pub(crate) fn check(r: Response) -> Result<Response, FsError> {
     if r.ok {
         Ok(r)
     } else {
-        Err(FsError::Io { message: r.errore.unwrap_or_else(|| "Richiesta rifiutata.".into()) })
+        Err(FsError::Io { message: r.error.unwrap_or_else(|| "Richiesta rifiutata.".into()) })
     }
 }
 
-/// I PC in rete come voci della posizione «Rete locale».
-pub fn voci_pari(lan: &Lan) -> Vec<Entry> {
-    lan.pari()
+/// The PCs on the network as entries of the «Rete locale» location.
+pub fn peer_entries(lan: &Lan) -> Vec<Entry> {
+    lan.peers()
         .into_iter()
         .map(|p| Entry {
-            name: p.nome.clone(),
-            path: format!("{}\\{}", RADICE, p.id),
+            name: p.name.clone(),
+            path: format!("{}\\{}", ROOT, p.id),
             kind: EntryKind::Dir,
             size: 0,
             modified: None,
             hidden: false,
-            origine: p.condivisa.map(|c| format!("condivide «{}»", c)),
-            libero: None,
-            totale: None,
-            icona_propria: false,
+            origin: p.shared.map(|c| format!("condivide «{}»", c)),
+            free: None,
+            total: None,
+            own_icon: false,
             snippet: None,
         })
         .collect()
 }
 
-/// Il contenuto di una cartella condivisa da un altro PC.
-pub fn elenca_remoto(lan: &Lan, path: &str) -> Result<Vec<Entry>, FsError> {
-    let (id, rel) = dividi(path).ok_or(FsError::NotFound)?;
-    let mut s = connetti(lan, &id)?;
-    scrivi_json(&mut s, &Richiesta::Elenca { path: rel }).map_err(errore_io)?;
-    let r = controlla(leggi_json(&mut s).map_err(errore_io)?)?;
+/// The content of a folder shared by another PC.
+pub fn list_remote(lan: &Lan, path: &str) -> Result<Vec<Entry>, FsError> {
+    let (id, rel) = split(path).ok_or(FsError::NotFound)?;
+    let mut s = connect(lan, &id)?;
+    write_json(&mut s, &Request::List { path: rel }).map_err(io_error)?;
+    let r = check(read_json(&mut s).map_err(io_error)?)?;
     let base = path.trim_end_matches('\\');
-    Ok(r.voci
+    Ok(r.items
         .into_iter()
         .map(|v| Entry {
-            path: format!("{}\\{}", base, v.nome),
-            name: v.nome,
-            kind: if v.cartella { EntryKind::Dir } else { EntryKind::File },
-            size: v.dimensione,
-            modified: v.modificato,
+            path: format!("{}\\{}", base, v.name),
+            name: v.name,
+            kind: if v.folder { EntryKind::Dir } else { EntryKind::File },
+            size: v.size,
+            modified: v.modified,
             hidden: false,
-            origine: None,
-            libero: None,
-            totale: None,
-            icona_propria: false,
+            origin: None,
+            free: None,
+            total: None,
+            own_icon: false,
             snippet: None,
         })
         .collect())
 }
 
-/// Scarica elementi dalla cartella condivisa di un altro PC dentro `dest`.
-/// Ritorna le coppie sorgente → path creato.
-pub fn scarica(
+/// Downloads items from another PC's shared folder into `dest`.
+/// Returns the source → created path pairs.
+pub fn download(
     lan: &Lan,
-    sorgenti: &[String],
+    sources: &[String],
     dest: &str,
-    annulla: &AtomicBool,
-    avanzamento: &mut dyn FnMut(u64, u64),
+    cancel: &AtomicBool,
+    progress: &mut dyn FnMut(u64, u64),
 ) -> Result<Vec<[String; 2]>, FsError> {
-    let mut coppie = Vec::new();
-    let mut bloccati = Vec::new();
-    let mut gia = 0u64;
-    for sorgente in sorgenti {
-        let (id, rel) = dividi(sorgente).ok_or(FsError::NotFound)?;
-        let mut s = connetti(lan, &id)?;
-        scrivi_json(&mut s, &Richiesta::Scarica { path: rel }).map_err(errore_io)?;
-        let r = controlla(leggi_json(&mut s).map_err(errore_io)?)?;
-        let totale = riepilogo(&r.contenuto).1;
-        let arrivo = prendi_file(&mut s, Path::new(dest), &r.contenuto, annulla, &mut |f| {
-            avanzamento(gia.saturating_add(f), gia.saturating_add(totale))
+    let mut pairs = Vec::new();
+    let mut blocked = Vec::new();
+    let mut already = 0u64;
+    for source in sources {
+        let (id, rel) = split(source).ok_or(FsError::NotFound)?;
+        let mut s = connect(lan, &id)?;
+        write_json(&mut s, &Request::Download { path: rel }).map_err(io_error)?;
+        let r = check(read_json(&mut s).map_err(io_error)?)?;
+        let total = summary(&r.content).1;
+        let arrival = receive_files(&mut s, Path::new(dest), &r.content, cancel, &mut |f| {
+            progress(already.saturating_add(f), already.saturating_add(total))
         })
-        .map_err(errore_io)?;
-        gia = gia.saturating_add(totale);
-        bloccati.extend(arrivo.bloccati);
-        if let Some(c) = arrivo.creati.first() {
-            coppie.push([sorgente.clone(), paths::display(c)]);
+        .map_err(io_error)?;
+        already = already.saturating_add(total);
+        blocked.extend(arrival.blocked);
+        if let Some(c) = arrival.created.first() {
+            pairs.push([source.clone(), paths::display(c)]);
         }
     }
-    match avviso_bloccati(&bloccati) {
+    match blocked_notice(&blocked) {
         Some(message) => Err(FsError::Io { message }),
-        None => Ok(coppie),
+        None => Ok(pairs),
     }
 }
 
-/// Invia file locali a un altro PC. Attende che l'altro accetti.
-pub fn invia(
+/// Sends local files to another PC. Waits for the other to accept.
+pub fn send(
     lan: &Lan,
     id: &str,
-    sorgenti: &[String],
-    annulla: &AtomicBool,
-    avanzamento: &mut dyn FnMut(u64, u64),
+    sources: &[String],
+    cancel: &AtomicBool,
+    progress: &mut dyn FnMut(u64, u64),
 ) -> Result<(), FsError> {
-    let mut s = connetti(lan, id)?;
-    // Sorgenti da cartelle diverse: ognuna con la sua base, nello stesso flusso.
-    let piani: Vec<(PathBuf, Vec<Voce>)> = sorgenti
+    let mut s = connect(lan, id)?;
+    // Sources from different folders: each with its own base, in the same stream.
+    let plans: Vec<(PathBuf, Vec<Item>)> = sources
         .iter()
         .map(|p| {
             let path = PathBuf::from(p);
             let base = path.parent().unwrap_or(&path).to_path_buf();
-            (base, piano(&path))
+            (base, plan(&path))
         })
         .collect();
-    let voci: Vec<Voce> = piani.iter().flat_map(|(_, v)| v.clone()).collect();
-    let totale: u64 = voci.iter().map(|v| v.dimensione).sum();
+    let items: Vec<Item> = plans.iter().flat_map(|(_, v)| v.clone()).collect();
+    let total: u64 = items.iter().map(|v| v.size).sum();
 
-    scrivi_json(&mut s, &Richiesta::Invia { da: lan.nome.clone(), voci, totale }).map_err(errore_io)?;
-    // Il destinatario ha tempo di leggere e decidere.
-    let _ = s.set_read_timeout(Some(ATTESA_CONSENSO + Duration::from_secs(5)));
-    controlla(leggi_json(&mut s).map_err(errore_io)?)?;
+    write_json(&mut s, &Request::Send { from: lan.name.clone(), items, total }).map_err(io_error)?;
+    // The recipient has time to read and decide.
+    let _ = s.set_read_timeout(Some(CONSENT_WAIT + Duration::from_secs(5)));
+    check(read_json(&mut s).map_err(io_error)?)?;
 
-    let mut gia = 0u64;
-    for (base, voci) in &piani {
-        let parte: u64 = voci.iter().map(|v| v.dimensione).sum();
-        manda_file(&mut s, base, voci, annulla, &mut |f| avanzamento(gia + f, totale)).map_err(|e| {
+    let mut already = 0u64;
+    for (base, items) in &plans {
+        let part: u64 = items.iter().map(|v| v.size).sum();
+        send_files(&mut s, base, items, cancel, &mut |f| progress(already + f, total)).map_err(|e| {
             use io::ErrorKind::*;
             if matches!(e.kind(), BrokenPipe | ConnectionReset | ConnectionAborted) {
                 FsError::Io { message: "L'altro PC ha interrotto il trasferimento.".to_string() }
             } else {
-                errore_io(e)
+                io_error(e)
             }
         })?;
-        gia += parte;
+        already += part;
     }
     Ok(())
 }
@@ -1212,106 +1276,106 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
-    fn un_intestazione_che_promette_tanto_e_manda_poco_e_un_errore() {
-        // 16 MiB annunciati, dieci byte mandati: errore, senza aspettare
-        // né tenere da parte i 16 MiB.
-        let mut flusso = (16u32 * 1024 * 1024).to_be_bytes().to_vec();
-        flusso.extend_from_slice(b"0123456789");
-        let esito: io::Result<Risposta> = leggi_json(&mut flusso.as_slice());
-        assert_eq!(esito.unwrap_err().kind(), io::ErrorKind::UnexpectedEof);
+    fn a_header_that_promises_much_and_sends_little_is_an_error() {
+        // 16 MiB announced, ten bytes sent: error, without waiting or
+        // setting the 16 MiB aside.
+        let mut stream = (16u32 * 1024 * 1024).to_be_bytes().to_vec();
+        stream.extend_from_slice(b"0123456789");
+        let outcome: io::Result<Response> = read_json(&mut stream.as_slice());
+        assert_eq!(outcome.unwrap_err().kind(), io::ErrorKind::UnexpectedEof);
     }
 
     #[test]
-    fn il_riquadro_del_consenso_conta_cio_che_arriva_davvero() {
-        let voce = |rel: &str, dimensione: u64, cartella: bool| Voce { rel: rel.into(), dimensione, cartella };
-        // Chi invia dichiara «1 KB» e una sola cartella, ma annuncia di più:
-        // anche voci con la barra rovescia, che prima non si contavano.
-        let voci = vec![
-            voce("foto", 0, true),
-            voce("foto/a.jpg", 3_000_000, false),
-            voce("nascosto\\b.bin", 5_000_000_000, false),
-            voce("nota.txt", 10, false),
+    fn the_consent_box_counts_what_actually_arrives() {
+        let item = |rel: &str, size: u64, folder: bool| Item { rel: rel.into(), size, folder };
+        // The sender declares «1 KB» and a single folder, but announces more:
+        // also items with a backslash, which were not counted before.
+        let items = vec![
+            item("foto", 0, true),
+            item("foto/a.jpg", 3_000_000, false),
+            item("nascosto\\b.bin", 5_000_000_000, false),
+            item("nota.txt", 10, false),
         ];
-        let (primi, totale) = riepilogo(&voci);
-        assert_eq!(primi, vec!["foto", "nascosto", "nota.txt"]);
-        assert_eq!(totale, 5_003_000_010);
-        // Una somma che trabocca resta il massimo, senza panico.
-        assert_eq!(riepilogo(&[voce("a", u64::MAX, false), voce("b", 5, false)]).1, u64::MAX);
+        let (first, total) = summary(&items);
+        assert_eq!(first, vec!["foto", "nascosto", "nota.txt"]);
+        assert_eq!(total, 5_003_000_010);
+        // A sum that overflows stays at the maximum, without panicking.
+        assert_eq!(summary(&[item("a", u64::MAX, false), item("b", 5, false)]).1, u64::MAX);
     }
 
     #[test]
-    fn le_connessioni_contemporanee_hanno_un_tetto() {
-        let contatore = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-        let posti: Vec<_> = (0..MASSIMO_CONNESSIONI).map(|_| Posto::prendi(&contatore).unwrap()).collect();
-        assert!(Posto::prendi(&contatore).is_none());
-        drop(posti);
-        assert!(Posto::prendi(&contatore).is_some());
+    fn concurrent_connections_have_a_cap() {
+        let counter = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let slots: Vec<_> = (0..MAX_CONNECTIONS).map(|_| Slot::take_slot(&counter).unwrap()).collect();
+        assert!(Slot::take_slot(&counter).is_none());
+        drop(slots);
+        assert!(Slot::take_slot(&counter).is_some());
     }
 
     #[test]
-    fn i_path_dalla_rete_non_escono_dalla_cartella() {
-        assert_eq!(rel_sicuro("a/b.txt"), Some(PathBuf::from("a").join("b.txt")));
-        assert_eq!(rel_sicuro(""), Some(PathBuf::new()));
-        assert_eq!(rel_sicuro("../segreto"), None);
-        assert_eq!(rel_sicuro("a/../../x"), None);
-        assert_eq!(rel_sicuro("C:/Windows"), None);
-        assert_eq!(rel_sicuro("a\\..\\x"), None);
-        // Nomi che Windows riserva, e punti o spazi finali: col prefisso
-        // \\?\ si creerebbero davvero, ed Esplora non riuscirebbe a toglierli.
-        for cattivo in ["CON", "a/nul", "COM1.txt", "lpt9.log", "aux.", "x/nota.txt.", "spazio "] {
-            assert_eq!(rel_sicuro(cattivo), None, "{cattivo}");
+    fn network_paths_do_not_leave_the_folder() {
+        assert_eq!(safe_rel("a/b.txt"), Some(PathBuf::from("a").join("b.txt")));
+        assert_eq!(safe_rel(""), Some(PathBuf::new()));
+        assert_eq!(safe_rel("../segreto"), None);
+        assert_eq!(safe_rel("a/../../x"), None);
+        assert_eq!(safe_rel("C:/Windows"), None);
+        assert_eq!(safe_rel("a\\..\\x"), None);
+        // Names Windows reserves, and trailing dots or spaces: with the
+        // \\?\ prefix they would really be created, and Explorer could not remove them.
+        for bad in ["CON", "a/nul", "COM1.txt", "lpt9.log", "aux.", "x/nota.txt.", "spazio "] {
+            assert_eq!(safe_rel(bad), None, "{bad}");
         }
-        assert!(rel_sicuro("console.txt").is_some());
-        assert!(rel_sicuro("COM10.txt").is_some());
+        assert!(safe_rel("console.txt").is_some());
+        assert!(safe_rel("COM10.txt").is_some());
     }
 
     #[test]
-    fn dentro_rifiuta_chi_prova_a_uscire() {
+    fn inside_refuses_escape_attempts() {
         let d = tempdir().unwrap();
-        let radice = d.path().join("condivisa");
-        fs::create_dir_all(radice.join("sotto")).unwrap();
+        let root = d.path().join("condivisa");
+        fs::create_dir_all(root.join("sotto")).unwrap();
         fs::write(d.path().join("fuori.txt"), b"x").unwrap();
 
-        assert!(dentro(&radice, "sotto").is_some());
-        assert!(dentro(&radice, "").is_some());
-        assert!(dentro(&radice, "../fuori.txt").is_none());
+        assert!(inside(&root, "sotto").is_some());
+        assert!(inside(&root, "").is_some());
+        assert!(inside(&root, "../fuori.txt").is_none());
     }
 
-    /// Nell'elenco i nascosti non c'erano, ma chi ne conosceva il path li
-    /// scaricava lo stesso (per esempio la chiave degli Amici in AppData).
+    /// The hidden ones were not in the listing, but whoever knew their path
+    /// downloaded them anyway (for example the Friends key in AppData).
     #[cfg(windows)]
     #[test]
-    fn i_nascosti_della_cartella_condivisa_non_si_scaricano() {
+    fn hidden_items_of_the_shared_folder_cannot_be_downloaded() {
         let d = tempdir().unwrap();
-        let radice = d.path().join("condivisa");
-        let segreta = radice.join("AppData");
-        fs::create_dir_all(&segreta).unwrap();
-        fs::write(segreta.join("amici.key"), b"chiave").unwrap();
-        fs::write(radice.join("foto.jpg"), b"x").unwrap();
-        let nascondi = std::process::Command::new("attrib").arg("+h").arg(&segreta).status().unwrap();
-        assert!(nascondi.success());
+        let root = d.path().join("condivisa");
+        let secret = root.join("AppData");
+        fs::create_dir_all(&secret).unwrap();
+        fs::write(secret.join("amici.key"), b"chiave").unwrap();
+        fs::write(root.join("foto.jpg"), b"x").unwrap();
+        let hide = std::process::Command::new("attrib").arg("+h").arg(&secret).status().unwrap();
+        assert!(hide.success());
 
-        assert!(condiviso(&radice, "AppData/amici.key").is_none());
-        assert!(condiviso(&radice, "AppData").is_none());
-        assert!(condiviso(&radice, "foto.jpg").is_some());
-        // Scaricando tutta la cartella, il nascosto resta fuori.
-        let voci: Vec<String> = piano_condiviso(&radice).into_iter().map(|v| v.rel).collect();
-        assert!(voci.iter().any(|r| r.ends_with("foto.jpg")));
-        assert!(!voci.iter().any(|r| r.contains("AppData")));
+        assert!(shared_path(&root, "AppData/amici.key").is_none());
+        assert!(shared_path(&root, "AppData").is_none());
+        assert!(shared_path(&root, "foto.jpg").is_some());
+        // Downloading the whole folder, the hidden one stays out.
+        let items: Vec<String> = shared_plan(&root).into_iter().map(|v| v.rel).collect();
+        assert!(items.iter().any(|r| r.ends_with("foto.jpg")));
+        assert!(!items.iter().any(|r| r.contains("AppData")));
     }
 
     #[test]
-    fn i_path_virtuali_si_dividono_e_si_risale() {
-        assert_eq!(dividi(r"::lan\PC-1\a\b"), Some(("PC-1".into(), "a/b".into())));
-        assert_eq!(dividi(r"::lan\PC-1"), Some(("PC-1".into(), "".into())));
-        assert_eq!(dividi(r"::lan"), None);
-        assert_eq!(genitore(r"::lan\PC-1\a\b"), Some(r"::lan\PC-1\a".into()));
-        assert_eq!(genitore(r"::lan\PC-1\a"), Some(r"::lan\PC-1".into()));
-        assert_eq!(genitore(r"::lan\PC-1"), Some("::lan".into()));
+    fn virtual_paths_split_and_go_up() {
+        assert_eq!(split(r"::lan\PC-1\a\b"), Some(("PC-1".into(), "a/b".into())));
+        assert_eq!(split(r"::lan\PC-1"), Some(("PC-1".into(), "".into())));
+        assert_eq!(split(r"::lan"), None);
+        assert_eq!(parent_of(r"::lan\PC-1\a\b"), Some(r"::lan\PC-1\a".into()));
+        assert_eq!(parent_of(r"::lan\PC-1\a"), Some(r"::lan\PC-1".into()));
+        assert_eq!(parent_of(r"::lan\PC-1"), Some("::lan".into()));
     }
 
     #[test]
-    fn un_albero_fa_il_giro_completo_intatto() {
+    fn a_tree_round_trips_intact() {
         let d = tempdir().unwrap();
         let src = d.path().join("progetto");
         fs::create_dir_all(src.join("vuota")).unwrap();
@@ -1319,295 +1383,322 @@ mod tests {
         fs::write(src.join("a.txt"), b"alfa").unwrap();
         fs::write(src.join("sotto").join("b.bin"), vec![7u8; 300_000]).unwrap();
 
-        let voci = piano(&src);
-        let mut flusso = Vec::new();
-        manda_file(&mut flusso, d.path(), &voci, &AtomicBool::new(false), &mut |_| {}).unwrap();
+        let items = plan(&src);
+        let mut stream = Vec::new();
+        send_files(&mut stream, d.path(), &items, &AtomicBool::new(false), &mut |_| {}).unwrap();
 
         let dest = d.path().join("arrivo");
-        // «progetto» non esiste a destinazione: tiene il suo nome.
-        let creati = prendi_file(&mut flusso.as_slice(), &dest, &voci, &AtomicBool::new(false), &mut |_| {}).unwrap().creati;
-        assert_eq!(creati, vec![dest.join("progetto")]);
+        // «progetto» does not exist at the destination: it keeps its name.
+        let created = receive_files(&mut stream.as_slice(), &dest, &items, &AtomicBool::new(false), &mut |_| {}).unwrap().created;
+        assert_eq!(created, vec![dest.join("progetto")]);
         assert_eq!(fs::read_to_string(dest.join("progetto").join("a.txt")).unwrap(), "alfa");
         assert_eq!(fs::read(dest.join("progetto").join("sotto").join("b.bin")).unwrap().len(), 300_000);
         assert!(dest.join("progetto").join("vuota").is_dir());
 
-        // Una seconda volta il nome è occupato: arriva numerato.
-        let creati = prendi_file(&mut flusso.as_slice(), &dest, &voci, &AtomicBool::new(false), &mut |_| {}).unwrap().creati;
-        assert_eq!(creati, vec![dest.join("progetto (2)")]);
+        // A second time the name is taken: it arrives numbered.
+        let created = receive_files(&mut stream.as_slice(), &dest, &items, &AtomicBool::new(false), &mut |_| {}).unwrap().created;
+        assert_eq!(created, vec![dest.join("progetto (2)")]);
     }
 
     #[test]
-    fn una_ricezione_interrotta_non_lascia_file_a_meta() {
+    fn an_interrupted_receive_leaves_no_half_files() {
         let d = tempdir().unwrap();
         let src = d.path().join("progetto");
         fs::create_dir_all(&src).unwrap();
         fs::write(src.join("grande.bin"), vec![1u8; 600_000]).unwrap();
-        let voci = piano(&src);
-        let mut flusso = Vec::new();
-        manda_file(&mut flusso, d.path(), &voci, &AtomicBool::new(false), &mut |_| {}).unwrap();
+        let items = plan(&src);
+        let mut stream = Vec::new();
+        send_files(&mut stream, d.path(), &items, &AtomicBool::new(false), &mut |_| {}).unwrap();
 
-        // Si annulla dopo il primo blocco ricevuto.
+        // Cancelled after the first block received.
         let dest = d.path().join("arrivo");
-        let annulla = AtomicBool::new(false);
-        let esito = prendi_file(&mut flusso.as_slice(), &dest, &voci, &annulla, &mut |_| annulla.store(true, Ordering::Relaxed));
-        assert!(esito.is_err());
+        let cancel = AtomicBool::new(false);
+        let outcome = receive_files(&mut stream.as_slice(), &dest, &items, &cancel, &mut |_| cancel.store(true, Ordering::Relaxed));
+        assert!(outcome.is_err());
         assert!(!dest.join("progetto").exists());
     }
 
     #[test]
-    fn la_ricezione_si_annulla_dal_lato_di_chi_riceve() {
+    fn receiving_can_be_cancelled_by_the_receiver() {
         let dir = tempdir().unwrap();
-        let lan = Lan::nuovo("A".into(), "A".into(), Config::default(), dir.path().join("lan.json"));
+        let lan = Lan::new("A".into(), "A".into(), Config::default(), dir.path().join("lan.json"));
         let flag = Arc::new(AtomicBool::new(false));
-        lan.ricezioni.lock().unwrap().insert(7, flag.clone());
-        assert!(lan.annulla_ricezione(7));
+        lan.receivings.lock().unwrap().insert(7, flag.clone());
+        assert!(lan.cancel_receive(7));
         assert!(flag.load(Ordering::Relaxed));
-        assert!(!lan.annulla_ricezione(8));
+        assert!(!lan.cancel_receive(8));
     }
 
     #[test]
-    fn accettando_si_sceglie_dove_salvare() {
+    fn accepting_chooses_where_to_save() {
         let dir = tempdir().unwrap();
-        let ricevuti = dir.path().join("ricevuti");
-        let config = Config { ricevuti: Some(ricevuti.to_string_lossy().into_owned()), ..Default::default() };
-        let lan = Lan::nuovo("A".into(), "A".into(), config, dir.path().join("lan.json"));
-        let risposta = |accetta: bool, cartella: Option<&str>| {
+        let received = dir.path().join("ricevuti");
+        let config = Config { received: Some(received.to_string_lossy().into_owned()), ..Default::default() };
+        let lan = Lan::new("A".into(), "A".into(), config, dir.path().join("lan.json"));
+        let reply = |accept: bool, folder: Option<&str>| {
             let (tx, rx) = mpsc::channel();
-            lan.richieste.lock().unwrap().insert(1, tx);
-            lan.rispondi(1, accetta, cartella.map(String::from));
+            lan.requests.lock().unwrap().insert(1, tx);
+            lan.respond(1, accept, folder.map(String::from));
             rx.recv().unwrap()
         };
-        let scelta = dir.path().join("eccezioni");
-        assert_eq!(risposta(true, Some(&scelta.to_string_lossy())), Some(scelta));
-        // Nessuna scelta, o una che non è un path su disco: la cartella dei ricevuti.
-        assert_eq!(risposta(true, None), Some(ricevuti.clone()));
-        assert_eq!(risposta(true, Some("::amici")), Some(ricevuti.clone()));
-        assert_eq!(risposta(true, Some("relativa")), Some(ricevuti));
-        assert_eq!(risposta(false, Some(r"C:\qualsiasi")), None);
+        let choice = dir.path().join("eccezioni");
+        assert_eq!(reply(true, Some(&choice.to_string_lossy())), Some(choice));
+        // No choice, or one that is not a path on disk: the received folder.
+        assert_eq!(reply(true, None), Some(received.clone()));
+        assert_eq!(reply(true, Some("::amici")), Some(received.clone()));
+        assert_eq!(reply(true, Some("relativa")), Some(received));
+        assert_eq!(reply(false, Some(r"C:\qualsiasi")), None);
     }
 
     #[cfg(windows)]
     #[test]
-    fn i_file_ricevuti_risultano_da_internet() {
+    fn received_files_are_marked_from_internet() {
         let d = tempdir().unwrap();
         let src = d.path().join("doc.txt");
         fs::write(&src, b"testo").unwrap();
-        let voci = piano(&src);
-        let mut flusso = Vec::new();
-        manda_file(&mut flusso, d.path(), &voci, &AtomicBool::new(false), &mut |_| {}).unwrap();
+        let items = plan(&src);
+        let mut stream = Vec::new();
+        send_files(&mut stream, d.path(), &items, &AtomicBool::new(false), &mut |_| {}).unwrap();
         let dest = d.path().join("arrivo");
-        let arrivo = prendi_file(&mut flusso.as_slice(), &dest, &voci, &AtomicBool::new(false), &mut |_| {}).unwrap();
-        assert!(arrivo.bloccati.is_empty());
+        let arrival = receive_files(&mut stream.as_slice(), &dest, &items, &AtomicBool::new(false), &mut |_| {}).unwrap();
+        assert!(arrival.blocked.is_empty());
         let mut ads = dest.join("doc.txt").into_os_string();
         ads.push(":Zone.Identifier");
         assert!(fs::read_to_string(ads).unwrap().contains("ZoneId=3"));
     }
 
     #[test]
-    fn l_avviso_dei_bloccati_nomina_il_file() {
-        assert_eq!(avviso_bloccati(&[]), None);
-        assert!(avviso_bloccati(&["cartella/virus.exe".into()]).unwrap().contains("«virus.exe»"));
-        assert!(avviso_bloccati(&["a.exe".into(), "b.exe".into()]).unwrap().contains("2 file"));
+    fn the_blocked_notice_names_the_file() {
+        assert_eq!(blocked_notice(&[]), None);
+        assert!(blocked_notice(&["cartella/virus.exe".into()]).unwrap().contains("«virus.exe»"));
+        assert!(blocked_notice(&["a.exe".into(), "b.exe".into()]).unwrap().contains("2 file"));
     }
 
     #[test]
-    fn chi_riceve_rifiuta_path_maliziosi() {
+    fn receiver_refuses_malicious_paths() {
         let d = tempdir().unwrap();
-        let voci = vec![Voce { rel: "../evaso.txt".into(), dimensione: 1, cartella: false }];
-        let errore = prendi_file(&mut [0u8].as_slice(), d.path(), &voci, &AtomicBool::new(false), &mut |_| {});
-        assert!(errore.is_err());
+        let items = vec![Item { rel: "../evaso.txt".into(), size: 1, folder: false }];
+        let error = receive_files(&mut [0u8].as_slice(), d.path(), &items, &AtomicBool::new(false), &mut |_| {});
+        assert!(error.is_err());
         assert!(!d.path().parent().unwrap().join("evaso.txt").exists());
     }
 
     #[test]
-    fn gli_indirizzi_scritti_a_mano_vanno_alla_porta_degli_annunci() {
-        assert_eq!(indirizzo_annunci("100.64.0.2"), Some("100.64.0.2:47820".parse().unwrap()));
-        assert_eq!(indirizzo_annunci(" 100.64.0.2:9999 "), Some("100.64.0.2:47820".parse().unwrap()));
-        assert_eq!(indirizzo_annunci("localhost").map(|a| a.port()), Some(PORTA_ANNUNCI));
-        assert_eq!(indirizzo_annunci(""), None);
+    fn typed_addresses_go_to_the_announce_port() {
+        assert_eq!(announce_address("100.64.0.2"), Some("100.64.0.2:47820".parse().unwrap()));
+        assert_eq!(announce_address(" 100.64.0.2:9999 "), Some("100.64.0.2:47820".parse().unwrap()));
+        assert_eq!(announce_address("localhost").map(|a| a.port()), Some(ANNOUNCE_PORT));
+        assert_eq!(announce_address(""), None);
     }
 
     #[test]
-    fn un_lan_json_senza_indirizzi_si_legge_ancora() {
-        let c: Config = serde_json::from_str(r#"{"visibile":true,"condivisa":null,"ricevuti":null}"#).unwrap();
-        assert!(c.indirizzi.is_empty());
-    }
-
-    #[test]
-    fn chi_annuncia_da_fuori_riceve_la_risposta_di_persona() {
-        let dir = tempdir().unwrap();
-        let lan = Lan::nuovo("A".into(), "A".into(), Config::default(), dir.path().join("lan.json"));
-        lan.ritorni.lock().unwrap().insert("100.64.0.9".parse().unwrap(), Instant::now());
-        let c = Config { indirizzi: vec!["100.64.0.2".into(), "100.64.0.2".into()], ..Default::default() };
+    fn the_wire_format_keeps_its_italian_names() {
+        let send = Request::Send { from: "A".into(), items: vec![Item { rel: "a".into(), size: 1, folder: false }], total: 1 };
         assert_eq!(
-            destinazioni_dirette(&lan, &c),
+            serde_json::to_string(&send).unwrap(),
+            r#"{"tipo":"invia","da":"A","voci":[{"rel":"a","dimensione":1,"cartella":false}],"totale":1}"#
+        );
+        let r = Response {
+            ok: true,
+            items: vec![RemoteItem { name: "n".into(), folder: true, size: 0, modified: None }],
+            name: Some("B".into()),
+            confirmed: true,
+            ..Default::default()
+        };
+        assert_eq!(
+            serde_json::to_string(&r).unwrap(),
+            r#"{"ok":true,"voci":[{"nome":"n","cartella":true,"dimensione":0,"modificato":null}],"nome":"B","confermato":true}"#
+        );
+        let a = Announcement { app: "space-train".into(), v: 1, id: "i".into(), name: "N".into(), port: 2, shared: None };
+        assert_eq!(
+            serde_json::to_string(&a).unwrap(),
+            r#"{"app":"space-train","v":1,"id":"i","nome":"N","porta":2,"condivisa":null}"#
+        );
+        let c = Config { visible: true, shared: None, received: None, addresses: vec![] };
+        assert_eq!(serde_json::to_string(&c).unwrap(), r#"{"visibile":true,"condivisa":null,"ricevuti":null,"indirizzi":[]}"#);
+    }
+
+    #[test]
+    fn a_lan_json_without_addresses_still_loads() {
+        let c: Config = serde_json::from_str(r#"{"visibile":true,"condivisa":null,"ricevuti":null}"#).unwrap();
+        assert!(c.addresses.is_empty());
+    }
+
+    #[test]
+    fn who_announces_from_outside_gets_a_direct_reply() {
+        let dir = tempdir().unwrap();
+        let lan = Lan::new("A".into(), "A".into(), Config::default(), dir.path().join("lan.json"));
+        lan.replies.lock().unwrap().insert("100.64.0.9".parse().unwrap(), Instant::now());
+        let c = Config { addresses: vec!["100.64.0.2".into(), "100.64.0.2".into()], ..Default::default() };
+        assert_eq!(
+            direct_destinations(&lan, &c),
             vec!["100.64.0.2:47820".parse().unwrap(), "100.64.0.9:47820".parse().unwrap()]
         );
     }
 
     #[test]
-    fn le_intestazioni_viaggiano_con_la_loro_lunghezza() {
+    fn headers_travel_with_their_length() {
         let mut b = Vec::new();
-        scrivi_json(&mut b, &Richiesta::Elenca { path: "x/y".into() }).unwrap();
-        let r: Richiesta = leggi_json(&mut b.as_slice()).unwrap();
-        assert!(matches!(r, Richiesta::Elenca { path } if path == "x/y"));
+        write_json(&mut b, &Request::List { path: "x/y".into() }).unwrap();
+        let r: Request = read_json(&mut b.as_slice()).unwrap();
+        assert!(matches!(r, Request::List { path } if path == "x/y"));
     }
 
-    /// Un «PC» completo dentro il test: server TCP su una porta libera di
-    /// 127.0.0.1, che accetta da solo ogni invio se `accetta` è vero.
-    fn pc_di_prova(nome: &str, config: Config, accetta: bool) -> (Arc<Lan>, u16) {
+    /// A complete «PC» inside the test: TCP server on a free port of
+    /// 127.0.0.1, which accepts every send by itself if `accept` is true.
+    fn test_pc(name: &str, config: Config, accept: bool) -> (Arc<Lan>, u16) {
         let dir = tempdir().unwrap().keep();
-        let lan = Arc::new(Lan::nuovo(nome.into(), nome.into(), config, dir.join("lan.json")));
-        let per_avvisi = lan.clone();
-        let avvisi: Avvisi = Arc::new(move |evento: &str, dato: serde_json::Value| {
-            if evento == "lan-richiesta" {
-                let id = dato["id"].as_u64().unwrap();
-                let lan = per_avvisi.clone();
-                // Risponde da un altro thread, come farebbe l'utente.
-                std::thread::spawn(move || lan.rispondi(id, accetta, None));
+        let lan = Arc::new(Lan::new(name.into(), name.into(), config, dir.join("lan.json")));
+        let for_notifier = lan.clone();
+        let notifier: Notifier = Arc::new(move |event: &str, payload: serde_json::Value| {
+            if event == "lan-request" {
+                let id = payload["id"].as_u64().unwrap();
+                let lan = for_notifier.clone();
+                // Answers from another thread, as the user would.
+                std::thread::spawn(move || lan.respond(id, accept, None));
             }
         });
         let server = TcpListener::bind("127.0.0.1:0").unwrap();
-        let porta = server.local_addr().unwrap().port();
-        avvia_server(avvisi, lan.clone(), server);
-        (lan, porta)
+        let port = server.local_addr().unwrap().port();
+        start_server(notifier, lan.clone(), server);
+        (lan, port)
     }
 
-    /// Fa conoscere a `chi` il PC `altro`, come avrebbe fatto un annuncio.
-    fn presenta(chi: &Lan, altro: &Lan, porta: u16) {
-        let p = Pari { id: altro.id.clone(), nome: altro.nome.clone(), ip: "127.0.0.1".into(), porta, condivisa: None };
-        chi.pari.lock().unwrap().insert(altro.id.clone(), (p, Instant::now()));
+    /// Makes `who` know the PC `other`, as an announcement would have.
+    fn introduce(who: &Lan, other: &Lan, port: u16) {
+        let p = Peer { id: other.id.clone(), name: other.name.clone(), ip: "127.0.0.1".into(), port, shared: None };
+        who.peers.lock().unwrap().insert(other.id.clone(), (p, Instant::now()));
     }
 
     #[test]
-    fn un_annuncio_non_ruba_l_identita_di_un_pc_gia_visto() {
-        let (lan, _) = pc_di_prova("IO", Config::default(), true);
-        let pari = |ip: &str| Pari { id: "SALOTTO".into(), nome: "Salotto".into(), ip: ip.into(), porta: 47821, condivisa: None };
-        lan.registra(pari("192.168.1.10"));
-        // Un altro PC si spaccia per «SALOTTO»: resta quello vero.
-        lan.registra(pari("192.168.1.66"));
-        assert_eq!(lan.pari()[0].ip, "192.168.1.10");
-        // Annunci con id sempre nuovi non fanno crescere la lista senza fine.
+    fn an_announcement_does_not_steal_a_known_pc_identity() {
+        let (lan, _) = test_pc("IO", Config::default(), true);
+        let peers = |ip: &str| Peer { id: "SALOTTO".into(), name: "Salotto".into(), ip: ip.into(), port: 47821, shared: None };
+        lan.register(peers("192.168.1.10"));
+        // Another PC pretends to be «SALOTTO»: the real one stays.
+        lan.register(peers("192.168.1.66"));
+        assert_eq!(lan.peers()[0].ip, "192.168.1.10");
+        // Announcements with ever new ids do not make the list grow without end.
         for i in 0..500 {
-            lan.registra(Pari { id: format!("finto{i}"), ..pari("10.0.0.1") });
+            lan.register(Peer { id: format!("finto{i}"), ..peers("10.0.0.1") });
         }
-        assert!(lan.pari().len() <= MASSIMO_PARI);
+        assert!(lan.peers().len() <= MAX_PEERS);
     }
 
     #[test]
-    fn due_pc_si_sfogliano_scaricano_e_si_inviano_file() {
+    fn two_pcs_browse_download_and_send_files() {
         let d = tempdir().unwrap();
-        let condivisa = d.path().join("condivisa");
-        fs::create_dir_all(condivisa.join("Foto")).unwrap();
-        fs::write(condivisa.join("Foto").join("mare.jpg"), vec![9u8; 50_000]).unwrap();
-        fs::write(condivisa.join("nota.txt"), b"ciao").unwrap();
-        let ricevuti = d.path().join("ricevuti");
+        let shared = d.path().join("condivisa");
+        fs::create_dir_all(shared.join("Foto")).unwrap();
+        fs::write(shared.join("Foto").join("mare.jpg"), vec![9u8; 50_000]).unwrap();
+        fs::write(shared.join("nota.txt"), b"ciao").unwrap();
+        let received = d.path().join("ricevuti");
 
-        let (server, porta) = pc_di_prova(
+        let (server, port) = test_pc(
             "SERVER",
             Config {
-                visibile: true,
-                condivisa: Some(condivisa.to_string_lossy().into_owned()),
-                ricevuti: Some(ricevuti.to_string_lossy().into_owned()),
+                visible: true,
+                shared: Some(shared.to_string_lossy().into_owned()),
+                received: Some(received.to_string_lossy().into_owned()),
                 ..Default::default()
             },
             true,
         );
-        let (client, _) = pc_di_prova("CLIENT", Config::default(), true);
-        presenta(&client, &server, porta);
+        let (client, _) = test_pc("CLIENT", Config::default(), true);
+        introduce(&client, &server, port);
 
-        // Sfoglia la radice condivisa e una sottocartella.
-        let mut nomi: Vec<String> = elenca_remoto(&client, r"::lan\SERVER")
+        // Browses the shared root and a subfolder.
+        let mut names: Vec<String> = list_remote(&client, r"::lan\SERVER")
             .unwrap()
             .into_iter()
             .map(|e| e.name)
             .collect();
-        nomi.sort();
-        assert_eq!(nomi, vec!["Foto", "nota.txt"]);
-        let foto = elenca_remoto(&client, r"::lan\SERVER\Foto").unwrap();
-        assert_eq!(foto[0].path, r"::lan\SERVER\Foto\mare.jpg");
-        assert_eq!(foto[0].size, 50_000);
+        names.sort();
+        assert_eq!(names, vec!["Foto", "nota.txt"]);
+        let photos = list_remote(&client, r"::lan\SERVER\Foto").unwrap();
+        assert_eq!(photos[0].path, r"::lan\SERVER\Foto\mare.jpg");
+        assert_eq!(photos[0].size, 50_000);
 
-        // Scarica una cartella intera.
-        let qui = d.path().join("qui");
-        let coppie = scarica(
+        // Downloads a whole folder.
+        let here = d.path().join("qui");
+        let pairs = download(
             &client,
             &[r"::lan\SERVER\Foto".to_string()],
-            &qui.to_string_lossy(),
+            &here.to_string_lossy(),
             &AtomicBool::new(false),
             &mut |_, _| {},
         )
         .unwrap();
-        assert_eq!(coppie.len(), 1);
-        assert_eq!(fs::read(qui.join("Foto").join("mare.jpg")).unwrap().len(), 50_000);
+        assert_eq!(pairs.len(), 1);
+        assert_eq!(fs::read(here.join("Foto").join("mare.jpg")).unwrap().len(), 50_000);
 
-        // Uscire dalla cartella condivisa non si può.
-        assert!(elenca_remoto(&client, r"::lan\SERVER\..").is_err());
+        // Getting out of the shared folder is not possible.
+        assert!(list_remote(&client, r"::lan\SERVER\..").is_err());
 
-        // Invio: il server accetta e i file arrivano nei suoi ricevuti.
-        let da_inviare = d.path().join("regalo.txt");
-        fs::write(&da_inviare, b"per te").unwrap();
-        invia(
+        // Send: the server accepts and the files arrive in its received folder.
+        let to_send = d.path().join("regalo.txt");
+        fs::write(&to_send, b"per te").unwrap();
+        send(
             &client,
             "SERVER",
-            &[da_inviare.to_string_lossy().into_owned()],
+            &[to_send.to_string_lossy().into_owned()],
             &AtomicBool::new(false),
             &mut |_, _| {},
         )
         .unwrap();
         // The receiver creates the file before writing it: wait for the
         // content, not just the name.
-        let arrivato = ricevuti.join("regalo.txt");
-        let mut letto = String::new();
+        let arrived = received.join("regalo.txt");
+        let mut read_back = String::new();
         for _ in 0..250 {
-            letto = fs::read_to_string(&arrivato).unwrap_or_default();
-            if letto == "per te" {
+            read_back = fs::read_to_string(&arrived).unwrap_or_default();
+            if read_back == "per te" {
                 break;
             }
             std::thread::sleep(Duration::from_millis(20));
         }
-        assert_eq!(letto, "per te");
+        assert_eq!(read_back, "per te");
     }
 
     #[test]
-    fn un_invio_rifiutato_non_lascia_niente() {
+    fn a_refused_send_leaves_nothing() {
         let d = tempdir().unwrap();
-        let ricevuti = d.path().join("ricevuti");
-        let (server, porta) = pc_di_prova(
+        let received = d.path().join("ricevuti");
+        let (server, port) = test_pc(
             "RIFIUTA",
-            Config { visibile: true, ricevuti: Some(ricevuti.to_string_lossy().into_owned()), ..Default::default() },
+            Config { visible: true, received: Some(received.to_string_lossy().into_owned()), ..Default::default() },
             false,
         );
-        let (client, _) = pc_di_prova("MANDA", Config::default(), true);
-        presenta(&client, &server, porta);
+        let (client, _) = test_pc("MANDA", Config::default(), true);
+        introduce(&client, &server, port);
 
         let f = d.path().join("x.txt");
         fs::write(&f, b"x").unwrap();
-        let errore = invia(&client, "RIFIUTA", &[f.to_string_lossy().into_owned()], &AtomicBool::new(false), &mut |_, _| {});
-        match errore {
+        let error = send(&client, "RIFIUTA", &[f.to_string_lossy().into_owned()], &AtomicBool::new(false), &mut |_, _| {});
+        match error {
             Err(FsError::Io { message }) => assert!(message.contains("rifiutato")),
-            altro => panic!("doveva essere rifiutato: {:?}", altro),
+            other => panic!("should have been refused: {:?}", other),
         }
-        assert!(!ricevuti.join("x.txt").exists());
+        assert!(!received.join("x.txt").exists());
     }
 
     #[test]
-    fn un_pc_invisibile_non_risponde_e_senza_condivisione_non_si_sfoglia() {
-        let (nascosto, porta_n) = pc_di_prova("NASCOSTO", Config::default(), true);
-        let (senza, porta_s) = pc_di_prova("SENZA", Config { visibile: true, ..Default::default() }, true);
-        let (client, _) = pc_di_prova("CHIEDE", Config::default(), true);
-        presenta(&client, &nascosto, porta_n);
-        presenta(&client, &senza, porta_s);
+    fn a_hidden_pc_does_not_answer_and_without_a_share_cannot_be_browsed() {
+        let (hidden, port_h) = test_pc("NASCOSTO", Config::default(), true);
+        let (unshared, port_u) = test_pc("SENZA", Config { visible: true, ..Default::default() }, true);
+        let (client, _) = test_pc("CHIEDE", Config::default(), true);
+        introduce(&client, &hidden, port_h);
+        introduce(&client, &unshared, port_u);
 
-        let e = elenca_remoto(&client, r"::lan\NASCOSTO").unwrap_err();
+        let e = list_remote(&client, r"::lan\NASCOSTO").unwrap_err();
         assert!(format!("{:?}", e).contains("non è visibile"));
-        let e = elenca_remoto(&client, r"::lan\SENZA").unwrap_err();
+        let e = list_remote(&client, r"::lan\SENZA").unwrap_err();
         assert!(format!("{:?}", e).contains("non condivide"));
     }
 
     #[test]
-    fn un_intestazione_enorme_viene_rifiutata() {
+    fn a_huge_header_is_refused() {
         let b = (u32::MAX).to_be_bytes();
-        assert!(leggi_json::<Risposta>(&mut b.as_slice()).is_err());
+        assert!(read_json::<Response>(&mut b.as_slice()).is_err());
     }
 }

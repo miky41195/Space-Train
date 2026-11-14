@@ -4,8 +4,8 @@
   "description": "Capability for the main window",
   "windows": [
     "main",
-    "finestra-*",
-    "editor-temi"
+    "window-*",
+    "theme-editor"
   ],
   "permissions": [
     "core:default",

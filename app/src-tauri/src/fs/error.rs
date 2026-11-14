@@ -1,8 +1,8 @@
 use serde::Serialize;
 
-/// Codice Win32 ERROR_NOT_READY: unità senza supporto, rete non raggiungibile.
+/// Win32 code ERROR_NOT_READY: drive with no media, network unreachable.
 const ERROR_NOT_READY: i32 = 21;
-/// Codice Win32 ERROR_DIRECTORY: il path esiste ma non è una directory.
+/// Win32 code ERROR_DIRECTORY: the path exists but is not a directory.
 const ERROR_DIRECTORY: i32 = 267;
 
 #[derive(Serialize, Debug, PartialEq, Eq, Clone)]
@@ -45,7 +45,7 @@ mod tests {
     use std::io::{Error, ErrorKind};
 
     #[test]
-    fn mappa_gli_errori_io_noti() {
+    fn maps_known_io_errors() {
         assert_eq!(
             from_io(&Error::new(ErrorKind::PermissionDenied, "x")),
             FsError::AccessDenied
@@ -57,16 +57,16 @@ mod tests {
     }
 
     #[test]
-    fn gli_errori_sconosciuti_conservano_il_messaggio() {
-        let e = from_io(&Error::new(ErrorKind::Other, "disco in fiamme"));
+    fn unknown_errors_keep_the_message() {
+        let e = from_io(&Error::new(ErrorKind::Other, "disk on fire"));
         match e {
-            FsError::Io { message } => assert!(message.contains("disco in fiamme")),
-            other => panic!("variante inattesa: {:?}", other),
+            FsError::Io { message } => assert!(message.contains("disk on fire")),
+            other => panic!("unexpected variant: {:?}", other),
         }
     }
 
     #[test]
-    fn serializza_con_un_campo_kind() {
+    fn serializes_with_a_kind_field() {
         let json = serde_json::to_string(&FsError::AccessDenied).unwrap();
         assert_eq!(json, r#"{"kind":"accessDenied"}"#);
     }

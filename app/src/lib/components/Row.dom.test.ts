@@ -6,11 +6,11 @@ import type { Entry } from '../ipc';
 
 afterEach(cleanup);
 
-function voce(name: string, kind: Entry['kind'] = 'file'): Entry {
+function item(name: string, kind: Entry['kind'] = 'file'): Entry {
 	return { name, path: `C:\\${name}`, kind, size: 1234, modified: 0, hidden: false };
 }
 
-function montaInRinomina(entry: Entry) {
+function mountRenaming(entry: Entry) {
 	const onrename = vi.fn();
 	const oncancelrename = vi.fn();
 
@@ -25,87 +25,87 @@ function montaInRinomina(entry: Entry) {
 		}
 	});
 
-	const campo = screen.getByLabelText('Nuovo nome') as HTMLInputElement;
-	return { campo, onrename, oncancelrename };
+	const field = screen.getByLabelText('Nuovo nome') as HTMLInputElement;
+	return { field, onrename, oncancelrename };
 }
 
-describe('Row in rinomina', () => {
-	it('mostra il nome corrente nel campo', () => {
-		const { campo } = montaInRinomina(voce('appunti.txt'));
-		expect(campo.value).toBe('appunti.txt');
+describe('Row while renaming', () => {
+	it('mostra il nome corrente nel field', () => {
+		const { field } = mountRenaming(item('notes.txt'));
+		expect(field.value).toBe('notes.txt');
 	});
 
-	it('Invio conferma il nuovo nome una volta sola', async () => {
-		const { campo, onrename } = montaInRinomina(voce('vecchio.txt'));
+	it('Enter confirms the new name only once', async () => {
+		const { field, onrename } = mountRenaming(item('old.txt'));
 
-		campo.value = 'nuovo.txt';
-		campo.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-		// Lo smontaggio del campo scatena blur: è il secondo invio che
-		// causava «Esiste già un elemento con quel nome».
-		campo.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+		field.value = 'new.txt';
+		field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+		// Lo smontaggio del field scatena blur: è il secondo invio che
+		// caused «Esiste già un elemento con quel nome».
+		field.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
 
 		expect(onrename).toHaveBeenCalledTimes(1);
-		expect(onrename).toHaveBeenCalledWith(expect.objectContaining({ name: 'vecchio.txt' }), 'nuovo.txt');
+		expect(onrename).toHaveBeenCalledWith(expect.objectContaining({ name: 'old.txt' }), 'new.txt');
 	});
 
-	it('Escape annulla una volta sola, senza rinominare', () => {
-		const { campo, onrename, oncancelrename } = montaInRinomina(voce('vecchio.txt'));
+	it('Escape cancels only once, without renaming', () => {
+		const { field, onrename, oncancelrename } = mountRenaming(item('old.txt'));
 
-		campo.value = 'nuovo.txt';
-		campo.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-		campo.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+		field.value = 'new.txt';
+		field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+		field.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
 
 		expect(onrename).not.toHaveBeenCalled();
 		expect(oncancelrename).toHaveBeenCalledTimes(1);
 	});
 
-	it('confermare lo stesso nome annulla invece di rinominare', () => {
-		const { campo, onrename, oncancelrename } = montaInRinomina(voce('uguale.txt'));
+	it('confirming the same name cancels instead of renaming', () => {
+		const { field, onrename, oncancelrename } = mountRenaming(item('same.txt'));
 
-		campo.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-
-		expect(onrename).not.toHaveBeenCalled();
-		expect(oncancelrename).toHaveBeenCalledTimes(1);
-	});
-
-	it('un nome di soli spazi non viene inviato al backend', () => {
-		const { campo, onrename, oncancelrename } = montaInRinomina(voce('valido.txt'));
-
-		campo.value = '   ';
-		campo.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+		field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
 
 		expect(onrename).not.toHaveBeenCalled();
 		expect(oncancelrename).toHaveBeenCalledTimes(1);
 	});
 
-	it('il solo blur, senza Invio, conferma comunque', () => {
-		const { campo, onrename } = montaInRinomina(voce('vecchio.txt'));
+	it('a name of only spaces is not sent to the backend', () => {
+		const { field, onrename, oncancelrename } = mountRenaming(item('valid.txt'));
 
-		campo.value = 'nuovo.txt';
-		campo.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+		field.value = '   ';
+		field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+		expect(onrename).not.toHaveBeenCalled();
+		expect(oncancelrename).toHaveBeenCalledTimes(1);
+	});
+
+	it('blur alone, without Enter, still confirms', () => {
+		const { field, onrename } = mountRenaming(item('old.txt'));
+
+		field.value = 'new.txt';
+		field.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
 
 		expect(onrename).toHaveBeenCalledTimes(1);
 	});
 });
 
-describe('Row normale', () => {
-	it('mostra nome e dimensione', () => {
+describe('Row, normal', () => {
+	it('shows name and size', () => {
 		render(Row, {
 			props: {
-				entry: voce('appunti.txt'),
+				entry: item('notes.txt'),
 				onactivate: vi.fn(),
 				onselect: vi.fn()
 			}
 		});
 
-		expect(screen.getByText('appunti.txt')).toBeTruthy();
+		expect(screen.getByText('notes.txt')).toBeTruthy();
 		expect(screen.getByText('1 KB')).toBeTruthy();
 	});
 
-	it('le cartelle non mostrano una dimensione', () => {
+	it('folders show no size', () => {
 		render(Row, {
 			props: {
-				entry: voce('progetti', 'dir'),
+				entry: item('projects', 'dir'),
 				onactivate: vi.fn(),
 				onselect: vi.fn()
 			}
@@ -114,20 +114,20 @@ describe('Row normale', () => {
 		expect(screen.getByText('—')).toBeTruthy();
 	});
 
-	it('il doppio click apre, il click singolo seleziona', () => {
+	it('double click opens, single click selects', () => {
 		const onactivate = vi.fn();
 		const onselect = vi.fn();
 		const { container } = render(Row, {
-			props: { entry: voce('a.txt'), onactivate, onselect }
+			props: { entry: item('a.txt'), onactivate, onselect }
 		});
 
-		const riga = container.querySelector('.row') as HTMLElement;
+		const row = container.querySelector('.row') as HTMLElement;
 
-		riga.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		row.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 		expect(onselect).toHaveBeenCalledTimes(1);
 		expect(onactivate).not.toHaveBeenCalled();
 
-		riga.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+		row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
 		expect(onactivate).toHaveBeenCalledTimes(1);
 	});
 });
@@ -136,7 +136,7 @@ describe('Row in one-click mode', () => {
 	function mount(props: Record<string, unknown>) {
 		const onselect = vi.fn();
 		const { container } = render(Row, {
-			props: { entry: voce('note.txt'), onactivate: vi.fn(), onselect, ...props }
+			props: { entry: item('note.txt'), onactivate: vi.fn(), onselect, ...props }
 		});
 		return { row: container.querySelector('.row') as HTMLElement, onselect };
 	}
@@ -144,7 +144,7 @@ describe('Row in one-click mode', () => {
 	it('selects the item the pointer rests on', () => {
 		vi.useFakeTimers();
 		try {
-			const { row, onselect } = mount({ unClic: true });
+			const { row, onselect } = mount({ singleClick: true });
 			row.dispatchEvent(new MouseEvent('mouseenter'));
 			vi.advanceTimersByTime(600);
 			expect(onselect).toHaveBeenCalledWith(expect.objectContaining({ name: 'note.txt' }), {});
@@ -156,13 +156,13 @@ describe('Row in one-click mode', () => {
 	it('does nothing if the pointer leaves first, or without one-click mode', () => {
 		vi.useFakeTimers();
 		try {
-			const a = mount({ unClic: true });
+			const a = mount({ singleClick: true });
 			a.row.dispatchEvent(new MouseEvent('mouseenter'));
 			a.row.dispatchEvent(new MouseEvent('mouseleave'));
 			vi.advanceTimersByTime(600);
 			expect(a.onselect).not.toHaveBeenCalled();
 
-			const b = mount({ unClic: false });
+			const b = mount({ singleClick: false });
 			b.row.dispatchEvent(new MouseEvent('mouseenter'));
 			vi.advanceTimersByTime(600);
 			expect(b.onselect).not.toHaveBeenCalled();
@@ -174,16 +174,16 @@ describe('Row in one-click mode', () => {
 
 describe('Row with a content search snippet', () => {
 	it('shows the found line with the match highlighted and the extra count', () => {
-		const entry = { ...voce('note.txt'), snippet: { line: 42, text: '…la 😀 fattura 2024 qui', at: 6, len: 12, more: 2 } };
+		const entry = { ...item('note.txt'), snippet: { line: 42, text: '…la 😀 fattura 2024 qui', at: 6, len: 12, more: 2 } };
 		const { container } = render(Row, { props: { entry, onactivate: vi.fn(), onselect: vi.fn() } });
-		const f = container.querySelector('.frammento')!;
-		expect(f.querySelector('.riga-num')?.textContent).toBe('42');
+		const f = container.querySelector('.snippet')!;
+		expect(f.querySelector('.line-num')?.textContent).toBe('42');
 		expect(f.querySelector('mark')?.textContent).toBe('fattura 2024');
 		expect(f.textContent).toContain('+2 altre righe');
 	});
 
 	it('plain rows have no snippet line', () => {
-		const { container } = render(Row, { props: { entry: voce('note.txt'), onactivate: vi.fn(), onselect: vi.fn() } });
-		expect(container.querySelector('.frammento')).toBeNull();
+		const { container } = render(Row, { props: { entry: item('note.txt'), onactivate: vi.fn(), onselect: vi.fn() } });
+		expect(container.querySelector('.snippet')).toBeNull();
 	});
 });

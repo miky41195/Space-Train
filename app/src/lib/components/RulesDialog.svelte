@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { Backend, Entry } from '../ipc';
-	import { nomeDi } from '../posizioni';
+	import { nameOf } from '../locations';
 	import { CATEGORIES, matches, parseExts, problem, type Action, type Condition, type Rule } from '../rules';
-	import { COLORI_CARTELLA, type IdColore } from '../stores/colori.svelte';
+	import { FOLDER_COLORS, type ColorId } from '../stores/colors.svelte';
 	import type { LogEntry } from '../stores/rules.svelte';
 
 	let {
@@ -19,8 +19,8 @@
 		rules: Rule[];
 		/** Past actions of the rules of this folder, newest first. */
 		log: LogEntry[];
-		backend: Pick<Backend, 'listDir' | 'scegliCartella'>;
-		labelName: (id: IdColore) => string;
+		backend: Pick<Backend, 'listDir' | 'pickFolder'>;
+		labelName: (id: ColorId) => string;
 		onsave: (rules: Rule[]) => void;
 		onclose: () => void;
 		onundo: (id: number) => void;
@@ -107,7 +107,7 @@
 
 	async function pickDest(r: Rule) {
 		if (r.then.type !== 'move' && r.then.type !== 'copy') return;
-		const chosen = await backend.scegliCartella('Dove mettere i file', r.then.dest || folder).catch(() => null);
+		const chosen = await backend.pickFolder('Dove mettere i file', r.then.dest || folder).catch(() => null);
 		if (chosen && (r.then.type === 'move' || r.then.type === 'copy')) r.then = { type: r.then.type, dest: chosen };
 	}
 
@@ -115,23 +115,23 @@
 		return (files ?? []).filter((f) => matches(r.if, f, now));
 	}
 
-	const ora = (t: number) => new Date(t).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+	const timeOf = (t: number) => new Date(t).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
 </script>
 
-<div class="sfondo" role="presentation" onclick={(e) => e.target === e.currentTarget && onclose()} onkeydown={(e) => e.key === 'Escape' && onclose()}>
-	<div class="finestra" role="dialog" aria-modal="true" aria-label={`Regole di ${nomeDi(folder) || folder}`}>
-		<h2>Regole di {nomeDi(folder) || folder}</h2>
-		<p class="nota">Valgono per i file di questa cartella, non per le sottocartelle. Non sovrascrivono mai niente e il cestino è il massimo: nessuna eliminazione definitiva.</p>
+<div class="backdrop" role="presentation" onclick={(e) => e.target === e.currentTarget && onclose()} onkeydown={(e) => e.key === 'Escape' && onclose()}>
+	<div class="dialog" role="dialog" aria-modal="true" aria-label={`Regole di ${nameOf(folder) || folder}`}>
+		<h2>Regole di {nameOf(folder) || folder}</h2>
+		<p class="note">Valgono per i file di questa cartella, non per le sottocartelle. Non sovrascrivono mai niente e il cestino è il massimo: nessuna eliminazione definitiva.</p>
 
 		{#if rules.length === 0}
-			<p class="vuoto">Nessuna regola. Aggiungine una per mettere in ordine questa cartella da sola.</p>
+			<p class="empty">Nessuna regola. Aggiungine una per mettere in ordine questa cartella da sola.</p>
 		{/if}
 
-		<ul class="regole">
+		<ul class="rules">
 			{#each rules as r, i (r.id)}
 				{@const n = files ? matching(r).length : null}
-				<li class="regola" class:spenta={!r.enabled}>
-					<div class="frase">
+				<li class="rule" class:off={!r.enabled}>
+					<div class="sentence">
 						<select aria-label="Quando" value={r.when} onchange={(e) => (r.when = e.currentTarget.value as Rule['when'])}>
 							<option value="arrival">Quando arriva un file</option>
 							<option value="daily">Ogni giorno</option>
@@ -153,7 +153,7 @@
 						{:else if r.if.type !== 'any'}
 							<input
 								aria-label="Valore della condizione"
-								class:numero={r.if.type === 'olderThan' || r.if.type === 'largerThan'}
+								class:number={r.if.type === 'olderThan' || r.if.type === 'largerThan'}
 								inputmode={r.if.type === 'olderThan' || r.if.type === 'largerThan' ? 'decimal' : 'text'}
 								value={typed[r.id] ?? ''}
 								oninput={(e) => setValue(r, e.currentTarget.value)}
@@ -167,22 +167,22 @@
 							<option value="trash">mandalo nel cestino</option>
 						</select>
 						{#if r.then.type === 'move' || r.then.type === 'copy'}
-							<button class="scegli" title={r.then.dest || undefined} onclick={() => void pickDest(r)}>
-								{r.then.dest ? nomeDi(r.then.dest) || r.then.dest : 'Scegli cartella…'}
+							<button class="pick" title={r.then.dest || undefined} onclick={() => void pickDest(r)}>
+								{r.then.dest ? nameOf(r.then.dest) || r.then.dest : 'Scegli cartella…'}
 							</button>
 						{:else if r.then.type === 'label'}
 							{@const a = r.then}
-							<select aria-label="Etichetta" value={a.color} onchange={(e) => (r.then = { type: 'label', color: e.currentTarget.value as IdColore })}>
-								{#each COLORI_CARTELLA as c (c.id)}<option value={c.id}>{labelName(c.id)}</option>{/each}
+							<select aria-label="Etichetta" value={a.color} onchange={(e) => (r.then = { type: 'label', color: e.currentTarget.value as ColorId })}>
+								{#each FOLDER_COLORS as c (c.id)}<option value={c.id}>{labelName(c.id)}</option>{/each}
 							</select>
 						{/if}
 					</div>
-					<div class="piede">
-						<label class="attiva"><input type="checkbox" bind:checked={r.enabled} /> Attiva</label>
+					<div class="footer">
+						<label class="enabled"><input type="checkbox" bind:checked={r.enabled} /> Attiva</label>
 						{#if problems[i]}
-							<span class="problema" role="alert">{problems[i]}</span>
+							<span class="problem" role="alert">{problems[i]}</span>
 						{:else if n !== null}
-							<span class="anteprima">
+							<span class="preview">
 								{r.when === 'daily' ? 'Oggi agirebbe su' : 'Fra i file di adesso corrispondono'}
 								<b>{n === 1 ? '1 file' : `${n} file`}</b>
 								{#if n > 0}
@@ -190,46 +190,46 @@
 								{/if}
 							</span>
 						{/if}
-						<button class="link togli" onclick={() => rules.splice(i, 1)}>Elimina regola</button>
+						<button class="link remove" onclick={() => rules.splice(i, 1)}>Elimina regola</button>
 					</div>
 					{#if shown === r.id}
-						<ul class="elenco">
+						<ul class="list">
 							{#each matching(r).slice(0, 12) as f (f.path)}<li>{f.name}</li>{/each}
-							{#if matching(r).length > 12}<li class="resto">e altri {matching(r).length - 12}…</li>{/if}
+							{#if matching(r).length > 12}<li class="rest">e altri {matching(r).length - 12}…</li>{/if}
 						</ul>
 					{/if}
 				</li>
 			{/each}
 		</ul>
 
-		<button class="aggiungi" onclick={add}>+ Aggiungi regola</button>
+		<button class="add" onclick={add}>+ Aggiungi regola</button>
 
 		{#if log.length > 0}
 			<h3>Ultime azioni</h3>
-			<ul class="registro">
+			<ul class="log">
 				{#each log.slice(0, 20) as l (l.id)}
-					<li class:fallita={l.failed}>
-						<time>{ora(l.time)}</time>
-						<span class="testo" title={l.text}>{l.text}</span>
+					<li class:failed={l.failed}>
+						<time>{timeOf(l.time)}</time>
+						<span class="text" title={l.text}>{l.text}</span>
 						{#if l.undo && !l.undone}
 							<button class="link" onclick={() => onundo(l.id)}>Annulla</button>
 						{:else if l.undone}
-							<span class="annullata">annullata</span>
+							<span class="undone">annullata</span>
 						{/if}
 					</li>
 				{/each}
 			</ul>
 		{/if}
 
-		<div class="azioni">
+		<div class="actions">
 			<button onclick={onclose}>Annulla</button>
-			<button class="primario" disabled={!canSave} onclick={() => onsave($state.snapshot(rules) as Rule[])}>Salva</button>
+			<button class="primary" disabled={!canSave} onclick={() => onsave($state.snapshot(rules) as Rule[])}>Salva</button>
 		</div>
 	</div>
 </div>
 
 <style>
-	.sfondo {
+	.backdrop {
 		position: fixed;
 		inset: 0;
 		display: flex;
@@ -238,7 +238,7 @@
 		background: color-mix(in srgb, var(--bg) 72%, transparent);
 		z-index: 10;
 	}
-	.finestra {
+	.dialog {
 		width: min(680px, 94vw);
 		max-height: 86vh;
 		overflow-y: auto;
@@ -246,26 +246,26 @@
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: var(--radius);
-		clip-path: var(--forma, none);
-		mask: var(--maschera, none);
+		clip-path: var(--shape, none);
+		mask: var(--mask, none);
 		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
 	}
 	h2 {
 		margin: 0 0 6px;
-		font-size: calc(15px * var(--scala-testo, 1));
+		font-size: calc(15px * var(--text-scale, 1));
 		font-weight: 600;
 	}
 	h3 {
 		margin: 18px 0 6px;
 		font-family: var(--font-display);
-		font-size: calc(11px * var(--scala-testo, 1));
+		font-size: calc(11px * var(--text-scale, 1));
 		font-weight: 600;
 		letter-spacing: 0.12em;
 		text-transform: uppercase;
 		color: var(--text-dim);
 	}
-	.nota,
-	.vuoto {
+	.note,
+	.empty {
 		margin: 0 0 12px;
 		color: var(--text-dim);
 		line-height: 1.5;
@@ -275,11 +275,11 @@
 		margin: 0;
 		padding: 0;
 	}
-	.regole {
+	.rules {
 		display: grid;
 		gap: 8px;
 	}
-	.regola {
+	.rule {
 		display: grid;
 		gap: 8px;
 		padding: 10px 12px;
@@ -287,10 +287,10 @@
 		border-radius: var(--radius-sm);
 		background: var(--bg);
 	}
-	.regola.spenta .frase {
+	.rule.off .sentence {
 		opacity: 0.55;
 	}
-	.frase {
+	.sentence {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
@@ -298,7 +298,7 @@
 	}
 	.kw {
 		font-family: var(--font-display);
-		font-size: calc(10px * var(--scala-testo, 1));
+		font-size: calc(10px * var(--text-scale, 1));
 		font-weight: 600;
 		letter-spacing: 0.12em;
 		text-transform: uppercase;
@@ -306,7 +306,7 @@
 	}
 	select,
 	input:not([type='checkbox']),
-	.scegli {
+	.pick {
 		height: 26px;
 		padding: 0 8px;
 		border: 1px solid var(--border);
@@ -319,40 +319,40 @@
 		width: 140px;
 		background: var(--surface);
 	}
-	input.numero {
+	input.number {
 		width: 70px;
 		font-family: var(--font-display);
 		font-variant-numeric: tabular-nums;
 	}
-	.scegli {
+	.pick {
 		max-width: 200px;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		cursor: default;
 	}
-	.piede {
+	.footer {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
 		gap: 12px;
-		font-size: calc(12px * var(--scala-testo, 1));
+		font-size: calc(12px * var(--text-scale, 1));
 		color: var(--text-dim);
 	}
-	.attiva {
+	.enabled {
 		display: inline-flex;
 		align-items: center;
 		gap: 6px;
 		color: var(--text);
 	}
-	.anteprima b {
+	.preview b {
 		color: var(--text);
 		font-weight: 600;
 	}
-	.problema {
-		color: var(--errore-testo, #ffb4ab);
+	.problem {
+		color: var(--error-text, #ffb4ab);
 	}
-	.togli {
+	.remove {
 		margin-left: auto;
 	}
 	.link {
@@ -366,15 +366,15 @@
 	.link:hover {
 		text-decoration: underline;
 	}
-	.elenco {
+	.list {
 		padding-left: 4px;
 		color: var(--text-dim);
-		font-size: calc(12px * var(--scala-testo, 1));
+		font-size: calc(12px * var(--text-scale, 1));
 	}
-	.resto {
+	.rest {
 		font-style: italic;
 	}
-	.aggiungi {
+	.add {
 		margin-top: 10px;
 		padding: 0;
 		border: none;
@@ -383,62 +383,62 @@
 		font: inherit;
 		cursor: default;
 	}
-	.aggiungi:hover {
+	.add:hover {
 		color: var(--text);
 	}
-	.registro li {
+	.log li {
 		display: grid;
 		grid-template-columns: 44px minmax(0, 1fr) auto;
 		gap: 8px;
 		align-items: center;
 		padding: 3px 6px;
 		border-radius: var(--radius-sm);
-		font-size: calc(12px * var(--scala-testo, 1));
+		font-size: calc(12px * var(--text-scale, 1));
 	}
-	.registro li:hover {
+	.log li:hover {
 		background: var(--row-hover);
 	}
-	.registro time {
+	.log time {
 		font-family: var(--font-display);
 		font-variant-numeric: tabular-nums;
 		color: var(--text-dim);
 	}
-	.registro .testo {
+	.log .text {
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
-	.fallita .testo {
-		color: var(--errore-testo, #ffb4ab);
+	.failed .text {
+		color: var(--error-text, #ffb4ab);
 	}
-	.annullata {
+	.undone {
 		color: var(--text-dim);
 	}
-	.azioni {
+	.actions {
 		display: flex;
 		justify-content: flex-end;
 		gap: 8px;
 		margin-top: 16px;
 	}
-	.azioni button {
+	.actions button {
 		height: 30px;
 		padding: 0 14px;
 		border: 1px solid var(--border);
 		border-radius: var(--radius-sm);
-		clip-path: var(--forma-sm, none);
-		mask: var(--maschera-sm, none);
+		clip-path: var(--shape-sm, none);
+		mask: var(--mask-sm, none);
 		background: transparent;
 		color: var(--text);
 		font: inherit;
 		cursor: default;
 	}
-	.azioni button:hover:not(:disabled) {
+	.actions button:hover:not(:disabled) {
 		background: var(--row-hover);
 	}
-	.azioni button:disabled {
+	.actions button:disabled {
 		opacity: 0.5;
 	}
-	.azioni .primario {
+	.actions .primary {
 		border-color: transparent;
 		background: var(--accent);
 		color: #fff;

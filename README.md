@@ -47,7 +47,7 @@ cd src-tauri && cargo test --lib   # backend tests
 
 ```sh
 cd app
-npm run rilascia -- 0.2.0
+npm run release -- 0.2.0
 ```
 
 The script sets the version in `package.json`, `tauri.conf.json` and

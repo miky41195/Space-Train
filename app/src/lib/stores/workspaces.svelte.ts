@@ -1,5 +1,5 @@
-import type { Archivio } from './preferiti.svelte';
-import { alCambioDi } from './sincronizza';
+import type { KeyValueStore } from './favorites.svelte';
+import { onChangeOf } from './sync';
 
 const KEY = 'space-train.aree';
 const MAX_NAME = 40;
@@ -29,9 +29,9 @@ export class WorkspacesStore {
 	areas = $state<Workspace[]>([]);
 	current = $state<string | null>(null);
 
-	constructor(private archivio: Archivio | null = defaultStorage()) {
-		this.#read(archivio?.getItem(KEY) ?? null);
-		alCambioDi(KEY, (v) => this.#read(v));
+	constructor(private storage: KeyValueStore | null = defaultStorage()) {
+		this.#read(storage?.getItem(KEY) ?? null);
+		onChangeOf(KEY, (v) => this.#read(v));
 	}
 
 	get(name: string): Workspace | undefined {
@@ -102,7 +102,7 @@ export class WorkspacesStore {
 
 	#write(): void {
 		try {
-			this.archivio?.setItem(KEY, JSON.stringify({ current: this.current, areas: this.areas } satisfies Saved));
+			this.storage?.setItem(KEY, JSON.stringify({ current: this.current, areas: this.areas } satisfies Saved));
 		} catch {
 			// Storage denied: areas last for this session.
 		}
@@ -137,7 +137,7 @@ function normalize(s: Snapshot): Snapshot {
 	return { tabs: [...s.tabs], active, split };
 }
 
-function defaultStorage(): Archivio | null {
+function defaultStorage(): KeyValueStore | null {
 	try {
 		return typeof localStorage === 'undefined' ? null : localStorage;
 	} catch {

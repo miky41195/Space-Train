@@ -9,16 +9,16 @@ export interface Entry {
 	size: number;
 	modified: number | null;
 	hidden: boolean;
-	/** Solo nel Cestino: la cartella da cui l'elemento è stato eliminato. */
-	origine?: string;
-	/** Solo per i volumi in «Questo PC». */
-	libero?: number;
-	totale?: number;
+	/** Only in the Recycle Bin: the folder the item was deleted from. */
+	origin?: string;
+	/** Only for the volumes in «Questo PC». */
+	free?: number;
+	total?: number;
 	/**
-	 * Ha un'icona sua, diversa da quella del tipo: un programma, un
-	 * collegamento, una cartella personalizzata, un disco.
+	 * It has an icon of its own, different from its type's: a program, a
+	 * shortcut, a customized folder, a drive.
 	 */
-	iconaPropria?: boolean;
+	ownIcon?: boolean;
 	/** Only in content search results: the first line that contains the text. */
 	snippet?: Snippet;
 }
@@ -81,9 +81,9 @@ export interface SortSpec {
 export interface Drive {
 	label: string;
 	path: string;
-	libero: number | null;
-	totale: number | null;
-	tipo: 'fisso' | 'rimovibile' | 'rete' | 'ottico' | 'ram' | 'sconosciuto';
+	free: number | null;
+	total: number | null;
+	kind: 'fixed' | 'removable' | 'network' | 'optical' | 'ram' | 'unknown';
 }
 
 export interface KnownFolder {
@@ -120,20 +120,20 @@ export interface ServerConfig {
 	remember: boolean;
 }
 
-/** Cosa fare quando a destinazione esiste già un elemento con lo stesso nome. */
-export type Politica = 'sovrascrivi' | 'rinomina' | 'salta';
+/** What to do when an item with the same name already exists at the destination. */
+export type ConflictPolicy = 'overwrite' | 'rename' | 'skip';
 
-export interface Progresso {
+export interface Progress {
 	transferred: number;
 	total: number;
 }
 
-export interface Esito {
-	copiati: number;
-	saltati: number;
-	annullato: boolean;
-	/** Sorgente e arrivo effettivo di ogni elemento trasferito. */
-	coppie: Array<[string, string]>;
+export interface CopyOutcome {
+	copied: number;
+	skipped: number;
+	cancelled: boolean;
+	/** Source and actual arrival path of every transferred item. */
+	pairs: Array<[string, string]>;
 }
 
 export type DuplicateEvent =
@@ -157,10 +157,10 @@ export interface ArchiveItem {
 
 export type ImageTarget = 'jpg' | 'png' | 'webp';
 
-export interface CriteriRicerca {
-	testo: string;
-	contenuto: boolean;
-	nascosti: boolean;
+export interface SearchCriteria {
+	text: string;
+	content: boolean;
+	hidden: boolean;
 	/** Smart folder filters: any of them limits the results to files. */
 	extensions?: string[];
 	minSize?: number;
@@ -168,126 +168,128 @@ export interface CriteriRicerca {
 	modifiedBefore?: number;
 }
 
-export interface ContenutoAppunti {
+export interface ClipboardContent {
 	paths: string[];
-	taglia: boolean;
+	cut: boolean;
 }
 
-export interface Destinazione {
-	cartella: string;
-	seleziona: string | null;
+export interface Destination {
+	folder: string;
+	select: string | null;
 }
 
-export interface Modificatori {
+export interface Modifiers {
 	ctrl: boolean;
 	shift: boolean;
 	alt: boolean;
 }
 
-/** Un tipo di file del menu «Nuovo», come lo registra Windows. */
-export interface TipoNuovo {
+/** A file type of the «Nuovo» menu, as Windows registers it. */
+export interface NewFileType {
 	ext: string;
-	nome: string;
+	name: string;
 }
 
-/** Preferenze della rete locale fra copie di Space Train. */
-export interface ConfigLan {
-	visibile: boolean;
-	condivisa: string | null;
-	ricevuti: string | null;
-	/** PC da raggiungere per indirizzo: un IP o un nome, anche di una VPN. */
-	indirizzi: string[];
+/** Lan preferences between copies of Space Train. */
+export interface LanSettings {
+	visible: boolean;
+	shared: string | null;
+	received: string | null;
+	/** PCs to reach by address: an IP or a name, also of a VPN. */
+	addresses: string[];
 }
 
-export interface StatoLan extends ConfigLan {
+export interface LanStatus extends LanSettings {
 	id: string;
-	nome: string;
-	/** Dove finiscono i file ricevuti, anche se è quella predefinita. */
-	cartellaRicevuti: string;
+	name: string;
+	/** Where received files end up, even when it is the default one. */
+	receivedFolder: string;
 }
 
-/** Un altro PC con Space Train trovato in rete locale. */
-export interface Pari {
+/** Another PC with Space Train found on the lan. */
+export interface Peer {
 	id: string;
-	nome: string;
+	name: string;
 	ip: string;
-	porta: number;
-	condivisa: string | null;
+	port: number;
+	shared: string | null;
 }
 
 /**
- * Un amico su Space Train, raggiungibile anche fuori casa.
- * `inviata`: l'abbiamo chiesta noi; `ricevuta`: tocca a noi rispondere.
+ * A friend on Space Train, reachable even away from home.
+ * `sent`: we asked; `received`: it is up to us to answer.
  */
-export interface Amico {
-	/** Il suo codice personale. */
+export interface FriendView {
+	/** Their personal code. */
 	id: string;
-	nome: string;
-	stato: 'confermato' | 'inviata' | 'ricevuta';
-	/** Può sfogliare e scaricare la nostra cartella condivisa. */
-	condividi: boolean;
-	inLinea: boolean;
+	name: string;
+	status: 'confirmed' | 'sent' | 'received';
+	/** Can browse and download our shared folder. */
+	share: boolean;
+	/** The other already knows about our last step (request or confirmation). */
+	delivered?: boolean;
+	online: boolean;
 	/** Our folder kept aligned on their PC, once a day. */
-	backup?: { cartella: string; ultimo: number | null; tentato: number | null; esito: string | null };
+	backup?: { folder: string; last: number | null; attempted: number | null; outcome: string | null };
 	/** Their backup kept here: they asked, we said yes or no. */
-	ospite?: { consenso: 'chiesto' | 'si' | 'no'; cartella: string | null; ultimo: number | null };
+	guest?: { consent: 'asked' | 'yes' | 'no'; folder: string | null; last: number | null };
 }
 
-export interface StatoAmici {
-	/** Il nostro codice personale, da dare agli amici. */
-	codice: string;
-	/** La connessione è pronta: senza, gli amici non si raggiungono. */
-	pronto: boolean;
-	amici: Amico[];
+export interface FriendsStatus {
+	/** Our personal code, to give to friends. */
+	code: string;
+	/** The connection is ready: without it, friends cannot be reached. */
+	ready: boolean;
+	friends: FriendView[];
 }
 
-/** Un altro PC vuole inviarci dei file: serve il nostro consenso. */
-export interface RichiestaInvio {
+/** Another PC wants to send us files: our consent is needed. */
+export interface SendRequest {
 	id: number;
-	da: string;
-	quanti: number;
-	totale: number;
-	nomi: string[];
+	from: string;
+	count: number;
+	total: number;
+	names: string[];
 }
 
-/** Cosa ha deciso chi ha ricevuto un trascinamento verso l'esterno. */
-export type EffettoTrascina = 'sposta' | 'copia' | 'collegamento' | 'nessuno';
+/** What the receiver of a drag out of the app decided. */
+export type DragEffect = 'move' | 'copy' | 'link' | 'none';
 
 export interface TransferOpts {
-	/** Identificativo scelto dal frontend, serve per annullare. */
+	/** Identifier chosen by the frontend, used to cancel. */
 	opId: number;
 	sources: string[];
 	dest: string;
 	mode: 'copy' | 'move';
-	policy: Politica;
-	onProgress: (p: Progresso) => void;
+	policy: ConflictPolicy;
+	onProgress: (p: Progress) => void;
 }
 
-/** Com'è finito il menu di sistema. */
-export interface EsitoMenu {
-	/** È stata scelta ed eseguita una voce. */
-	eseguito: boolean;
-	/** «Apri percorso file»: la cartella da aprire nell'app, con la voce da selezionare. */
-	apri: Destinazione | null;
+/** How the system menu ended. */
+export interface MenuOutcome {
+	/** An item was chosen and run. */
+	executed: boolean;
+	/** «Apri percorso file»: the folder to open in the app, with the item to select. */
+	open: Destination | null;
 }
 
 /**
- * Confine col backend. I test dello store montano una implementazione finta
- * di questa interfaccia: nessun test del frontend tocca il filesystem.
+ * Boundary with the backend. The store tests mount a fake implementation
+ * of this interface: no frontend test touches the filesystem.
  */
 export interface Backend {
 	listDir(path: string, sort: SortSpec, showHidden: boolean): Promise<Listing>;
 	openEntry(path: string): Promise<void>;
-	/** Byte di tutto l'albero di una cartella; null se un turno più nuovo l'ha fermato. */
-	dimensioneCartella(path: string, turno: number): Promise<number | null>;
-	/** Comincia un turno di calcoli delle dimensioni e ferma il precedente. */
-	turnoDimensioni(turno: number): Promise<void>;
+	/** Bytes of a folder's whole tree; null if a newer turn stopped it. */
+	folderSize(path: string, turn: number): Promise<number | null>;
+	/** Starts a turn of size computations and stops the previous one. */
+	sizeTurn(turn: number): Promise<void>;
 	/** Starts a new cleanup scan; the previous one stops. */
-	cleanupRound(giro: number): Promise<void>;
+	cleanupRound(round: number): Promise<void>;
 	/** What one cleanup category holds on a drive, biggest first; null if a newer scan started. */
-	cleanupScan(category: CategoriaPulizia, drive: string, roots: string[], giro: number): Promise<Trovato[] | null>;
+	cleanupScan(category: CleanupCategory, drive: string, roots: string[], round: number): Promise<CleanupCandidate[] | null>;
 	/** The biggest programs installed on a drive (Windows only). */
-	programsList(drive: string): Promise<Programma[]>;
+	programsList(drive: string): Promise<Program[]>;
 	/** Starts a program's official uninstaller. */
 	programUninstall(id: string): Promise<void>;
 	navigate(path: string, direction: 'up'): Promise<string>;
@@ -300,7 +302,7 @@ export interface Backend {
 	iconForExtension(ext: string, isDir: boolean, large: boolean): Promise<string | null>;
 	thumbnail(path: string, size: number): Promise<string | null>;
 	scanConflicts(sources: string[], dest: string): Promise<string[]>;
-	transfer(opts: TransferOpts): Promise<Esito>;
+	transfer(opts: TransferOpts): Promise<CopyOutcome>;
 	cancelTransfer(opId: number): Promise<boolean>;
 	deletePermanently(paths: string[]): Promise<void>;
 	trashRestore(paths: string[]): Promise<void>;
@@ -308,77 +310,77 @@ export interface Backend {
 	trashEmpty(): Promise<void>;
 	trashRestoreOriginals(paths: string[]): Promise<void>;
 	textPreview(path: string): Promise<string | null>;
-	resolvePath(input: string): Promise<Destinazione>;
+	resolvePath(input: string): Promise<Destination>;
 	clipboardWrite(paths: string[], cut: boolean): Promise<void>;
-	clipboardRead(): Promise<ContenutoAppunti | null>;
+	clipboardRead(): Promise<ClipboardContent | null>;
 	clipboardClear(): Promise<void>;
 	watchDirs(paths: string[]): Promise<void>;
-	keyModifiers(): Promise<Modificatori>;
-	startDrag(paths: string[]): Promise<EffettoTrascina>;
-	showShellMenu(paths: string[], folder: string, x: number, y: number): Promise<EsitoMenu>;
-	/** Apre un terminale nella cartella indicata. */
+	keyModifiers(): Promise<Modifiers>;
+	startDrag(paths: string[]): Promise<DragEffect>;
+	showShellMenu(paths: string[], folder: string, x: number, y: number): Promise<MenuOutcome>;
+	/** Opens a terminal in the given folder. */
 	openTerminal(path: string): Promise<void>;
-	/** La versione dell'app installata, es. «0.2.2». */
+	/** The installed app's version, e.g. «0.2.2». */
 	appVersion(): Promise<string>;
 	showProperties(paths: string[]): Promise<void>;
 	openWith(path: string): Promise<void>;
 	runAsAdmin(path: string): Promise<void>;
-	/** Il selettore di cartelle di Windows; null se l'utente annulla. */
-	scegliCartella(titolo: string, iniziale: string | null): Promise<string | null>;
-	newFileTypes(): Promise<TipoNuovo[]>;
+	/** The Windows folder picker; null if the user cancels. */
+	pickFolder(title: string, initial: string | null): Promise<string | null>;
+	newFileTypes(): Promise<NewFileType[]>;
 	createNewFile(parent: string, ext: string): Promise<string>;
-	/** La cartella con cui Windows ha avviato l'app, se c'è. */
-	initialPath(): Promise<Destinazione | null>;
-	/** Apre un'altra finestra dell'app sulla cartella indicata. */
+	/** The folder Windows started the app with, if any. */
+	initialPath(): Promise<Destination | null>;
+	/** Opens another window of the app on the given folder. */
 	newWindow(path: string | null): Promise<string>;
-	/** Apre l'editor dei temi in una finestra sua, sopra questa. */
-	apriEditorTemi(): Promise<void>;
-	/** Salva un'immagine per i personaggi di un tema. Ritorna il percorso. */
-	saveThemeImage(nome: string, base64: string): Promise<string>;
-	/** Rilegge in base64 un'immagine salvata con `saveThemeImage`. */
+	/** Opens the theme editor in a window of its own, above this one. */
+	openThemeEditor(): Promise<void>;
+	/** Saves an image for a theme's characters. Returns the path. */
+	saveThemeImage(name: string, base64: string): Promise<string>;
+	/** Reads back in base64 an image saved with `saveThemeImage`. */
 	readThemeImage(path: string): Promise<string>;
-	amiciStato(): Promise<StatoAmici>;
-	/** Chiede l'amicizia a chi ha questo codice. */
-	amiciAggiungi(codice: string): Promise<void>;
-	amiciAccetta(id: string): Promise<void>;
-	/** Toglie un amico o rifiuta la sua richiesta. */
-	amiciRimuovi(id: string): Promise<void>;
-	amiciCondividi(id: string, si: boolean): Promise<StatoAmici>;
-	/** Il QR code del nostro codice, in SVG. */
-	amiciQr(): Promise<string>;
+	friendsStatus(): Promise<FriendsStatus>;
+	/** Asks for the friendship of whoever has this code. */
+	friendsAdd(code: string): Promise<void>;
+	friendsAccept(id: string): Promise<void>;
+	/** Removes a friend or refuses their request. */
+	friendsRemove(id: string): Promise<void>;
+	friendsShare(id: string, enabled: boolean): Promise<FriendsStatus>;
+	/** The QR code of our code, in SVG. */
+	friendsQr(): Promise<string>;
 	/** Starts (with a folder) or stops the daily backup towards a friend. */
-	amiciBackup(id: string, cartella: string | null): Promise<StatoAmici>;
+	friendsBackup(id: string, folder: string | null): Promise<FriendsStatus>;
 	/** Runs the backup now; resolves with what was sent. */
-	amiciBackupOra(id: string): Promise<string>;
-	/** Yes or no to a friend's backup on this PC; `cartella` null = the default one. */
-	amiciRispondiBackup(id: string, si: boolean, cartella: string | null): Promise<StatoAmici>;
-	lanStato(): Promise<StatoLan>;
-	lanImposta(config: ConfigLan): Promise<StatoLan>;
-	lanPari(): Promise<Pari[]>;
-	/** Accetta o rifiuta file in arrivo; accettando, `cartella` è dove salvarli (null: i ricevuti). */
-	lanRispondi(id: number, accetta: boolean, cartella?: string | null): Promise<void>;
-	lanApri(path: string): Promise<void>;
-	/** Ferma da questo lato una ricezione in corso. */
-	lanAnnullaRicezione(id: number): Promise<boolean>;
-	/** Scarica in una cartella temporanea, per trascinare fuori dall'app. Ritorna i path locali. */
-	lanPreparaTrascina(paths: string[]): Promise<string[]>;
-	lanInvia(opts: {
+	friendsBackupNow(id: string): Promise<string>;
+	/** Yes or no to a friend's backup on this PC; `folder` null = the default one. */
+	friendsAnswerBackup(id: string, yes: boolean, folder: string | null): Promise<FriendsStatus>;
+	lanStatus(): Promise<LanStatus>;
+	lanConfigure(config: LanSettings): Promise<LanStatus>;
+	lanPeers(): Promise<Peer[]>;
+	/** Accepts or refuses incoming files; when accepting, `folder` is where to save them (null: the received folder). */
+	lanRespond(id: number, accept: boolean, folder?: string | null): Promise<void>;
+	lanOpen(path: string): Promise<void>;
+	/** Stops from this side a reception in progress. */
+	lanCancelReceive(id: number): Promise<boolean>;
+	/** Downloads into a temporary folder, to drag out of the app. Returns the local paths. */
+	lanPrepareDrag(paths: string[]): Promise<string[]>;
+	lanSend(opts: {
 		opId: number;
 		peer: string;
 		paths: string[];
-		onProgress: (p: Progresso) => void;
+		onProgress: (p: Progress) => void;
 	}): Promise<void>;
-	lanScarica(opts: {
+	lanDownload(opts: {
 		opId: number;
 		sources: string[];
 		dest: string;
-		onProgress: (p: Progresso) => void;
-	}): Promise<Esito>;
+		onProgress: (p: Progress) => void;
+	}): Promise<CopyOutcome>;
 	search(opts: {
 		opId: number;
 		root: string;
-		criteri: CriteriRicerca;
-		onResults: (lotto: Entry[]) => void;
+		criteria: SearchCriteria;
+		onResults: (batch: Entry[]) => void;
 	}): Promise<number>;
 	findDuplicates(opts: {
 		opId: number;
@@ -393,9 +395,9 @@ export interface Backend {
 		opId: number;
 		sources: string[];
 		dest: string;
-		onProgress: (p: Progresso) => void;
+		onProgress: (p: Progress) => void;
 	}): Promise<string>;
-	extract(opts: { opId: number; archive: string; onProgress: (p: Progresso) => void }): Promise<string>;
+	extract(opts: { opId: number; archive: string; onProgress: (p: Progress) => void }): Promise<string>;
 	/** Hex checksum of a file; `null` when cancelled. */
 	fileChecksum(opts: { opId: number; path: string; algorithm: 'sha256' | 'sha1' | 'md5' }): Promise<string | null>;
 	archiveList(archive: string): Promise<ArchiveItem[]>;
@@ -407,7 +409,7 @@ export interface Backend {
 		archive: string;
 		items: string[];
 		dest: string;
-		onProgress: (p: Progresso) => void;
+		onProgress: (p: Progress) => void;
 	}): Promise<void>;
 	/** Pauses or resumes a running job between items. */
 	pauseTransfer(opId: number, paused: boolean): Promise<boolean>;
@@ -444,7 +446,7 @@ export interface Backend {
 		target: ImageTarget;
 		maxSide: number | null;
 		quality: number;
-		onProgress: (p: Progresso) => void;
+		onProgress: (p: Progress) => void;
 	}): Promise<string[]>;
 	/**
 	 * Deletes with progress counted in items. Cancellable between items;
@@ -452,34 +454,34 @@ export interface Backend {
 	 */
 	deleteItems(opts: {
 		opId: number;
-		mode: ModoElimina;
+		mode: DeleteMode;
 		paths: string[];
-		onProgress: (p: Progresso) => void;
-	}): Promise<Eliminati>;
+		onProgress: (p: Progress) => void;
+	}): Promise<Deleted>;
 }
 
 /** What a deletion removed, and what it had to leave with the reason. */
-export interface Eliminati {
+export interface Deleted {
 	done: string[];
 	failed: Array<{ path: string; error: FsError }>;
 }
 
 /** To the Trash, from disk, selected items out of the Trash, or all of it. */
-export type ModoElimina = 'cestino' | 'disco' | 'dalCestino' | 'svuota';
+export type DeleteMode = 'trash' | 'permanent' | 'fromTrash' | 'emptyTrash';
 
-function canale<T>(su: (m: T) => void): Channel<T> {
+function channel<T>(onMessage: (m: T) => void): Channel<T> {
 	const c = new Channel<T>();
-	c.onmessage = su;
+	c.onmessage = onMessage;
 	return c;
 }
 
 export const tauriBackend: Backend = {
 	listDir: (path, sort, showHidden) => invoke('list_dir', { path, sort, showHidden }),
 	openEntry: (path) => invoke('open_entry', { path }),
-	dimensioneCartella: (path, turno) => invoke('dimensione_cartella', { path, turno }),
-	turnoDimensioni: (turno) => invoke('turno_dimensioni', { turno }),
-	cleanupRound: (giro) => invoke('cleanup_round', { giro }),
-	cleanupScan: (category, drive, roots, giro) => invoke('cleanup_scan', { category, drive, roots, giro }),
+	folderSize: (path, turn) => invoke('folder_size', { path, turn }),
+	sizeTurn: (turn) => invoke('size_turn', { turn }),
+	cleanupRound: (round) => invoke('cleanup_round', { round }),
+	cleanupScan: (category, drive, roots, round) => invoke('cleanup_scan', { category, drive, roots, round }),
 	programsList: (drive) => invoke('programs_list', { drive }),
 	programUninstall: (id) => invoke('program_uninstall', { id }),
 	navigate: (path, direction) => invoke('navigate', { path, direction }),
@@ -487,7 +489,7 @@ export const tauriBackend: Backend = {
 	knownFolders: () => invoke('known_folders'),
 	revealInExplorer: (path) => invoke('reveal_in_explorer', { path }),
 	openTerminal: (path) => invoke('open_terminal', { path }),
-	// Lo stesso comando che usa `getVersion` del pacchetto `@tauri-apps/api/app`.
+	// The same command used by `getVersion` of the `@tauri-apps/api/app` package.
 	appVersion: () => invoke('plugin:app|version'),
 	createFolder: (parent, name) => invoke('create_folder', { parent, name }),
 	renameEntry: (path, name) => invoke('rename_entry', { path, name }),
@@ -495,10 +497,10 @@ export const tauriBackend: Backend = {
 	iconForExtension: (ext, isDir, large) => invoke('icon_for_extension', { ext, isDir, large }),
 	thumbnail: (path, size) => invoke('thumbnail', { path, size }),
 	scanConflicts: (sources, dest) => invoke('scan_conflicts', { sources, dest }),
-	// Il Channel è il canale di ritorno del progresso: Rust ci scrive
-	// mentre copia, senza che il frontend debba interrogarlo.
+	// The Channel is the return path for progress: Rust writes to it
+	// while copying, without the frontend having to poll it.
 	transfer: ({ opId, sources, dest, mode, policy, onProgress }) =>
-		invoke('transfer', { opId, sources, dest, mode, policy, onProgress: canale(onProgress) }),
+		invoke('transfer', { opId, sources, dest, mode, policy, onProgress: channel(onProgress) }),
 	cancelTransfer: (opId) => invoke('cancel_transfer', { opId }),
 	deletePermanently: (paths) => invoke('delete_permanently', { paths }),
 	trashRestore: (paths) => invoke('trash_restore', { paths }),
@@ -517,50 +519,50 @@ export const tauriBackend: Backend = {
 	showProperties: (paths) => invoke('show_properties', { paths }),
 	openWith: (path) => invoke('open_with', { path }),
 	runAsAdmin: (path) => invoke('run_as_admin', { path }),
-	scegliCartella: (titolo, iniziale) => invoke('scegli_cartella', { titolo, iniziale }),
+	pickFolder: (title, initial) => invoke('pick_folder', { title, initial }),
 	newFileTypes: () => invoke('new_file_types'),
 	createNewFile: (parent, ext) => invoke('create_new_file', { parent, ext }),
 	initialPath: () => invoke('initial_path'),
 	newWindow: (path) => invoke('new_window', { path }),
-	apriEditorTemi: () => invoke('apri_editor_temi'),
-	saveThemeImage: (nome, base64) => invoke('save_theme_image', { nome, dati: base64 }),
+	openThemeEditor: () => invoke('open_theme_editor'),
+	saveThemeImage: (name, base64) => invoke('save_theme_image', { name, data: base64 }),
 	readThemeImage: (path) => invoke('read_theme_image', { path }),
-	amiciStato: () => invoke('amici_stato'),
-	amiciAggiungi: (codice) => invoke('amici_aggiungi', { codice }),
-	amiciAccetta: (id) => invoke('amici_accetta', { id }),
-	amiciRimuovi: (id) => invoke('amici_rimuovi', { id }),
-	amiciCondividi: (id, si) => invoke('amici_condividi', { id, si }),
-	amiciQr: () => invoke('amici_qr'),
-	amiciBackup: (id, cartella) => invoke('amici_backup', { id, cartella }),
-	amiciBackupOra: (id) => invoke('amici_backup_ora', { id }),
-	amiciRispondiBackup: (id, si, cartella) => invoke('amici_rispondi_backup', { id, si, cartella }),
-	lanStato: () => invoke('lan_stato'),
-	lanImposta: (config) => invoke('lan_imposta', { config }),
-	lanPari: () => invoke('lan_pari'),
-	lanRispondi: (id, accetta, cartella = null) => invoke('lan_rispondi', { id, accetta, cartella }),
-	lanApri: (path) => invoke('lan_apri', { path }),
-	lanAnnullaRicezione: (id) => invoke('lan_annulla_ricezione', { id }),
-	lanPreparaTrascina: (paths) => invoke('lan_prepara_trascina', { paths }),
-	lanInvia: ({ opId, peer, paths, onProgress }) =>
-		invoke('lan_invia', { opId, peer, paths, onProgress: canale(onProgress) }),
-	lanScarica: ({ opId, sources, dest, onProgress }) =>
-		invoke('lan_scarica', { opId, sources, dest, onProgress: canale(onProgress) }),
-	search: ({ opId, root, criteri, onResults }) =>
-		invoke('search', { opId, root, criteri, onResults: canale(onResults) }),
+	friendsStatus: () => invoke('friends_status'),
+	friendsAdd: (code) => invoke('friends_add', { code }),
+	friendsAccept: (id) => invoke('friends_accept', { id }),
+	friendsRemove: (id) => invoke('friends_remove', { id }),
+	friendsShare: (id, enabled) => invoke('friends_share', { id, enabled }),
+	friendsQr: () => invoke('friends_qr'),
+	friendsBackup: (id, folder) => invoke('friends_backup', { id, folder }),
+	friendsBackupNow: (id) => invoke('friends_backup_now', { id }),
+	friendsAnswerBackup: (id, yes, folder) => invoke('friends_answer_backup', { id, yes, folder }),
+	lanStatus: () => invoke('lan_status'),
+	lanConfigure: (config) => invoke('lan_configure', { config }),
+	lanPeers: () => invoke('lan_peers'),
+	lanRespond: (id, accept, folder = null) => invoke('lan_respond', { id, accept, folder }),
+	lanOpen: (path) => invoke('lan_open', { path }),
+	lanCancelReceive: (id) => invoke('lan_cancel_receive', { id }),
+	lanPrepareDrag: (paths) => invoke('lan_prepare_drag', { paths }),
+	lanSend: ({ opId, peer, paths, onProgress }) =>
+		invoke('lan_send', { opId, peer, paths, onProgress: channel(onProgress) }),
+	lanDownload: ({ opId, sources, dest, onProgress }) =>
+		invoke('lan_download', { opId, sources, dest, onProgress: channel(onProgress) }),
+	search: ({ opId, root, criteria, onResults }) =>
+		invoke('search', { opId, root, criteria, onResults: channel(onResults) }),
 	findDuplicates: ({ opId, root, hidden, onEvent }) =>
-		invoke('find_duplicates', { opId, root, hidden, onEvent: canale(onEvent) }),
+		invoke('find_duplicates', { opId, root, hidden, onEvent: channel(onEvent) }),
 	entriesFor: (paths) => invoke('entries_for', { paths }),
 	compareFolders: ({ opId, here, there, content, hidden }) =>
 		invoke('compare_folders', { opId, here, there, content, hidden }),
 	compress: ({ opId, sources, dest, onProgress }) =>
-		invoke('compress', { opId, sources, dest, onProgress: canale(onProgress) }),
+		invoke('compress', { opId, sources, dest, onProgress: channel(onProgress) }),
 	extract: ({ opId, archive, onProgress }) =>
-		invoke('extract', { opId, archive, onProgress: canale(onProgress) }),
+		invoke('extract', { opId, archive, onProgress: channel(onProgress) }),
 	fileChecksum: ({ opId, path, algorithm }) => invoke('file_checksum', { opId, path, algorithm }),
 	archiveList: (archive) => invoke('archive_list', { archive }),
 	archiveOpenItem: (archive, item) => invoke('archive_open_item', { archive, item }),
 	archiveExtract: ({ opId, archive, items, dest, onProgress }) =>
-		invoke('archive_extract', { opId, archive, items, dest, onProgress: canale(onProgress) }),
+		invoke('archive_extract', { opId, archive, items, dest, onProgress: channel(onProgress) }),
 	pauseTransfer: (opId, paused) => invoke('pause_transfer', { opId, paused }),
 	shortcutFree: (accelerator) => invoke('shortcut_free', { accelerator }),
 	imageRotate: (paths, clockwise) => invoke('image_rotate', { paths, clockwise }),
@@ -582,19 +584,19 @@ export const tauriBackend: Backend = {
 	vaultOpenItem: (path, item) => invoke('vault_open_item', { path, item }),
 	vaultDelete: (path, items) => invoke('vault_delete', { path, items }),
 	imageConvert: ({ opId, paths, target, maxSide, quality, onProgress }) =>
-		invoke('image_convert', { opId, paths, target, maxSide, quality, onProgress: canale(onProgress) }),
+		invoke('image_convert', { opId, paths, target, maxSide, quality, onProgress: channel(onProgress) }),
 	deleteItems: ({ opId, mode, paths, onProgress }) =>
-		invoke('delete_items', { opId, mode, paths, onProgress: canale(onProgress) })
+		invoke('delete_items', { opId, mode, paths, onProgress: channel(onProgress) })
 };
 
-export type CategoriaPulizia = 'temp' | 'cache' | 'progetti' | 'modelli' | 'download' | 'cestino';
+export type CleanupCategory = 'temp' | 'cache' | 'projects' | 'models' | 'download' | 'trash';
 /** Something disk cleanup found: size and last use (ms). */
-export interface Trovato {
+export interface CleanupCandidate {
 	path: string;
 	size: number;
 	used: number;
 }
-export interface Programma {
+export interface Program {
 	id: string;
 	name: string;
 	publisher: string | null;

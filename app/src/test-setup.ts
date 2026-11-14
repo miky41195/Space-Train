@@ -1,7 +1,7 @@
 /**
- * jsdom non implementa ResizeObserver, che Svelte usa dietro
- * `bind:clientHeight`. Uno stub inerte basta: nei test le dimensioni si
- * impostano a mano, perché jsdom non fa comunque layout.
+ * jsdom does not implement ResizeObserver, which Svelte uses behind
+ * `bind:clientHeight`. An inert stub is enough: in tests sizes are set
+ * by hand, because jsdom does no layout anyway.
  */
 class ResizeObserverStub {
 	observe(): void {}

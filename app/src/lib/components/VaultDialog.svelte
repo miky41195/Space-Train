@@ -25,58 +25,58 @@
 		oncancel: () => void;
 	} = $props();
 
-	let nuovoNome = $state('');
+	let newName = $state('');
 	let password = $state('');
-	let ripeti = $state('');
-	let cestina = $state(false);
-	let primo = $state<HTMLInputElement | HTMLButtonElement | null>(null);
+	let repeat = $state('');
+	let trashOriginals = $state(false);
+	let first = $state<HTMLInputElement | HTMLButtonElement | null>(null);
 
 	$effect(() => {
-		primo?.focus();
+		first?.focus();
 	});
 
-	let problema = $derived.by(() => {
+	let problem = $derived.by(() => {
 		if (mode !== 'create') return null;
-		if (!nuovoNome.trim()) return 'Scegli un nome.';
+		if (!newName.trim()) return 'Scegli un nome.';
 		if ([...password].length < 8) return 'La password deve avere almeno 8 caratteri.';
-		if (ripeti && ripeti !== password) return 'Le due password non sono uguali.';
-		if (!ripeti) return 'Scrivi di nuovo la password.';
+		if (repeat && repeat !== password) return 'Le due password non sono uguali.';
+		if (!repeat) return 'Scrivi di nuovo la password.';
 		return null;
 	});
 
-	let titolo = $derived(
+	let title = $derived(
 		mode === 'unlock' ? `Apri «${name}»` : mode === 'create' ? 'Nuova cassaforte' : `Metti nella cassaforte «${name}»`
 	);
 
-	function conferma(e: SubmitEvent) {
+	function submit(e: SubmitEvent) {
 		e.preventDefault();
 		if (busy) return;
 		if (mode === 'unlock' && password) onunlock?.(password);
-		else if (mode === 'create' && !problema) oncreate?.(nuovoNome.trim(), password);
-		else if (mode === 'add') onadd?.(cestina);
+		else if (mode === 'create' && !problem) oncreate?.(newName.trim(), password);
+		else if (mode === 'add') onadd?.(trashOriginals);
 	}
 </script>
 
-<div class="sfondo" role="presentation" onclick={(e) => e.target === e.currentTarget && !busy && oncancel()} onkeydown={(e) => e.key === 'Escape' && !busy && oncancel()}>
-	<div class="finestra" role="dialog" aria-modal="true" aria-label={titolo}>
-		<form onsubmit={conferma}>
-			<div class="testata">
-				<span class="lucchetto" aria-hidden="true"></span>
-				<h2>{titolo}</h2>
+<div class="backdrop" role="presentation" onclick={(e) => e.target === e.currentTarget && !busy && oncancel()} onkeydown={(e) => e.key === 'Escape' && !busy && oncancel()}>
+	<div class="dialog" role="dialog" aria-modal="true" aria-label={title}>
+		<form onsubmit={submit}>
+			<div class="header">
+				<span class="padlock" aria-hidden="true"></span>
+				<h2>{title}</h2>
 			</div>
 
 			{#if mode === 'create'}
 				<label>
-					<span class="etichetta">Nome</span>
-					<input bind:this={primo} bind:value={nuovoNome} maxlength="80" placeholder="Privato" />
+					<span class="label">Nome</span>
+					<input bind:this={first} bind:value={newName} maxlength="80" placeholder="Privato" />
 				</label>
 			{/if}
 
 			{#if mode === 'unlock' || mode === 'create'}
 				<label>
-					<span class="etichetta">Password</span>
+					<span class="label">Password</span>
 					{#if mode === 'unlock'}
-						<input bind:this={primo} type="password" bind:value={password} autocomplete="current-password" />
+						<input bind:this={first} type="password" bind:value={password} autocomplete="current-password" />
 					{:else}
 						<input type="password" bind:value={password} autocomplete="new-password" />
 					{/if}
@@ -85,32 +85,32 @@
 
 			{#if mode === 'create'}
 				<label>
-					<span class="etichetta">Ripeti la password</span>
-					<input type="password" bind:value={ripeti} autocomplete="new-password" />
+					<span class="label">Ripeti la password</span>
+					<input type="password" bind:value={repeat} autocomplete="new-password" />
 				</label>
-				<p class="avviso">
+				<p class="notice">
 					Se perdi la password i file non si possono più aprire. Nemmeno Space Train li può recuperare: scrivila in un posto sicuro.
 				</p>
 			{/if}
 
 			{#if mode === 'add'}
 				<p>{count === 1 ? '1 elemento verrà cifrato' : `${count} elementi verranno cifrati`} dentro la cassaforte.</p>
-				<label class="scelta"><input type="checkbox" bind:checked={cestina} /> Poi manda gli originali nel cestino</label>
-				<p class="nota">Senza questa scelta gli originali restano dove sono, leggibili come prima.</p>
+				<label class="choice"><input type="checkbox" bind:checked={trashOriginals} /> Poi manda gli originali nel cestino</label>
+				<p class="note">Senza questa scelta gli originali restano dove sono, leggibili come prima.</p>
 			{/if}
 
-			{#if error}<p class="errore" role="alert">{error}</p>{/if}
-			{#if mode === 'create' && problema && (nuovoNome || password)}<p class="nota">{problema}</p>{/if}
+			{#if error}<p class="error" role="alert">{error}</p>{/if}
+			{#if mode === 'create' && problem && (newName || password)}<p class="note">{problem}</p>{/if}
 
-			<div class="azioni">
+			<div class="actions">
 				<button type="button" onclick={oncancel} disabled={busy}>Annulla</button>
 				{#if mode === 'add'}
-					<button bind:this={primo} type="submit" class="primario" disabled={busy}>Metti nella cassaforte</button>
+					<button bind:this={first} type="submit" class="primary" disabled={busy}>Metti nella cassaforte</button>
 				{:else}
 					<button
 						type="submit"
-						class="primario"
-						disabled={busy || (mode === 'unlock' ? !password : problema !== null)}
+						class="primary"
+						disabled={busy || (mode === 'unlock' ? !password : problem !== null)}
 						>{busy ? 'Un momento…' : mode === 'unlock' ? 'Apri' : 'Crea cassaforte'}</button
 					>
 				{/if}
@@ -120,7 +120,7 @@
 </div>
 
 <style>
-	.sfondo {
+	.backdrop {
 		position: fixed;
 		inset: 0;
 		display: flex;
@@ -129,27 +129,27 @@
 		background: color-mix(in srgb, var(--bg) 72%, transparent);
 		z-index: 10;
 	}
-	.finestra {
+	.dialog {
 		width: min(400px, 90vw);
 		padding: 20px;
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: var(--radius);
-		clip-path: var(--forma, none);
-		mask: var(--maschera, none);
+		clip-path: var(--shape, none);
+		mask: var(--mask, none);
 		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
 	}
 	form {
 		display: grid;
 		gap: 12px;
 	}
-	.testata {
+	.header {
 		display: flex;
 		align-items: center;
 		gap: 10px;
 	}
 	/* A signal-amber padlock: the vault's one mark. */
-	.lucchetto {
+	.padlock {
 		position: relative;
 		flex: none;
 		width: 14px;
@@ -158,7 +158,7 @@
 		border-radius: 2px;
 		background: var(--signal, #ffb454);
 	}
-	.lucchetto::before {
+	.padlock::before {
 		content: '';
 		position: absolute;
 		left: 3px;
@@ -172,7 +172,7 @@
 	}
 	h2 {
 		margin: 0;
-		font-size: calc(15px * var(--scala-testo, 1));
+		font-size: calc(15px * var(--text-scale, 1));
 		font-weight: 600;
 		overflow-wrap: anywhere;
 	}
@@ -180,9 +180,9 @@
 		display: grid;
 		gap: 6px;
 	}
-	.etichetta {
+	.label {
 		font-family: var(--font-display);
-		font-size: calc(11px * var(--scala-testo, 1));
+		font-size: calc(11px * var(--text-scale, 1));
 		font-weight: 600;
 		letter-spacing: 0.12em;
 		text-transform: uppercase;
@@ -201,7 +201,7 @@
 		border-color: var(--accent);
 		outline: none;
 	}
-	.scelta {
+	.choice {
 		display: flex;
 		align-items: center;
 		gap: 8px;
@@ -210,19 +210,19 @@
 		margin: 0;
 		line-height: 1.5;
 	}
-	.nota {
+	.note {
 		color: var(--text-dim);
-		font-size: calc(12px * var(--scala-testo, 1));
+		font-size: calc(12px * var(--text-scale, 1));
 	}
-	.avviso,
-	.errore {
+	.notice,
+	.error {
 		padding: 8px 10px;
 		border-radius: var(--radius-sm);
 		background: rgba(196, 43, 28, 0.12);
-		color: var(--errore-testo, #ffb4ab);
-		font-size: calc(12px * var(--scala-testo, 1));
+		color: var(--error-text, #ffb4ab);
+		font-size: calc(12px * var(--text-scale, 1));
 	}
-	.azioni {
+	.actions {
 		display: flex;
 		justify-content: flex-end;
 		gap: 8px;
@@ -233,8 +233,8 @@
 		padding: 0 14px;
 		border: 1px solid var(--border);
 		border-radius: var(--radius-sm);
-		clip-path: var(--forma-sm, none);
-		mask: var(--maschera-sm, none);
+		clip-path: var(--shape-sm, none);
+		mask: var(--mask-sm, none);
 		background: transparent;
 		color: var(--text);
 		font: inherit;
@@ -251,7 +251,7 @@
 		outline: 2px solid var(--accent);
 		outline-offset: 2px;
 	}
-	.primario {
+	.primary {
 		border-color: transparent;
 		background: var(--accent);
 		color: #fff;
