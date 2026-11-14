@@ -192,7 +192,7 @@
 						<span class="pill {c.kind}">{KIND_LABELS[c.kind]}</span>
 					</div>
 					<div class="detail">
-						{#if !items}pesando…{:else if c.kind === 'trash'}{items.length} {items.length === 1 ? 'item' : 'items'}{:else if items.length === 0}niente da togliere{:else}{c.detail}{/if}
+						{#if !items}pesando…{:else if c.kind === 'trash'}{items.length} {items.length === 1 ? 'elemento' : 'elementi'}{:else if items.length === 0}niente da togliere{:else}{c.detail}{/if}
 					</div>
 					<div class="track"><span style:width="{(weight(items) / max) * 100}%"></span></div>
 				</div>

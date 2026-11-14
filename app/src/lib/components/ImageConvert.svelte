@@ -178,7 +178,7 @@
 		height: 24px;
 		padding: 0 10px;
 	}
-	button.acceso {
+	button.on {
 		background: var(--accent-soft);
 		border-color: transparent;
 	}

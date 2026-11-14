@@ -132,6 +132,14 @@ try {
 		for (const x of ['beta.txt', 'gamma']) if (!n.includes(x)) throw new Error(`missing ${x}: ${n}`);
 	});
 
+	// A fresh profile is a first install: the welcome guide covers the app until skipped.
+	await step('the welcome guide shows at the first start and can be skipped', async () => {
+		const guide = `document.querySelector('[role=dialog][aria-label="Benvenuto in Space Train"]')`;
+		await until('welcome guide shown', () => run(`return !!${guide}`), 10000);
+		await run(`[...${guide}.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Salta').click()`);
+		await until('welcome guide gone', async () => !(await run(`return !!${guide}`)));
+	});
+
 	await step('breadcrumbs follow the Linux path', async () => {
 		const text = await run(`return document.body.innerText`);
 		for (const x of ['File system', 'st-e2e']) if (!text.includes(x)) throw new Error(`no «${x}» on screen`);

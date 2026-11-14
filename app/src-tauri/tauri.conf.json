@@ -74,7 +74,7 @@
         "https://github.com/miky41195/Space-Train/releases/latest/download/latest.json"
       ],
       "windows": {
-        "installMode": "passive"
+        "installMode": "quiet"
       }
     }
   }

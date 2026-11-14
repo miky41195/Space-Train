@@ -222,7 +222,7 @@
 		padding: 0 10px;
 		font-size: calc(12px * var(--text-scale, 1));
 	}
-	button.acceso {
+	button.on {
 		background: var(--accent-soft);
 		border-color: transparent;
 	}

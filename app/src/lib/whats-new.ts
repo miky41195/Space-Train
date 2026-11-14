@@ -14,6 +14,14 @@ export interface WhatsNew {
 
 export const WHATS_NEW: WhatsNew[] = [
 	{
+		version: '0.10.1',
+		items: [
+			'Aggiornamenti dentro l’app: lo scaricamento si vede in una barra in alto, e l’installazione non apre più la finestra dell’installer. Space Train si chiude e si riapre da solo già aggiornato (da questo aggiornamento in poi).',
+			'Nelle finestre «Somma di controllo» e «Converti e ridimensiona» il pulsante scelto torna evidenziato.',
+			'Nella Pulizia disco il Cestino conta di nuovo gli «elementi».'
+		]
+	},
+	{
 		version: '0.10.0',
 		items: [
 			'Modifica veloce dei testi: clic destro su un file di testo (txt, md, json, codice, configurazioni…) e «Modifica» lo apre in un editor. Ctrl+S salva mantenendo gli a capo del file; se nel frattempo un altro programma l’ha cambiato, Space Train chiede prima di sovrascrivere. Chiudendo con modifiche non salvate chiede cosa fare.',

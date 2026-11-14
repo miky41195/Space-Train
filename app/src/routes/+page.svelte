@@ -3801,10 +3801,25 @@
 			{#if updates.visible}
 				<div class="notice update" role="status">
 					<span>
-						{updates.state === 'installing'
-							? 'Installazione dell’aggiornamento…'
-							: `È pronta la versione ${updates.version} di Space Train.`}
+						{updates.state === 'downloading'
+							? `Scarico la versione ${updates.version} di Space Train…`
+							: updates.state === 'installing'
+								? `Installo la versione ${updates.version}: Space Train si chiude e si riapre da solo.`
+								: `È pronta la versione ${updates.version} di Space Train.`}
 					</span>
+					{#if updates.state === 'downloading'}
+						<span
+							class="update-bar"
+							role="progressbar"
+							aria-label="Download dell’aggiornamento"
+							aria-valuemin="0"
+							aria-valuemax="100"
+							aria-valuenow={updates.progress === null ? undefined : Math.round(updates.progress * 100)}
+						><span style:width="{(updates.progress ?? 0) * 100}%" class:unknown={updates.progress === null}></span></span>
+						{#if updates.progress !== null}<span class="update-percent">{Math.round(updates.progress * 100)}%</span>{/if}
+					{:else if updates.state === 'installing'}
+						<span class="update-bar" aria-hidden="true"><span class="unknown"></span></span>
+					{/if}
 					{#if updates.state === 'ready'}
 						<button onclick={() => updates.postpone()}>Più tardi</button>
 						<button class="primary" onclick={installUpdate}>Riavvia e aggiorna</button>
@@ -4462,6 +4477,46 @@
 		display: flex;
 		align-items: center;
 		gap: 8px;
+	}
+	/* The download as a thin line of current, like the rail. */
+	.update-bar {
+		position: relative;
+		flex: 0 1 180px;
+		height: 4px;
+		overflow: hidden;
+		border-radius: 2px;
+		background: color-mix(in srgb, var(--current) 20%, transparent);
+	}
+	.update-bar > span {
+		position: absolute;
+		inset-block: 0;
+		left: 0;
+		background: var(--current);
+		box-shadow: 0 0 6px var(--current);
+		transition: width 0.2s linear;
+	}
+	.update-bar > span.unknown {
+		width: 30%;
+		animation: update-sweep 1.2s ease-in-out infinite;
+	}
+	@keyframes update-sweep {
+		from {
+			transform: translateX(-100%);
+		}
+		to {
+			transform: translateX(340%);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.update-bar > span.unknown {
+			animation: none;
+			width: 100%;
+			opacity: 0.5;
+		}
+	}
+	.update-percent {
+		font-variant-numeric: tabular-nums;
+		min-width: 4ch;
 	}
 	.update span {
 		flex: 1;

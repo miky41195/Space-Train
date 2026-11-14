@@ -34,6 +34,35 @@ describe('UpdatesStore', () => {
 		expect(s.visible).toBe(true);
 	});
 
+	it('shows the download progress in the app while it downloads', async () => {
+		let finish = () => {};
+		const a = update({
+			download: vi.fn(
+				(onProgress?: (r: number, t: number | null) => void) =>
+					new Promise<void>((done) => {
+						onProgress?.(25, 100);
+						finish = done;
+					})
+			)
+		});
+		const s = new UpdatesStore(source(a));
+		const checking = s.check();
+		await vi.waitFor(() => expect(s.progress).toBe(0.25));
+		expect(s.state).toBe('downloading');
+		expect(s.version).toBe('0.2.0');
+		expect(s.visible).toBe(true);
+		finish();
+		await checking;
+		expect(s.state).toBe('ready');
+	});
+
+	it('an unknown size leaves the progress undetermined', async () => {
+		const a = update({ download: vi.fn(async (onProgress?: (r: number, t: number | null) => void) => onProgress?.(10, null)) });
+		const s = new UpdatesStore(source(a));
+		await s.check();
+		expect(s.progress).toBeNull();
+	});
+
 	it('installs and then restarts', async () => {
 		const a = update();
 		const f = source(a);
