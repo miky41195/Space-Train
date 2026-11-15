@@ -15,6 +15,17 @@ export interface WhatsNew {
 
 export const WHATS_NEW: WhatsNew[] = [
 	{
+		version: '0.11.0',
+		items: [
+			t('Versioni precedenti: prima di sovrascrivere un file (incollando, allineando, salvando nell’editor) Space Train tiene la versione di prima. Dal menu del file, «Versioni precedenti…» le mostra in fila: si aprono, si confrontano con quella attuale e si ripristinano. Con «Proteggi le versioni dei file» su una cartella si tiene ogni modifica, anche fatta da altri programmi.'),
+			t('Backup verso un server: nella scheda di un server si sceglie una cartella del PC da copiare ogni giorno, solo i file nuovi o cambiati, senza cancellare niente sul server.'),
+			t('Space Train parla inglese: in Impostazioni → Generale → Lingua si sceglie fra italiano e inglese, oppure si segue la lingua di Windows.'),
+			t('Spostando una cartella su una con lo stesso nome e scegliendo «Sostituisci», le due cartelle si uniscono: si sostituiscono solo i file con lo stesso nome, gli altri restano.'),
+			t('Ogni fermata della barra laterale ha il suo menu col tasto destro; dal Cestino si svuota, da cartelle e dischi si analizza lo spazio.'),
+			t('Server più veloci: la connessione resta aperta fra un’operazione e l’altra, e si copia direttamente da un server all’altro.')
+		]
+	},
+	{
 		version: '0.10.2',
 		items: [
 			t('Pulizia disco: togliendo i «Resti di programmi» la richiesta di amministratore di Windows compare subito in primo piano, invece di restare nascosta e annullarsi. Se qualcosa non va, il messaggio dice il motivo vero.'),

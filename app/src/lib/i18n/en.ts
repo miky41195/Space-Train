@@ -1471,6 +1471,18 @@ export const EN: Record<string, string> = {
 	'Memoria per gli appunti non disponibile: {0}': 'Clipboard memory not available: {0}',
 	'Memoria per gli appunti non disponibile.': 'Clipboard memory not available.',
 	'Impossibile scrivere negli appunti: {0}': 'Cannot write to the clipboard: {0}',
+	'Versioni precedenti: prima di sovrascrivere un file (incollando, allineando, salvando nell’editor) Space Train tiene la versione di prima. Dal menu del file, «Versioni precedenti…» le mostra in fila: si aprono, si confrontano con quella attuale e si ripristinano. Con «Proteggi le versioni dei file» su una cartella si tiene ogni modifica, anche fatta da altri programmi.':
+		'Previous versions: before overwriting a file (pasting, aligning, saving in the editor) Space Train keeps the version from before. From the file’s menu, “Previous versions…” lines them up: open them, compare them with the current one and restore them. With “Protect file versions” on a folder every change is kept, even those made by other programs.',
+	'Backup verso un server: nella scheda di un server si sceglie una cartella del PC da copiare ogni giorno, solo i file nuovi o cambiati, senza cancellare niente sul server.':
+		'Backup to a server: in a server’s settings choose a PC folder to copy every day, only new or changed files, without deleting anything on the server.',
+	'Space Train parla inglese: in Impostazioni → Generale → Lingua si sceglie fra italiano e inglese, oppure si segue la lingua di Windows.':
+		'Space Train speaks English: in Settings → General → Language choose between Italian and English, or follow the Windows language.',
+	'Spostando una cartella su una con lo stesso nome e scegliendo «Sostituisci», le due cartelle si uniscono: si sostituiscono solo i file con lo stesso nome, gli altri restano.':
+		'Moving a folder onto one with the same name and choosing “Replace” merges the two folders: only same-named files are replaced, the others stay.',
+	'Ogni fermata della barra laterale ha il suo menu col tasto destro; dal Cestino si svuota, da cartelle e dischi si analizza lo spazio.':
+		'Every stop in the sidebar has its own right-click menu; the Recycle Bin can be emptied from there, and folders and drives can have their space analyzed.',
+	'Server più veloci: la connessione resta aperta fra un’operazione e l’altra, e si copia direttamente da un server all’altro.':
+		'Faster servers: the connection stays open between operations, and files copy straight from one server to another.',
 	'Unità di rete': 'Network drive',
 	// Drive labels arrive from Rust as «name (C:)»: the pattern lets tr() translate the name.
 	'{0} ({1}:)': '{0} ({1}:)',
