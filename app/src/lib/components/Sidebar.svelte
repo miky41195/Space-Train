@@ -8,6 +8,7 @@
 	import type { ServerConfig } from '../ipc';
 	import { SERVER } from '../locations';
 	import type { SavedSearch } from '../stores/searches.svelte';
+	import type { SidebarKind } from '../menu';
 
 	let {
 		store,
@@ -59,7 +60,7 @@
 		/** Right-click on a Quick access item. */
 		onquickaccessmenu?: (path: string, event: MouseEvent) => void;
 		/** Right-click on any other stop that opens a location. */
-		onitemmenu?: (path: string, kind: 'place' | 'folder' | 'drive', event: MouseEvent) => void;
+		onitemmenu?: (path: string, kind: SidebarKind, event: MouseEvent) => void;
 		/** Colour labels in use: one stop each, listing every item that carries it. */
 		labels?: Array<{ id: ColorId; name: string; hex: string; count: number }>;
 		/** Name of the label whose items the active tab shows. */
@@ -115,7 +116,7 @@
 		return peers.some((p) => p.ip === address.trim().split(':')[0]);
 	}
 
-	function menuOn(path: string, kind: 'place' | 'folder' | 'drive') {
+	function menuOn(path: string, kind: SidebarKind) {
 		return (e: MouseEvent) => {
 			if (!onitemmenu) return;
 			e.preventDefault();
@@ -162,7 +163,7 @@
 				class:drop-target={dropTarget === p.path}
 				data-folder={p.path === TRASH ? TRASH : undefined}
 				onclick={() => go(p.path)}
-				oncontextmenu={menuOn(p.path, 'place')}>{p.label}</button
+				oncontextmenu={menuOn(p.path, p.path === TRASH ? 'trash' : 'place')}>{p.label}</button
 			>
 		{/each}
 	</div>

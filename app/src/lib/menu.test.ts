@@ -366,8 +366,9 @@ describe('Quick access in the menu', () => {
 	it('every other sidebar stop opens elsewhere; drives also clean up', () => {
 		const act = (v: ReturnType<typeof sidebarItems>) => v.map((x) => x.action);
 		expect(act(sidebarItems('place', false))).toEqual(['openNewTab', 'openNewWindow']);
-		expect(act(sidebarItems('folder', false))).toEqual(['openNewTab', 'openNewWindow', 'properties']);
-		expect(act(sidebarItems('drive', false))).toEqual(['openNewTab', 'openNewWindow', 'cleanup', 'properties']);
+		expect(act(sidebarItems('trash', false))).toEqual(['openNewTab', 'openNewWindow', 'emptyTrash']);
+		expect(act(sidebarItems('folder', false))).toEqual(['openNewTab', 'openNewWindow', 'space', 'properties']);
+		expect(act(sidebarItems('drive', false))).toEqual(['openNewTab', 'openNewWindow', 'space', 'cleanup', 'properties']);
 		expect(act(sidebarItems('drive', true))).not.toContain('properties');
 	});
 });

@@ -555,14 +555,19 @@ export function quickAccessItems(first: boolean, last: boolean): MenuItem[] {
 	return items;
 }
 
-/** The menu of any other sidebar stop: a virtual place, a Windows folder or a drive. */
-export function sidebarItems(kind: 'place' | 'folder' | 'drive', linux = ON_LINUX): MenuItem[] {
+/** What a sidebar stop opens: a virtual place, the Recycle Bin, a Windows folder or a drive. */
+export type SidebarKind = 'place' | 'trash' | 'folder' | 'drive';
+
+/** The menu of any other sidebar stop. */
+export function sidebarItems(kind: SidebarKind, linux = ON_LINUX): MenuItem[] {
 	const items: MenuItem[] = [
 		{ action: 'openNewTab', label: 'Apri in una nuova scheda' },
 		{ action: 'openNewWindow', label: 'Apri in una nuova finestra' }
 	];
-	if (kind === 'drive') items.push({ action: 'cleanup', label: 'Pulizia disco…', separator: true });
-	if (kind !== 'place' && !linux) items.push({ action: 'properties', label: 'Proprietà', separator: kind === 'folder' });
+	if (kind === 'trash') items.push({ action: 'emptyTrash', label: 'Svuota Cestino', separator: true, danger: true });
+	if (kind === 'folder' || kind === 'drive') items.push({ action: 'space', label: 'Analizza spazio', separator: true });
+	if (kind === 'drive') items.push({ action: 'cleanup', label: 'Pulizia disco…' });
+	if ((kind === 'folder' || kind === 'drive') && !linux) items.push({ action: 'properties', label: 'Proprietà' });
 	return items;
 }
 

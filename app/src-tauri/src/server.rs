@@ -74,7 +74,11 @@ pub struct RItem {
 }
 
 /// What every protocol knows how to do. Paths are absolute on the server, with `/`.
-pub trait Remote {
+pub trait Remote: Send {
+    /// Still usable after waiting in the pool (the server may have closed it).
+    fn alive(&mut self) -> bool {
+        true
+    }
     fn list(&mut self, dir: &str) -> Result<Vec<RItem>, FsError>;
     fn download(&mut self, path: &str, to: &mut dyn Write, cancel: &AtomicBool, on: &mut dyn FnMut(u64)) -> Result<(), FsError>;
     fn upload(&mut self, path: &str, from: &mut dyn Read, size: u64, cancel: &AtomicBool, on: &mut dyn FnMut(u64)) -> Result<(), FsError>;
@@ -96,12 +100,17 @@ pub struct Servers {
     file: PathBuf,
     list: Mutex<Vec<Config>>,
     session: Mutex<HashMap<String, Zeroizing<String>>>,
+    /// One connection per server kept after an operation, reused by the next.
+    idle: Mutex<HashMap<String, (Box<dyn Remote>, std::time::Instant)>>,
 }
+
+/// Under the 60 s after which SSH drops a silent session.
+const IDLE: std::time::Duration = std::time::Duration::from_secs(45);
 
 impl Servers {
     pub fn load(file: PathBuf) -> Self {
         let list = std::fs::read(&file).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
-        Servers { file, list: Mutex::new(list), session: Mutex::new(HashMap::new()) }
+        Servers { file, list: Mutex::new(list), session: Mutex::new(HashMap::new()), idle: Mutex::new(HashMap::new()) }
     }
 
     pub fn all(&self) -> Vec<Config> {
@@ -152,6 +161,7 @@ impl Servers {
         if !c.remember {
             creds::delete(&c.id);
         }
+        self.idle.lock().unwrap().remove(&c.id);
         list.retain(|o| o.id != c.id);
         list.push(c.clone());
         self.save(&list)?;
@@ -161,6 +171,7 @@ impl Servers {
     pub fn remove(&self, id: &str) -> Result<(), FsError> {
         let mut list = self.list.lock().unwrap();
         list.retain(|c| c.id != id);
+        self.idle.lock().unwrap().remove(id);
         self.session.lock().unwrap().remove(id);
         creds::delete(id);
         self.save(&list)
@@ -175,6 +186,7 @@ impl Servers {
     }
 
     fn set_password(&self, c: &Config, pw: &str) -> Result<(), FsError> {
+        self.idle.lock().unwrap().remove(&c.id);
         self.session.lock().unwrap().insert(c.id.clone(), Zeroizing::new(pw.to_string()));
         if c.remember {
             creds::write(&c.id, &c.user, pw)?;
@@ -201,7 +213,21 @@ impl Servers {
         Some(p)
     }
 
-    /// Opens a connection to the server of a virtual path.
+    /// Runs `op` on a connection to the server: the one kept from the last
+    /// operation if still alive, otherwise a new one. It is kept only after
+    /// success, so a connection left in a broken state is never reused.
+    fn with<T>(&self, id: &str, op: impl FnOnce(&Config, &mut dyn Remote) -> Result<T, FsError>) -> Result<T, FsError> {
+        let kept = self.idle.lock().unwrap().remove(id).filter(|(_, at)| at.elapsed() < IDLE).map(|(r, _)| r);
+        let (c, mut r) = match kept.and_then(|mut r| r.alive().then_some(r)) {
+            Some(r) => (self.get(id)?, r),
+            None => self.connect(id)?,
+        };
+        let v = op(&c, r.as_mut())?;
+        self.idle.lock().unwrap().insert(id.to_string(), (r, std::time::Instant::now()));
+        Ok(v)
+    }
+
+    /// Opens a new connection to the server of a virtual path.
     fn connect(&self, id: &str) -> Result<(Config, Box<dyn Remote>), FsError> {
         let c = self.get(id)?;
         let pw = match self.password_of(&c) {
@@ -230,8 +256,7 @@ impl Servers {
 
     pub fn list(&self, path: &str) -> Result<Vec<Entry>, FsError> {
         let (id, rel) = split(path).ok_or(FsError::NotFound)?;
-        let (c, mut r) = self.connect(&id)?;
-        let items = r.list(&remote_path(&c, &rel))?;
+        let items = self.with(&id, |c, r| r.list(&remote_path(c, &rel)))?;
         Ok(items
             .into_iter()
             .filter(|i| valid_name(&i.name))
@@ -242,15 +267,13 @@ impl Servers {
     /// Downloads items into a local folder; a taken name gets a number.
     pub fn download(&self, sources: &[String], dest: &str, cancel: &AtomicBool, progress: &mut dyn FnMut(u64, u64)) -> Result<Vec<[String; 2]>, FsError> {
         let Some((id, _)) = sources.first().and_then(|s| split(s)) else { return Ok(Vec::new()) };
-        let (c, mut r) = self.connect(&id)?;
-        download_from(&c, r.as_mut(), &id, sources, dest, cancel, progress)
+        self.with(&id, |c, r| download_from(c, r, &id, sources, dest, cancel, progress))
     }
 
     /// Uploads local files and folders into a server folder; a taken name gets a number.
     pub fn upload(&self, sources: &[String], dest: &str, cancel: &AtomicBool, progress: &mut dyn FnMut(u64, u64)) -> Result<Vec<[String; 2]>, FsError> {
         let (id, _) = split(dest).ok_or(FsError::NotFound)?;
-        let (c, mut r) = self.connect(&id)?;
-        upload_to(&c, r.as_mut(), sources, dest, cancel, progress)
+        self.with(&id, |c, r| upload_to(c, r, sources, dest, cancel, progress))
     }
 
     pub fn rename(&self, path: &str, name: &str) -> Result<String, FsError> {
@@ -258,9 +281,8 @@ impl Servers {
             return Err(io("Nome non valido."));
         }
         let (id, rel) = split(path).ok_or(FsError::NotFound)?;
-        let (c, mut r) = self.connect(&id)?;
         let parent = rel.rsplit_once('/').map(|p| p.0).unwrap_or("");
-        r.rename(&remote_path(&c, &rel), &join(&remote_path(&c, parent), name))?;
+        self.with(&id, |c, r| r.rename(&remote_path(c, &rel), &join(&remote_path(c, parent), name)))?;
         Ok(format!("{}\\{name}", parent_of(path).unwrap_or_default()))
     }
 
@@ -269,26 +291,26 @@ impl Servers {
             return Err(io("Nome non valido."));
         }
         let (id, rel) = split(parent).ok_or(FsError::NotFound)?;
-        let (c, mut r) = self.connect(&id)?;
-        r.mkdir(&join(&remote_path(&c, &rel), name))?;
+        self.with(&id, |c, r| r.mkdir(&join(&remote_path(c, &rel), name)))?;
         Ok(format!("{parent}\\{name}"))
     }
 
     /// Deletes for good: servers have no Recycle Bin.
     pub fn delete(&self, paths: &[String]) -> Result<(), FsError> {
         let Some((id, _)) = paths.first().and_then(|s| split(s)) else { return Ok(()) };
-        let (c, mut r) = self.connect(&id)?;
-        for p in paths {
-            let (_, rel) = split(p).ok_or(FsError::NotFound)?;
-            if rel.is_empty() {
-                return Err(io("Non si può eliminare la cartella iniziale del server."));
+        self.with(&id, |c, r| {
+            for p in paths {
+                let (_, rel) = split(p).ok_or(FsError::NotFound)?;
+                if rel.is_empty() {
+                    return Err(io("Non si può eliminare la cartella iniziale del server."));
+                }
+                let name = rel.rsplit('/').next().unwrap_or_default();
+                let parent = rel.rsplit_once('/').map(|p| p.0).unwrap_or("");
+                let item = r.list(&remote_path(c, parent))?.into_iter().find(|i| i.name == name).ok_or(FsError::NotFound)?;
+                remove_tree(r, &remote_path(c, &rel), item.dir)?;
             }
-            let name = rel.rsplit('/').next().unwrap_or_default();
-            let parent = rel.rsplit_once('/').map(|p| p.0).unwrap_or("");
-            let item = r.list(&remote_path(&c, parent))?.into_iter().find(|i| i.name == name).ok_or(FsError::NotFound)?;
-            remove_tree(r.as_mut(), &remote_path(&c, &rel), item.dir)?;
-        }
-        Ok(())
+            Ok(())
+        })
     }
 }
 
@@ -594,6 +616,10 @@ mod sftp {
     }
 
     impl Remote for Sftp {
+        fn alive(&mut self) -> bool {
+            !self._session.is_closed()
+        }
+
         fn list(&mut self, dir: &str) -> Result<Vec<RItem>, FsError> {
             let rd = block(self.sftp.read_dir(dir)).map_err(io)?;
             Ok(rd
@@ -711,6 +737,10 @@ mod ftp {
     }
 
     impl Remote for Ftp {
+        fn alive(&mut self) -> bool {
+            with!(self, f => f.noop().is_ok())
+        }
+
         fn list(&mut self, dir: &str) -> Result<Vec<RItem>, FsError> {
             let lines = with!(self, f => f.list(Some(dir)).map_err(io)?);
             Ok(lines
@@ -810,21 +840,20 @@ mod dav {
             format!("{}{}", self.base, enc.join("/"))
         }
 
-        fn send(&self, method: Method, path: &str, body: Option<reqwest::Body>, headers: &[(&str, String)]) -> Result<reqwest::Response, FsError> {
+        fn request(&self, method: Method, path: &str, headers: &[(&str, String)]) -> reqwest::RequestBuilder {
             let mut req = self.client.request(method, self.url(path)).basic_auth(&self.user, Some(self.pw.as_str()));
             for (k, v) in headers {
                 req = req.header(*k, v);
             }
+            req
+        }
+
+        fn send(&self, method: Method, path: &str, body: Option<reqwest::Body>, headers: &[(&str, String)]) -> Result<reqwest::Response, FsError> {
+            let mut req = self.request(method, path, headers);
             if let Some(b) = body {
                 req = req.body(b);
             }
-            let res = block(req.send()).map_err(|e| io(format!("Il server non risponde: {e}")))?;
-            match res.status() {
-                StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => Err(FsError::ServerPassword),
-                StatusCode::NOT_FOUND => Err(FsError::NotFound),
-                s if s.is_success() || s.as_u16() == 207 => Ok(res),
-                s => Err(io(format!("Il server ha risposto {s}."))),
-            }
+            check(block(req.send()))
         }
 
         fn propfind(&self, dir: &str) -> Result<Vec<RItem>, FsError> {
@@ -832,6 +861,28 @@ mod dav {
             let res = self.send(Method::from_bytes(b"PROPFIND").unwrap(), &dir, None, &[("Depth", "1".into())])?;
             let text = block(res.text()).map_err(io)?;
             Ok(parse_multistatus(&text, &self.url(&dir)))
+        }
+    }
+
+    fn check(sent: Result<reqwest::Response, reqwest::Error>) -> Result<reqwest::Response, FsError> {
+        let res = sent.map_err(|e| io(format!("Il server non risponde: {e}")))?;
+        match res.status() {
+            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => Err(FsError::ServerPassword),
+            StatusCode::NOT_FOUND => Err(FsError::NotFound),
+            s if s.is_success() || s.as_u16() == 207 => Ok(res),
+            s => Err(io(format!("Il server ha risposto {s}."))),
+        }
+    }
+
+    /// The writing end of the pipe that feeds a streamed PUT.
+    struct Pipe(tokio::io::DuplexStream);
+
+    impl Write for Pipe {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            block(tokio::io::AsyncWriteExt::write(&mut self.0, buf))
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
         }
     }
 
@@ -957,10 +1008,21 @@ mod dav {
         }
 
         fn upload(&mut self, path: &str, from: &mut dyn Read, size: u64, cancel: &AtomicBool, on: &mut dyn FnMut(u64)) -> Result<(), FsError> {
-            // shortcut: the whole file is read into memory before the PUT; stream it when large uploads matter.
-            let mut data = Vec::with_capacity(size as usize);
-            pump(from, &mut data, cancel, on)?;
-            self.send(Method::PUT, path, Some(data.into()), &[]).map(|_| ())
+            // The file goes out while it is read: a pipe feeds the PUT running on the runtime.
+            let (pipe, out) = tokio::io::duplex(CHUNK);
+            let body = reqwest::Body::wrap_stream(tokio_util::io::ReaderStream::new(out));
+            let req = self.request(Method::PUT, path, &[("Content-Length", size.to_string())]).body(body);
+            let sent = tauri::async_runtime::spawn(req.send());
+            let mut pipe = Pipe(pipe);
+            let fed = pump(from, &mut pipe, cancel, on);
+            drop(pipe);
+            let answer = block(sent).map_err(io)?;
+            if cancel.load(Ordering::Relaxed) {
+                return Err(cancelled());
+            }
+            // A refusal (wrong password, no space) closes the pipe: the answer says why.
+            check(answer)?;
+            fed.map(|_| ())
         }
 
         fn mkdir(&mut self, path: &str) -> Result<(), FsError> {
@@ -981,6 +1043,42 @@ mod dav {
     #[cfg(test)]
     mod tests {
         use super::*;
+
+        #[test]
+        fn upload_streams_the_file_with_its_length() {
+            use std::io::BufRead;
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            let port = listener.local_addr().unwrap().port();
+            // A one-request server: reads the PUT and hands back its length header and body.
+            let server = std::thread::spawn(move || {
+                let (sock, _) = listener.accept().unwrap();
+                let mut r = std::io::BufReader::new(sock.try_clone().unwrap());
+                let mut length = None;
+                loop {
+                    let mut line = String::new();
+                    r.read_line(&mut line).unwrap();
+                    if line == "\r\n" {
+                        break;
+                    }
+                    if let Some(v) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+                        length = Some(v.trim().parse::<usize>().unwrap());
+                    }
+                }
+                let mut body = vec![0u8; length.unwrap()];
+                r.read_exact(&mut body).unwrap();
+                (&sock).write_all(b"HTTP/1.1 201 Created\r\nContent-Length: 0\r\n\r\n").unwrap();
+                (length, body)
+            });
+            let _ = rustls::crypto::ring::default_provider().install_default();
+            let mut d = Dav { client: Client::new(), base: format!("http://127.0.0.1:{port}"), user: "u".into(), pw: Zeroizing::new(String::new()) };
+            let data: Vec<u8> = (0..3 * CHUNK + 17).map(|i| (i % 251) as u8).collect();
+            let mut seen = 0;
+            d.upload("/a.bin", &mut &data[..], data.len() as u64, &AtomicBool::new(false), &mut |n| seen = n).unwrap();
+            let (length, body) = server.join().unwrap();
+            assert_eq!(length, Some(data.len()), "sent with its length, not chunked");
+            assert!(body == data);
+            assert_eq!(seen, data.len() as u64);
+        }
 
         #[test]
         fn parses_a_propfind_answer() {
@@ -1209,5 +1307,55 @@ mod tests {
         let moved = again.put(Config { host: "altro.local".into(), ..again.all()[0].clone() }, None).unwrap();
         assert_eq!(moved.fingerprint, None);
         assert_eq!(again.list(&format!(r"::server\{}", c.id)).unwrap_err(), FsError::ServerPassword);
+    }
+
+    /// A kept connection the server has closed.
+    struct Closed;
+
+    impl Remote for Closed {
+        fn alive(&mut self) -> bool {
+            false
+        }
+        fn list(&mut self, _: &str) -> Result<Vec<RItem>, FsError> {
+            panic!("a closed connection is never used")
+        }
+        fn download(&mut self, _: &str, _: &mut dyn Write, _: &AtomicBool, _: &mut dyn FnMut(u64)) -> Result<(), FsError> {
+            unreachable!()
+        }
+        fn upload(&mut self, _: &str, _: &mut dyn Read, _: u64, _: &AtomicBool, _: &mut dyn FnMut(u64)) -> Result<(), FsError> {
+            unreachable!()
+        }
+        fn mkdir(&mut self, _: &str) -> Result<(), FsError> {
+            unreachable!()
+        }
+        fn rename(&mut self, _: &str, _: &str) -> Result<(), FsError> {
+            unreachable!()
+        }
+        fn remove(&mut self, _: &str, _: bool) -> Result<(), FsError> {
+            unreachable!()
+        }
+    }
+
+    #[test]
+    fn a_kept_connection_is_reused_while_alive_and_dropped_on_change() {
+        let dir = tempfile::tempdir().unwrap();
+        let s = Servers::load(dir.path().join("server.json"));
+        let c = s.put(Config { id: String::new(), ..cfg() }, None).unwrap();
+        let path = format!(r"::server\{}", c.id);
+        let keep = |r: Box<dyn Remote>| s.idle.lock().unwrap().insert(c.id.clone(), (r, std::time::Instant::now()));
+
+        let mut f = Fake::default();
+        f.0.insert("/home/a.txt".into(), Some(b"x".to_vec()));
+        keep(Box::new(f));
+        // No password saved: only the kept connection can answer.
+        assert_eq!(s.list(&path).unwrap()[0].name, "a.txt");
+        assert_eq!(s.list(&path).unwrap().len(), 1, "kept again after success");
+
+        keep(Box::new(Closed));
+        assert_eq!(s.list(&path).unwrap_err(), FsError::ServerPassword, "a closed one makes way for a new one");
+
+        keep(Box::new(Fake::default()));
+        s.put(Config { host: "other".into(), ..s.all()[0].clone() }, None).unwrap();
+        assert!(s.idle.lock().unwrap().is_empty(), "a changed server forgets its connection");
     }
 }

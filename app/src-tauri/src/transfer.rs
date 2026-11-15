@@ -486,17 +486,50 @@ pub async fn lan_download(
     let friends = friends.inner().clone();
     let outcome = tauri::async_runtime::spawn_blocking(move || {
         let mut last = Instant::now();
-        let pairs = crate::ipc::download_remote(&lan, &friends, &sources, &dest, &cancel, &mut |done, total| {
+        let mut report = |done: u64, total: u64| {
             if last.elapsed() >= PROGRESS_INTERVAL {
                 last = Instant::now();
                 let _ = on_progress.send(Progress { transferred: done, total });
             }
-        })?;
+        };
+        let pairs = if crate::server::is_server(&dest) {
+            relay_to_server(&lan, &friends, &sources, &dest, op_id, &cancel, &mut report)?
+        } else {
+            crate::ipc::download_remote(&lan, &friends, &sources, &dest, &cancel, &mut report)?
+        };
         Ok::<_, FsError>(CopyOutcome { copied: pairs.len() as u64, skipped: 0, cancelled: false, pairs })
     })
     .await;
     state.forget(op_id);
     outcome.map_err(|e| FsError::Io { message: format!("Copia interrotta: {}", e) })?
+}
+
+/// From a server, another PC or a friend into a server: the items pass
+/// through a temporary folder on this PC, downloaded and then uploaded.
+/// The bar counts both halves.
+fn relay_to_server(
+    lan: &crate::lan::Lan,
+    friends: &crate::friends::Friends,
+    sources: &[String],
+    dest: &str,
+    op_id: u64,
+    cancel: &AtomicBool,
+    report: &mut dyn FnMut(u64, u64),
+) -> Result<Vec<[String; 2]>, FsError> {
+    let tmp = std::env::temp_dir().join(format!("space-train-relay-{}-{op_id}", std::process::id()));
+    std::fs::create_dir_all(&tmp).map_err(|e| crate::fs::error::from_io(&e))?;
+    let res = (|| {
+        let mut whole = 0u64;
+        let got = crate::ipc::download_remote(lan, friends, sources, &tmp.to_string_lossy(), cancel, &mut |d, t| {
+            whole = t;
+            report(d, t * 2);
+        })?;
+        let local: Vec<String> = got.iter().map(|p| p[1].clone()).collect();
+        let sent = crate::server::servers()?.upload(&local, dest, cancel, &mut |d, _| report(whole + d, whole * 2))?;
+        Ok(got.iter().zip(sent).map(|(g, s)| [g[0].clone(), s[1].clone()]).collect())
+    })();
+    let _ = std::fs::remove_dir_all(&tmp);
+    res
 }
 
 #[tauri::command]

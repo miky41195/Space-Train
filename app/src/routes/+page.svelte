@@ -97,6 +97,7 @@
 		newItems,
 		quickAccessItems,
 		sidebarItems,
+		type SidebarKind,
 		columnItems,
 		DEFAULT_START_PAGE,
 		LAST_FOLDER_START_PAGE,
@@ -1783,12 +1784,8 @@
 	 * appears and the operation starts right away.
 	 */
 	async function runTransfer(sources: string[], dest: string, mode: 'copy' | 'move') {
-		if (sources.length > 0 && isServer(sources[0]) && isServer(dest)) {
-			opError = 'Fra due cartelle di server si copia passando dal PC: scarica e poi carica.';
-			return;
-		}
-		// From another PC it is always a copy, and taken names are numbered by
-		// themselves.
+		// From another PC or a server it is always a copy, and taken names are
+		// numbered by themselves; into a server it passes through this PC.
 		if (sources.length > 0 && isLan(sources[0])) {
 			await downloadFromNetwork(sources, dest);
 			return;
@@ -1892,11 +1889,13 @@
 				dest,
 				onProgress: (p) => (progress = p)
 			});
-			undo.record({
-				kind: 'create',
-				paths: outcome.pairs.map((c) => c[1]),
-				description: `copia di ${outcome.pairs.length === 1 ? '1 elemento' : `${outcome.pairs.length} elementi`} dalla rete locale`
-			});
+			// Undo moves copies to the Recycle Bin: a server has none.
+			if (!isServer(dest))
+				undo.record({
+					kind: 'create',
+					paths: outcome.pairs.map((c) => c[1]),
+					description: `copia di ${outcome.pairs.length === 1 ? '1 elemento' : `${outcome.pairs.length} elementi`} dalla rete locale`
+				});
 			await reload();
 			return outcome;
 		} catch (e) {
@@ -2949,7 +2948,7 @@
 		};
 	}
 
-	function openSidebarMenu(path: string, kind: 'place' | 'folder' | 'drive', event: MouseEvent) {
+	function openSidebarMenu(path: string, kind: SidebarKind, event: MouseEvent) {
 		quickAccessMenu = path;
 		menu = { items: sidebarItems(kind), x: event.clientX, y: event.clientY };
 	}
@@ -3179,6 +3178,14 @@
 					return quickAccess.shift(fromBar, 1);
 				case 'cleanup':
 					return openCleanup(fromBar);
+				case 'space':
+					return analyzeSpace(fromBar);
+				case 'emptyTrash': {
+					// The confirmation counts the items: read the bin, wherever the tab is.
+					const bin = await tauriBackend.listDir(TRASH, { key: 'name', ascending: true }, true).catch(() => null);
+					toDelete = { items: bin?.entries ?? [], kind: 'emptyTrash' };
+					return;
+				}
 				case 'properties':
 					return tauriBackend.showProperties([fromBar]).catch((e) => void (opError = describeError(e)));
 			}
