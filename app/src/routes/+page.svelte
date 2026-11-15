@@ -96,6 +96,7 @@
 		sortItems,
 		newItems,
 		quickAccessItems,
+		sidebarItems,
 		columnItems,
 		DEFAULT_START_PAGE,
 		LAST_FOLDER_START_PAGE,
@@ -2948,6 +2949,11 @@
 		};
 	}
 
+	function openSidebarMenu(path: string, kind: 'place' | 'folder' | 'drive', event: MouseEvent) {
+		quickAccessMenu = path;
+		menu = { items: sidebarItems(kind), x: event.clientX, y: event.clientY };
+	}
+
 	async function openMenu(event: MouseEvent) {
 		quickAccessMenu = null;
 		const x = event.clientX;
@@ -3171,6 +3177,10 @@
 					return quickAccess.shift(fromBar, -1);
 				case 'quickAccessDown':
 					return quickAccess.shift(fromBar, 1);
+				case 'cleanup':
+					return openCleanup(fromBar);
+				case 'properties':
+					return tauriBackend.showProperties([fromBar]).catch((e) => void (opError = describeError(e)));
 			}
 		}
 		const choices = selectedEntries();
@@ -3600,6 +3610,7 @@
 				configureLan(addresses.length > (lanState?.addresses?.length ?? 0) ? { addresses, visible: true } : { addresses })}
 			quickAccess={quickAccess.folders}
 			onquickaccessmenu={openQuickAccessMenu}
+			onitemmenu={openSidebarMenu}
 			labels={colors.used}
 			openLabel={store.activeTab?.label ?? null}
 			onlabel={(id) => void showLabel(id)}

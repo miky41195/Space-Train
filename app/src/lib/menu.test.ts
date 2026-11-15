@@ -5,6 +5,7 @@ import {
 	sortItems,
 	newItems,
 	quickAccessItems,
+	sidebarItems,
 	placeMenu,
 	isEditableText
 } from './menu';
@@ -360,6 +361,14 @@ describe('Quick access in the menu', () => {
 		expect(act(quickAccessItems(true, false))).not.toContain('quickAccessUp');
 		expect(act(quickAccessItems(false, true))).not.toContain('quickAccessDown');
 		expect(act(quickAccessItems(true, true))).toEqual(['openNewTab', 'openNewWindow', 'unpin']);
+	});
+
+	it('every other sidebar stop opens elsewhere; drives also clean up', () => {
+		const act = (v: ReturnType<typeof sidebarItems>) => v.map((x) => x.action);
+		expect(act(sidebarItems('place', false))).toEqual(['openNewTab', 'openNewWindow']);
+		expect(act(sidebarItems('folder', false))).toEqual(['openNewTab', 'openNewWindow', 'properties']);
+		expect(act(sidebarItems('drive', false))).toEqual(['openNewTab', 'openNewWindow', 'cleanup', 'properties']);
+		expect(act(sidebarItems('drive', true))).not.toContain('properties');
 	});
 });
 

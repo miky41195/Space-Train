@@ -555,6 +555,17 @@ export function quickAccessItems(first: boolean, last: boolean): MenuItem[] {
 	return items;
 }
 
+/** The menu of any other sidebar stop: a virtual place, a Windows folder or a drive. */
+export function sidebarItems(kind: 'place' | 'folder' | 'drive', linux = ON_LINUX): MenuItem[] {
+	const items: MenuItem[] = [
+		{ action: 'openNewTab', label: 'Apri in una nuova scheda' },
+		{ action: 'openNewWindow', label: 'Apri in una nuova finestra' }
+	];
+	if (kind === 'drive') items.push({ action: 'cleanup', label: 'Pulizia disco…', separator: true });
+	if (kind !== 'place' && !linux) items.push({ action: 'properties', label: 'Proprietà', separator: kind === 'folder' });
+	return items;
+}
+
 const SORT_KEYS: Array<{ key: SortKey; name: string }> = [
 	{ key: 'name', name: 'Nome' },
 	{ key: 'modified', name: 'Data di modifica' },

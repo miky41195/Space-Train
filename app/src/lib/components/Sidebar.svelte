@@ -23,6 +23,7 @@
 		onopenfriends = undefined,
 		quickAccess = [],
 		onquickaccessmenu = undefined,
+		onitemmenu = undefined,
 		labels = [],
 		openLabel = null,
 		onlabel = undefined,
@@ -57,6 +58,8 @@
 		quickAccess?: string[];
 		/** Right-click on a Quick access item. */
 		onquickaccessmenu?: (path: string, event: MouseEvent) => void;
+		/** Right-click on any other stop that opens a location. */
+		onitemmenu?: (path: string, kind: 'place' | 'folder' | 'drive', event: MouseEvent) => void;
 		/** Colour labels in use: one stop each, listing every item that carries it. */
 		labels?: Array<{ id: ColorId; name: string; hex: string; count: number }>;
 		/** Name of the label whose items the active tab shows. */
@@ -112,6 +115,14 @@
 		return peers.some((p) => p.ip === address.trim().split(':')[0]);
 	}
 
+	function menuOn(path: string, kind: 'place' | 'folder' | 'drive') {
+		return (e: MouseEvent) => {
+			if (!onitemmenu) return;
+			e.preventDefault();
+			onitemmenu(path, kind, e);
+		};
+	}
+
 	function go(path: string) {
 		if (store.activeId !== null) store.navigate(store.activeId, path);
 	}
@@ -150,7 +161,8 @@
 				class:current={isCurrent(p.path)}
 				class:drop-target={dropTarget === p.path}
 				data-folder={p.path === TRASH ? TRASH : undefined}
-				onclick={() => go(p.path)}>{p.label}</button
+				onclick={() => go(p.path)}
+				oncontextmenu={menuOn(p.path, 'place')}>{p.label}</button
 			>
 		{/each}
 	</div>
@@ -183,6 +195,7 @@
 					class="item online"
 					class:current={store.activeTab?.path.toLowerCase().startsWith(peerPath(p).toLowerCase())}
 					onclick={() => go(peerPath(p))}
+					oncontextmenu={menuOn(peerPath(p), 'place')}
 					title={p.shared ? `${p.name} — condivide «${p.shared}»` : `${p.name} — nessuna cartella condivisa`}
 				>
 					{p.name}
@@ -257,6 +270,7 @@
 					class:online={a.online}
 					class:current={isWithin(FRIENDS + '\\' + a.id)}
 					onclick={() => go(FRIENDS + '\\' + a.id)}
+					oncontextmenu={menuOn(FRIENDS + '\\' + a.id, 'place')}
 					title={a.online ? `${a.name} — in linea` : `${a.name} — non in linea`}
 				>
 					{a.name}
@@ -282,6 +296,7 @@
 				class:drop-target={dropTarget === f.path}
 				data-folder={f.path}
 				onclick={() => go(f.path)}
+				oncontextmenu={menuOn(f.path, 'folder')}
 			>
 				{#if colorOf?.(f.path)}<span class="dot" style:background={colorOf(f.path)}></span>{/if}
 				{f.label}
@@ -387,6 +402,7 @@
 				class:drop-target={dropTarget === d.path}
 				data-folder={d.path}
 				onclick={() => go(d.path)}
+				oncontextmenu={menuOn(d.path, 'drive')}
 				title={d.free !== null && d.total ? `${formatBytes(d.free)} liberi di ${formatBytes(d.total)}` : d.label}
 			>
 				<span class="label">{d.label}</span>
