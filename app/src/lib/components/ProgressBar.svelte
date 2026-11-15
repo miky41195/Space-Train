@@ -38,7 +38,8 @@
 		trash: 'Spostamento nel Cestino',
 		delete: 'Eliminazione',
 		duplicates: 'Confronto dei file',
-		images: 'Conversione delle immagini'
+		images: 'Conversione delle immagini',
+		backup: 'Backup sul server'
 	} as const;
 
 	/** Deletions count items: bytes would say nothing about how long is left. */

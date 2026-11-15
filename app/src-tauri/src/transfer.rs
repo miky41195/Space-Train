@@ -532,6 +532,32 @@ fn relay_to_server(
     res
 }
 
+/// «Back up now» for a server, with the bar.
+#[tauri::command]
+pub async fn server_backup(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Operations>,
+    op_id: u64,
+    id: String,
+    on_progress: Channel<Progress>,
+) -> Result<String, FsError> {
+    let cancel = state.register(op_id);
+    let outcome = tauri::async_runtime::spawn_blocking(move || {
+        let mut last = Instant::now();
+        let r = crate::server::servers()?.back_up(&id, &cancel, &mut |done, total| {
+            if last.elapsed() >= PROGRESS_INTERVAL {
+                last = Instant::now();
+                let _ = on_progress.send(Progress { transferred: done, total });
+            }
+        });
+        crate::server::backup_done(&app);
+        r
+    })
+    .await;
+    state.forget(op_id);
+    outcome.map_err(|e| FsError::Io { message: format!("Backup interrotto: {}", e) })?
+}
+
 #[tauri::command]
 pub fn cancel_transfer(state: tauri::State<'_, Operations>, op_id: u64) -> bool {
     state.cancel(op_id)

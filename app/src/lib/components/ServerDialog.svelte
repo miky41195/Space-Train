@@ -1,5 +1,7 @@
 <script lang="ts">
 	import type { ServerConfig, ServerProtocol } from '../ipc';
+	import { nameOf } from '../locations';
+	import { backupStatus } from '../server-backup';
 
 	type Mode =
 		| { kind: 'edit'; server: ServerConfig | null }
@@ -14,6 +16,8 @@
 		onremove = undefined,
 		ontrust = undefined,
 		onpassword = undefined,
+		onpickfolder = undefined,
+		onbackupnow = undefined,
 		oncancel
 	}: {
 		mode: Mode;
@@ -23,6 +27,10 @@
 		onremove?: (id: string) => void;
 		ontrust?: () => void;
 		onpassword?: (password: string, remember: boolean) => void;
+		/** Chooses the folder of this PC to back up. */
+		onpickfolder?: (initial: string | null) => Promise<string | null>;
+		/** Saves, then runs the backup now. */
+		onbackupnow?: (config: ServerConfig, password: string | null) => void;
 		oncancel: () => void;
 	} = $props();
 
@@ -43,6 +51,20 @@
 	// svelte-ignore state_referenced_locally
 	let remember = $state(mode.kind === 'edit' ? start.remember : (mode.server.remember ?? true));
 	let first = $state<HTMLInputElement | HTMLButtonElement | null>(null);
+	let backingUp = $state(!!start.backup);
+
+	async function pickFolder() {
+		const chosen = await onpickfolder?.(config.backup?.folder || null);
+		if (!chosen) return;
+		const target = config.backup?.target || nameOf(chosen);
+		config.backup = { ...(config.backup ?? {}), folder: chosen, target };
+	}
+
+	/** The config as it is saved: no backup without its folder. */
+	function toSave(): ServerConfig {
+		const backup = backingUp && config.backup?.folder ? config.backup : null;
+		return { ...config, remember, backup };
+	}
 
 	$effect(() => {
 		first?.focus();
@@ -69,7 +91,7 @@
 	function submit(e: SubmitEvent) {
 		e.preventDefault();
 		if (busy) return;
-		if (mode.kind === 'edit' && config.host.trim()) onsave?.({ ...config, remember }, password || null);
+		if (mode.kind === 'edit' && config.host.trim()) onsave?.(toSave(), password || null);
 		else if (mode.kind === 'key' && !mode.changed) ontrust?.();
 		else if (mode.kind === 'password' && password) onpassword?.(password, remember);
 	}
@@ -122,6 +144,39 @@
 				{#if config.protocol === 'ftp' || config.host.startsWith('http://')}
 					<p class="notice">Questo collegamento non è cifrato: password e file viaggiano in chiaro. Usalo solo nella rete di casa.</p>
 				{/if}
+				<section class="backup" aria-label="Backup automatico">
+					<label class="choice head">
+						<input type="checkbox" bind:checked={backingUp} />
+						<span>Backup automatico</span>
+					</label>
+					{#if backingUp}
+						<div class="route">
+							<label>
+								<span class="label">Dal PC</span>
+								<button type="button" class="pick" onclick={pickFolder} title={config.backup?.folder ?? ''}>
+									{config.backup?.folder ? nameOf(config.backup.folder) : 'Scegli la cartella…'}
+								</button>
+							</label>
+							<span class="arrow" aria-hidden="true">→</span>
+							<label>
+								<span class="label">Sul server</span>
+								<input
+									value={config.backup?.target ?? ''}
+									oninput={(e) => config.backup && (config.backup.target = e.currentTarget.value)}
+									disabled={!config.backup?.folder}
+									spellcheck="false"
+								/>
+							</label>
+						</div>
+						<p class="hint">
+							{#if config.backup?.folder}
+								{backupStatus(config.backup)}
+							{:else}
+								Una volta al giorno, mentre Space Train è aperto: solo i file nuovi o cambiati, sul server non si cancella niente.
+							{/if}
+						</p>
+					{/if}
+				</section>
 			{:else if mode.kind === 'key'}
 				{#if mode.changed}
 					<p class="notice">
@@ -149,6 +204,9 @@
 					<button type="button" class="route" onclick={() => onremove(id)} disabled={busy}>Rimuovi</button>
 				{/if}
 				<button type="button" onclick={oncancel} disabled={busy}>{mode.kind === 'key' && mode.changed ? 'Chiudi' : 'Annulla'}</button>
+				{#if mode.kind === 'edit' && backingUp && config.backup?.folder && onbackupnow}
+					<button type="button" onclick={() => onbackupnow(toSave(), password || null)} disabled={busy || !config.host.trim()}>Fai il backup ora</button>
+				{/if}
 				{#if mode.kind === 'edit'}
 					<button type="submit" class="primary" disabled={busy || !config.host.trim()}>{busy ? 'Un momento…' : mode.server ? 'Salva' : 'Aggiungi'}</button>
 				{:else if mode.kind === 'key' && !mode.changed}
@@ -260,6 +318,48 @@
 		display: flex;
 		align-items: center;
 		gap: 8px;
+	}
+	.backup {
+		display: grid;
+		gap: 10px;
+		padding-top: 12px;
+		border-top: 1px solid var(--border);
+	}
+	.backup .head {
+		font-weight: 600;
+	}
+	.backup .route {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+		align-items: end;
+		gap: 8px;
+	}
+	.backup .arrow {
+		padding-bottom: 6px;
+		color: var(--text-dim);
+	}
+	.pick {
+		height: 30px;
+		padding: 0 10px;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		clip-path: var(--shape-sm, none);
+		mask: var(--mask-sm, none);
+		background: var(--bg);
+		color: var(--text);
+		font: inherit;
+		text-align: left;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		cursor: default;
+	}
+	.pick:hover {
+		border-color: var(--text-dim);
+	}
+	.hint {
+		color: var(--text-dim);
+		font-size: calc(12px * var(--text-scale, 1));
 	}
 	.fingerprint {
 		display: block;

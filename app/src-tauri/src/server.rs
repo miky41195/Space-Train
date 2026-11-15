@@ -30,6 +30,25 @@ pub fn servers() -> Result<&'static std::sync::Arc<Servers>, FsError> {
 }
 
 /// A path on a remote server (or the list of servers).
+/// Every window reads the servers again: a backup changed its outcome.
+pub const BACKUP_EVENT: &str = "server-backup";
+
+pub fn backup_done(app: &tauri::AppHandle) {
+    use tauri::Emitter;
+    let _ = app.emit(BACKUP_EVENT, ());
+}
+
+/// Checks once a minute, while the app is open, whether a daily backup is due.
+pub fn schedule_backups(app: tauri::AppHandle, servers: std::sync::Arc<Servers>) {
+    std::thread::spawn(move || loop {
+        std::thread::sleep(std::time::Duration::from_secs(60));
+        for id in servers.due_backups(crate::backup::now()) {
+            let _ = servers.back_up(&id, &AtomicBool::new(false), &mut |_, _| {});
+            backup_done(&app);
+        }
+    });
+}
+
 pub fn is_server(path: &str) -> bool {
     path == ROOT || path.starts_with(&format!("{ROOT}\\"))
 }
@@ -62,6 +81,28 @@ pub struct Config {
     /// The password is in the Credential Manager.
     #[serde(default)]
     pub remember: bool,
+    /// A folder of this PC copied here once a day.
+    #[serde(default)]
+    pub backup: Option<ServerBackup>,
+}
+
+/// A folder of this PC kept on the server: only new or changed files are
+/// sent, nothing is ever deleted there.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerBackup {
+    /// Folder on this PC.
+    pub folder: String,
+    /// Folder on the server, under the start folder, that mirrors it.
+    pub target: String,
+    /// Last backup that went through, ms since 1970.
+    #[serde(default)]
+    pub last: Option<i64>,
+    /// Last attempt, successful or not.
+    #[serde(default)]
+    pub attempted: Option<i64>,
+    #[serde(default)]
+    pub outcome: Option<String>,
 }
 
 /// One item as the server lists it.
@@ -102,7 +143,14 @@ pub struct Servers {
     session: Mutex<HashMap<String, Zeroizing<String>>>,
     /// One connection per server kept after an operation, reused by the next.
     idle: Mutex<HashMap<String, (Box<dyn Remote>, std::time::Instant)>>,
+    /// Servers whose backup is running now.
+    backing_up: Mutex<std::collections::HashSet<String>>,
 }
+
+/// What a backup already sent: path from the folder's name → size and date.
+/// Servers do not keep the original dates, so the comparison is made with
+/// what was sent, not with what is there.
+type Sent = HashMap<String, (u64, Option<i64>)>;
 
 /// Under the 60 s after which SSH drops a silent session.
 const IDLE: std::time::Duration = std::time::Duration::from_secs(45);
@@ -110,7 +158,7 @@ const IDLE: std::time::Duration = std::time::Duration::from_secs(45);
 impl Servers {
     pub fn load(file: PathBuf) -> Self {
         let list = std::fs::read(&file).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
-        Servers { file, list: Mutex::new(list), session: Mutex::new(HashMap::new()), idle: Mutex::new(HashMap::new()) }
+        Servers { file, list: Mutex::new(list), session: Mutex::new(HashMap::new()), idle: Mutex::new(HashMap::new()), backing_up: Mutex::new(Default::default()) }
     }
 
     pub fn all(&self) -> Vec<Config> {
@@ -147,12 +195,35 @@ impl Servers {
         if c.id.is_empty() {
             c.id = new_id();
         }
+        if let Some(b) = c.backup.as_mut() {
+            b.folder = b.folder.trim().to_string();
+            b.target = b.target.trim().trim_matches('/').to_string();
+            if b.folder.is_empty() {
+                return Err(io("Scegli la cartella del PC da copiare."));
+            }
+            // Never straight into the start folder: it would mix with what is there.
+            if b.target.is_empty() {
+                b.target = Path::new(&b.folder).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "Backup".into());
+            }
+            if b.target.split('/').any(|x| !valid_name(x)) {
+                return Err(io("Cartella sul server non valida."));
+            }
+        }
         let mut list = self.list.lock().unwrap();
         if let Some(old) = list.iter().find(|o| o.id == c.id) {
             if old.host != c.host || old.port != c.port || old.protocol != c.protocol {
                 c.fingerprint = None;
             } else if c.fingerprint.is_none() {
                 c.fingerprint = old.fingerprint.clone();
+            }
+            match (&old.backup, c.backup.as_mut()) {
+                (Some(o), Some(n)) if o.folder == n.folder && o.target == n.target => {
+                    (n.last, n.attempted, n.outcome) = (o.last, o.attempted, o.outcome.clone());
+                }
+                (Some(_), _) => {
+                    let _ = std::fs::remove_file(self.sent_file(&c.id));
+                }
+                _ => {}
             }
         }
         if let Some(pw) = password {
@@ -171,6 +242,7 @@ impl Servers {
     pub fn remove(&self, id: &str) -> Result<(), FsError> {
         let mut list = self.list.lock().unwrap();
         list.retain(|c| c.id != id);
+        let _ = std::fs::remove_file(self.sent_file(id));
         self.idle.lock().unwrap().remove(id);
         self.session.lock().unwrap().remove(id);
         creds::delete(id);
@@ -244,6 +316,63 @@ impl Servers {
             Protocol::Webdav => Box::new(dav::Dav::connect(&c, &pw)?),
         };
         Ok((c, remote))
+    }
+
+    fn sent_file(&self, id: &str) -> PathBuf {
+        self.file.with_file_name(format!("server-backup-{id}.json"))
+    }
+
+    /// Servers whose daily backup is due now.
+    pub fn due_backups(&self, now: i64) -> Vec<String> {
+        self.all()
+            .into_iter()
+            .filter(|c| c.backup.as_ref().is_some_and(|b| crate::backup::due_at(b.last, b.attempted, now)))
+            .map(|c| c.id)
+            .collect()
+    }
+
+    /// Sends the server what changed in the backup folder and notes how it went.
+    pub fn back_up(&self, id: &str, cancel: &AtomicBool, progress: &mut dyn FnMut(u64, u64)) -> Result<String, FsError> {
+        let b = self.get(id)?.backup.ok_or_else(|| io("Nessun backup impostato per questo server."))?;
+        if !self.backing_up.lock().unwrap().insert(id.to_string()) {
+            return Err(io("Il backup è già in corso."));
+        }
+        let outcome = self.back_up_now(id, &b, cancel, progress);
+        self.backing_up.lock().unwrap().remove(id);
+        let now = crate::backup::now();
+        let mut list = self.list.lock().unwrap();
+        if let Some(x) = list.iter_mut().find(|c| c.id == id).and_then(|c| c.backup.as_mut()) {
+            x.attempted = Some(now);
+            match &outcome {
+                Ok(m) => {
+                    x.last = Some(now);
+                    x.outcome = Some(m.clone());
+                }
+                Err(e) => x.outcome = Some(crate::backup::text(e)),
+            }
+        }
+        let _ = self.save(&list);
+        outcome
+    }
+
+    fn back_up_now(&self, id: &str, b: &ServerBackup, cancel: &AtomicBool, progress: &mut dyn FnMut(u64, u64)) -> Result<String, FsError> {
+        let root = PathBuf::from(&b.folder);
+        if !crate::fs::paths::extended(&root).is_dir() {
+            let name = root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+            return Err(io(format!("La cartella «{name}» non esiste più.")));
+        }
+        let mut sent: Sent = std::fs::read(self.sent_file(id)).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
+        let changed: Vec<_> = crate::backup::listing(&root).into_iter().filter(|v| sent.get(&v.rel) != Some(&(v.size, v.modified))).collect();
+        if changed.is_empty() {
+            return Ok("già allineata".into());
+        }
+        let res = self.with(id, |c, r| send_backup(r, &remote_path(c, &b.target), &root, &changed, &mut sent, cancel, progress));
+        // What went through counts even if something failed later.
+        if let Ok(json) = serde_json::to_vec(&sent) {
+            let _ = std::fs::write(self.sent_file(id), json);
+        }
+        res?;
+        Ok(if changed.len() == 1 { "1 file".into() } else { format!("{} file", changed.len()) })
     }
 
     /// The servers as entries, for `::server`.
@@ -443,6 +572,51 @@ fn put_tree(r: &mut dyn Remote, src: &Path, rp: &str, cancel: &AtomicBool, on: &
     r.upload(rp, &mut f, meta.len(), cancel, &mut |n| on(base + n))?;
     *done += meta.len();
     Ok(())
+}
+
+/// Uploads the changed files of a backup over their copy on the server,
+/// creating the folders they need; `sent` learns each file that arrives.
+fn send_backup(
+    r: &mut dyn Remote,
+    base: &str,
+    root: &Path,
+    changed: &[crate::backup::BackupItem],
+    sent: &mut Sent,
+    cancel: &AtomicBool,
+    progress: &mut dyn FnMut(u64, u64),
+) -> Result<(), FsError> {
+    let total: u64 = changed.iter().map(|v| v.size).sum();
+    let mut made = std::collections::HashSet::new();
+    let mut done = 0u64;
+    for v in changed {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(cancelled());
+        }
+        // `rel` starts with the folder's own name, which the target replaces.
+        let inner = v.rel.split_once('/').map_or(v.rel.as_str(), |x| x.1);
+        let rp = join(base, inner);
+        make_dirs(r, rp.rsplit_once('/').map_or(base, |x| x.0), &mut made);
+        // Extended-length paths (`\\?\`) take no forward slashes.
+        let src = root.join(inner.replace('/', std::path::MAIN_SEPARATOR_STR));
+        let mut f = std::io::BufReader::new(std::fs::File::open(crate::fs::paths::extended(&src)).map_err(|e| crate::fs::error::from_io(&e))?);
+        let at = done;
+        r.upload(&rp, &mut f, v.size, cancel, &mut |n| progress(at + n, total))?;
+        done += v.size;
+        sent.insert(v.rel.clone(), (v.size, v.modified));
+    }
+    Ok(())
+}
+
+/// Creates `dir` and the folders above it once per backup; one that is
+/// already there answers with an error, which is fine.
+fn make_dirs(r: &mut dyn Remote, dir: &str, made: &mut std::collections::HashSet<String>) {
+    let mut path = String::new();
+    for part in dir.split('/').filter(|p| !p.is_empty()) {
+        path = format!("{path}/{part}");
+        if made.insert(path.clone()) {
+            let _ = r.mkdir(&path);
+        }
+    }
 }
 
 fn remove_tree(r: &mut dyn Remote, rp: &str, dir: bool) -> Result<(), FsError> {
@@ -1214,7 +1388,7 @@ mod tests {
         assert_eq!(split("::server"), None);
         assert_eq!(parent_of(r"::server\abc\Foto"), Some(r"::server\abc".into()));
         assert_eq!(parent_of(r"::server\abc"), Some("::server".into()));
-        let c = Config { id: "a".into(), name: "".into(), protocol: Protocol::Sftp, host: "h".into(), port: 0, user: "u".into(), path: "/var/www".into(), fingerprint: None, remember: false };
+        let c = Config { id: "a".into(), name: "".into(), protocol: Protocol::Sftp, host: "h".into(), port: 0, user: "u".into(), path: "/var/www".into(), fingerprint: None, remember: false, backup: None };
         assert_eq!(remote_path(&c, "a/b"), "/var/www/a/b");
         assert_eq!(remote_path(&Config { path: "/".into(), ..c }, ""), "/");
     }
@@ -1263,7 +1437,7 @@ mod tests {
     }
 
     fn cfg() -> Config {
-        Config { id: "s".into(), name: "S".into(), protocol: Protocol::Sftp, host: "h".into(), port: 0, user: "u".into(), path: "/home".into(), fingerprint: None, remember: false }
+        Config { id: "s".into(), name: "S".into(), protocol: Protocol::Sftp, host: "h".into(), port: 0, user: "u".into(), path: "/home".into(), fingerprint: None, remember: false, backup: None }
     }
 
     #[test]
@@ -1298,7 +1472,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let s = Servers::load(dir.path().join("server.json"));
         let c = s
-            .put(Config { id: String::new(), name: " NAS ".into(), protocol: Protocol::Sftp, host: "nas.local".into(), port: 22, user: "io".into(), path: "".into(), fingerprint: None, remember: false }, None)
+            .put(Config { id: String::new(), name: " NAS ".into(), protocol: Protocol::Sftp, host: "nas.local".into(), port: 22, user: "io".into(), path: "".into(), fingerprint: None, remember: false, backup: None }, None)
             .unwrap();
         assert_eq!((c.name.as_str(), c.path.as_str()), ("NAS", "/"));
         s.trust(&c.id, "SHA256:abc").unwrap();
@@ -1307,6 +1481,45 @@ mod tests {
         let moved = again.put(Config { host: "altro.local".into(), ..again.all()[0].clone() }, None).unwrap();
         assert_eq!(moved.fingerprint, None);
         assert_eq!(again.list(&format!(r"::server\{}", c.id)).unwrap_err(), FsError::ServerPassword);
+    }
+
+    #[test]
+    fn a_backup_sends_only_what_changed_and_never_renames() {
+        let t = tempfile::tempdir().unwrap();
+        let docs = t.path().join("Documenti");
+        std::fs::create_dir_all(docs.join("Lavoro")).unwrap();
+        std::fs::write(docs.join("a.txt"), b"uno").unwrap();
+        std::fs::write(docs.join("Lavoro").join("b.txt"), b"due").unwrap();
+        let mut r = Fake::default();
+        r.0.insert("/home/copia/a.txt".into(), Some(b"vecchio".to_vec()));
+        let no = AtomicBool::new(false);
+        let mut sent = Sent::new();
+        let all = crate::backup::listing(&docs);
+        send_backup(&mut r, "/home/copia", &docs, &all, &mut sent, &no, &mut |_, _| {}).unwrap();
+        assert_eq!(r.0.get("/home/copia/a.txt").cloned().flatten().unwrap(), b"uno", "replaced in place");
+        assert_eq!(r.0.get("/home/copia/Lavoro/b.txt").cloned().flatten().unwrap(), b"due");
+        assert!(r.0.contains_key("/home/copia/Lavoro"), "folders made on the way");
+        assert_eq!(sent.len(), 2);
+        let again: Vec<_> = crate::backup::listing(&docs).into_iter().filter(|v| sent.get(&v.rel) != Some(&(v.size, v.modified))).collect();
+        assert!(again.is_empty(), "nothing left to send");
+    }
+
+    #[test]
+    fn a_new_backup_folder_starts_over_and_the_target_has_a_name() {
+        let dir = tempfile::tempdir().unwrap();
+        let s = Servers::load(dir.path().join("server.json"));
+        let b = ServerBackup { folder: "C:/Utenti/Documenti".into(), target: " / ".into(), ..Default::default() };
+        let c = s.put(Config { backup: Some(b), ..cfg() }, None).unwrap();
+        assert_eq!(c.backup.as_ref().unwrap().target, "Documenti");
+        std::fs::write(s.sent_file(&c.id), b"{}").unwrap();
+        s.list.lock().unwrap()[0].backup.as_mut().unwrap().last = Some(5);
+        let same = s.put(c.clone(), None).unwrap();
+        assert_eq!(same.backup.as_ref().unwrap().last, Some(5), "history kept");
+        assert!(s.sent_file(&c.id).exists());
+        let moved = ServerBackup { target: "Altro".into(), ..c.backup.clone().unwrap() };
+        s.put(Config { backup: Some(moved), ..c.clone() }, None).unwrap();
+        assert!(!s.sent_file(&c.id).exists(), "a new target sends everything again");
+        assert_eq!(s.due_backups(crate::backup::now()), vec![c.id.clone()]);
     }
 
     /// A kept connection the server has closed.

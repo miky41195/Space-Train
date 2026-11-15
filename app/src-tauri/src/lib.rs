@@ -109,6 +109,7 @@ pub fn run() {
             let lan = lan::Lan::start(app.handle().clone(), data.clone());
             let servers = std::sync::Arc::new(server::Servers::load(data.join("server.json")));
             server::install(servers.clone());
+            server::schedule_backups(app.handle().clone(), servers.clone());
             app.manage(servers);
             // Friends use the same shared folder and the same name as the
             // lan, but travel over the internet, encrypted.
@@ -223,6 +224,7 @@ pub fn run() {
             server::server_trust,
             server::server_password,
             server::server_test,
+            transfer::server_backup,
             transfer::image_convert,
             ipc::entries_for,
             ipc::shortcut_free,

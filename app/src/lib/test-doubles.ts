@@ -220,6 +220,9 @@ export function fakeBackend(over: Partial<Backend> = {}): Backend {
 		async serverTrust() {},
 		async serverPassword() {},
 		async serverTest() {},
+		async serverBackup() {
+			return 'già allineata';
+		},
 		async vaultCreate() {
 			return '';
 		},

@@ -120,6 +120,19 @@ export interface ServerConfig {
 	fingerprint?: string | null;
 	/** The password is kept in the Windows Credential Manager. */
 	remember: boolean;
+	/** A folder of this PC copied to the server once a day. */
+	backup?: ServerBackup | null;
+}
+
+/** Only new or changed files are sent; nothing is deleted on the server. */
+export interface ServerBackup {
+	/** Folder on this PC. */
+	folder: string;
+	/** Folder on the server, under the start folder. */
+	target: string;
+	last?: number | null;
+	attempted?: number | null;
+	outcome?: string | null;
 }
 
 /** What to do when an item with the same name already exists at the destination. */
@@ -444,6 +457,8 @@ export interface Backend {
 	serverPassword(id: string, password: string, remember: boolean): Promise<void>;
 	/** Tries to connect, nothing else. */
 	serverTest(id: string): Promise<void>;
+	/** Runs the server's backup now; answers with what was sent. */
+	serverBackup(opId: number, id: string, onProgress: (p: Progress) => void): Promise<string>;
 	/** Vault: a folder `<name>.cassaforte` encrypted with a password. Create leaves it open. */
 	vaultCreate(parent: string, name: string, password: string): Promise<string>;
 	vaultUnlock(path: string, password: string): Promise<void>;
@@ -597,6 +612,7 @@ export const tauriBackend: Backend = {
 	serverTrust: (id, fingerprint) => invoke('server_trust', { id, fingerprint }),
 	serverPassword: (id, password, remember) => invoke('server_password', { id, password, remember }),
 	serverTest: (id) => invoke('server_test', { id }),
+	serverBackup: (opId, id, onProgress) => invoke('server_backup', { opId, id, onProgress: channel(onProgress) }),
 	vaultCreate: (parent, name, password) => invoke('vault_create', { parent, name, password }),
 	vaultUnlock: (path, password) => invoke('vault_unlock', { path, password }),
 	vaultLock: (path) => invoke('vault_lock', { path }),

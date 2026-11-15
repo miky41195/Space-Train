@@ -9,4 +9,5 @@ export type ProgressMode =
 	| 'trash'
 	| 'delete'
 	| 'duplicates'
-	| 'images';
+	| 'images'
+	| 'backup';

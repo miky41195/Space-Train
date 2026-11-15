@@ -99,7 +99,12 @@ pub fn now() -> i64 {
 
 /// Whether the daily backup is due at `now`.
 pub fn due(b: &Backup, now: i64) -> bool {
-    b.last.is_none_or(|u| now - u >= EVERY) && b.attempted.is_none_or(|t| now - t >= RETRY)
+    due_at(b.last, b.attempted, now)
+}
+
+/// Due when the last success is a day old and the last try ten minutes old.
+pub fn due_at(last: Option<i64>, attempted: Option<i64>, now: i64) -> bool {
+    last.is_none_or(|u| now - u >= EVERY) && attempted.is_none_or(|t| now - t >= RETRY)
 }
 
 /// Every file under `folder`, paths starting with its name. Links and

@@ -136,6 +136,7 @@
 		sameVolume
 	} from '$lib/locations';
 	import { SYSTEM_ROOT, ON_LINUX } from '$lib/platform';
+	import { sentText } from '$lib/server-backup';
 
 	const settings = new SettingsStore();
 	// Like Explorer, every folder remembers how the user sorted it.
@@ -549,6 +550,38 @@
 		if (!tab || store.activeId === null) return;
 		if (tab.failedPath) await store.navigate(store.activeId, tab.failedPath);
 		else await reload();
+	}
+
+	/** Saves the server and runs its backup now, on the transfer bar. */
+	async function backUpServerNow(config: ServerConfig, password: string | null) {
+		const d = serverDialog;
+		if (!d) return;
+		serverDialog = { ...d, busy: true, error: null };
+		let saved: ServerConfig;
+		try {
+			saved = await tauriBackend.serverPut(config, password);
+		} catch (err) {
+			serverDialog = { ...d, busy: false, error: describeError(err) };
+			return;
+		}
+		serverDialog = null;
+		await loadServers();
+		void enqueue(`Backup su ${saved.name}`, async () => {
+			const opId = nextOpId++;
+			runningMode = 'backup';
+			runningOp = opId;
+			progress = { transferred: 0, total: 0 };
+			try {
+				const sent = await tauriBackend.serverBackup(opId, saved.id, (p) => (progress = p));
+				notify(`Backup su «${saved.name}»: ${sentText(sent)}.`);
+			} catch (e) {
+				opError = describeError(e);
+			} finally {
+				runningOp = null;
+				progress = null;
+				await loadServers();
+			}
+		});
 	}
 
 	async function removeServer(id: string) {
@@ -1965,6 +1998,8 @@
 				.catch(() => {});
 
 		void listenHere<Peer[]>('lan-peers', (p) => (lanPeerList = p));
+		// A backup ran (by itself or from another window): outcome and date changed.
+		void listen('server-backup', () => void loadServers()).then((u) => (active ? unmount.push(u) : u()), () => {});
 		void listenHere<EditorMessage>(EDITOR_EVENT, fromEditor);
 		void listenHere<FriendsStatus>('friends', (s) => {
 			friendsState = s;
@@ -4050,6 +4085,8 @@
 			onremove={(id) => void removeServer(id)}
 			ontrust={() => void confirmServerKey()}
 			onpassword={(pw, r) => void submitServerPassword(pw, r)}
+			onpickfolder={(initial) => tauriBackend.pickFolder('Cartella da copiare sul server', initial).catch(() => null)}
+			onbackupnow={(c, pw) => void backUpServerNow(c, pw)}
 			oncancel={() => (serverDialog = null)}
 		/>
 	{/if}
