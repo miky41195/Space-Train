@@ -75,6 +75,7 @@ pub fn write(path: &str, text: &str, crlf: bool, bom: bool, expected: u64, force
         return Err(FsError::Changed);
     }
     let name = p.file_name().ok_or(FsError::NotFound)?.to_string_lossy().into_owned();
+    crate::versions::keep_before(Path::new(path), crate::versions::Reason::Edited);
     let temp = p.with_file_name(format!(".{}.space-train-save", name));
     std::fs::write(&temp, encode(text, crlf, bom)).map_err(|e| from_io(&e))?;
     if let Err(e) = std::fs::rename(&temp, &p) {

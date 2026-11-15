@@ -1,4 +1,6 @@
 <script lang="ts">
+	import type { VersionsOverview } from '../ipc';
+	import { formatBytes } from '../locations';
 	import type { SettingsStore, FolderSizes } from '../stores/settings.svelte';
 	import { TRAIN_PAUSES, DEFAULT_START_PAGE, LAST_FOLDER_START_PAGE } from '../menu';
 	import { ON_LINUX } from '../platform';
@@ -28,7 +30,10 @@
 		ongallery,
 		oneditor,
 		onclose,
-		ontestshortcut = undefined
+		ontestshortcut = undefined,
+		versions = null,
+		onversionlimits = undefined,
+		onunprotect = undefined
 	}: {
 		settings: SettingsStore;
 		/** Hidden items live in the tabs store, not here. */
@@ -51,7 +56,13 @@
 		onclose: () => void;
 		/** Asks Windows whether another program holds a combination (`null` = cannot tell). */
 		ontestshortcut?: (accelerator: string) => Promise<boolean | null>;
+		/** Previous versions: limits, protected folders, space used. */
+		versions?: VersionsOverview | null;
+		onversionlimits?: (days: number, maxBytes: number) => void;
+		onunprotect?: (folder: string) => void;
 	} = $props();
+
+	const GB = 1024 ** 3;
 
 	// ── Custom shortcuts ─────────────────────────────────────────────
 	const ACTIONS: SimpleAction[] = [
@@ -292,6 +303,36 @@
 						)}
 					</span>
 				</div>
+				{#if versions}
+					{@const v = versions}
+					<h4>Versioni precedenti</h4>
+					<label class="item">
+						<span class="text">Tieni le versioni per<small>La più recente di ogni file resta sempre.</small></span>
+						<select value={String(v.days)} onchange={(e) => onversionlimits?.(Number(e.currentTarget.value), v.maxBytes)}>
+							{#each [7, 14, 30, 90, 365] as d (d)}<option value={String(d)}>{d === 365 ? '1 anno' : `${d} giorni`}</option>{/each}
+							{#if ![7, 14, 30, 90, 365].includes(v.days)}<option value={String(v.days)}>{v.days} giorni</option>{/if}
+						</select>
+					</label>
+					<label class="item">
+						<span class="text">Spazio massimo<small>Usati {formatBytes(v.used)}. Oltre il limite vanno via le versioni più vecchie.</small></span>
+						<select value={String(v.maxBytes)} onchange={(e) => onversionlimits?.(v.days, Number(e.currentTarget.value))}>
+							{#each [1, 2, 5, 10, 20, 50] as g (g)}<option value={String(g * GB)}>{g} GB</option>{/each}
+							{#if ![1, 2, 5, 10, 20, 50].some((g) => g * GB === v.maxBytes)}<option value={String(v.maxBytes)}>{formatBytes(v.maxBytes)}</option>{/if}
+						</select>
+					</label>
+					<div class="item column">
+						<span class="text">Cartelle protette<small>Ogni modifica dei file qui dentro, anche da altri programmi, lascia una versione. Si aggiungono col tasto destro su una cartella.</small></span>
+						{#if v.protected.length === 0}
+							<span class="dim">Nessuna.</span>
+						{:else}
+							<ul class="protected-list">
+								{#each v.protected as f (f)}
+									<li><span title={f}>{f}</span><button class="button" onclick={() => onunprotect?.(f)}>Togli</button></li>
+								{/each}
+							</ul>
+						{/if}
+					</div>
+				{/if}
 			{:else if section === 'appearance'}
 				<h3>Aspetto</h3>
 				<div class="item">
@@ -798,5 +839,41 @@
 		.switch::after {
 			transition: none;
 		}
+	}
+	h4 {
+		margin: 18px 0 4px;
+		font-family: var(--font-display);
+		font-size: calc(11px * var(--text-scale, 1));
+		font-weight: 600;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--text-dim);
+	}
+	.item.column {
+		flex-direction: column;
+		align-items: stretch;
+		gap: 8px;
+	}
+	.dim {
+		color: var(--text-dim);
+	}
+	.protected-list {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		display: grid;
+		gap: 4px;
+	}
+	.protected-list li {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+	.protected-list span {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 </style>

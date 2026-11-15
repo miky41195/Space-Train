@@ -38,6 +38,7 @@ describe('menuItems', () => {
 			'compare',
 			'space',
 			'rules',
+			'protectVersions',
 			'terminal',
 			'integratedTerminal',
 			'moreOptions',

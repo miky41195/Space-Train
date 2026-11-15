@@ -124,6 +124,26 @@ export interface ServerConfig {
 	backup?: ServerBackup | null;
 }
 
+export type VersionReason = 'overwritten' | 'edited' | 'restored' | 'changed' | 'protected';
+
+/** A previous content of a file kept by Space Train. */
+export interface Version {
+	id: string;
+	/** When it was kept, ms. */
+	at: number;
+	size: number;
+	modified: number | null;
+	reason: VersionReason;
+}
+
+export interface VersionsOverview {
+	protected: string[];
+	days: number;
+	maxBytes: number;
+	/** Bytes the kept contents take. */
+	used: number;
+}
+
 /** Only new or changed files are sent; nothing is deleted on the server. */
 export interface ServerBackup {
 	/** Folder on this PC. */
@@ -457,6 +477,14 @@ export interface Backend {
 	serverPassword(id: string, password: string, remember: boolean): Promise<void>;
 	/** Tries to connect, nothing else. */
 	serverTest(id: string): Promise<void>;
+	/** Previous versions of a file, newest first, without its current content. */
+	versionsList(path: string): Promise<Version[]>;
+	/** A copy of the version in a temporary folder; answers with its path. */
+	versionExtract(path: string, id: string): Promise<string>;
+	versionRestore(path: string, id: string): Promise<void>;
+	versionsOverview(): Promise<VersionsOverview>;
+	versionsProtect(folder: string, on: boolean): Promise<void>;
+	versionsLimits(days: number, maxBytes: number): Promise<void>;
 	/** Runs the server's backup now; answers with what was sent. */
 	serverBackup(opId: number, id: string, onProgress: (p: Progress) => void): Promise<string>;
 	/** Vault: a folder `<name>.cassaforte` encrypted with a password. Create leaves it open. */
@@ -612,6 +640,12 @@ export const tauriBackend: Backend = {
 	serverTrust: (id, fingerprint) => invoke('server_trust', { id, fingerprint }),
 	serverPassword: (id, password, remember) => invoke('server_password', { id, password, remember }),
 	serverTest: (id) => invoke('server_test', { id }),
+	versionsList: (path) => invoke('versions_list', { path }),
+	versionExtract: (path, id) => invoke('version_extract', { path, id }),
+	versionRestore: (path, id) => invoke('version_restore', { path, id }),
+	versionsOverview: () => invoke('versions_overview'),
+	versionsProtect: (folder, on) => invoke('versions_protect', { folder, on }),
+	versionsLimits: (days, maxBytes) => invoke('versions_limits', { days, maxBytes }),
 	serverBackup: (opId, id, onProgress) => invoke('server_backup', { opId, id, onProgress: channel(onProgress) }),
 	vaultCreate: (parent, name, password) => invoke('vault_create', { parent, name, password }),
 	vaultUnlock: (path, password) => invoke('vault_unlock', { path, password }),

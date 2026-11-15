@@ -144,6 +144,9 @@ pub fn copy_all(
             }
         };
 
+        if policy == ConflictPolicy::Overwrite {
+            crate::versions::keep_overwritten(origin, &arrival);
+        }
         copy_recursive(origin, &arrival, cancel, &mut done, progress)?;
         outcome.copied += 1;
         outcome.pairs.push([source.clone(), paths::display(&arrival)]);
@@ -193,6 +196,7 @@ pub fn move_all(
         };
 
         if policy == ConflictPolicy::Overwrite && paths::extended(&arrival).exists() {
+            crate::versions::keep_overwritten(origin, &arrival);
             remove(&arrival)?;
         }
 

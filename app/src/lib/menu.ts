@@ -1,3 +1,4 @@
+import { canHaveVersions } from './versions';
 import type { Entry, SortKey, SortSpec } from './ipc';
 import { isArchive, isExecutable, nameOf, locationName } from './locations';
 import { SYSTEM_ROOT, WINDOWS_ONLY, ON_LINUX } from './platform';
@@ -61,6 +62,9 @@ export type MenuAction =
 	| 'refresh'
 	| 'restore'
 	| 'emptyTrash'
+	| 'versions'
+	| 'protectVersions'
+	| 'unprotectVersions'
 	| 'folderColor'
 	| 'newMenu'
 	| `send:${string}`
@@ -170,6 +174,14 @@ export interface MenuContext {
 	atStartup?: boolean;
 	/** Folder of the other pane when the dual pane is open: «Confronta» uses it. */
 	otherPane?: string | null;
+	/** The menu's folder is protected: every change of its files leaves a version. */
+	protectedFolder?: boolean;
+}
+
+function protectItem(on: boolean): MenuItem {
+	return on
+		? { action: 'unprotectVersions', label: 'Togli la protezione delle versioni' }
+		: { action: 'protectVersions', label: 'Proteggi le versioni dei file' };
 }
 
 /**
@@ -208,7 +220,8 @@ function backgroundItems({
 	pinned = false,
 	isStartPage = false,
 	atStartup = false,
-	otherPane = null
+	otherPane = null,
+	protectedFolder = false
 }: MenuContext): MenuItem[] {
 	const items: MenuItem[] = [];
 	if (!search) {
@@ -244,6 +257,7 @@ function backgroundItems({
 		items.push(compareItem(otherPane));
 		items.push({ action: 'space', label: 'Analizza spazio' });
 		items.push({ action: 'rules', label: 'Regole automatiche…' });
+		items.push(protectItem(protectedFolder));
 		items.push({ action: 'terminal', label: 'Apri nel terminale' });
 		items.push({ action: 'integratedTerminal', label: 'Apri nel terminale integrato' });
 		items.push({ action: 'moreOptions', label: 'Altre opzioni di Windows', separator: true });
@@ -281,7 +295,8 @@ function selectionItems({
 	pinned = false,
 	isStartPage = false,
 	atStartup = false,
-	otherPane = null
+	otherPane = null,
+	protectedFolder = false
 }: MenuContext): MenuItem[] {
 	const items: MenuItem[] = [];
 	const count = selection.length;
@@ -303,10 +318,12 @@ function selectionItems({
 			items.push(compareItem(otherPane));
 			items.push({ action: 'space', label: 'Analizza spazio' });
 			items.push({ action: 'rules', label: 'Regole automatiche…' });
+			items.push(protectItem(protectedFolder));
 		} else {
 			if (isEditableText(single)) items.push({ action: 'edit', label: 'Modifica' });
 			items.push({ action: 'openWith', label: 'Apri con…' });
 			items.push({ action: 'checksum', label: 'Somma di controllo…' });
+			if (canHaveVersions(single.path)) items.push({ action: 'versions', label: 'Versioni precedenti…' });
 			if (otherPane) items.push({ action: 'compareFileOtherPane', label: 'Confronta con lo stesso file nell’altro pannello' });
 			if (isExecutable(single.name)) {
 				items.push({ action: 'runAsAdmin', label: 'Esegui come amministratore' });

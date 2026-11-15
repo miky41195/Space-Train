@@ -220,6 +220,18 @@ export function fakeBackend(over: Partial<Backend> = {}): Backend {
 		async serverTrust() {},
 		async serverPassword() {},
 		async serverTest() {},
+		async versionsList() {
+			return [];
+		},
+		async versionExtract(path: string) {
+			return path;
+		},
+		async versionRestore() {},
+		async versionsOverview() {
+			return { protected: [], days: 30, maxBytes: 5 * 1024 ** 3, used: 0 };
+		},
+		async versionsProtect() {},
+		async versionsLimits() {},
 		async serverBackup() {
 			return 'già allineata';
 		},

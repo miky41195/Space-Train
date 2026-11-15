@@ -14,7 +14,9 @@
 		type SendRequest,
 		type FriendsStatus,
 		type GitStatus,
-		type ServerConfig
+		type ServerConfig,
+		type Version,
+		type VersionsOverview
 	} from '$lib/ipc';
 	import { TabsStore } from '$lib/stores/tabs.svelte';
 	import TitleBar from '$lib/components/TitleBar.svelte';
@@ -137,6 +139,8 @@
 	} from '$lib/locations';
 	import { SYSTEM_ROOT, ON_LINUX } from '$lib/platform';
 	import { sentText } from '$lib/server-backup';
+	import { protectedFolderOf, versionWhen } from '$lib/versions';
+	import VersionsDialog from '$lib/components/VersionsDialog.svelte';
 
 	const settings = new SettingsStore();
 	// Like Explorer, every folder remembers how the user sorted it.
@@ -898,6 +902,58 @@
 	$effect(() => {
 		if (fileComparison && store.activeTab && !samePath(store.activeTab.path, fileComparison.folder)) fileComparison = null;
 	});
+	// ── Previous versions ────────────────────────────────────────────
+	let versionsOverview = $state<VersionsOverview | null>(null);
+	/** The file whose versions are shown. */
+	let versionsOf = $state<Entry | null>(null);
+	const loadVersions = () =>
+		tauriBackend
+			.versionsOverview()
+			.then((o) => (versionsOverview = o))
+			.catch(() => {});
+	$effect(() => {
+		void loadVersions();
+	});
+	const isProtected = (path: string | null | undefined) => !!path && !!protectedFolderOf(path, versionsOverview?.protected ?? []);
+
+	async function protectVersions(folder: string, on: boolean) {
+		try {
+			await tauriBackend.versionsProtect(folder, on);
+			notify(
+				on
+					? `«${nameOf(folder)}» protetta: Space Train copia i file e da ora tiene ogni loro modifica.`
+					: `«${nameOf(folder)}» non è più protetta. Le versioni già tenute restano finché scadono.`
+			);
+		} catch (e) {
+			opError = describeError(e);
+		}
+		await loadVersions();
+	}
+
+	/** A version as a file in a temporary folder, as an entry for opening or comparing. */
+	async function versionEntry(file: Entry, v: Version): Promise<Entry | null> {
+		try {
+			const tmp = await tauriBackend.versionExtract(file.path, v.id);
+			const [e] = await tauriBackend.entriesFor([tmp]);
+			return e ? { ...e, name: `${file.name} (${versionWhen(v.at)})`, modified: v.modified ?? v.at } : null;
+		} catch (err) {
+			opError = describeError(err);
+			return null;
+		}
+	}
+
+	async function openVersion(file: Entry, v: Version) {
+		const e = await versionEntry(file, v);
+		if (e) await tauriBackend.openEntry(e.path).catch((err) => (opError = describeError(err)));
+	}
+
+	async function compareVersion(file: Entry, v: Version) {
+		const e = await versionEntry(file, v);
+		if (!e) return;
+		versionsOf = null;
+		compareFiles(e, file);
+	}
+
 	function compareFiles(a: Entry, b: Entry) {
 		// The older one on the left, as «before» and «after»; same date: the shorter name (the original, not «(copia)»).
 		const [x, y] = [a, b].sort((p, q) => (p.modified ?? 0) - (q.modified ?? 0) || p.name.length - q.name.length);
@@ -3017,7 +3073,8 @@
 				pinned: quickAccess.has(menuFolder(choices) ?? ''),
 				isStartPage: isStartPageOf(choices),
 				atStartup: isAtStartup(choices),
-				otherPane: otherTab && !isVirtual(otherTab.path) ? otherTab.path : null
+				otherPane: otherTab && !isVirtual(otherTab.path) ? otherTab.path : null,
+				protectedFolder: isProtected(menuFolder(choices))
 			}),
 			x,
 			y
@@ -3339,6 +3396,15 @@
 				case 'checksum':
 					if (choices[0]) checksumOf = choices[0];
 					break;
+				case 'versions':
+					if (choices[0]) versionsOf = choices[0];
+					break;
+				case 'protectVersions':
+				case 'unprotectVersions': {
+					const folder = menuFolder(choices);
+					if (folder) await protectVersions(folder, action === 'protectVersions');
+					break;
+				}
 				case 'cleanup':
 					if (choices[0]) await openCleanup(choices[0].path);
 					break;
@@ -4038,6 +4104,13 @@
 				void openEditor();
 			}}
 			onclose={() => (settingsOpen = false)}
+			versions={versionsOverview}
+			onversionlimits={(days, max) =>
+				void tauriBackend
+					.versionsLimits(days, max)
+					.catch((e) => (opError = describeError(e)))
+					.then(loadVersions)}
+			onunprotect={(f) => void protectVersions(f, false)}
 		/>
 	{/if}
 
@@ -4073,6 +4146,25 @@
 				conflicts = [];
 				pendingConflicts = null;
 			}}
+		/>
+	{/if}
+
+	{#if versionsOf}
+		{@const file = versionsOf}
+		<VersionsDialog
+			backend={tauriBackend}
+			path={file.path}
+			size={file.size}
+			protectedFolder={protectedFolderOf(file.path, versionsOverview?.protected ?? [])}
+			onopen={(v) => void openVersion(file, v)}
+			oncompare={(v) => void compareVersion(file, v)}
+			onrestored={() => {
+				versionsOf = null;
+				notify(`«${file.name}» ripristinato. La versione di prima resta fra le versioni.`);
+				void reload();
+			}}
+			onprotect={() => void protectVersions(folderOf(file.path), true)}
+			onclose={() => (versionsOf = null)}
 		/>
 	{/if}
 
