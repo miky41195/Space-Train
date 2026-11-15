@@ -104,7 +104,7 @@ export function describeCondition(c: Condition): string {
 		case 'name':
 			return t('il nome contiene «{0}»', [c.text]);
 		case 'olderThan':
-			return t('è più vecchio di {0} {1}', [c.days, c.days === 1 ? 'giorno' : 'giorni']);
+			return t('è più vecchio di {0} {1}', [c.days, c.days === 1 ? t('giorno') : t('giorni')]);
 		case 'largerThan':
 			return t('è più grande di {0} MB', [c.mb]);
 	}

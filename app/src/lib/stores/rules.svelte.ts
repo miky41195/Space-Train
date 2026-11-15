@@ -1,4 +1,4 @@
-import { t } from '../i18n';
+import { t, tr } from '../i18n';
 import type { Backend, Entry } from '../ipc';
 import { nameOf } from '../locations';
 import { dayStart, matches, problem, samePath, settled, type Rule } from '../rules';
@@ -169,7 +169,7 @@ export class RulesStore {
 					}));
 			this.#push(r.folder, text, undo ?? null);
 		} catch (err) {
-			const msg = (err as { message?: string })?.message ?? String(err);
+			const msg = tr((err as { message?: string })?.message ?? String(err));
 			this.#push(r.folder, t('{0}: non riuscito ({1})', [f.name, msg]), null, true);
 		}
 	}

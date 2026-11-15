@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { t } from '../i18n';
+	import { t, tr } from '../i18n';
 	import type { Backend, Drive, KnownFolder, Peer, FriendsStatus, LanStatus } from '../ipc';
 	import type { TabsStore } from '../stores/tabs.svelte';
 	import Icon from './Icon.svelte';
@@ -404,9 +404,9 @@
 				data-folder={d.path}
 				onclick={() => go(d.path)}
 				oncontextmenu={menuOn(d.path, 'drive')}
-				title={d.free !== null && d.total ? t('{0} liberi di {1}', [formatBytes(d.free), formatBytes(d.total)]) : d.label}
+				title={d.free !== null && d.total ? t('{0} liberi di {1}', [formatBytes(d.free), formatBytes(d.total)]) : tr(d.label)}
 			>
-				<span class="label">{d.label}</span>
+				<span class="label">{tr(d.label)}</span>
 				{#if used !== null && d.free !== null}
 					<span class="fill" class:full={used > 0.9}>
 						<span style:width="{Math.round(used * 100)}%"></span>

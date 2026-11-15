@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { t } from '../i18n';
+	import { t, tr } from '../i18n';
 	import type { Backend, Entry } from '../ipc';
 
 	/**
@@ -35,7 +35,7 @@
 			.then((v) => {
 				if (v !== null) value = v;
 			})
-			.catch((e) => (error = e?.message ?? String(e)));
+			.catch((e) => (error = tr(e?.message ?? String(e))));
 		return () => void backend.cancelTransfer(opId);
 	});
 

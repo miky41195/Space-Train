@@ -477,7 +477,7 @@ function bevelPolygon(n: number): string {
 /** Carves the corners inwards, like the cartouches of maps. */
 function notchMask(n: number, topOnly = false): string {
 	const corner = (x: string, y: string) =>
-		t('radial-gradient(circle at {0} {1}, #0000 {2}, #000 {3}) {4} {5} / 51% {6} no-repeat', [x, y, px(n), px(n + 0.5), x, y, topOnly ? '100%' : '51%']);
+		`radial-gradient(circle at ${x} ${y}, #0000 ${px(n)}, #000 ${px(n + 0.5)}) ${x} ${y} / 51% ${topOnly ? '100%' : '51%'} no-repeat`;
 	const top = [corner('0', '0'), corner('100%', '0')];
 	return (topOnly ? top : [...top, corner('0', '100%'), corner('100%', '100%')]).join(', ');
 }

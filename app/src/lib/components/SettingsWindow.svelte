@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { t } from '../i18n';
+	import { t, languageChoice, setLanguage, type LanguageChoice } from '../i18n';
 	import type { VersionsOverview } from '../ipc';
 	import { formatBytes } from '../locations';
 	import type { SettingsStore, FolderSizes } from '../stores/settings.svelte';
@@ -209,6 +209,14 @@
 						{#if !START_PAGES.some((i) => i.value === settings.startPage)}
 							<option value={settings.startPage}>{settings.startPage}</option>
 						{/if}
+					</select>
+				</label>
+				<label class="item">
+					<span class="text">{t('Lingua')}<small>{t('Le finestre si ricaricano, le schede restano.')}</small></span>
+					<select value={languageChoice} onchange={(e) => setLanguage(e.currentTarget.value as LanguageChoice)}>
+						<option value="auto">{t('Come Windows')}</option>
+						<option value="it">Italiano</option>
+						<option value="en">English</option>
 					</select>
 				</label>
 				<div class="item">

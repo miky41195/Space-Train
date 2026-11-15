@@ -158,7 +158,7 @@
 <div class="cleanup">
 	<div class="band" role="status">
 		<span><b>{formatBytes(toDo.bytes)}</b> {t('scelti su')} <b>{formatBytes(total)}</b> {t('trovati')}</span>
-		{#if running > 0}<span class="weighing">{t('pesando {0} {1}…', [running, running === 1 ? 'categoria' : 'categorie'])}</span>{/if}
+		{#if running > 0}<span class="weighing">{t('pesando {0} {1}…', [running, running === 1 ? t('categoria') : t('categorie')])}</span>{/if}
 		<span class="spacer"></span>
 		<button onclick={onclose}>{t('Chiudi')}</button>
 		<button class="primary" disabled={toDo.bytes === 0 || freeing} onclick={() => (confirming = true)}> {t('Libera {0}', [formatBytes(toDo.bytes)])} </button>
@@ -262,7 +262,7 @@
 			{/if}
 			{#if toDo.trash.length + toDo.asAdmin.length > 0}
 				{@const n = toDo.trash.length + toDo.asAdmin.length}
-				<p><b>{n}</b> {t('da guardare: {0} nel Cestino.', [n === 1 ? 'va' : 'vanno'])}</p>
+				<p><b>{n}</b> {t('da guardare: {0} nel Cestino.', [n === 1 ? t('va') : t('vanno')])}</p>
 			{/if}
 			{#if toDo.asAdmin.length > 0}<p>{t('Per i resti di programmi Windows chiederà il permesso di amministratore.')}</p>{/if}
 			{#if toDo.emptyTrash}<p>{t('Il Cestino si svuota.')}</p>{/if}

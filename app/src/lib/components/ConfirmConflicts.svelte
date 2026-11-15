@@ -38,7 +38,7 @@
 	<div class="dialog" role="dialog" aria-modal="true" aria-label={t('Conflitto di nomi')}>
 		<h2>{title}</h2>
 
-		<p> {t('Stai {0} elementi con nomi già presenti nella cartella di destinazione. La scelta vale per tutti.', [mode === 'move' ? 'spostando' : 'copiando'])} </p>
+		<p> {t('Stai {0} elementi con nomi già presenti nella cartella di destinazione. La scelta vale per tutti.', [mode === 'move' ? t('spostando') : t('copiando')])} </p>
 
 		{#if names.length > 1}
 			<ul>

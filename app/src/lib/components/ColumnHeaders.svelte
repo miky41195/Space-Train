@@ -80,7 +80,7 @@
 			onclick={() => onsortmedia?.(c.key)}
 			aria-label={!active
 				? t('Ordina per {0}', [c.label.toLowerCase()])
-				: t('{0}, ordine {1}. Premi per invertire', [c.label, mediaSort?.ascending ? 'crescente' : 'decrescente'])}
+				: t('{0}, ordine {1}. Premi per invertire', [c.label, mediaSort?.ascending ? t('crescente') : t('decrescente')])}
 		>
 			<span class="text">{c.label}</span>
 			{#if active}

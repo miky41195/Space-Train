@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { t } from '$lib/i18n';
+	import { t, tr, RESUME_KEY } from '$lib/i18n';
 	import { invoke } from '@tauri-apps/api/core';
 	import { tick, untrack } from 'svelte';
 	import { listen } from '@tauri-apps/api/event';
@@ -1299,7 +1299,7 @@
 	/** Backend errors arrive as FsError, not as Error. */
 	function describeError(e: unknown): string {
 		const err = e as FsError;
-		if (err?.kind === 'io') return err.message;
+		if (err?.kind === 'io') return tr(err.message);
 		return errorMessage(err ?? null) || t('Operazione non riuscita.');
 	}
 
@@ -2700,6 +2700,16 @@
 
 	/** The open tabs, to pick them up again at the next startup. */
 	const SESSION_KEY = 'space-train.sessione';
+	/** Reloaded for a new language: the tabs come back even without «resume». */
+	const resumeAfterLanguage = (() => {
+		try {
+			const v = sessionStorage.getItem(RESUME_KEY) === '1';
+			sessionStorage.removeItem(RESUME_KEY);
+			return v;
+		} catch {
+			return false;
+		}
+	})();
 
 	interface Session {
 		tabs: string[];
@@ -2740,7 +2750,8 @@
 	 * skipped; if nothing is left, the start page.
 	 */
 	async function initialTabs(): Promise<Session> {
-		const saved = settings.session ? savedSession() : null;
+		// The saved session is the main window's: another window keeps its own start.
+		const saved = settings.session || (resumeAfterLanguage && windowLabel === 'main') ? savedSession() : null;
 		const candidate = [...(saved?.tabs ?? [])];
 		for (const c of settings.startupFolders) {
 			if (!candidate.some((p) => samePath(p, c))) candidate.push(c);
@@ -3644,7 +3655,7 @@
 			case 'deviceNotReady':
 				return t('Unità non pronta. Controlla che il supporto sia inserito.');
 			case 'io':
-				return err.message;
+				return tr(err.message);
 			case 'serverKey':
 				return err.changed ? t('La chiave del server è cambiata: Space Train non si collega.') : t('Conferma la chiave del server per collegarti.');
 			case 'serverPassword':

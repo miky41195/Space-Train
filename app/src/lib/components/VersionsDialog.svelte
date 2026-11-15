@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { t } from '../i18n';
+	import { t, tr } from '../i18n';
 	import type { Backend, Version } from '../ipc';
 	import { formatBytes, nameOf } from '../locations';
 	import { REASON_TEXT, versionWhen } from '../versions';
@@ -55,7 +55,7 @@
 			await backend.versionRestore(path, selected.id);
 			onrestored();
 		} catch (e) {
-			error = (e as { message?: string })?.message ?? t('Ripristino non riuscito.');
+			error = tr((e as { message?: string })?.message ?? t('Ripristino non riuscito.'));
 			busy = false;
 			asking = false;
 		}
