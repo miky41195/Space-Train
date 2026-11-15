@@ -197,26 +197,60 @@ pub fn move_all(
 
         if policy == ConflictPolicy::Overwrite && paths::extended(&arrival).exists() {
             crate::versions::keep_overwritten(origin, &arrival);
-            remove(&arrival)?;
         }
-
-        match std::fs::rename(paths::extended(origin), paths::extended(&arrival)) {
-            Ok(()) => {
-                done += weight(&arrival);
-                progress(done);
-            }
-            Err(_) => {
-                // Different volumes: rename cannot cross them.
-                copy_recursive(origin, &arrival, cancel, &mut done, progress)?;
-                remove(origin)?;
-            }
-        }
+        move_one(origin, &arrival, cancel, &mut done, progress)?;
 
         outcome.copied += 1;
         outcome.pairs.push([source.clone(), paths::display(&arrival)]);
     }
 
     Ok(outcome)
+}
+
+/// Moves `origin` to `arrival`, replacing what is there. Two folders merge,
+/// as with copying: files only at the destination stay, same-named files
+/// are replaced.
+fn move_one(
+    origin: &Path,
+    arrival: &Path,
+    cancel: &AtomicBool,
+    done: &mut u64,
+    progress: &mut dyn FnMut(u64),
+) -> Result<(), FsError> {
+    if crate::fs::pause::stopped(cancel) {
+        return Ok(());
+    }
+
+    let both_folders = paths::extended(origin).is_dir() && paths::extended(arrival).is_dir();
+    let link = std::fs::symlink_metadata(paths::extended(origin)).map(|m| m.is_symlink()).unwrap_or(false);
+    if both_folders && !link {
+        let items = std::fs::read_dir(paths::extended(origin)).map_err(|e| from_io(&e))?;
+        for item in items.filter_map(|v| v.ok()) {
+            move_one(&item.path(), &arrival.join(item.file_name()), cancel, done, progress)?;
+        }
+        // Not empty only when stopped halfway: what is left stays at the origin.
+        if !crate::fs::pause::stopped(cancel) {
+            std::fs::remove_dir(paths::extended(origin)).map_err(|e| from_io(&e))?;
+        }
+        return Ok(());
+    }
+
+    if paths::extended(arrival).exists() {
+        remove(arrival)?;
+    }
+
+    match std::fs::rename(paths::extended(origin), paths::extended(arrival)) {
+        Ok(()) => {
+            *done += weight(arrival);
+            progress(*done);
+        }
+        Err(_) => {
+            // Different volumes: rename cannot cross them.
+            copy_recursive(origin, arrival, cancel, done, progress)?;
+            remove(origin)?;
+        }
+    }
+    Ok(())
 }
 
 /// Arrival path according to the policy. `None` means "skip this one".
@@ -474,6 +508,37 @@ mod tests {
             fs::read_to_string(dest.path().join("a.txt")).unwrap(),
             "vecchio"
         );
+    }
+
+    #[test]
+    fn moving_over_a_folder_merges_it() {
+        let origin = tempdir().unwrap();
+        let dest = tempdir().unwrap();
+        let src = origin.path().join("foto");
+        let old = dest.path().join("foto");
+        fs::create_dir_all(src.join("sub")).unwrap();
+        fs::create_dir_all(old.join("sub")).unwrap();
+        fs::write(src.join("a.txt"), b"nuovo").unwrap();
+        fs::write(src.join("sub").join("b.txt"), b"nuovo").unwrap();
+        fs::write(old.join("a.txt"), b"vecchio").unwrap();
+        fs::write(old.join("solo.txt"), b"resta").unwrap();
+        fs::write(old.join("sub").join("c.txt"), b"resta").unwrap();
+
+        let sources = vec![src.to_string_lossy().into_owned()];
+        move_all(
+            &sources,
+            &dest.path().to_string_lossy(),
+            ConflictPolicy::Overwrite,
+            &never(),
+            &mut silent(),
+        )
+        .unwrap();
+
+        assert!(!src.exists());
+        assert_eq!(fs::read_to_string(old.join("a.txt")).unwrap(), "nuovo");
+        assert_eq!(fs::read_to_string(old.join("sub").join("b.txt")).unwrap(), "nuovo");
+        assert_eq!(fs::read_to_string(old.join("solo.txt")).unwrap(), "resta");
+        assert_eq!(fs::read_to_string(old.join("sub").join("c.txt")).unwrap(), "resta");
     }
 
     #[test]
