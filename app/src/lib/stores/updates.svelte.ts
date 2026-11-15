@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 /**
  * Automatic updates from the GitHub releases.
  *
@@ -74,7 +75,7 @@ export class UpdatesStore {
 			await this.source.relaunch();
 		} catch {
 			this.state = 'ready';
-			throw new Error('Aggiornamento non installato: riprova più tardi.');
+			throw new Error(t('Aggiornamento non installato: riprova più tardi.'));
 		}
 	}
 

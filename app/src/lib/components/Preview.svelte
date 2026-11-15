@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import { convertFileSrc } from '@tauri-apps/api/core';
 	import type { Backend, Entry, MediaProps } from '../ipc';
 	import { mediaLines } from '../media';
@@ -108,10 +109,10 @@
 	}
 </script>
 
-<aside class="preview" aria-label="Anteprima">
+<aside class="preview" aria-label={t('Anteprima')}>
 	{#if !item}
 		<p class="empty">
-			{count > 1 ? `${count} elementi selezionati` : 'Seleziona un file per vederne l’anteprima.'}
+			{count > 1 ? t('{0} elementi selezionati', [count]) : t('Seleziona un file per vederne l’anteprima.')}
 		</p>
 	{:else}
 		<div class="screen">
@@ -164,7 +165,7 @@
 				</div>
 			{:else if mode === 'archive' && archiveContents}
 				<div class="archive">
-					<p class="count">{archiveContents.total} file nell’archivio</p>
+					<p class="count">{t('{0} file nell’archivio', [archiveContents.total])}</p>
 					<ul>
 						{#each archiveContents.items.slice(0, 40) as v (v.path)}
 							<li class:folder={v.kind === 'dir'}><span>{v.name}</span>{#if v.kind !== 'dir'}<span class="weight">{formatBytes(v.size)}</span>{/if}</li>
@@ -172,41 +173,41 @@
 					</ul>
 				</div>
 			{:else if readsText && loading}
-				<p class="empty">Lettura…</p>
+				<p class="empty">{t('Lettura…')}</p>
 			{:else}
-				<p class="empty">Nessuna anteprima disponibile.</p>
+				<p class="empty">{t('Nessuna anteprima disponibile.')}</p>
 			{/if}
 		</div>
 
 		{#if RICH.has(mode) && text !== null}
-			<label class="plain"><input type="checkbox" bind:checked={plain} /> Testo semplice</label>
+			<label class="plain"><input type="checkbox" bind:checked={plain} /> {t('Testo semplice')}</label>
 		{/if}
 		<dl class="card">
-			<dt>Nome</dt>
+			<dt>{t('Nome')}</dt>
 			<dd title={item.name}>{item.name}</dd>
-			<dt>Tipo</dt>
+			<dt>{t('Tipo')}</dt>
 			<dd>{describeType(item)}</dd>
 			{#if item.kind !== 'dir'}
-				<dt>Dimensione</dt>
+				<dt>{t('Dimensione')}</dt>
 				<dd>{formatBytes(item.size)}</dd>
 			{/if}
 			{#if item.total !== undefined && item.free !== undefined}
-				<dt>Spazio</dt>
-				<dd>{formatBytes(item.free)} liberi di {formatBytes(item.total)}</dd>
+				<dt>{t('Spazio')}</dt>
+				<dd>{t('{0} liberi di {1}', [formatBytes(item.free), formatBytes(item.total)])}</dd>
 			{/if}
-			<dt>{item.origin ? 'Eliminato' : 'Modificato'}</dt>
+			<dt>{item.origin ? t('Eliminato') : t('Modificato')}</dt>
 			<dd>{formatDate(item.modified)}</dd>
 			{#each mediaLines(media) as [k, v] (k)}
 				<dt>{k}</dt>
 				<dd title={v}>{v}</dd>
 			{/each}
 			{#if item.origin}
-				<dt>Posizione originale</dt>
+				<dt>{t('Posizione originale')}</dt>
 				<dd title={item.origin}>{item.origin}</dd>
 			{/if}
 			{#if count > 1}
-				<dt>Selezione</dt>
-				<dd>{count} elementi</dd>
+				<dt>{t('Selezione')}</dt>
+				<dd>{t('{0} elementi', [count])}</dd>
 			{/if}
 		</dl>
 	{/if}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import { getCurrentWindow } from '@tauri-apps/api/window';
 	import type { TabsStore } from '../stores/tabs.svelte';
 	import { NEW_TAB, isVirtual, locationName } from '../locations';
@@ -41,7 +42,7 @@
 <svelte:window onfocus={() => (active = true)} onblur={() => (active = false)} />
 
 <header class="titlebar" data-tauri-drag-region class:inactive={!active}>
-	<span class="wordmark" data-tauri-drag-region>Space Train</span>
+	<span class="wordmark" data-tauri-drag-region>{t('Space Train')}</span>
 
 	<!-- The free space between the tabs, where the train passes, moves the
 	     window like the wordmark: Tauri reacts only if the click lands
@@ -53,10 +54,10 @@
 			class="area"
 			class:empty={area === null}
 			onclick={onareas}
-			title="Aree di lavoro"
-			aria-label={area === null ? 'Aree di lavoro' : `Area di lavoro: ${area}`}
+			title={t('Aree di lavoro')}
+			aria-label={area === null ? t('Aree di lavoro') : t('Area di lavoro: {0}', [area])}
 			aria-haspopup="menu"
-			><span class="area-name">{area ?? 'Aree'}</span><svg viewBox="0 0 10 10" width="9" height="9" aria-hidden="true"
+			><span class="area-name">{area ?? t('Aree')}</span><svg viewBox="0 0 10 10" width="9" height="9" aria-hidden="true"
 				><path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4" /></svg
 			></button
 		>
@@ -93,8 +94,8 @@
 		<button
 			class="new"
 			onclick={() => store.openTab(store.activeTab?.path ?? SYSTEM_ROOT)}
-			title="Nuova scheda (Ctrl+T)"
-			aria-label="Nuova scheda"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.5" /></svg></button
+			title={t('Nuova scheda (Ctrl+T)')}
+			aria-label={t('Nuova scheda')}><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.5" /></svg></button
 		>
 	</div>
 
@@ -103,7 +104,7 @@
 		     they are buttons, not signals. -->
 		<div class="tools">
 			{#if onwhatsnew}
-				<button class="tool" onclick={onwhatsnew} title="Novità di questa versione" aria-label="Novità di questa versione">
+				<button class="tool" onclick={onwhatsnew} title={t('Novità di questa versione')} aria-label={t('Novità di questa versione')}>
 					<svg viewBox="0 0 16 16" aria-hidden="true"
 						><path d="M2 6.5v3h2.2L10 13V3L4.2 6.5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" /><path
 							d="M12.3 5.6a3.3 3.3 0 0 1 0 4.8M4.6 9.6l.9 4"
@@ -116,7 +117,7 @@
 				</button>
 			{/if}
 			{#if onsettings}
-				<button class="tool" onclick={onsettings} title="Impostazioni" aria-label="Impostazioni">
+				<button class="tool" onclick={onsettings} title={t('Impostazioni')} aria-label={t('Impostazioni')}>
 					<svg viewBox="0 0 16 16" aria-hidden="true"
 						><circle cx="8" cy="8" r="2.6" fill="none" stroke="currentColor" stroke-width="1.4" /><path
 							d="M6.8 1.5h2.4l.4 1.8 1.2.7 1.8-.6 1.2 2.1-1.4 1.2v1.4l1.4 1.2-1.2 2.1-1.8-.6-1.2.7-.4 1.8H6.8l-.4-1.8-1.2-.7-1.8.6-1.2-2.1 1.4-1.2V7.3L2.2 6.1l1.2-2.1 1.8.6 1.2-.7z"
@@ -134,12 +135,12 @@
 	<!-- On the right, as on Windows: close stays last, in the corner the
 	     hand looks for. The position changes, not the treatment. -->
 	<div class="lamps">
-		<button class="lamp minimize" onclick={() => win.minimize()} aria-label="Riduci a icona">
+		<button class="lamp minimize" onclick={() => win.minimize()} aria-label={t('Riduci a icona')}>
 			<svg viewBox="0 0 8 8" aria-hidden="true"
 				><path d="M2 4 L6 4" stroke="currentColor" stroke-width="1.4" /></svg
 			>
 		</button>
-		<button class="lamp maximize" onclick={() => win.toggleMaximize()} aria-label="Ingrandisci">
+		<button class="lamp maximize" onclick={() => win.toggleMaximize()} aria-label={t('Ingrandisci')}>
 			<svg viewBox="0 0 8 8" aria-hidden="true"
 				><path
 					d="M2.5 5.5 L2.5 2.5 L5.5 2.5 M5.5 2.5 L2.5 5.5"
@@ -149,7 +150,7 @@
 				/></svg
 			>
 		</button>
-		<button class="lamp close" onclick={() => win.close()} aria-label="Chiudi">
+		<button class="lamp close" onclick={() => win.close()} aria-label={t('Chiudi')}>
 			<svg viewBox="0 0 8 8" aria-hidden="true"
 				><path d="M2 2 L6 6 M6 2 L2 6" stroke="currentColor" stroke-width="1.4" /></svg
 			>

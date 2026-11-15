@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '$lib/i18n';
 	import { invoke } from '@tauri-apps/api/core';
 	import { tick, untrack } from 'svelte';
 	import { listen } from '@tauri-apps/api/event';
@@ -239,7 +240,7 @@
 		if (m.kind === 'save') {
 			settings.saveTheme(m.theme);
 			settings.set('theme', m.theme.id);
-			notify(`Tema «${m.theme.name}» salvato.`);
+			notify(t('Tema «{0}» salvato.', [m.theme.name]));
 		} else if (m.kind === 'delete') {
 			settings.deleteTheme(m.id);
 		}
@@ -333,34 +334,34 @@
 		}
 		const here = store.activeTab && location === 'normal' ? store.activeTab.path : null;
 		if (here) {
-			out.push({ kind: 'action', name: 'Analizza spazio', detail: locationName(here), run: () => void analyzeSpace(here) });
-			out.push({ kind: 'action', name: 'Trova duplicati qui', detail: locationName(here), run: () => store.activeId !== null && void store.findDuplicates(store.activeId, store.showHidden) });
-			out.push({ kind: 'action', name: 'Confronta con un’altra cartella', run: () => void compareWith(here) });
+			out.push({ kind: 'action', name: t('Analizza spazio'), detail: locationName(here), run: () => void analyzeSpace(here) });
+			out.push({ kind: 'action', name: t('Trova duplicati qui'), detail: locationName(here), run: () => store.activeId !== null && void store.findDuplicates(store.activeId, store.showHidden) });
+			out.push({ kind: 'action', name: t('Confronta con un’altra cartella'), run: () => void compareWith(here) });
 		}
 		const drive = here && /^[a-z]:\\/i.test(here) ? here.slice(0, 3) : SYSTEM_ROOT;
-		out.push({ kind: 'action', name: 'Pulizia disco', detail: drive, run: () => void openCleanup(drive) });
-		out.push({ kind: 'action', name: 'Impostazioni', run: () => (settingsOpen = true) });
-		out.push({ kind: 'action', name: 'Editor dei temi', run: () => void openEditor() });
-		out.push({ kind: 'action', name: 'Guida di benvenuto', run: () => (welcomeOpen = true) });
+		out.push({ kind: 'action', name: t('Pulizia disco'), detail: drive, run: () => void openCleanup(drive) });
+		out.push({ kind: 'action', name: t('Impostazioni'), run: () => (settingsOpen = true) });
+		out.push({ kind: 'action', name: t('Editor dei temi'), run: () => void openEditor() });
+		out.push({ kind: 'action', name: t('Guida di benvenuto'), run: () => (welcomeOpen = true) });
 		const go = (path: string) => () => store.activeId !== null && void store.navigate(store.activeId, path);
 		for (const p of quickAccess.folders) out.push({ kind: 'folder', name: nameOf(p), detail: p, run: go(p) });
 		for (const f of knownFolders) out.push({ kind: 'folder', name: f.label, detail: f.path, run: go(f.path) });
 		for (const r of [...READY_SEARCHES, ...searches.items]) out.push({ kind: 'search', name: r.name, run: () => void openSavedSearch(r) });
-		for (const t of [...THEMES, ...settings.personalThemes]) {
-			out.push({ kind: 'theme', name: t.name, detail: t.id === settings.theme ? 'in uso' : undefined, run: () => settings.set('theme', t.id) });
+		for (const theme of [...THEMES, ...settings.personalThemes]) {
+			out.push({ kind: 'theme', name: theme.name, detail: theme.id === settings.theme ? t('in uso') : undefined, run: () => settings.set('theme', theme.id) });
 		}
 		const toggles: Array<[string, 'extensions' | 'compact' | 'preview' | 'singleClick' | 'confirmTrash' | 'introAnimation']> = [
-			['Mostra le estensioni dei file', 'extensions'],
-			['Vista compatta', 'compact'],
-			['Riquadro di anteprima', 'preview'],
-			['Apri con un clic', 'singleClick'],
-			['Conferma prima del Cestino', 'confirmTrash'],
-			['Animazione all’avvio', 'introAnimation']
+			[t('Mostra le estensioni dei file'), 'extensions'],
+			[t('Vista compatta'), 'compact'],
+			[t('Riquadro di anteprima'), 'preview'],
+			[t('Apri con un clic'), 'singleClick'],
+			[t('Conferma prima del Cestino'), 'confirmTrash'],
+			[t('Animazione all’avvio'), 'introAnimation']
 		];
 		for (const [name, key] of toggles) {
 			out.push({ kind: 'setting', name, detail: settings[key] ? 'attivo' : 'spento', run: () => settings.set(key, !settings[key]) });
 		}
-		out.push({ kind: 'setting', name: 'Mostra i file nascosti', detail: store.showHidden ? 'attivo' : 'spento', run: () => void store.setShowHidden(!store.showHidden) });
+		out.push({ kind: 'setting', name: t('Mostra i file nascosti'), detail: store.showHidden ? 'attivo' : 'spento', run: () => void store.setShowHidden(!store.showHidden) });
 		return out;
 	}
 
@@ -421,7 +422,7 @@
 			workspaceName = null;
 		} else if (workspaces.current !== null) {
 			if (workspaces.rename(workspaces.current, name)) workspaceName = null;
-			else workspaceName = { mode: 'rename', error: `Esiste già un'area «${name}».` };
+			else workspaceName = { mode: 'rename', error: t('Esiste già un\'area «{0}».', [name]) };
 		}
 	}
 
@@ -570,14 +571,14 @@
 		}
 		serverDialog = null;
 		await loadServers();
-		void enqueue(`Backup su ${saved.name}`, async () => {
+		void enqueue(t('Backup su {0}', [saved.name]), async () => {
 			const opId = nextOpId++;
 			runningMode = 'backup';
 			runningOp = opId;
 			progress = { transferred: 0, total: 0 };
 			try {
 				const sent = await tauriBackend.serverBackup(opId, saved.id, (p) => (progress = p));
-				notify(`Backup su «${saved.name}»: ${sentText(sent)}.`);
+				notify(t('Backup su «{0}»: {1}.', [saved.name, sentText(sent)]));
 			} catch (e) {
 				opError = describeError(e);
 			} finally {
@@ -615,7 +616,7 @@
 			await retryServer();
 		} catch (err) {
 			const e = err as FsError;
-			serverDialog = { ...d, busy: false, error: e?.kind === 'serverPassword' ? 'Password sbagliata.' : describeError(err) };
+			serverDialog = { ...d, busy: false, error: e?.kind === 'serverPassword' ? t('Password sbagliata.') : describeError(err) };
 		}
 	}
 
@@ -717,7 +718,7 @@
 		const arc = store.activeTab?.archive;
 		if (!arc?.vault || paths.length === 0) return;
 		if (paths.some((p) => isLan(p))) {
-			opError = 'Prima scarica i file dall’altro PC, poi mettili nella cassaforte.';
+			opError = t('Prima scarica i file dall’altro PC, poi mettili nella cassaforte.');
 			return;
 		}
 		vaultDialog = { mode: 'add', path: arc.file, sources: paths, error: null, busy: false };
@@ -921,8 +922,8 @@
 			await tauriBackend.versionsProtect(folder, on);
 			notify(
 				on
-					? `«${nameOf(folder)}» protetta: Space Train copia i file e da ora tiene ogni loro modifica.`
-					: `«${nameOf(folder)}» non è più protetta. Le versioni già tenute restano finché scadono.`
+					? t('«{0}» protetta: Space Train copia i file e da ora tiene ogni loro modifica.', [nameOf(folder)])
+					: t('«{0}» non è più protetta. Le versioni già tenute restano finché scadono.', [nameOf(folder)])
 			);
 		} catch (e) {
 			opError = describeError(e);
@@ -935,7 +936,7 @@
 		try {
 			const tmp = await tauriBackend.versionExtract(file.path, v.id);
 			const [e] = await tauriBackend.entriesFor([tmp]);
-			return e ? { ...e, name: `${file.name} (${versionWhen(v.at)})`, modified: v.modified ?? v.at } : null;
+			return e ? { ...e, name: t('{0} ({1})', [file.name, versionWhen(v.at)]), modified: v.modified ?? v.at } : null;
 		} catch (err) {
 			opError = describeError(err);
 			return null;
@@ -1064,7 +1065,7 @@
 		if (p.asAdmin.length > 0) await tauriBackend.cleanupRecycleLeftovers(p.asAdmin).catch((e) => (opError = describeError(e)));
 		drivesRefresh++;
 		const after = await freeOn(drive);
-		if (before !== null && after !== null) notify(`Liberati ${formatBytes(Math.max(0, after - before))} su ${locationName(drive)}.`);
+		if (before !== null && after !== null) notify(t('Liberati {0} su {1}.', [formatBytes(Math.max(0, after - before)), locationName(drive)]));
 	}
 
 	// ── Folder growth ──
@@ -1237,13 +1238,13 @@
 		if (!tab) return;
 		const text = tab.query.trim();
 		searches.save({
-			name: `${describeSearch(text, filters)} in ${locationName(tab.path)}`,
+			name: t('{0} in {1}', [describeSearch(text, filters), locationName(tab.path)]),
 			folder: tab.path,
 			text,
 			content: contentSearch,
 			filters: { ...filters }
 		});
-		notify('Ricerca salvata nella barra laterale.');
+		notify(t('Ricerca salvata nella barra laterale.'));
 	}
 
 	function toggleRecursive() {
@@ -1299,7 +1300,7 @@
 	function describeError(e: unknown): string {
 		const err = e as FsError;
 		if (err?.kind === 'io') return err.message;
-		return errorMessage(err ?? null) || 'Operazione non riuscita.';
+		return errorMessage(err ?? null) || t('Operazione non riuscita.');
 	}
 
 	/**
@@ -1370,7 +1371,7 @@
 		if (!arc) return;
 		const choices = selectedEntries();
 		const items = choices.length > 0 ? choices.map((e) => innerOf(e.path)) : (store.activeTab?.results ?? []).map((e) => innerOf(e.path));
-		return enqueue(`Estrai da «${nameOf(arc.file)}» → ${locationName(dest)}`, () => extractFromArchiveNow(arc.file, items, dest));
+		return enqueue(t('Estrai da «{0}» → {1}', [nameOf(arc.file), locationName(dest)]), () => extractFromArchiveNow(arc.file, items, dest));
 	}
 
 	async function extractFromArchiveNow(file: string, items: string[], dest: string) {
@@ -1384,7 +1385,7 @@
 				await tauriBackend.vaultExtract(file, items, dest);
 				touch(file);
 			} else await tauriBackend.archiveExtract({ opId, archive: file, items, dest, onProgress: (p) => (progress = p) });
-			notify(`Estratto in ${dest}.`);
+			notify(t('Estratto in {0}.', [dest]));
 			void store.refreshFolder(dest);
 			drivesRefresh++;
 		} catch (err) {
@@ -1410,11 +1411,11 @@
 		const other =
 			otherTab && !isVirtual(otherTab.path)
 				? otherTab.path
-				: await tauriBackend.pickFolder('Confronta con…', folder);
+				: await tauriBackend.pickFolder(t('Confronta con…'), folder);
 		if (!other) return;
 		// One inside the other, «Allinea» would copy a folder into itself.
 		if (isInside(other, folder) || isInside(folder, other)) {
-			opError = 'Una cartella sta dentro l’altra: scegli due cartelle separate.';
+			opError = t('Una cartella sta dentro l’altra: scegli due cartelle separate.');
 			return;
 		}
 		if (folder !== store.activeTab?.path) await store.navigate(id, folder);
@@ -1510,10 +1511,10 @@
 		const parent = store.activeTab.path;
 
 		for (let n = 1; n <= 100; n++) {
-			const name = n === 1 ? 'Nuova cartella' : `Nuova cartella (${n})`;
+			const name = n === 1 ? t('Nuova cartella') : t('Nuova cartella ({0})', [n]);
 			try {
 				const createdFolder = await tauriBackend.createFolder(parent, name);
-				undo.record({ kind: 'create', paths: [createdFolder], description: `creazione di «${name}»` });
+				undo.record({ kind: 'create', paths: [createdFolder], description: t('creazione di «{0}»', [name]) });
 				await store.reload(store.activeId);
 				if (store.activeTab) store.activeTab.selection = [createdFolder];
 				renaming = createdFolder;
@@ -1528,7 +1529,7 @@
 			}
 		}
 
-		opError = 'Troppe cartelle con lo stesso nome.';
+		opError = t('Troppe cartelle con lo stesso nome.');
 	}
 
 	/** The types of the «Nuovo» menu: Windows is asked for them only once. */
@@ -1549,7 +1550,7 @@
 		opError = null;
 		try {
 			const createdFile = await tauriBackend.createNewFile(store.activeTab.path, ext);
-			undo.record({ kind: 'create', paths: [createdFile], description: `creazione di «${nameOf(createdFile)}»` });
+			undo.record({ kind: 'create', paths: [createdFile], description: t('creazione di «{0}»', [nameOf(createdFile)]) });
 			await store.reload(store.activeId);
 			store.selectPaths(store.activeId, [createdFile]);
 			renaming = createdFile;
@@ -1613,10 +1614,10 @@
 	/** Items the deletion had to leave: named, with the reason, the rest went. */
 	function reportFailed(outcome: Deleted) {
 		if (outcome.failed.length === 0) return;
-		const rows = outcome.failed.slice(0, 3).map((f) => `«${nameOf(f.path)}»: ${describeError(f.error)}`);
+		const rows = outcome.failed.slice(0, 3).map((f) => t('«{0}»: {1}', [nameOf(f.path), describeError(f.error)]));
 		const others = outcome.failed.length - rows.length;
-		const title = outcome.failed.length === 1 ? '1 elemento non eliminato' : `${outcome.failed.length} elementi non eliminati`;
-		opError = `${title} (gli altri sì). ${rows.join(' · ')}${others > 0 ? ` e altri ${others}` : ''}`;
+		const title = outcome.failed.length === 1 ? t('1 elemento non eliminato') : t('{0} elementi non eliminati', [outcome.failed.length]);
+		opError = t('{0} (gli altri sì). {1}{2}', [title, rows.join(' · '), others > 0 ? t(' e altri {0}', [others]) : '']);
 	}
 
 	async function trash(items = toTrash) {
@@ -1660,7 +1661,7 @@
 		if (choices.length === 0) return;
 		try {
 			await tauriBackend.trashRestore(choices.map((e) => e.path));
-			notify(choices.length === 1 ? `«${choices[0].name}» ripristinato.` : `${choices.length} elementi ripristinati.`);
+			notify(choices.length === 1 ? t('«{0}» ripristinato.', [choices[0].name]) : t('{0} elementi ripristinati.', [choices.length]));
 			await reload();
 		} catch (e) {
 			opError = describeError(e);
@@ -1672,7 +1673,7 @@
 		try {
 			const undone = await undo.undo();
 			if (undone) {
-				notify(`Annullata: ${undone}.`);
+				notify(t('Annullata: {0}.', [undone]));
 				await reload();
 			}
 		} catch (e) {
@@ -1756,7 +1757,7 @@
 	}
 
 	function count(paths: readonly string[]): string {
-		return paths.length === 1 ? `«${nameOf(paths[0])}»` : `${paths.length} elementi`;
+		return paths.length === 1 ? t('«{0}»', [nameOf(paths[0])]) : t('{0} elementi', [paths.length]);
 	}
 	/** Transfer waiting for the user to resolve the name conflicts. */
 	let pendingConflicts = $state<{ sources: string[]; dest: string; mode: 'copy' | 'move' } | null>(null);
@@ -1899,7 +1900,7 @@
 		conflicts = [];
 		pendingConflicts = null;
 		if (!op) return Promise.resolve(undefined);
-		const title = `${op.mode === 'move' ? 'Sposta' : 'Copia'} ${count(op.sources)} → ${locationName(op.dest)}`;
+		const title = t('{0} {1} → {2}', [op.mode === 'move' ? t('Sposta') : t('Copia'), count(op.sources), locationName(op.dest)]);
 		return enqueue(title, () => runNow(policy, op));
 	}
 
@@ -1934,7 +1935,7 @@
 				undo.record({
 					kind: 'create',
 					paths: outcome.pairs.map((c) => c[1]),
-					description: `copia di ${outcome.pairs.length === 1 ? '1 elemento' : `${outcome.pairs.length} elementi`}`
+					description: t('copia di {0}', [outcome.pairs.length === 1 ? t('1 elemento') : t('{0} elementi', [outcome.pairs.length])])
 				});
 
 			// Cutting uses up the clipboard, as in Explorer; copying does
@@ -1947,9 +1948,9 @@
 				void tauriBackend.clipboardClear().catch(() => {});
 			}
 
-			if (outcome.cancelled) opError = 'Operazione annullata. I file già trasferiti restano.';
+			if (outcome.cancelled) opError = t('Operazione annullata. I file già trasferiti restano.');
 			else if (outcome.skipped > 0)
-				opError = `${outcome.skipped} ${outcome.skipped === 1 ? 'elemento saltato' : 'elementi saltati'}.`;
+				opError = t('{0} {1}.', [outcome.skipped, outcome.skipped === 1 ? t('elemento saltato') : t('elementi saltati')]);
 
 			await reload();
 		} catch (e) {
@@ -1962,7 +1963,7 @@
 
 	/** Copies from the shared folder of another PC, with the progress bar. */
 	function downloadFromNetwork(sources: string[], dest: string) {
-		return enqueue(`Scarica ${count(sources)} → ${locationName(dest)}`, () => downloadFromNetworkNow(sources, dest));
+		return enqueue(t('Scarica {0} → {1}', [count(sources), locationName(dest)]), () => downloadFromNetworkNow(sources, dest));
 	}
 
 	async function downloadFromNetworkNow(sources: string[], dest: string) {
@@ -1983,7 +1984,7 @@
 				undo.record({
 					kind: 'create',
 					paths: outcome.pairs.map((c) => c[1]),
-					description: `copia di ${outcome.pairs.length === 1 ? '1 elemento' : `${outcome.pairs.length} elementi`} dalla rete locale`
+					description: t('copia di {0} dalla rete locale', [outcome.pairs.length === 1 ? t('1 elemento') : t('{0} elementi', [outcome.pairs.length])])
 				});
 			await reload();
 			return outcome;
@@ -2003,7 +2004,7 @@
 		const choices = selectedEntries();
 		if (choices.length === 0) return;
 		const name = recipients.find((p) => p.id === peer)?.name ?? peer;
-		return enqueue(`Invia ${count(choices.map((e) => e.path))} a ${name}`, () => sendToNow(peer, name, choices));
+		return enqueue(t('Invia {0} a {1}', [count(choices.map((e) => e.path)), name]), () => sendToNow(peer, name, choices));
 	}
 
 	async function sendToNow(peer: string, name: string, choices: Entry[]) {
@@ -2012,7 +2013,7 @@
 		runningOp = opId;
 		progress = { transferred: 0, total: 0 };
 		opError = null;
-		notify(`In attesa che ${name} accetti…`);
+		notify(t('In attesa che {0} accetti…', [name]));
 		try {
 			await tauriBackend.lanSend({
 				opId,
@@ -2021,7 +2022,7 @@
 				onProgress: (p) => (progress = p)
 			});
 			notify(
-				`${choices.length === 1 ? `«${choices[0].name}» inviato` : `${choices.length} elementi inviati`} a ${name}.`
+				t('{0} a {1}.', [choices.length === 1 ? t('«{0}» inviato', [choices[0].name]) : t('{0} elementi inviati', [choices.length]), name])
 			);
 		} catch (e) {
 			opError = describeError(e);
@@ -2064,10 +2065,10 @@
 			void store.refreshFolder(FRIENDS);
 		});
 		void listenHere<{ id: string; name: string }>('friend-request', (r) =>
-			notify(`${r.name} ti ha chiesto l’amicizia: rispondi da Amici nella barra laterale.`)
+			notify(t('{0} ti ha chiesto l’amicizia: rispondi da Amici nella barra laterale.', [r.name]))
 		);
 		void listenHere<{ id: string; name: string }>('friend-backup', (r) =>
-			notify(`${r.name} vuole tenere un backup su questo PC: rispondi da Amici nella barra laterale.`)
+			notify(t('{0} vuole tenere un backup su questo PC: rispondi da Amici nella barra laterale.', [r.name]))
 		);
 		void listenHere<SendRequest>('lan-request', (r) => (lanRequests = [...lanRequests, r]));
 		void listenHere<{ id: number; done: number; total: number }>('lan-receiving', (r) => {
@@ -2089,10 +2090,10 @@
 			(r) => {
 				if (receiving === r.id) receiving = null;
 				if (runningOp === null) progress = null;
-				if (r.cancelled) notify(`Ricezione da ${r.from} annullata.`);
-				else if (r.error) opError = `Ricezione da ${r.from} interrotta: ${r.error}`;
-				else if (r.blocked) opError = `Ricezione da ${r.from}: ${r.blocked}`;
-				else notify(`Ricevuti ${r.count === 1 ? '1 elemento' : `${r.count} elementi`} da ${r.from} in ${r.folder}.`);
+				if (r.cancelled) notify(t('Ricezione da {0} annullata.', [r.from]));
+				else if (r.error) opError = t('Ricezione da {0} interrotta: {1}', [r.from, r.error]);
+				else if (r.blocked) opError = t('Ricezione da {0}: {1}', [r.from, r.blocked]);
+				else notify(t('Ricevuti {0} da {1} in {2}.', [r.count === 1 ? t('1 elemento') : t('{0} elementi', [r.count]), r.from, r.folder]));
 				void store.refreshFolder(r.folder);
 			}
 		);
@@ -2144,7 +2145,7 @@
 	 */
 	async function share(folder: string | null) {
 		await configureLan(folder ? { shared: folder, visible: true } : { shared: null });
-		if (folder) notify(`«${nameOf(folder)}» è condivisa in rete locale, in sola lettura.`);
+		if (folder) notify(t('«{0}» è condivisa in rete locale, in sola lettura.', [nameOf(folder)]));
 	}
 
 	function respondLan(accept: boolean, where: string | null) {
@@ -2171,7 +2172,7 @@
 		const tab = store.activeTab;
 		const choices = selectedEntries();
 		if (!tab || choices.length === 0) return;
-		const title = kind === 'compress' ? `Comprimi ${count(choices.map((e) => e.path))}` : `Estrai «${choices[0].name}»`;
+		const title = kind === 'compress' ? t('Comprimi {0}', [count(choices.map((e) => e.path))]) : t('Estrai «{0}»', [choices[0].name]);
 		return enqueue(title, () => archiveNow(kind, tab.path, choices));
 	}
 
@@ -2192,7 +2193,7 @@
 		toConvert = null;
 		const folder = store.activeTab?.path;
 		if (!folder) return;
-		return enqueue(`Converti ${count(items.map((e) => e.path))}`, async () => {
+		return enqueue(t('Converti {0}', [count(items.map((e) => e.path))]), async () => {
 			const opId = nextOpId++;
 			runningMode = 'images';
 			runningOp = opId;
@@ -2205,7 +2206,7 @@
 					...o,
 					onProgress: (p) => (progress = p)
 				});
-				undo.record({ kind: 'create', paths: createdFiles, description: `conversione di ${count(createdFiles)}` });
+				undo.record({ kind: 'create', paths: createdFiles, description: t('conversione di {0}', [count(createdFiles)]) });
 				if (store.activeId !== null && store.activeTab?.path === folder) {
 					await store.reload(store.activeId);
 					store.selectPaths(store.activeId, createdFiles);
@@ -2243,7 +2244,7 @@
 			undo.record({
 				kind: 'create',
 				paths: [createdFile],
-				description: kind === 'compress' ? `compressione in «${nameOf(createdFile)}»` : `estrazione in «${nameOf(createdFile)}»`
+				description: kind === 'compress' ? t('compressione in «{0}»', [nameOf(createdFile)]) : t('estrazione in «{0}»', [nameOf(createdFile)])
 			});
 			if (store.activeId !== null) {
 				await store.reload(store.activeId);
@@ -2283,7 +2284,7 @@
 			// this disk: Windows accepts them only after they have been
 			// downloaded.
 			if (location === 'lan') {
-				notify('Preparo i file da trascinare…');
+				notify(t('Preparo i file da trascinare…'));
 				paths = await tauriBackend.lanPrepareDrag(paths);
 			}
 			await tauriBackend.startDrag(paths);
@@ -2921,7 +2922,7 @@
 			await store.navigate(store.activeId, dest.folder);
 			if (dest.select) store.selectPaths(store.activeId, [dest.select]);
 		} catch {
-			opError = `Impossibile trovare «${text}». Controlla di averlo scritto correttamente.`;
+			opError = t('Impossibile trovare «{0}». Controlla di averlo scritto correttamente.', [text]);
 		}
 	}
 
@@ -3198,7 +3199,7 @@
 			case 'start': {
 				const choices: Record<string, string> = { pc: '::pc', c: DEFAULT_START_PAGE, last: LAST_FOLDER_START_PAGE };
 				if (choices[value]) settings.set('startPage', choices[value]);
-				if (value === 'pc') notify('Questo PC si aprirà all’avvio.');
+				if (value === 'pc') notify(t('Questo PC si aprirà all’avvio.'));
 				return true;
 			}
 			case 'accent':
@@ -3322,7 +3323,7 @@
 					const folder = menuFolder(choices);
 					if (folder) {
 						quickAccess.pin(folder);
-						notify(`«${nameOf(folder)}» fissata nella barra laterale.`);
+						notify(t('«{0}» fissata nella barra laterale.', [nameOf(folder)]));
 					}
 					break;
 				}
@@ -3389,7 +3390,7 @@
 				}
 				case 'extractTo': {
 					const arc = store.activeTab?.archive;
-					const dest = arc ? await tauriBackend.pickFolder('Estrai in…', folderOf(arc.file)) : null;
+					const dest = arc ? await tauriBackend.pickFolder(t('Estrai in…'), folderOf(arc.file)) : null;
 					if (dest) await extractFromArchive(dest);
 					break;
 				}
@@ -3414,7 +3415,7 @@
 				case 'compareFileOtherPane': {
 					const twin = otherTab?.entries.find((e) => e.kind === 'file' && e.name.toLowerCase() === choices[0]?.name.toLowerCase());
 					if (choices[0] && twin) compareFiles(choices[0], twin);
-					else if (choices[0]) opError = `Nell’altro pannello non c’è «${choices[0].name}».`;
+					else if (choices[0]) opError = t('Nell’altro pannello non c’è «{0}».', [choices[0].name]);
 					break;
 				}
 				case 'space': {
@@ -3465,7 +3466,7 @@
 						);
 					} else {
 						settings.set('startupFolders', [...settings.startupFolders, folder]);
-						notify(`«${nameOf(folder)}» si aprirà a ogni avvio, in una scheda sua.`);
+						notify(t('«{0}» si aprirà a ogni avvio, in una scheda sua.', [nameOf(folder)]));
 					}
 					break;
 				}
@@ -3476,7 +3477,7 @@
 					const folder = menuFolder(choices);
 					if (folder) {
 						settings.set('startPage', folder);
-						notify(`«${nameOf(folder)}» si aprirà all’avvio.`);
+						notify(t('«{0}» si aprirà all’avvio.', [nameOf(folder)]));
 					}
 					break;
 				}
@@ -3531,12 +3532,12 @@
 				}
 				case 'stopSharing':
 					await share(null);
-					notify('La cartella non è più condivisa.');
+					notify(t('La cartella non è più condivisa.'));
 					break;
 				case 'download':
 					if (lanState) {
 						const outcome = await downloadFromNetwork(choices.map((e) => e.path), lanState.receivedFolder);
-						if (outcome) notify(`Scaricato in ${lanState.receivedFolder}.`);
+						if (outcome) notify(t('Scaricato in {0}.', [lanState.receivedFolder]));
 					}
 					break;
 				case 'newMenu':
@@ -3615,10 +3616,10 @@
 		try {
 			const backup = await invoke<string>('set_as_default');
 			isDefault = true;
-			message = `Ora le cartelle si aprono con Space Train. Backup in ${backup}`;
+			message = t('Ora le cartelle si aprono con Space Train. Backup in {0}', [backup]);
 		} catch (e) {
 			// Before, the error was lost and the button seemed to have worked.
-			opError = `Impossibile impostare Space Train come predefinito: ${describeError(e)}`;
+			opError = t('Impossibile impostare Space Train come predefinito: {0}', [describeError(e)]);
 		}
 	}
 
@@ -3626,30 +3627,30 @@
 		try {
 			await invoke('restore_windows_explorer');
 			isDefault = false;
-			message = 'Esplora risorse di Windows ripristinato.';
+			message = t('Esplora risorse di Windows ripristinato.');
 		} catch (e) {
-			opError = `Impossibile ripristinare Esplora risorse: ${describeError(e)}`;
+			opError = t('Impossibile ripristinare Esplora risorse: {0}', [describeError(e)]);
 		}
 	}
 
 	function errorMessage(err: FsError | null): string {
 		switch (err?.kind) {
 			case 'accessDenied':
-				return 'Accesso negato a questa cartella.';
+				return t('Accesso negato a questa cartella.');
 			case 'notFound':
-				return 'Cartella non trovata.';
+				return t('Cartella non trovata.');
 			case 'notADirectory':
-				return 'Questo elemento non è una cartella.';
+				return t('Questo elemento non è una cartella.');
 			case 'deviceNotReady':
-				return 'Unità non pronta. Controlla che il supporto sia inserito.';
+				return t('Unità non pronta. Controlla che il supporto sia inserito.');
 			case 'io':
 				return err.message;
 			case 'serverKey':
-				return err.changed ? 'La chiave del server è cambiata: Space Train non si collega.' : 'Conferma la chiave del server per collegarti.';
+				return err.changed ? t('La chiave del server è cambiata: Space Train non si collega.') : t('Conferma la chiave del server per collegarti.');
 			case 'serverPassword':
-				return 'Il server chiede la password.';
+				return t('Il server chiede la password.');
 			case 'changed':
-				return 'Il file è cambiato su disco nel frattempo.';
+				return t('Il file è cambiato su disco nel frattempo.');
 			default:
 				return '';
 		}
@@ -3746,7 +3747,7 @@
 				dropTarget={dropTarget}
 				branchInfo={gitHere}
 				lockIn={lockInHere}
-				stop={cleanupOf ? 'Pulizia' : fileComparison ? 'Confronto' : null}
+				stop={cleanupOf ? t('Pulizia') : fileComparison ? t('Confronto') : null}
 				onstop={() => {
 					cleanupOf = null;
 					fileComparison = null;
@@ -3820,47 +3821,47 @@
 			{/if}
 			{#if duplicateSummary.groups > 0}
 				<div class="duplicates-summary">
-					<span><b>{duplicateSummary.groups}</b> {duplicateSummary.groups === 1 ? 'gruppo di copie' : 'gruppi di copie'}</span>
-					<span><b>{formatBytes(duplicateSummary.recoverable)}</b> recuperabili</span>
-					<button onclick={selectExtraCopies} title="Tutte tranne la più vecchia di ogni gruppo">Seleziona le copie in più</button>
+					<span><b>{duplicateSummary.groups}</b> {duplicateSummary.groups === 1 ? t('gruppo di copie') : t('gruppi di copie')}</span>
+					<span><b>{formatBytes(duplicateSummary.recoverable)}</b> {t('recuperabili')}</span>
+					<button onclick={selectExtraCopies} title={t('Tutte tranne la più vecchia di ogni gruppo')}>{t('Seleziona le copie in più')}</button>
 				</div>
 			{/if}
 			{#if inSpace && store.activeTab}
 				<div class="duplicates-summary" role="status">
-					<span><b>{formatBytes(totalSpace)}</b> in {locationName(store.activeTab.path)}</span>
+					<span><b>{formatBytes(totalSpace)}</b> {t('in {0}', [locationName(store.activeTab.path)])}</span>
 					{#if totalGrowth}
 						<span
-							><b class="total-growth">{growthText(totalGrowth.delta, formatBytes)}</b> dal {new Date(totalGrowth.since).toLocaleDateString('it-IT', {
+							><b class="total-growth">{growthText(totalGrowth.delta, formatBytes)}</b> {t('dal {0}', [new Date(totalGrowth.since).toLocaleDateString('it-IT', {
 								day: 'numeric',
 								month: 'long'
-							})}</span
+							})])}</span
 						>
 						<button class:on={byGrowth} aria-pressed={byGrowth} onclick={() => (byGrowth = !byGrowth)}
-							>{byGrowth ? 'Ordina per peso' : 'Ordina per crescita'}</button
+							>{byGrowth ? t('Ordina per peso') : t('Ordina per crescita')}</button
 						>
 					{/if}
-					{#if spaceComputing > 0}<span>pesando <b>{spaceComputing}</b> {spaceComputing === 1 ? 'cartella' : 'cartelle'}…</span>{/if}
-					<button onclick={() => store.activeId !== null && store.setSpace(store.activeId, false)}>Chiudi l’analisi</button>
+					{#if spaceComputing > 0}<span>{t('pesando')} <b>{spaceComputing}</b> {spaceComputing === 1 ? 'cartella' : 'cartelle'}…</span>{/if}
+					<button onclick={() => store.activeId !== null && store.setSpace(store.activeId, false)}>{t('Chiudi l’analisi')}</button>
 				</div>
 			{/if}
 			{#if store.activeTab?.comparison}
 				{@const c = store.activeTab.comparison}
 				<div class="duplicates-summary" role="status">
 					{#if c.running}
-						<span>Confronto in corso…</span>
+						<span>{t('Confronto in corso…')}</span>
 					{:else}
-						<span><b>{c.onlyHere}</b> mancano in {locationName(c.other)}</span>
+						<span><b>{c.onlyHere}</b> {t('mancano in {0}', [locationName(c.other)])}</span>
 						<span><b>{c.different.length}</b> {c.different.length === 1 ? 'diverso' : 'diversi'}</span>
-						<span><b>{c.onlyThere}</b> mancano qui</span>
+						<span><b>{c.onlyThere}</b> {t('mancano qui')}</span>
 						{#if !c.content}
-							<button onclick={compareContent} title="Legge i file invece di guardare dimensione e data">Controlla il contenuto</button>
+							<button onclick={compareContent} title={t('Legge i file invece di guardare dimensione e data')}>{t('Controlla il contenuto')}</button>
 						{/if}
 						{#if c.onlyThere > 0 || c.different.some((d) => !d.newerHere)}
-							<button onclick={() => void align('here')} title="Copia qui ciò che manca e le versioni più recenti">Allinea qui</button>
+							<button onclick={() => void align('here')} title={t('Copia qui ciò che manca e le versioni più recenti')}>{t('Allinea qui')}</button>
 						{/if}
 						{#if c.onlyHere > 0 || c.different.some((d) => d.newerHere)}
-							<button class="primary" onclick={() => void align('there')} title="Copia ciò che manca e le versioni più recenti; non cancella niente"
-								>Allinea {locationName(c.other)}</button
+							<button class="primary" onclick={() => void align('there')} title={t('Copia ciò che manca e le versioni più recenti; non cancella niente')}
+								>{t('Allinea {0}', [locationName(c.other)])}</button
 							>
 						{/if}
 					{/if}
@@ -3892,7 +3893,7 @@
 			{#if opError}
 				<div class="error">
 					{opError}
-					<button class="close-error" onclick={() => (opError = null)} aria-label="Chiudi"
+					<button class="close-error" onclick={() => (opError = null)} aria-label={t('Chiudi')}
 						><Icon name="close" /></button
 					>
 				</div>
@@ -3905,15 +3906,15 @@
 				{@const p = reminder}
 				<div class="notice update reminder" role="status">
 					<span
-						>{locationName(p.drive.path)} ha <b>{formatBytes(p.drive.free ?? 0)}</b> liberi ({Math.round(p.share * 100)}%).{#if p.found}{' '}La Pulizia ha trovato <b>{formatBytes(p.found)}</b> da togliere.{/if}</span
+						>{t('{0} ha', [locationName(p.drive.path)])} <b>{formatBytes(p.drive.free ?? 0)}</b> {t('liberi ({0}%).', [Math.round(p.share * 100)])}{#if p.found}{t('{0}La Pulizia ha trovato', [' '])} <b>{formatBytes(p.found)}</b> {t('da togliere.')}{/if}</span
 					>
-					<button onclick={snoozeReminder}>Non ora</button>
+					<button onclick={snoozeReminder}>{t('Non ora')}</button>
 					<button
 						class="primary"
 						onclick={() => {
 							reminder = null;
 							void openCleanup(p.drive.path);
-						}}>Apri la Pulizia</button
+						}}>{t('Apri la Pulizia')}</button
 					>
 				</div>
 			{/if}
@@ -3921,16 +3922,16 @@
 				<div class="notice update" role="status">
 					<span>
 						{updates.state === 'downloading'
-							? `Scarico la versione ${updates.version} di Space Train…`
+							? t('Scarico la versione {0} di Space Train…', [updates.version])
 							: updates.state === 'installing'
-								? `Installo la versione ${updates.version}: Space Train si chiude e si riapre da solo.`
-								: `È pronta la versione ${updates.version} di Space Train.`}
+								? t('Installo la versione {0}: Space Train si chiude e si riapre da solo.', [updates.version])
+								: t('È pronta la versione {0} di Space Train.', [updates.version])}
 					</span>
 					{#if updates.state === 'downloading'}
 						<span
 							class="update-bar"
 							role="progressbar"
-							aria-label="Download dell’aggiornamento"
+							aria-label={t('Download dell’aggiornamento')}
 							aria-valuemin="0"
 							aria-valuemax="100"
 							aria-valuenow={updates.progress === null ? undefined : Math.round(updates.progress * 100)}
@@ -3940,8 +3941,8 @@
 						<span class="update-bar" aria-hidden="true"><span class="unknown"></span></span>
 					{/if}
 					{#if updates.state === 'ready'}
-						<button onclick={() => updates.postpone()}>Più tardi</button>
-						<button class="primary" onclick={installUpdate}>Riavvia e aggiorna</button>
+						<button onclick={() => updates.postpone()}>{t('Più tardi')}</button>
+						<button class="primary" onclick={installUpdate}>{t('Riavvia e aggiorna')}</button>
 					{/if}
 				</div>
 			{/if}
@@ -3965,9 +3966,9 @@
 					<EmptyState
 						variant={emptyState}
 						action={emptyState === 'emptyFolder' && editable
-							? 'Nuova cartella'
+							? t('Nuova cartella')
 							: emptyState === 'noResults'
-								? 'Azzera la ricerca'
+								? t('Azzera la ricerca')
 								: undefined}
 						onaction={emptyState === 'emptyFolder' && editable
 							? newFolder
@@ -4160,7 +4161,7 @@
 			oncompare={(v) => void compareVersion(file, v)}
 			onrestored={() => {
 				versionsOf = null;
-				notify(`«${file.name}» ripristinato. La versione di prima resta fra le versioni.`);
+				notify(t('«{0}» ripristinato. La versione di prima resta fra le versioni.', [file.name]));
 				void reload();
 			}}
 			onprotect={() => void protectVersions(folderOf(file.path), true)}
@@ -4177,7 +4178,7 @@
 			onremove={(id) => void removeServer(id)}
 			ontrust={() => void confirmServerKey()}
 			onpassword={(pw, r) => void submitServerPassword(pw, r)}
-			onpickfolder={(initial) => tauriBackend.pickFolder('Cartella da copiare sul server', initial).catch(() => null)}
+			onpickfolder={(initial) => tauriBackend.pickFolder(t('Cartella da copiare sul server'), initial).catch(() => null)}
 			onbackupnow={(c, pw) => void backUpServerNow(c, pw)}
 			oncancel={() => (serverDialog = null)}
 		/>
@@ -4226,10 +4227,10 @@
 
 	{#if workspaceName}
 		<NameDialog
-			title={workspaceName.mode === 'new' ? 'Nuova area di lavoro' : 'Rinomina l’area'}
-			label="Nome dell'area"
+			title={workspaceName.mode === 'new' ? t('Nuova area di lavoro') : t('Rinomina l’area')}
+			label={t('Nome dell\'area')}
 			value={workspaceName.mode === 'rename' ? (workspaces.current ?? '') : (store.activeTab ? locationName(store.activeTab.path) : '')}
-			confirm={workspaceName.mode === 'new' ? 'Salva area' : 'Rinomina'}
+			confirm={workspaceName.mode === 'new' ? t('Salva area') : t('Rinomina')}
 			error={workspaceName.error}
 			onconfirm={confirmWorkspaceName}
 			oncancel={() => (workspaceName = null)}
@@ -4300,7 +4301,7 @@
 			<IncomingFiles
 				request={lanRequests[0]}
 				folder={lanState.receivedFolder}
-				onpick={(from) => tauriBackend.pickFolder('Dove salvare i file in arrivo', from)}
+				onpick={(from) => tauriBackend.pickFolder(t('Dove salvare i file in arrivo'), from)}
 				onanswer={respondLan}
 			/>
 		{/key}
@@ -4325,7 +4326,7 @@
 		type="color"
 		bind:this={colorPicker}
 		value={settings.accentColor}
-		aria-label="Colore d'evidenziazione personalizzato"
+		aria-label={t('Colore d\'evidenziazione personalizzato')}
 		oninput={(e) => {
 			settings.set('accentColor', e.currentTarget.value);
 			settings.set('accent', CUSTOM_ACCENT);
@@ -4343,16 +4344,14 @@
 
 	<footer class="settings">
 		{#if isDefault}
-			<button onclick={restoreExplorer}>Ripristina Esplora risorse</button>
+			<button onclick={restoreExplorer}>{t('Ripristina Esplora risorse')}</button>
 		{:else}
-			<button onclick={setAsDefault}>Imposta come predefinito</button>
+			<button onclick={setAsDefault}>{t('Imposta come predefinito')}</button>
 		{/if}
 		{#if message}<span class="note">{message}</span>{/if}
 		<span class="state">
 			<!-- A single expression: Svelte strips the trailing space of an {#if}
-			     block, and the text became «1 selezionati ·10 elementi». -->
-			{selection.length > 0 ? `${selection.length} selezionati · ` : ''}{visibleItems.length} elementi
-		</span>
+			     block, and the text became «1 selezionati ·10 elementi». --> {t('{0}{1} elementi', [selection.length > 0 ? t('{0} selezionati · ', [selection.length]) : '', visibleItems.length])} </span>
 		<!-- As in Explorer's status bar: quick switch between details and
 		     icons, plus a slider for the icon size. -->
 		<div class="quick-view">
@@ -4363,8 +4362,8 @@
 					min={SIDE_MIN}
 					max={SIDE_MAX}
 					value={settings.side}
-					aria-label="Dimensione delle icone"
-					title="Dimensione delle icone (anche Ctrl+rotella)"
+					aria-label={t('Dimensione delle icone')}
+					title={t('Dimensione delle icone (anche Ctrl+rotella)')}
 					oninput={(e) => settings.setView('icons', Number(e.currentTarget.value))}
 				/>
 			{/if}
@@ -4372,8 +4371,8 @@
 				class="quick"
 				class:on={settings.view === 'details'}
 				aria-pressed={settings.view === 'details'}
-				aria-label="Dettagli"
-				title="Dettagli"
+				aria-label={t('Dettagli')}
+				title={t('Dettagli')}
 				onclick={() => settings.setView('details')}
 			>
 				<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
@@ -4386,8 +4385,8 @@
 				class="quick"
 				class:on={settings.view === 'icons'}
 				aria-pressed={settings.view === 'icons'}
-				aria-label="Icone grandi"
-				title="Icone grandi"
+				aria-label={t('Icone grandi')}
+				title={t('Icone grandi')}
 				onclick={() => settings.setView('icons', settings.view === 'icons' ? settings.side : 128)}
 			>
 				<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">

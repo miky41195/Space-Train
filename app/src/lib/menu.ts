@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { canHaveVersions } from './versions';
 import type { Entry, SortKey, SortSpec } from './ipc';
 import { isArchive, isExecutable, nameOf, locationName } from './locations';
@@ -180,8 +181,8 @@ export interface MenuContext {
 
 function protectItem(on: boolean): MenuItem {
 	return on
-		? { action: 'unprotectVersions', label: 'Togli la protezione delle versioni' }
-		: { action: 'protectVersions', label: 'Proteggi le versioni dei file' };
+		? { action: 'unprotectVersions', label: t('Togli la protezione delle versioni') }
+		: { action: 'protectVersions', label: t('Proteggi le versioni dei file') };
 }
 
 /**
@@ -193,7 +194,7 @@ function protectItem(on: boolean): MenuItem {
 function compareItem(other: string | null): MenuItem {
 	return {
 		action: 'compare',
-		label: other ? `Confronta con «${locationName(other)}»` : 'Confronta con un’altra cartella…'
+		label: other ? t('Confronta con «{0}»', [locationName(other)]) : t('Confronta con un’altra cartella…')
 	};
 }
 
@@ -225,43 +226,43 @@ function backgroundItems({
 }: MenuContext): MenuItem[] {
 	const items: MenuItem[] = [];
 	if (!search) {
-		items.push({ action: 'newMenu', label: 'Nuovo…' });
-		items.push({ action: 'newFolder', label: 'Nuova cartella', shortcut: 'Ctrl+Maiusc+N' });
+		items.push({ action: 'newMenu', label: t('Nuovo…') });
+		items.push({ action: 'newFolder', label: t('Nuova cartella'), shortcut: 'Ctrl+Maiusc+N' });
 		if (clipboardFull) {
-			items.push({ action: 'paste', label: 'Incolla', shortcut: 'Ctrl+V', separator: true });
+			items.push({ action: 'paste', label: t('Incolla'), shortcut: 'Ctrl+V', separator: true });
 		}
 	}
 	if (undoable) {
 		items.push({
 			action: 'undo',
-			label: `Annulla ${undoable}`,
+			label: t('Annulla {0}', [undoable]),
 			shortcut: 'Ctrl+Z',
 			separator: true
 		});
 	}
-	items.push({ action: 'refresh', label: 'Aggiorna', shortcut: 'F5', separator: true });
+	items.push({ action: 'refresh', label: t('Aggiorna'), shortcut: 'F5', separator: true });
 	if (!search) {
 		items.push(
 			pinned
-				? { action: 'unpin', label: 'Togli dalla barra laterale', separator: true }
-				: { action: 'pin', label: 'Fissa nella barra laterale', separator: true }
+				? { action: 'unpin', label: t('Togli dalla barra laterale'), separator: true }
+				: { action: 'pin', label: t('Fissa nella barra laterale'), separator: true }
 		);
 		items.push(
 			sharedHere
-				? { action: 'stopSharing', label: 'Smetti di condividere in rete locale' }
-				: { action: 'share', label: 'Condividi questa cartella in rete locale' }
+				? { action: 'stopSharing', label: t('Smetti di condividere in rete locale') }
+				: { action: 'share', label: t('Condividi questa cartella in rete locale') }
 		);
-		if (!isStartPage) items.push({ action: 'setStartPage', label: 'Imposta come pagina iniziale' });
+		if (!isStartPage) items.push({ action: 'setStartPage', label: t('Imposta come pagina iniziale') });
 		items.push(startupItem(atStartup));
-		items.push({ action: 'duplicates', label: 'Trova duplicati qui', separator: true });
+		items.push({ action: 'duplicates', label: t('Trova duplicati qui'), separator: true });
 		items.push(compareItem(otherPane));
-		items.push({ action: 'space', label: 'Analizza spazio' });
-		items.push({ action: 'rules', label: 'Regole automatiche…' });
+		items.push({ action: 'space', label: t('Analizza spazio') });
+		items.push({ action: 'rules', label: t('Regole automatiche…') });
 		items.push(protectItem(protectedFolder));
-		items.push({ action: 'terminal', label: 'Apri nel terminale' });
-		items.push({ action: 'integratedTerminal', label: 'Apri nel terminale integrato' });
-		items.push({ action: 'moreOptions', label: 'Altre opzioni di Windows', separator: true });
-		items.push({ action: 'properties', label: 'Proprietà', shortcut: 'Alt+Invio' });
+		items.push({ action: 'terminal', label: t('Apri nel terminale') });
+		items.push({ action: 'integratedTerminal', label: t('Apri nel terminale integrato') });
+		items.push({ action: 'moreOptions', label: t('Altre opzioni di Windows'), separator: true });
+		items.push({ action: 'properties', label: t('Proprietà'), shortcut: 'Alt+Invio' });
 	}
 	return items;
 }
@@ -305,45 +306,45 @@ function selectionItems({
 	// Opening makes sense on a single item: opening twenty files together is
 	// almost always an accident, not an intention.
 	if (single) {
-		items.push({ action: 'open', label: 'Apri', shortcut: 'Invio' });
+		items.push({ action: 'open', label: t('Apri'), shortcut: 'Invio' });
 		if (single.kind === 'dir') {
-			items.push({ action: 'openNewTab', label: 'Apri in una nuova scheda' });
-			items.push({ action: 'openNewWindow', label: 'Apri in una nuova finestra' });
-			items.push(pinned ? { action: 'unpin', label: 'Togli dalla barra laterale' } : { action: 'pin', label: 'Fissa nella barra laterale' });
-			if (!isStartPage) items.push({ action: 'setStartPage', label: 'Imposta come pagina iniziale' });
+			items.push({ action: 'openNewTab', label: t('Apri in una nuova scheda') });
+			items.push({ action: 'openNewWindow', label: t('Apri in una nuova finestra') });
+			items.push(pinned ? { action: 'unpin', label: t('Togli dalla barra laterale') } : { action: 'pin', label: t('Fissa nella barra laterale') });
+			if (!isStartPage) items.push({ action: 'setStartPage', label: t('Imposta come pagina iniziale') });
 			items.push(startupItem(atStartup));
-			items.push({ action: 'terminal', label: 'Apri nel terminale' });
-			items.push({ action: 'integratedTerminal', label: 'Apri nel terminale integrato' });
-			items.push({ action: 'duplicates', label: 'Trova duplicati qui' });
+			items.push({ action: 'terminal', label: t('Apri nel terminale') });
+			items.push({ action: 'integratedTerminal', label: t('Apri nel terminale integrato') });
+			items.push({ action: 'duplicates', label: t('Trova duplicati qui') });
 			items.push(compareItem(otherPane));
-			items.push({ action: 'space', label: 'Analizza spazio' });
-			items.push({ action: 'rules', label: 'Regole automatiche…' });
+			items.push({ action: 'space', label: t('Analizza spazio') });
+			items.push({ action: 'rules', label: t('Regole automatiche…') });
 			items.push(protectItem(protectedFolder));
 		} else {
-			if (isEditableText(single)) items.push({ action: 'edit', label: 'Modifica' });
-			items.push({ action: 'openWith', label: 'Apri con…' });
-			items.push({ action: 'checksum', label: 'Somma di controllo…' });
-			if (canHaveVersions(single.path)) items.push({ action: 'versions', label: 'Versioni precedenti…' });
-			if (otherPane) items.push({ action: 'compareFileOtherPane', label: 'Confronta con lo stesso file nell’altro pannello' });
+			if (isEditableText(single)) items.push({ action: 'edit', label: t('Modifica') });
+			items.push({ action: 'openWith', label: t('Apri con…') });
+			items.push({ action: 'checksum', label: t('Somma di controllo…') });
+			if (canHaveVersions(single.path)) items.push({ action: 'versions', label: t('Versioni precedenti…') });
+			if (otherPane) items.push({ action: 'compareFileOtherPane', label: t('Confronta con lo stesso file nell’altro pannello') });
 			if (isExecutable(single.name)) {
-				items.push({ action: 'runAsAdmin', label: 'Esegui come amministratore' });
+				items.push({ action: 'runAsAdmin', label: t('Esegui come amministratore') });
 			}
 		}
-		if (search) items.push({ action: 'openFileLocation', label: 'Apri percorso file' });
+		if (search) items.push({ action: 'openFileLocation', label: t('Apri percorso file') });
 	}
 
-	items.push({ action: 'copy', label: 'Copia', shortcut: 'Ctrl+C', separator: true });
-	items.push({ action: 'cut', label: 'Taglia', shortcut: 'Ctrl+X' });
+	items.push({ action: 'copy', label: t('Copia'), shortcut: 'Ctrl+C', separator: true });
+	items.push({ action: 'cut', label: t('Taglia'), shortcut: 'Ctrl+X' });
 
 	if (clipboardFull && !search) {
-		items.push({ action: 'paste', label: 'Incolla', shortcut: 'Ctrl+V' });
+		items.push({ action: 'paste', label: t('Incolla'), shortcut: 'Ctrl+V' });
 	}
 
 	if (single) {
-		items.push({ action: 'rename', label: 'Rinomina', shortcut: 'F2', separator: true });
+		items.push({ action: 'rename', label: t('Rinomina'), shortcut: 'F2', separator: true });
 	} else if (!search) {
 		// Several items in one folder: the batch rename dialog.
-		items.push({ action: 'rename', label: 'Rinomina…', shortcut: 'F2', separator: true });
+		items.push({ action: 'rename', label: t('Rinomina…'), shortcut: 'F2', separator: true });
 	}
 
 	// Favourites belong to the open folder: among the results of a search
@@ -351,7 +352,7 @@ function selectionItems({
 	if (!search) {
 		items.push({
 			action: 'favorite',
-			label: alreadyFavorite ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti',
+			label: alreadyFavorite ? t('Rimuovi dai preferiti') : t('Aggiungi ai preferiti'),
 			shortcut: 'Ctrl+D',
 			// With a single item the group is already opened by Rename.
 			separator: count > 1
@@ -363,59 +364,59 @@ function selectionItems({
 
 	items.push({
 		action: 'copyPath',
-		label: count === 1 ? 'Copia percorso' : 'Copia percorsi',
+		label: count === 1 ? t('Copia percorso') : t('Copia percorsi'),
 		separator: count > 1 && search
 	});
 
 	if (single) {
-		items.push({ action: 'revealInExplorer', label: 'Mostra in Esplora risorse' });
+		items.push({ action: 'revealInExplorer', label: t('Mostra in Esplora risorse') });
 	}
 	if (count === 2 && selection.every((e) => e.kind === 'file')) {
-		items.push({ action: 'compareFiles', label: 'Confronta i due file' });
+		items.push({ action: 'compareFiles', label: t('Confronta i due file') });
 	}
 
 	if (selection.every((e) => e.kind === 'file' && isEditableImage(e.name))) {
-		items.push({ action: 'rotateRight', label: 'Ruota a destra', separator: true });
-		items.push({ action: 'rotateLeft', label: 'Ruota a sinistra' });
-		items.push({ action: 'convertImages', label: 'Converti e ridimensiona…' });
+		items.push({ action: 'rotateRight', label: t('Ruota a destra'), separator: true });
+		items.push({ action: 'rotateLeft', label: t('Ruota a sinistra') });
+		items.push({ action: 'convertImages', label: t('Converti e ridimensiona…') });
 	}
 
 	if (!search) {
-		items.push({ action: 'compress', label: 'Comprimi in file ZIP', separator: true });
+		items.push({ action: 'compress', label: t('Comprimi in file ZIP'), separator: true });
 	}
 
 	// One send per PC found on the local network: whoever receives must accept.
 	peers.forEach((p, i) => {
-		items.push({ action: `send:${p.id}` as MenuAction, label: `Invia a ${p.name}`, separator: i === 0 });
+		items.push({ action: `send:${p.id}` as MenuAction, label: t('Invia a {0}', [p.name]), separator: i === 0 });
 	});
 	if (single?.kind === 'dir') {
 		const alreadyShared = shared !== null && shared.toLowerCase() === single.path.toLowerCase();
 		items.push(
 			alreadyShared
-				? { action: 'stopSharing', label: 'Smetti di condividere in rete locale', separator: peers.length === 0 }
-				: { action: 'share', label: 'Condividi in rete locale', separator: peers.length === 0 }
+				? { action: 'stopSharing', label: t('Smetti di condividere in rete locale'), separator: peers.length === 0 }
+				: { action: 'share', label: t('Condividi in rete locale'), separator: peers.length === 0 }
 		);
 	}
 	if (single && isArchive(single.name)) {
-		items.push({ action: 'extract', label: 'Estrai tutto', separator: search });
+		items.push({ action: 'extract', label: t('Estrai tutto'), separator: search });
 	}
 
 	items.push({
 		action: 'trash',
-		label: count === 1 ? 'Sposta nel Cestino' : `Sposta ${count} elementi nel Cestino`,
+		label: count === 1 ? t('Sposta nel Cestino') : t('Sposta {0} elementi nel Cestino', [count]),
 		shortcut: 'Canc',
 		separator: true,
 		danger: true
 	});
 	items.push({
 		action: 'deletePermanently',
-		label: 'Elimina definitivamente',
+		label: t('Elimina definitivamente'),
 		shortcut: 'Maiusc+Canc',
 		danger: true
 	});
 
-	items.push({ action: 'moreOptions', label: 'Altre opzioni di Windows', separator: true });
-	items.push({ action: 'properties', label: 'Proprietà', shortcut: 'Alt+Invio' });
+	items.push({ action: 'moreOptions', label: t('Altre opzioni di Windows'), separator: true });
+	items.push({ action: 'properties', label: t('Proprietà'), shortcut: 'Alt+Invio' });
 
 	return items;
 }
@@ -423,13 +424,13 @@ function selectionItems({
 /** In the folder another PC shares you read and copy, you do not change it. */
 function lanItems({ selection }: MenuContext): MenuItem[] {
 	if (selection.length === 0) {
-		return [{ action: 'refresh', label: 'Aggiorna', shortcut: 'F5' }];
+		return [{ action: 'refresh', label: t('Aggiorna'), shortcut: 'F5' }];
 	}
 	const single = selection.length === 1 ? selection[0] : null;
 	const items: MenuItem[] = [];
-	if (single) items.push({ action: 'open', label: 'Apri', shortcut: 'Invio' });
-	items.push({ action: 'copy', label: 'Copia', shortcut: 'Ctrl+C', separator: single !== null });
-	items.push({ action: 'download', label: 'Scarica nella cartella Ricevuti' });
+	if (single) items.push({ action: 'open', label: t('Apri'), shortcut: 'Invio' });
+	items.push({ action: 'copy', label: t('Copia'), shortcut: 'Ctrl+C', separator: single !== null });
+	items.push({ action: 'download', label: t('Scarica nella cartella Ricevuti') });
 	return items;
 }
 
@@ -437,35 +438,35 @@ function lanItems({ selection }: MenuContext): MenuItem[] {
 function serverItems({ selection, clipboardFull = false }: MenuContext): MenuItem[] {
 	if (selection.length === 0) {
 		const items: MenuItem[] = [];
-		if (clipboardFull) items.push({ action: 'paste', label: 'Incolla (carica sul server)', shortcut: 'Ctrl+V' });
-		items.push({ action: 'newFolder', label: 'Nuova cartella', shortcut: 'Ctrl+Maiusc+N' });
-		items.push({ action: 'refresh', label: 'Aggiorna', shortcut: 'F5', separator: true });
+		if (clipboardFull) items.push({ action: 'paste', label: t('Incolla (carica sul server)'), shortcut: 'Ctrl+V' });
+		items.push({ action: 'newFolder', label: t('Nuova cartella'), shortcut: 'Ctrl+Maiusc+N' });
+		items.push({ action: 'refresh', label: t('Aggiorna'), shortcut: 'F5', separator: true });
 		return items;
 	}
-	const items: MenuItem[] = [{ action: 'open', label: 'Apri', shortcut: 'Invio' }];
-	items.push({ action: 'copy', label: 'Copia', shortcut: 'Ctrl+C', separator: true });
-	items.push({ action: 'download', label: 'Scarica nella cartella Ricevuti' });
-	if (selection.length === 1) items.push({ action: 'rename', label: 'Rinomina…', shortcut: 'F2', separator: true });
-	items.push({ action: 'deletePermanently', label: 'Elimina dal server', shortcut: 'Canc', danger: true, separator: selection.length !== 1 });
-	items.push({ action: 'copyPath', label: 'Copia percorso', separator: true });
+	const items: MenuItem[] = [{ action: 'open', label: t('Apri'), shortcut: 'Invio' }];
+	items.push({ action: 'copy', label: t('Copia'), shortcut: 'Ctrl+C', separator: true });
+	items.push({ action: 'download', label: t('Scarica nella cartella Ricevuti') });
+	if (selection.length === 1) items.push({ action: 'rename', label: t('Rinomina…'), shortcut: 'F2', separator: true });
+	items.push({ action: 'deletePermanently', label: t('Elimina dal server'), shortcut: 'Canc', danger: true, separator: selection.length !== 1 });
+	items.push({ action: 'copyPath', label: t('Copia percorso'), separator: true });
 	return items;
 }
 
 function trashItems({ selection }: MenuContext): MenuItem[] {
 	if (selection.length === 0) {
 		return [
-			{ action: 'refresh', label: 'Aggiorna', shortcut: 'F5' },
-			{ action: 'emptyTrash', label: 'Svuota Cestino', separator: true, danger: true }
+			{ action: 'refresh', label: t('Aggiorna'), shortcut: 'F5' },
+			{ action: 'emptyTrash', label: t('Svuota Cestino'), separator: true, danger: true }
 		];
 	}
 	return [
 		{
 			action: 'restore',
-			label: selection.length === 1 ? 'Ripristina' : `Ripristina ${selection.length} elementi`
+			label: selection.length === 1 ? t('Ripristina') : t('Ripristina {0} elementi', [selection.length])
 		},
 		{
 			action: 'deletePermanently',
-			label: 'Elimina definitivamente',
+			label: t('Elimina definitivamente'),
 			shortcut: 'Canc',
 			separator: true,
 			danger: true
@@ -477,8 +478,8 @@ function trashItems({ selection }: MenuContext): MenuItem[] {
 function archiveItems({ selection, vault = false, clipboardFull = false }: MenuContext): MenuItem[] {
 	if (vault) return vaultItems(selection, clipboardFull);
 	const items: MenuItem[] = [];
-	if (selection.length === 1) items.push({ action: 'open', label: 'Apri', shortcut: 'Invio' });
-	const what = selection.length === 0 ? 'tutto' : selection.length === 1 ? '' : `${selection.length} elementi`;
+	if (selection.length === 1) items.push({ action: 'open', label: t('Apri'), shortcut: 'Invio' });
+	const what = selection.length === 0 ? 'tutto' : selection.length === 1 ? '' : t('{0} elementi', [selection.length]);
 	items.push({ action: 'extractHere', label: `Estrai ${what} accanto all’archivio`.replace('  ', ' '), separator: items.length > 0 });
 	items.push({ action: 'extractTo', label: `Estrai ${what} in…`.replace('  ', ' ') });
 	return items;
@@ -486,25 +487,25 @@ function archiveItems({ selection, vault = false, clipboardFull = false }: MenuC
 
 function virtualItems({ selection, isStartPage = false }: MenuContext, location: 'pc' | 'network'): MenuItem[] {
 	if (selection.length !== 1) {
-		const items: MenuItem[] = [{ action: 'refresh', label: 'Aggiorna', shortcut: 'F5' }];
+		const items: MenuItem[] = [{ action: 'refresh', label: t('Aggiorna'), shortcut: 'F5' }];
 		if (location === 'pc' && selection.length === 0 && !isStartPage) {
-			items.push({ action: 'start:pc', label: 'Imposta come pagina iniziale', separator: true });
+			items.push({ action: 'start:pc', label: t('Imposta come pagina iniziale'), separator: true });
 		}
 		return items;
 	}
 	const items: MenuItem[] = [
-		{ action: 'open', label: 'Apri', shortcut: 'Invio' },
-		{ action: 'openNewTab', label: 'Apri in una nuova scheda' },
-		{ action: 'copyPath', label: 'Copia percorso', separator: true }
+		{ action: 'open', label: t('Apri'), shortcut: 'Invio' },
+		{ action: 'openNewTab', label: t('Apri in una nuova scheda') },
+		{ action: 'copyPath', label: t('Copia percorso'), separator: true }
 	];
 	if (location === 'pc') {
 		if (selection[0].kind === 'dir') {
-			items.push({ action: 'space', label: 'Analizza spazio' });
+			items.push({ action: 'space', label: t('Analizza spazio') });
 			// Only drives carry their size: a known folder in This PC is not a drive.
-			if (selection[0].total != null) items.push({ action: 'cleanup', label: 'Pulizia disco…' });
+			if (selection[0].total != null) items.push({ action: 'cleanup', label: t('Pulizia disco…') });
 		}
-		items.push({ action: 'moreOptions', label: 'Altre opzioni di Windows', separator: true });
-		items.push({ action: 'properties', label: 'Proprietà', shortcut: 'Alt+Invio' });
+		items.push({ action: 'moreOptions', label: t('Altre opzioni di Windows'), separator: true });
+		items.push({ action: 'properties', label: t('Proprietà'), shortcut: 'Alt+Invio' });
 	}
 	return items;
 }
@@ -512,14 +513,14 @@ function virtualItems({ selection, isStartPage = false }: MenuContext, location:
 /** Inside an open vault: extract, add the copied files, delete for good, lock. */
 function vaultItems(selection: MenuContext['selection'], clipboardFull: boolean): MenuItem[] {
 	const items: MenuItem[] = [];
-	if (selection.length === 1) items.push({ action: 'open', label: 'Apri', shortcut: 'Invio' });
-	const what = selection.length === 0 ? 'tutto' : selection.length === 1 ? '' : `${selection.length} elementi`;
+	if (selection.length === 1) items.push({ action: 'open', label: t('Apri'), shortcut: 'Invio' });
+	const what = selection.length === 0 ? 'tutto' : selection.length === 1 ? '' : t('{0} elementi', [selection.length]);
 	items.push({ action: 'extractTo', label: `Estrai ${what} in…`.replace('  ', ' '), separator: items.length > 0 });
-	if (clipboardFull) items.push({ action: 'addToVault', label: 'Metti qui i file copiati', shortcut: 'Ctrl+V' });
+	if (clipboardFull) items.push({ action: 'addToVault', label: t('Metti qui i file copiati'), shortcut: 'Ctrl+V' });
 	if (selection.length > 0) {
-		items.push({ action: 'deleteFromVault', label: 'Elimina dalla cassaforte', shortcut: 'Canc', danger: true, separator: true });
+		items.push({ action: 'deleteFromVault', label: t('Elimina dalla cassaforte'), shortcut: 'Canc', danger: true, separator: true });
 	}
-	items.push({ action: 'lockVault', label: 'Chiudi la cassaforte', separator: true });
+	items.push({ action: 'lockVault', label: t('Chiudi la cassaforte'), separator: true });
 	return items;
 }
 
@@ -530,10 +531,10 @@ export function folderPalette(
 ): MenuItem {
 	return {
 		action: 'folderColor',
-		label: 'Colore',
+		label: t('Colore'),
 		separator: true,
 		palette: [
-			{ action: 'noColor', name: 'Nessun colore', color: null, active: current === null },
+			{ action: 'noColor', name: t('Nessun colore'), color: null, active: current === null },
 			...FOLDER_COLORS.map((c) => ({
 				action: `color:${c.id}` as MenuAction,
 				name: labelName(c.id),
@@ -550,8 +551,8 @@ export function folderPalette(
  */
 export function newItems(types: ReadonlyArray<{ ext: string; name: string }>): MenuItem[] {
 	return [
-		{ action: 'newFolder', label: 'Cartella', shortcut: 'Ctrl+Maiusc+N' },
-		{ action: 'newVault', label: 'Cassaforte…' },
+		{ action: 'newFolder', label: t('Cartella'), shortcut: 'Ctrl+Maiusc+N' },
+		{ action: 'newVault', label: t('Cassaforte…') },
 		...types.map((t, i) => ({
 			action: `new:${t.ext}` as MenuAction,
 			label: t.name,
@@ -563,12 +564,12 @@ export function newItems(types: ReadonlyArray<{ ext: string; name: string }>): M
 /** The menu of a Quick access folder in the sidebar. */
 export function quickAccessItems(first: boolean, last: boolean): MenuItem[] {
 	const items: MenuItem[] = [
-		{ action: 'openNewTab', label: 'Apri in una nuova scheda' },
-		{ action: 'openNewWindow', label: 'Apri in una nuova finestra' }
+		{ action: 'openNewTab', label: t('Apri in una nuova scheda') },
+		{ action: 'openNewWindow', label: t('Apri in una nuova finestra') }
 	];
-	if (!first) items.push({ action: 'quickAccessUp', label: 'Sposta su', separator: true });
-	if (!last) items.push({ action: 'quickAccessDown', label: 'Sposta giù', separator: first });
-	items.push({ action: 'unpin', label: 'Togli dalla barra laterale', separator: true });
+	if (!first) items.push({ action: 'quickAccessUp', label: t('Sposta su'), separator: true });
+	if (!last) items.push({ action: 'quickAccessDown', label: t('Sposta giù'), separator: first });
+	items.push({ action: 'unpin', label: t('Togli dalla barra laterale'), separator: true });
 	return items;
 }
 
@@ -578,29 +579,29 @@ export type SidebarKind = 'place' | 'trash' | 'folder' | 'drive';
 /** The menu of any other sidebar stop. */
 export function sidebarItems(kind: SidebarKind, linux = ON_LINUX): MenuItem[] {
 	const items: MenuItem[] = [
-		{ action: 'openNewTab', label: 'Apri in una nuova scheda' },
-		{ action: 'openNewWindow', label: 'Apri in una nuova finestra' }
+		{ action: 'openNewTab', label: t('Apri in una nuova scheda') },
+		{ action: 'openNewWindow', label: t('Apri in una nuova finestra') }
 	];
-	if (kind === 'trash') items.push({ action: 'emptyTrash', label: 'Svuota Cestino', separator: true, danger: true });
-	if (kind === 'folder' || kind === 'drive') items.push({ action: 'space', label: 'Analizza spazio', separator: true });
-	if (kind === 'drive') items.push({ action: 'cleanup', label: 'Pulizia disco…' });
-	if ((kind === 'folder' || kind === 'drive') && !linux) items.push({ action: 'properties', label: 'Proprietà' });
+	if (kind === 'trash') items.push({ action: 'emptyTrash', label: t('Svuota Cestino'), separator: true, danger: true });
+	if (kind === 'folder' || kind === 'drive') items.push({ action: 'space', label: t('Analizza spazio'), separator: true });
+	if (kind === 'drive') items.push({ action: 'cleanup', label: t('Pulizia disco…') });
+	if ((kind === 'folder' || kind === 'drive') && !linux) items.push({ action: 'properties', label: t('Proprietà') });
 	return items;
 }
 
 const SORT_KEYS: Array<{ key: SortKey; name: string }> = [
-	{ key: 'name', name: 'Nome' },
-	{ key: 'modified', name: 'Data di modifica' },
-	{ key: 'kind', name: 'Tipo' },
-	{ key: 'size', name: 'Dimensione' }
+	{ key: 'name', name: t('Nome') },
+	{ key: 'modified', name: t('Data di modifica') },
+	{ key: 'kind', name: t('Tipo') },
+	{ key: 'size', name: t('Dimensione') }
 ];
 
 const GROUP_MODES: Array<{ mode: GroupMode; name: string }> = [
-	{ mode: 'none', name: 'Nessuno' },
-	{ mode: 'name', name: 'Nome' },
-	{ mode: 'date', name: 'Data di modifica' },
-	{ mode: 'type', name: 'Tipo' },
-	{ mode: 'size', name: 'Dimensione' }
+	{ mode: 'none', name: t('Nessuno') },
+	{ mode: 'name', name: t('Nome') },
+	{ mode: 'date', name: t('Data di modifica') },
+	{ mode: 'type', name: t('Tipo') },
+	{ mode: 'size', name: t('Dimensione') }
 ];
 
 /** Explorer's «Ordina» menu: column, direction and grouping. */
@@ -611,15 +612,15 @@ export function sortItems(sort: SortSpec, grouping: GroupMode): MenuItem[] {
 			label: c.name,
 			checked: sort.key === c.key
 		})),
-		{ action: 'ascending', label: 'Crescente', checked: sort.ascending, separator: true },
-		{ action: 'descending', label: 'Decrescente', checked: !sort.ascending },
+		{ action: 'ascending', label: t('Crescente'), checked: sort.ascending, separator: true },
+		{ action: 'descending', label: t('Decrescente'), checked: !sort.ascending },
 		...GROUP_MODES.map((g, i) => ({
 			action: `group:${g.mode}` as MenuAction,
 			label: g.name,
 			checked: grouping === g.mode,
-			accessibleName: g.mode === 'none' ? 'Nessun raggruppamento' : `Raggruppa per ${g.name.toLowerCase()}`,
+			accessibleName: g.mode === 'none' ? t('Nessun raggruppamento') : t('Raggruppa per {0}', [g.name.toLowerCase()]),
 			separator: i === 0,
-			section: i === 0 ? 'Raggruppa per' : undefined
+			section: i === 0 ? t('Raggruppa per') : undefined
 		}))
 	];
 }
@@ -646,16 +647,16 @@ export const LAST_FOLDER_START_PAGE = '::ultima';
 /** Pinning a folder so it opens at every startup, or stopping. */
 function startupItem(atStartup: boolean): MenuItem {
 	return atStartup
-		? { action: 'startupFolder', label: 'Non aprire più all’avvio' }
-		: { action: 'startupFolder', label: 'Apri sempre all’avvio' };
+		? { action: 'startupFolder', label: t('Non aprire più all’avvio') }
+		: { action: 'startupFolder', label: t('Apri sempre all’avvio') };
 }
 
 /** The start pages to choose from in the «Visualizza» menu. */
 export function startPageItems(startPage: string = DEFAULT_START_PAGE, session = false): MenuItem[] {
 	const choices: Array<[MenuAction, string, string]> = [
-		['start:pc', 'Questo PC', '::pc'],
-		['start:c', ON_LINUX ? 'File system (/)' : 'Disco locale (C:)', DEFAULT_START_PAGE],
-		['start:last', 'Ultima cartella aperta', LAST_FOLDER_START_PAGE]
+		['start:pc', t('Questo PC'), '::pc'],
+		['start:c', ON_LINUX ? t('File system (/)') : t('Disco locale (C:)'), DEFAULT_START_PAGE],
+		['start:last', t('Ultima cartella aperta'), LAST_FOLDER_START_PAGE]
 	];
 	const items: MenuItem[] = choices.map(([action, label, value]) => ({
 		action,
@@ -667,8 +668,8 @@ export function startPageItems(startPage: string = DEFAULT_START_PAGE, session =
 		const name = nameOf(startPage) || startPage;
 		items.push({ action: 'start:current', label: name, checked: true, accessibleName: startPage });
 	}
-	items.push({ action: 'session', label: 'Riprendi le schede della volta scorsa', checked: session });
-	return items.map((v, i) => (i === 0 ? { ...v, separator: true, section: 'All’apertura' } : v));
+	items.push({ action: 'session', label: t('Riprendi le schede della volta scorsa'), checked: session });
+	return items.map((v, i) => (i === 0 ? { ...v, separator: true, section: t('All’apertura') } : v));
 }
 
 /** Explorer's «Visualizza» menu: views, icon sizes, options. */
@@ -680,22 +681,22 @@ export function viewItems(s: ViewMenuState): MenuItem[] {
 			label: t.name,
 			checked: size(t.side)
 		})),
-		{ action: 'view:list', label: 'Elenco', checked: s.view === 'list' },
-		{ action: 'view:details', label: 'Dettagli', checked: s.view === 'details' },
-		{ action: 'view:tiles', label: 'Riquadri', checked: s.view === 'tiles' },
-		{ action: 'view:content', label: 'Contenuto', checked: s.view === 'content' },
-		{ action: 'compact', label: 'Visualizzazione compatta', checked: s.compact, separator: true },
-		...columnItems(s.columns).map((v, i) => (i === 0 ? { ...v, separator: true, section: 'Colonne dei dettagli' } : v)),
+		{ action: 'view:list', label: t('Elenco'), checked: s.view === 'list' },
+		{ action: 'view:details', label: t('Dettagli'), checked: s.view === 'details' },
+		{ action: 'view:tiles', label: t('Riquadri'), checked: s.view === 'tiles' },
+		{ action: 'view:content', label: t('Contenuto'), checked: s.view === 'content' },
+		{ action: 'compact', label: t('Visualizzazione compatta'), checked: s.compact, separator: true },
+		...columnItems(s.columns).map((v, i) => (i === 0 ? { ...v, separator: true, section: t('Colonne dei dettagli') } : v)),
 		{
 			action: 'preview',
-			label: 'Riquadro di anteprima',
+			label: t('Riquadro di anteprima'),
 			checked: s.preview,
 			shortcut: 'Alt+P',
 			separator: true,
-			section: 'Mostra'
+			section: t('Mostra')
 		},
-		{ action: 'extensions', label: 'Estensioni dei nomi file', checked: s.extensions },
-		{ action: 'hidden', label: 'Elementi nascosti', checked: s.hidden },
+		{ action: 'extensions', label: t('Estensioni dei nomi file'), checked: s.extensions },
+		{ action: 'hidden', label: t('Elementi nascosti'), checked: s.hidden },
 		...startPageItems(s.startPage, s.session)
 	];
 }
@@ -706,9 +707,9 @@ export function columnItems(
 	media: { shown: readonly MediaKey[]; chosen: boolean } | null = null
 ): MenuItem[] {
 	const items: MenuItem[] = [
-		{ action: 'columnType', label: 'Tipo', checked: c.type },
-		{ action: 'columnSize', label: 'Dimensione', checked: c.size },
-		{ action: 'columnDate', label: 'Data di modifica', checked: c.date }
+		{ action: 'columnType', label: t('Tipo'), checked: c.type },
+		{ action: 'columnSize', label: t('Dimensione'), checked: c.size },
+		{ action: 'columnDate', label: t('Data di modifica'), checked: c.date }
 	];
 	if (!media) return items;
 	MEDIA_COLUMNS.forEach((m, i) =>
@@ -716,24 +717,24 @@ export function columnItems(
 			action: `media:${m.key}` as MenuAction,
 			label: m.label,
 			checked: media.shown.includes(m.key),
-			section: i === 0 ? 'Foto, video e musica' : undefined,
+			section: i === 0 ? t('Foto, video e musica') : undefined,
 			separator: i === 0
 		})
 	);
-	if (media.chosen) items.push({ action: 'mediaAuto', label: 'Colonne automatiche per questa cartella', separator: true });
+	if (media.chosen) items.push({ action: 'mediaAuto', label: t('Colonne automatiche per questa cartella'), separator: true });
 	return items;
 }
 
 /** The pauses between one pass and the next that can be chosen, in seconds. */
 export const TRAIN_PAUSES: ReadonlyArray<[number, string]> = [
-	[0, 'Di continuo'],
-	[15, 'Ogni 15 secondi'],
-	[30, 'Ogni 30 secondi'],
-	[60, 'Ogni minuto'],
-	[120, 'Ogni 2 minuti'],
-	[300, 'Ogni 5 minuti'],
-	[600, 'Ogni 10 minuti'],
-	[-1, 'Solo durante i trasferimenti']
+	[0, t('Di continuo')],
+	[15, t('Ogni 15 secondi')],
+	[30, t('Ogni 30 secondi')],
+	[60, t('Ogni minuto')],
+	[120, t('Ogni 2 minuti')],
+	[300, t('Ogni 5 minuti')],
+	[600, t('Ogni 10 minuti')],
+	[-1, t('Solo durante i trasferimenti')]
 ];
 
 /**
@@ -763,14 +764,14 @@ export function workspaceItems(areas: ReadonlyArray<{ name: string; tabs: readon
 	const items: MenuItem[] = areas.map((a) => ({
 		action: `workspace:${a.name}` as MenuAction,
 		label: a.name,
-		shortcut: a.tabs.length === 1 ? '1 scheda' : `${a.tabs.length} schede`,
+		shortcut: a.tabs.length === 1 ? t('1 scheda') : t('{0} schede', [a.tabs.length]),
 		checked: a.name === current
 	}));
-	items.push({ action: 'workspaceNew', label: 'Salva come nuova area…', separator: items.length > 0 });
+	items.push({ action: 'workspaceNew', label: t('Salva come nuova area…'), separator: items.length > 0 });
 	if (current !== null) {
-		items.push({ action: 'workspaceRename', label: `Rinomina «${current}»…` });
-		items.push({ action: 'workspaceLeave', label: 'Esci dall’area', accessibleName: `Esci dall’area ${current}` });
-		items.push({ action: 'workspaceDelete', label: `Elimina «${current}»`, danger: true, separator: true });
+		items.push({ action: 'workspaceRename', label: t('Rinomina «{0}»…', [current]) });
+		items.push({ action: 'workspaceLeave', label: t('Esci dall’area'), accessibleName: t('Esci dall’area {0}', [current]) });
+		items.push({ action: 'workspaceDelete', label: t('Elimina «{0}»', [current]), danger: true, separator: true });
 	}
 	return items;
 }

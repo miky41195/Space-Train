@@ -1,3 +1,4 @@
+import { t } from './i18n';
 /**
  * Pixel-art characters for the themes: they travel on the rail in place of
  * the train. All original, in the same style as the convoy.
@@ -39,13 +40,13 @@ const cat = (name: string, o: string, d: string, k: string, w: string, p: string
 
 // Figure ids are saved in themes: they stay as they are.
 export const FIGURES: Record<string, Figure> = {
-	gattoArancio: cat('Gatto rosso', '#f59e0b', '#d97706', '#1f2937', '#fff7ed', '#f472b6'),
-	gattoNero: cat('Gatto nero', '#2b2b35', '#1c1c24', '#a3e635', '#3a3a46', '#f472b6'),
-	gattoBianco: cat('Gatto bianco', '#f5f5f4', '#e7e5e4', '#60a5fa', '#ffffff', '#fda4af'),
-	gattoGrigio: cat('Gatto grigio', '#9ca3af', '#6b7280', '#facc15', '#e5e7eb', '#f9a8d4'),
+	gattoArancio: cat(t('Gatto rosso'), '#f59e0b', '#d97706', '#1f2937', '#fff7ed', '#f472b6'),
+	gattoNero: cat(t('Gatto nero'), '#2b2b35', '#1c1c24', '#a3e635', '#3a3a46', '#f472b6'),
+	gattoBianco: cat(t('Gatto bianco'), '#f5f5f4', '#e7e5e4', '#60a5fa', '#ffffff', '#fda4af'),
+	gattoGrigio: cat(t('Gatto grigio'), '#9ca3af', '#6b7280', '#facc15', '#e5e7eb', '#f9a8d4'),
 
 	// ── Pocket creatures (original) ──
-	fiammello: F('Fiammello', { r: '#f97316', y: '#fde68a', k: '#1f2937', f: '#ef4444', g: '#facc15' }, [
+	fiammello: F(t('Fiammello'), { r: '#f97316', y: '#fde68a', k: '#1f2937', f: '#ef4444', g: '#facc15' }, [
 		'..g...........',
 		'.gfg....rrrr..',
 		'.gfg...rrrrrr.',
@@ -56,7 +57,7 @@ export const FIGURES: Record<string, Figure> = {
 		'....rrrrrrr...',
 		'....r.r..r.r..'
 	]),
-	goccino: F('Goccino', { b: '#38bdf8', l: '#bae6fd', k: '#0f172a', s: '#0ea5e9' }, [
+	goccino: F(t('Goccino'), { b: '#38bdf8', l: '#bae6fd', k: '#0f172a', s: '#0ea5e9' }, [
 		'.........b....',
 		'........bbb...',
 		'.......bbbbb..',
@@ -67,7 +68,7 @@ export const FIGURES: Record<string, Figure> = {
 		'...bbbbbbbb...',
 		'...b.b..b.b...'
 	]),
-	germoglio: F('Germoglio', { g: '#22c55e', d: '#15803d', l: '#86efac', k: '#052e16', p: '#f472b6' }, [
+	germoglio: F(t('Germoglio'), { g: '#22c55e', d: '#15803d', l: '#86efac', k: '#052e16', p: '#f472b6' }, [
 		'.........dld..',
 		'........dlld..',
 		'.........d....',
@@ -78,7 +79,7 @@ export const FIGURES: Record<string, Figure> = {
 		'...ggggllllg..',
 		'...g.g...g.g..'
 	]),
-	scintilla: F('Scintilla', { y: '#fde047', o: '#f59e0b', k: '#1c1917', w: '#fefce8', b: '#7c3aed' }, [
+	scintilla: F(t('Scintilla'), { y: '#fde047', o: '#f59e0b', k: '#1c1917', w: '#fefce8', b: '#7c3aed' }, [
 		'o...........y.',
 		'oo.........yy.',
 		'.oo.....yyyyy.',
@@ -91,7 +92,7 @@ export const FIGURES: Record<string, Figure> = {
 	]),
 
 	// ── Chibi anime (original) ──
-	ragazzaRosa: F('Ragazza dai capelli rosa', { h: '#f472b6', d: '#db2777', s: '#fde4cf', k: '#1e1b4b', u: '#1e3a8a', r: '#ef4444', w: '#ffffff' }, [
+	ragazzaRosa: F(t('Ragazza dai capelli rosa'), { h: '#f472b6', d: '#db2777', s: '#fde4cf', k: '#1e1b4b', u: '#1e3a8a', r: '#ef4444', w: '#ffffff' }, [
 		'...rhhhhr.',
 		'..hhhhhhh.',
 		'.hhhhhhhhh',
@@ -105,7 +106,7 @@ export const FIGURES: Record<string, Figure> = {
 		'....s.s...',
 		'....k.k...'
 	]),
-	ragazzoPunte: F('Ragazzo dai capelli a punta', { h: '#1f2937', s: '#fde4cf', k: '#0f172a', o: '#f97316', b: '#1d4ed8', w: '#ffffff' }, [
+	ragazzoPunte: F(t('Ragazzo dai capelli a punta'), { h: '#1f2937', s: '#fde4cf', k: '#0f172a', o: '#f97316', b: '#1d4ed8', w: '#ffffff' }, [
 		'.h.h.h....',
 		'.hhhhhh.h.',
 		'hhhhhhhhh.',
@@ -119,7 +120,7 @@ export const FIGURES: Record<string, Figure> = {
 		'...b...b..',
 		'...k...k..'
 	]),
-	maghetta: F('Maghetta', { h: '#a78bfa', s: '#fde4cf', k: '#1e1b4b', p: '#ec4899', w: '#fdf4ff', y: '#facc15', b: '#78350f' }, [
+	maghetta: F(t('Maghetta'), { h: '#a78bfa', s: '#fde4cf', k: '#1e1b4b', p: '#ec4899', w: '#fdf4ff', y: '#facc15', b: '#78350f' }, [
 		'...hhhhh..y',
 		'..hhhhhhhyy',
 		'..hsssssh.b',
@@ -132,7 +133,7 @@ export const FIGURES: Record<string, Figure> = {
 		'....s..s...',
 		'....p..p...'
 	]),
-	ninja: F('Ninja', { n: '#312e81', s: '#fde4cf', k: '#0f172a', r: '#dc2626', g: '#64748b' }, [
+	ninja: F(t('Ninja'), { n: '#312e81', s: '#fde4cf', k: '#0f172a', r: '#dc2626', g: '#64748b' }, [
 		'...nnnnn...',
 		'..nnnnnnn..',
 		'..nnnnnnnrr',
@@ -147,7 +148,7 @@ export const FIGURES: Record<string, Figure> = {
 	]),
 
 	// ── Kawaii ──
-	mochi: F('Mochi', { p: '#fbcfe8', d: '#f9a8d4', k: '#3f3f46', r: '#fb7185' }, [
+	mochi: F(t('Mochi'), { p: '#fbcfe8', d: '#f9a8d4', k: '#3f3f46', r: '#fb7185' }, [
 		'...pppppp...',
 		'..pppppppp..',
 		'.pppppppppp.',
@@ -157,7 +158,7 @@ export const FIGURES: Record<string, Figure> = {
 		'..dddddddd..',
 		'...d....d...'
 	]),
-	onigiri: F('Onigiri', { w: '#fafafa', n: '#1e293b', k: '#27272a', r: '#fb7185' }, [
+	onigiri: F(t('Onigiri'), { w: '#fafafa', n: '#1e293b', k: '#27272a', r: '#fb7185' }, [
 		'.....ww.....',
 		'....wwww....',
 		'...wwwwww...',
@@ -168,7 +169,7 @@ export const FIGURES: Record<string, Figure> = {
 		'wwwnnnnnnwww',
 		'.w........w.'
 	]),
-	boba: F('Tè con le perle', { c: '#e7c9a9', s: '#f472b6', t: '#d6d3d1', k: '#3f3f46', b: '#44403c', r: '#fb7185' }, [
+	boba: F(t('Tè con le perle'), { c: '#e7c9a9', s: '#f472b6', t: '#d6d3d1', k: '#3f3f46', b: '#44403c', r: '#fb7185' }, [
 		'.......s.',
 		'......s..',
 		'.ttttsttt',
@@ -180,7 +181,7 @@ export const FIGURES: Record<string, Figure> = {
 		'..ccccccc.',
 		'...c...c..'
 	]),
-	stellina: F('Stellina', { y: '#fde047', o: '#facc15', k: '#3f3f46', r: '#fb7185' }, [
+	stellina: F(t('Stellina'), { y: '#fde047', o: '#facc15', k: '#3f3f46', r: '#fb7185' }, [
 		'.....y.....',
 		'....yyy....',
 		'yyyyyyyyyyy',
@@ -192,7 +193,7 @@ export const FIGURES: Record<string, Figure> = {
 	]),
 
 	// ── Spring ──
-	farfalla: F('Farfalla', { a: '#f472b6', b: '#a78bfa', k: '#1f2937', y: '#fde047' }, [
+	farfalla: F(t('Farfalla'), { a: '#f472b6', b: '#a78bfa', k: '#1f2937', y: '#fde047' }, [
 		'aa......bb',
 		'aaa.k..bbb',
 		'aaay.kybbb',
@@ -201,7 +202,7 @@ export const FIGURES: Record<string, Figure> = {
 		'bbb.kk.aaa',
 		'.bb....aa.'
 	]),
-	ape: F('Ape', { y: '#facc15', k: '#1c1917', w: '#e0f2fe' }, [
+	ape: F(t('Ape'), { y: '#facc15', k: '#1c1917', w: '#e0f2fe' }, [
 		'....ww.ww..',
 		'....wwwww..',
 		'..ykykyky..',
@@ -210,7 +211,7 @@ export const FIGURES: Record<string, Figure> = {
 		'..ykykyky..',
 		'...k...k...'
 	]),
-	coccinella: F('Coccinella', { r: '#ef4444', k: '#1c1917', w: '#ffffff' }, [
+	coccinella: F(t('Coccinella'), { r: '#ef4444', k: '#1c1917', w: '#ffffff' }, [
 		'....rrrr.k.',
 		'..rrkrrrrkk',
 		'.rrrrrkrrkw',
@@ -219,7 +220,7 @@ export const FIGURES: Record<string, Figure> = {
 		'..rrrrrrr..',
 		'..k.k.k.k..'
 	]),
-	coniglio: F('Coniglietto', { w: '#f5f5f4', p: '#f9a8d4', k: '#1f2937', g: '#d6d3d1' }, [
+	coniglio: F(t('Coniglietto'), { w: '#f5f5f4', p: '#f9a8d4', k: '#1f2937', g: '#d6d3d1' }, [
 		'.........w.w',
 		'.........wpw',
 		'.........wpw',
@@ -232,7 +233,7 @@ export const FIGURES: Record<string, Figure> = {
 	]),
 
 	// ── Summer ──
-	granchio: F('Granchio', { r: '#ef4444', d: '#b91c1c', k: '#1c1917', w: '#ffffff' }, [
+	granchio: F(t('Granchio'), { r: '#ef4444', d: '#b91c1c', k: '#1c1917', w: '#ffffff' }, [
 		'rr........rr',
 		'r.r......r.r',
 		'.r..w..w..r.',
@@ -242,7 +243,7 @@ export const FIGURES: Record<string, Figure> = {
 		'..rddddddr..',
 		'.r.r.r.r.r.r'
 	]),
-	gelato: F('Gelato', { p: '#f9a8d4', m: '#a7f3d0', c: '#d97706', y: '#fbbf24', k: '#3f3f46', r: '#e11d48' }, [
+	gelato: F(t('Gelato'), { p: '#f9a8d4', m: '#a7f3d0', c: '#d97706', y: '#fbbf24', k: '#3f3f46', r: '#e11d48' }, [
 		'....r....',
 		'...ppp...',
 		'..ppppp..',
@@ -254,7 +255,7 @@ export const FIGURES: Record<string, Figure> = {
 		'...ccc...',
 		'...c.c...'
 	]),
-	tartaruga: F('Tartaruga', { g: '#16a34a', d: '#166534', l: '#84cc16', k: '#052e16' }, [
+	tartaruga: F(t('Tartaruga'), { g: '#16a34a', d: '#166534', l: '#84cc16', k: '#052e16' }, [
 		'....dddd.....',
 		'...ddlldd....',
 		'..ddllllddll.',
@@ -262,7 +263,7 @@ export const FIGURES: Record<string, Figure> = {
 		'.dddddddddll.',
 		'..l.l..l.l...'
 	]),
-	sole: F('Sole', { y: '#fde047', o: '#f59e0b', k: '#78350f', r: '#fb7185' }, [
+	sole: F(t('Sole'), { y: '#fde047', o: '#f59e0b', k: '#78350f', r: '#fb7185' }, [
 		'o...o...o',
 		'.o.yyy.o.',
 		'..yyyyy..',
@@ -274,7 +275,7 @@ export const FIGURES: Record<string, Figure> = {
 	]),
 
 	// ── Autumn ──
-	riccio: F('Riccio', { b: '#78350f', s: '#a16207', f: '#fde4cf', k: '#1c1917' }, [
+	riccio: F(t('Riccio'), { b: '#78350f', s: '#a16207', f: '#fde4cf', k: '#1c1917' }, [
 		'..b.b.b.b....',
 		'.bbbbbbbbb...',
 		'bsbsbsbsbbf..',
@@ -283,7 +284,7 @@ export const FIGURES: Record<string, Figure> = {
 		'.bbbbbbbbbff.',
 		'..f.f..f.f...'
 	]),
-	scoiattolo: F('Scoiattolo', { o: '#c2410c', l: '#fdba74', k: '#1c1917', g: '#a16207' }, [
+	scoiattolo: F(t('Scoiattolo'), { o: '#c2410c', l: '#fdba74', k: '#1c1917', g: '#a16207' }, [
 		'oo........o.',
 		'ooo......ooo',
 		'ooo.....ookl',
@@ -293,7 +294,7 @@ export const FIGURES: Record<string, Figure> = {
 		'....oooolg..',
 		'....o.o..o..'
 	]),
-	fungo: F('Fungo', { r: '#dc2626', w: '#fafaf9', b: '#e7e5e4', k: '#292524' }, [
+	fungo: F(t('Fungo'), { r: '#dc2626', w: '#fafaf9', b: '#e7e5e4', k: '#292524' }, [
 		'...rrrrr...',
 		'..rrwrrwr..',
 		'.rwrrrrrwr.',
@@ -303,7 +304,7 @@ export const FIGURES: Record<string, Figure> = {
 		'...bbbbb...',
 		'...b...b...'
 	]),
-	foglia: F('Foglia', { o: '#ea580c', y: '#f59e0b', b: '#78350f', k: '#431407' }, [
+	foglia: F(t('Foglia'), { o: '#ea580c', y: '#f59e0b', b: '#78350f', k: '#431407' }, [
 		'......o....',
 		'....ooyo...',
 		'..ooyyyoo..',
@@ -316,7 +317,7 @@ export const FIGURES: Record<string, Figure> = {
 	]),
 
 	// ── Winter ──
-	pinguino: F('Pinguino', { n: '#1e293b', w: '#f8fafc', o: '#f97316', k: '#0f172a' }, [
+	pinguino: F(t('Pinguino'), { n: '#1e293b', w: '#f8fafc', o: '#f97316', k: '#0f172a' }, [
 		'...nnnn...',
 		'..nnnnnn..',
 		'..nwkwwn..',
@@ -327,7 +328,7 @@ export const FIGURES: Record<string, Figure> = {
 		'..nnnnnn..',
 		'...o..o...'
 	]),
-	pupazzo: F('Pupazzo di neve', { w: '#f8fafc', k: '#1e293b', o: '#f97316', r: '#dc2626', b: '#78350f' }, [
+	pupazzo: F(t('Pupazzo di neve'), { w: '#f8fafc', k: '#1e293b', o: '#f97316', r: '#dc2626', b: '#78350f' }, [
 		'...kkk...',
 		'..kkkkk..',
 		'..wwwww..',
@@ -339,7 +340,7 @@ export const FIGURES: Record<string, Figure> = {
 		'.wwwkwww.',
 		'..w...w..'
 	]),
-	orsoPolare: F('Orso polare', { w: '#f1f5f9', g: '#cbd5e1', k: '#0f172a' }, [
+	orsoPolare: F(t('Orso polare'), { w: '#f1f5f9', g: '#cbd5e1', k: '#0f172a' }, [
 		'.........w.w.',
 		'........wwwww',
 		'........wwkww',
@@ -350,7 +351,7 @@ export const FIGURES: Record<string, Figure> = {
 	]),
 
 	// ── Christmas ──
-	renna: F('Renna', { b: '#92400e', l: '#d6a46b', k: '#1c1917', r: '#ef4444', a: '#a16207' }, [
+	renna: F(t('Renna'), { b: '#92400e', l: '#d6a46b', k: '#1c1917', r: '#ef4444', a: '#a16207' }, [
 		'.........a.a.',
 		'.........aaa.',
 		'..........bb.',
@@ -360,7 +361,7 @@ export const FIGURES: Record<string, Figure> = {
 		'.bbllllbbb...',
 		'.b.b...b.b...'
 	]),
-	slitta: F('Slitta', { r: '#dc2626', d: '#991b1b', y: '#facc15', s: '#fde4cf', w: '#f8fafc', k: '#1c1917', g: '#16a34a' }, [
+	slitta: F(t('Slitta'), { r: '#dc2626', d: '#991b1b', y: '#facc15', s: '#fde4cf', w: '#f8fafc', k: '#1c1917', g: '#16a34a' }, [
 		'......rrr.....',
 		'.....rrrrw....',
 		'.....sskss....',
@@ -372,7 +373,7 @@ export const FIGURES: Record<string, Figure> = {
 		'.y..........y.',
 		'yyyyyyyyyyyyy.'
 	]),
-	regalo: F('Regalo', { g: '#16a34a', y: '#facc15', r: '#dc2626' }, [
+	regalo: F(t('Regalo'), { g: '#16a34a', y: '#facc15', r: '#dc2626' }, [
 		'...r.r...',
 		'....r....',
 		'ggggyggggg',
@@ -384,7 +385,7 @@ export const FIGURES: Record<string, Figure> = {
 	]),
 
 	// ── New Year ──
-	razzo: F('Razzo', { r: '#ef4444', w: '#f8fafc', b: '#3b82f6', y: '#facc15', o: '#f97316' }, [
+	razzo: F(t('Razzo'), { r: '#ef4444', w: '#f8fafc', b: '#3b82f6', y: '#facc15', o: '#f97316' }, [
 		'.....r',
 		'....rr',
 		'...wwr',
@@ -394,7 +395,7 @@ export const FIGURES: Record<string, Figure> = {
 		'yo....',
 		'o.....'
 	]),
-	bottiglia: F('Spumante', { g: '#15803d', y: '#facc15', w: '#fef9c3', k: '#1c1917' }, [
+	bottiglia: F(t('Spumante'), { g: '#15803d', y: '#facc15', w: '#fef9c3', k: '#1c1917' }, [
 		'...yyy...',
 		'...ggg...',
 		'...ggg...',
@@ -405,7 +406,7 @@ export const FIGURES: Record<string, Figure> = {
 		'.ggggggg.',
 		'..g...g..'
 	]),
-	orologio: F('Orologio di mezzanotte', { y: '#facc15', w: '#fefce8', k: '#1c1917', r: '#ef4444' }, [
+	orologio: F(t('Orologio di mezzanotte'), { y: '#facc15', w: '#fefce8', k: '#1c1917', r: '#ef4444' }, [
 		'..yyyyy..',
 		'.ywwkwwy.',
 		'ywwwkwwwy',
@@ -417,7 +418,7 @@ export const FIGURES: Record<string, Figure> = {
 	]),
 
 	// ── Valentine's Day ──
-	cuore: F('Cuoricino', { r: '#ef4444', p: '#fda4af', k: '#3f0d12', w: '#fff1f2' }, [
+	cuore: F(t('Cuoricino'), { r: '#ef4444', p: '#fda4af', k: '#3f0d12', w: '#fff1f2' }, [
 		'.rr...rr.',
 		'rrrr.rrrr',
 		'rwrrrrrrr',
@@ -427,7 +428,7 @@ export const FIGURES: Record<string, Figure> = {
 		'...rrr...',
 		'...k.k...'
 	]),
-	lettera: F('Lettera d’amore', { w: '#fff1f2', p: '#fbcfe8', r: '#e11d48', k: '#3f3f46' }, [
+	lettera: F(t('Lettera d’amore'), { w: '#fff1f2', p: '#fbcfe8', r: '#e11d48', k: '#3f3f46' }, [
 		'wwwwwwwwww',
 		'wpwwwwwwpw',
 		'wwppwwppww',
@@ -439,7 +440,7 @@ export const FIGURES: Record<string, Figure> = {
 	]),
 
 	// ── Carnival ──
-	maschera: F('Maschera', { v: '#7c3aed', y: '#facc15', p: '#ec4899', k: '#1e1b4b' }, [
+	maschera: F(t('Maschera'), { v: '#7c3aed', y: '#facc15', p: '#ec4899', k: '#1e1b4b' }, [
 		'y........y',
 		'.y.vvvv.y.',
 		'..vvvvvv..',
@@ -449,7 +450,7 @@ export const FIGURES: Record<string, Figure> = {
 		'...pppp...',
 		'...p..p...'
 	]),
-	giullare: F('Giullare', { r: '#dc2626', g: '#16a34a', y: '#facc15', s: '#fde4cf', k: '#1c1917' }, [
+	giullare: F(t('Giullare'), { r: '#dc2626', g: '#16a34a', y: '#facc15', s: '#fde4cf', k: '#1c1917' }, [
 		'y.......y',
 		'rr.....gg',
 		'.rrr.ggg.',
@@ -463,7 +464,7 @@ export const FIGURES: Record<string, Figure> = {
 	]),
 
 	// ── Easter ──
-	pulcino: F('Pulcino', { y: '#fde047', o: '#f97316', k: '#1c1917' }, [
+	pulcino: F(t('Pulcino'), { y: '#fde047', o: '#f97316', k: '#1c1917' }, [
 		'....yyy..',
 		'...yyyyy.',
 		'...yykyoo',
@@ -472,7 +473,7 @@ export const FIGURES: Record<string, Figure> = {
 		'.yyyyyy..',
 		'..o..o...'
 	]),
-	uovo: F('Uovo decorato', { a: '#a5f3fc', p: '#f9a8d4', y: '#fde68a', k: '#3f3f46' }, [
+	uovo: F(t('Uovo decorato'), { a: '#a5f3fc', p: '#f9a8d4', y: '#fde68a', k: '#3f3f46' }, [
 		'...aaa...',
 		'..aaaaa..',
 		'.ppppppp.',
@@ -484,7 +485,7 @@ export const FIGURES: Record<string, Figure> = {
 	]),
 
 	// ── Halloween ──
-	zucca: F('Zucca', { o: '#f97316', d: '#c2410c', g: '#15803d', k: '#1c1917' }, [
+	zucca: F(t('Zucca'), { o: '#f97316', d: '#c2410c', g: '#15803d', k: '#1c1917' }, [
 		'.....g....',
 		'....gg....',
 		'.ooodoooo.',
@@ -494,7 +495,7 @@ export const FIGURES: Record<string, Figure> = {
 		'.oodooodo.',
 		'..o....o..'
 	]),
-	fantasma: F('Fantasmino', { w: '#f8fafc', g: '#cbd5e1', k: '#1e293b' }, [
+	fantasma: F(t('Fantasmino'), { w: '#f8fafc', g: '#cbd5e1', k: '#1e293b' }, [
 		'...wwww...',
 		'..wwwwww..',
 		'.wwkwwkww.',
@@ -504,7 +505,7 @@ export const FIGURES: Record<string, Figure> = {
 		'.wgwwgwwg.',
 		'.w.w.w.w..'
 	]),
-	pipistrello: F('Pipistrello', { n: '#3b0764', p: '#a855f7', y: '#fde047' }, [
+	pipistrello: F(t('Pipistrello'), { n: '#3b0764', p: '#a855f7', y: '#fde047' }, [
 		'n....n....n',
 		'nn..nnn..nn',
 		'nnnnnyny.nn',
@@ -514,7 +515,7 @@ export const FIGURES: Record<string, Figure> = {
 	]),
 
 	// ── Cianografia: technical drawing tools ──
-	trenoFilo: F('Treno in fil di ferro', { w: '#e6f6ff', d: '#5db8ff', y: '#ffd36b' }, [
+	trenoFilo: F(t('Treno in fil di ferro'), { w: '#e6f6ff', d: '#5db8ff', y: '#ffd36b' }, [
 		'.ww...........',
 		'.ww...wwwwwww.',
 		'wwwwwww.....w.',
@@ -524,7 +525,7 @@ export const FIGURES: Record<string, Figure> = {
 		'.w..w.....w..w',
 		'.d..d.....d..d'
 	]),
-	compasso: F('Compasso', { w: '#e6f6ff', d: '#5db8ff', y: '#ffd36b' }, [
+	compasso: F(t('Compasso'), { w: '#e6f6ff', d: '#5db8ff', y: '#ffd36b' }, [
 		'....d....',
 		'...ddd...',
 		'....w....',
@@ -535,7 +536,7 @@ export const FIGURES: Record<string, Figure> = {
 		'.w.....w.',
 		'.d.....y.'
 	]),
-	squadra: F('Squadra', { w: '#e6f6ff', d: '#5db8ff' }, [
+	squadra: F(t('Squadra'), { w: '#e6f6ff', d: '#5db8ff' }, [
 		'w.........',
 		'ww........',
 		'w.w.......',
@@ -548,7 +549,7 @@ export const FIGURES: Record<string, Figure> = {
 	]),
 
 	// ── Abisso: creatures of the sea floor ──
-	medusa: F('Medusa', { b: '#52ffd6', l: '#c9fff1', p: '#ff8ade' }, [
+	medusa: F(t('Medusa'), { b: '#52ffd6', l: '#c9fff1', p: '#ff8ade' }, [
 		'...bbbbb...',
 		'..bbllbbb..',
 		'.bbllbbbbb.',
@@ -558,7 +559,7 @@ export const FIGURES: Record<string, Figure> = {
 		'.b.p.b.p.b.',
 		'.p...p...p.'
 	]),
-	pesceLanterna: F('Pesce lanterna', { b: '#2fb4ff', n: '#0e5f86', y: '#fff3a0', k: '#02121b', w: '#dcf6f3' }, [
+	pesceLanterna: F(t('Pesce lanterna'), { b: '#2fb4ff', n: '#0e5f86', y: '#fff3a0', k: '#02121b', w: '#dcf6f3' }, [
 		'...........yy.',
 		'.....nnnn.y...',
 		'n..nbbbbbn....',
@@ -568,7 +569,7 @@ export const FIGURES: Record<string, Figure> = {
 		'n..nbbbbbbn...',
 		'.....nnnn.....'
 	]),
-	cavalluccio: F('Cavalluccio marino', { s: '#ff8ade', d: '#c2589e', k: '#02121b' }, [
+	cavalluccio: F(t('Cavalluccio marino'), { s: '#ff8ade', d: '#c2589e', k: '#02121b' }, [
 		'....ssss..',
 		'...sskss..',
 		'...ssssss.',
@@ -582,7 +583,7 @@ export const FIGURES: Record<string, Figure> = {
 	]),
 
 	// ── Atlante: travels on paper ──
-	aeroplanino: F('Aeroplanino di carta', { w: '#ffffff', g: '#9fb5ab', k: '#17283a' }, [
+	aeroplanino: F(t('Aeroplanino di carta'), { w: '#ffffff', g: '#9fb5ab', k: '#17283a' }, [
 		'k.............',
 		'wwk...........',
 		'.wwwwk........',
@@ -592,7 +593,7 @@ export const FIGURES: Record<string, Figure> = {
 		'.ggggk........',
 		'ggk...........'
 	]),
-	mongolfiera: F('Mongolfiera', { o: '#c27a1a', b: '#0f6a8c', w: '#f7faf6', r: '#17283a', k: '#7a4a1e' }, [
+	mongolfiera: F(t('Mongolfiera'), { o: '#c27a1a', b: '#0f6a8c', w: '#f7faf6', r: '#17283a', k: '#7a4a1e' }, [
 		'...oooo...',
 		'..obwbwo..',
 		'.obwbwbwo.',
@@ -603,7 +604,7 @@ export const FIGURES: Record<string, Figure> = {
 		'...kkkk...',
 		'...kkkk...'
 	]),
-	faro: F('Faro', { y: '#ffd36b', k: '#17283a', w: '#f7faf6', r: '#b4432f' }, [
+	faro: F(t('Faro'), { y: '#ffd36b', k: '#17283a', w: '#f7faf6', r: '#b4432f' }, [
 		'..yyy..',
 		'.kkkkk.',
 		'..www..',
@@ -616,7 +617,7 @@ export const FIGURES: Record<string, Figure> = {
 	]),
 
 	// ── Orient Express: the luxury train ──
-	locoOro: F('Locomotiva a vapore', { v: '#2e6a50', g: '#cfa24a', d: '#f6dc96', f: '#cfc8b4', k: '#0c1512' }, [
+	locoOro: F(t('Locomotiva a vapore'), { v: '#2e6a50', g: '#cfa24a', d: '#f6dc96', f: '#cfc8b4', k: '#0c1512' }, [
 		'......fff.........',
 		'........fff.......',
 		'..........gg......',
@@ -627,7 +628,7 @@ export const FIGURES: Record<string, Figure> = {
 		'vvvvvvvvvvvvvvvvgg',
 		'.gg..gg....gg.....'
 	]),
-	carrozzaOro: F('Carrozza letto', { b: '#7a4a22', g: '#cfa24a', d: '#f6dc96', k: '#0c1512' }, [
+	carrozzaOro: F(t('Carrozza letto'), { b: '#7a4a22', g: '#cfa24a', d: '#f6dc96', k: '#0c1512' }, [
 		'.gggggggggggggggg.',
 		'gbbbbbbbbbbbbbbbbg',
 		'gbddbbddbbddbbddbg',
@@ -638,7 +639,7 @@ export const FIGURES: Record<string, Figure> = {
 	]),
 
 	// ── Train (for the editor: the original convoy is chosen apart) ──
-	vagone: F('Vagoncino', { p: '#8b5cf6', c: '#7cf5ff', k: '#1e1b4b', g: '#4b5563' }, [
+	vagone: F(t('Vagoncino'), { p: '#8b5cf6', c: '#7cf5ff', k: '#1e1b4b', g: '#4b5563' }, [
 		'pppppppppppp',
 		'pccpccpccpcp',
 		'pppppppppppp',

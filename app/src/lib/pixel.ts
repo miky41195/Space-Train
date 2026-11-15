@@ -1,3 +1,4 @@
+import { t } from './i18n';
 /**
  * From base64 PNG to pixels and back, with the WebView's canvas. Apart from
  * `transparency.ts` because it needs the browser: tests replace it.
@@ -22,7 +23,7 @@ export async function writePng(img: Pixel): Promise<string> {
 	canvas.height = img.height;
 	canvas.getContext('2d')!.putImageData(new ImageData(img.data, img.width, img.height), 0, 0);
 	const blob = await new Promise<Blob>((ok, ko) =>
-		canvas.toBlob((b) => (b ? ok(b) : ko(new Error('PNG non creato'))), 'image/png')
+		canvas.toBlob((b) => (b ? ok(b) : ko(new Error(t('PNG non creato')))), 'image/png')
 	);
 	const bytes = new Uint8Array(await blob.arrayBuffer());
 	let text = '';

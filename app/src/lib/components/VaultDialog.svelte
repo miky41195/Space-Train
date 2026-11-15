@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	let {
 		mode,
 		name = '',
@@ -37,15 +38,15 @@
 
 	let problem = $derived.by(() => {
 		if (mode !== 'create') return null;
-		if (!newName.trim()) return 'Scegli un nome.';
-		if ([...password].length < 8) return 'La password deve avere almeno 8 caratteri.';
-		if (repeat && repeat !== password) return 'Le due password non sono uguali.';
-		if (!repeat) return 'Scrivi di nuovo la password.';
+		if (!newName.trim()) return t('Scegli un nome.');
+		if ([...password].length < 8) return t('La password deve avere almeno 8 caratteri.');
+		if (repeat && repeat !== password) return t('Le due password non sono uguali.');
+		if (!repeat) return t('Scrivi di nuovo la password.');
 		return null;
 	});
 
 	let title = $derived(
-		mode === 'unlock' ? `Apri «${name}»` : mode === 'create' ? 'Nuova cassaforte' : `Metti nella cassaforte «${name}»`
+		mode === 'unlock' ? t('Apri «{0}»', [name]) : mode === 'create' ? t('Nuova cassaforte') : t('Metti nella cassaforte «{0}»', [name])
 	);
 
 	function submit(e: SubmitEvent) {
@@ -67,14 +68,14 @@
 
 			{#if mode === 'create'}
 				<label>
-					<span class="label">Nome</span>
-					<input bind:this={first} bind:value={newName} maxlength="80" placeholder="Privato" />
+					<span class="label">{t('Nome')}</span>
+					<input bind:this={first} bind:value={newName} maxlength="80" placeholder={t('Privato')} />
 				</label>
 			{/if}
 
 			{#if mode === 'unlock' || mode === 'create'}
 				<label>
-					<span class="label">Password</span>
+					<span class="label">{t('Password')}</span>
 					{#if mode === 'unlock'}
 						<input bind:this={first} type="password" bind:value={password} autocomplete="current-password" />
 					{:else}
@@ -85,33 +86,31 @@
 
 			{#if mode === 'create'}
 				<label>
-					<span class="label">Ripeti la password</span>
+					<span class="label">{t('Ripeti la password')}</span>
 					<input type="password" bind:value={repeat} autocomplete="new-password" />
 				</label>
-				<p class="notice">
-					Se perdi la password i file non si possono più aprire. Nemmeno Space Train li può recuperare: scrivila in un posto sicuro.
-				</p>
+				<p class="notice"> {t('Se perdi la password i file non si possono più aprire. Nemmeno Space Train li può recuperare: scrivila in un posto sicuro.')} </p>
 			{/if}
 
 			{#if mode === 'add'}
-				<p>{count === 1 ? '1 elemento verrà cifrato' : `${count} elementi verranno cifrati`} dentro la cassaforte.</p>
-				<label class="choice"><input type="checkbox" bind:checked={trashOriginals} /> Poi manda gli originali nel cestino</label>
-				<p class="note">Senza questa scelta gli originali restano dove sono, leggibili come prima.</p>
+				<p>{t('{0} dentro la cassaforte.', [count === 1 ? t('1 elemento verrà cifrato') : t('{0} elementi verranno cifrati', [count])])}</p>
+				<label class="choice"><input type="checkbox" bind:checked={trashOriginals} /> {t('Poi manda gli originali nel cestino')}</label>
+				<p class="note">{t('Senza questa scelta gli originali restano dove sono, leggibili come prima.')}</p>
 			{/if}
 
 			{#if error}<p class="error" role="alert">{error}</p>{/if}
 			{#if mode === 'create' && problem && (newName || password)}<p class="note">{problem}</p>{/if}
 
 			<div class="actions">
-				<button type="button" onclick={oncancel} disabled={busy}>Annulla</button>
+				<button type="button" onclick={oncancel} disabled={busy}>{t('Annulla')}</button>
 				{#if mode === 'add'}
-					<button bind:this={first} type="submit" class="primary" disabled={busy}>Metti nella cassaforte</button>
+					<button bind:this={first} type="submit" class="primary" disabled={busy}>{t('Metti nella cassaforte')}</button>
 				{:else}
 					<button
 						type="submit"
 						class="primary"
 						disabled={busy || (mode === 'unlock' ? !password : problem !== null)}
-						>{busy ? 'Un momento…' : mode === 'unlock' ? 'Apri' : 'Crea cassaforte'}</button
+						>{busy ? t('Un momento…') : mode === 'unlock' ? t('Apri') : t('Crea cassaforte')}</button
 					>
 				{/if}
 			</div>

@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import type { Backend } from '../ipc';
 import { nameOf } from '../locations';
 
@@ -91,7 +92,7 @@ export class UndoStore {
 						onProgress: () => {}
 					});
 					if (outcome.skipped > 0) {
-						throw { kind: 'io', message: `«${nameOf(source)}» esiste già nella posizione originale.` };
+						throw { kind: 'io', message: t('«{0}» esiste già nella posizione originale.', [nameOf(source)]) };
 					}
 					// With a conflict the item had arrived numbered: going
 					// home it takes its own name back.
@@ -107,19 +108,19 @@ export class UndoStore {
 }
 
 export function describeOperation(op: Operation): string {
-	const items = (n: number) => (n === 1 ? '1 elemento' : `${n} elementi`);
+	const items = (n: number) => (n === 1 ? t('1 elemento') : t('{0} elementi', [n]));
 	switch (op.kind) {
 		case 'rename':
-			return `rinomina di «${nameOf(op.to)}»`;
+			return t('rinomina di «{0}»', [nameOf(op.to)]);
 		case 'batchRename':
-			return `rinomina di ${items(new Set(op.steps.map(([from]) => from)).size)}`;
+			return t('rinomina di {0}', [items(new Set(op.steps.map(([from]) => from)).size)]);
 		case 'move':
-			return `spostamento di ${items(op.pairs.length)}`;
+			return t('spostamento di {0}', [items(op.pairs.length)]);
 		case 'create':
 			return op.description;
 		case 'trash':
-			return `eliminazione di ${items(op.originals.length)}`;
+			return t('eliminazione di {0}', [items(op.originals.length)]);
 		case 'rotate':
-			return `rotazione di ${op.paths.length === 1 ? `«${nameOf(op.paths[0])}»` : items(op.paths.length)}`;
+			return t('rotazione di {0}', [op.paths.length === 1 ? t('«{0}»', [nameOf(op.paths[0])]) : items(op.paths.length)]);
 	}
 }

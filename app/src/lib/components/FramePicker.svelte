@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import {
 		snapBox,
 		cell,
@@ -233,14 +234,14 @@
 
 	const HANDLES = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'] as const;
 	const NAMES: Record<(typeof HANDLES)[number], string> = {
-		n: 'Bordo superiore',
-		s: 'Bordo inferiore',
-		e: 'Bordo destro',
-		w: 'Bordo sinistro',
-		ne: 'Angolo in alto a destra',
-		nw: 'Angolo in alto a sinistra',
-		se: 'Angolo in basso a destra',
-		sw: 'Angolo in basso a sinistra'
+		n: t('Bordo superiore'),
+		s: t('Bordo inferiore'),
+		e: t('Bordo destro'),
+		w: t('Bordo sinistro'),
+		ne: t('Angolo in alto a destra'),
+		nw: t('Angolo in alto a sinistra'),
+		se: t('Angolo in basso a destra'),
+		sw: t('Angolo in basso a sinistra')
 	};
 </script>
 
@@ -248,17 +249,17 @@
 	<div class="bar">
 		{#if byHand}
 			{@const r = boxes[chosenValid]}
-			<span class="help">Clicca un fotogramma per modificarlo, disegnane uno nuovo nello spazio vuoto</span>
+			<span class="help">{t('Clicca un fotogramma per modificarlo, disegnane uno nuovo nello spazio vuoto')}</span>
 			<span class="choice">n. {chosenValid + 1}: {r.w}×{r.h} px da {r.x},{r.y}</span>
 			<button class="text" disabled={boxes.length <= 1} onclick={removeChosen}
-				aria-label="Togli il fotogramma {chosenValid + 1} di {name}">Togli</button>
+				aria-label={t('Togli il fotogramma {0} di {1}', [chosenValid + 1, name])}>{t('Togli')}</button>
 		{:else}
-			<span class="help">Disegna la zona dei fotogrammi, tira bordi e angoli o spostala</span>
+			<span class="help">{t('Disegna la zona dei fotogrammi, tira bordi e angoli o spostala')}</span>
 			<span class="choice">{sheet.w}×{sheet.h} px da {sheet.x},{sheet.y}</span>
 		{/if}
-		<button onclick={() => changeZoom(-1)} aria-label="Riduci lo zoom di {name}">−</button>
+		<button onclick={() => changeZoom(-1)} aria-label={t('Riduci lo zoom di {0}', [name])}>−</button>
 		<span class="zoom">{Math.round(zoom * 100)}%</span>
-		<button onclick={() => changeZoom(1)} aria-label="Aumenta lo zoom di {name}">+</button>
+		<button onclick={() => changeZoom(1)} aria-label={t('Aumenta lo zoom di {0}', [name])}>+</button>
 	</div>
 
 	<div class="sheet-window" onwheel={wheel}>
@@ -268,7 +269,7 @@
 			bind:this={sheetEl}
 			role="grid"
 			tabindex="-1"
-			aria-label="Foglio di {name}"
+			aria-label={t('Foglio di {0}', [name])}
 			style:width="{sheet.sheetWidth * zoom}px"
 			style:height="{sheet.sheetHeight * zoom}px"
 			style:background-image={`url("${src.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}")`}
@@ -287,7 +288,7 @@
 						class:chosen={k === chosenValid}
 						data-index={k}
 						data-handle="move"
-						aria-label="Fotogramma {k + 1} di {name}"
+						aria-label={t('Fotogramma {0} di {1}', [k + 1, name])}
 						style:left="{r.x * zoom}px"
 						style:top="{r.y * zoom}px"
 						style:width="{r.w * zoom}px"
@@ -296,7 +297,7 @@
 						<span class="number">{k + 1}</span>
 						{#if k === chosenValid}
 							{#each HANDLES as m (m)}
-								<span class="handle {m}" data-handle={m} aria-label="{NAMES[m]} del fotogramma di {name}"></span>
+								<span class="handle {m}" data-handle={m} aria-label={t('{0} del fotogramma di {1}', [NAMES[m], name])}></span>
 							{/each}
 						{/if}
 					</div>
@@ -313,7 +314,7 @@
 					class="zone"
 					class:active={gesture !== null}
 					data-handle="move"
-					aria-label="Zona di {name}"
+					aria-label={t('Zona di {0}', [name])}
 					style:left="{sheet.x * zoom}px"
 					style:top="{sheet.y * zoom}px"
 					style:width="{sheet.w * zoom}px"
@@ -332,7 +333,7 @@
 						><span class="number">{k + 1}</span></span>
 					{/each}
 					{#each HANDLES as m (m)}
-						<span class="handle {m}" data-handle={m} aria-label="{NAMES[m]} della zona di {name}"></span>
+						<span class="handle {m}" data-handle={m} aria-label={t('{0} della zona di {1}', [NAMES[m], name])}></span>
 					{/each}
 				</div>
 			{/if}

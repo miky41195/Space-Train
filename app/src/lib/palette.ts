@@ -1,13 +1,14 @@
+import { t } from './i18n';
 import { fuzzyMatch } from './fuzzy';
 
 export type CommandKind = 'action' | 'folder' | 'search' | 'theme' | 'setting';
 
 export const KIND_LABELS: Record<CommandKind, string> = {
 	action: 'Azione',
-	folder: 'Cartella',
-	search: 'Ricerca',
-	theme: 'Tema',
-	setting: 'Impostaz.'
+	folder: t('Cartella'),
+	search: t('Ricerca'),
+	theme: t('Tema'),
+	setting: t('Impostaz.')
 };
 
 /** One line of the command palette. */

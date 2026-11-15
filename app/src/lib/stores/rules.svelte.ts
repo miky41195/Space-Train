@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import type { Backend, Entry } from '../ipc';
 import { nameOf } from '../locations';
 import { dayStart, matches, problem, samePath, settled, type Rule } from '../rules';
@@ -141,7 +142,7 @@ export class RulesStore {
 						onProgress: () => {}
 					});
 					if (res.skipped > 0 || res.pairs.length === 0) {
-						this.#push(r.folder, `${f.name}: saltato, esiste già in ${nameOf(r.then.dest)}`, null, true);
+						this.#push(r.folder, t('{0}: saltato, esiste già in {1}', [f.name, nameOf(r.then.dest)]), null, true);
 						return;
 					}
 					op = r.then.type === 'move' ? { kind: 'move', pairs: res.pairs } : { kind: 'create', paths: res.pairs.map(([, to]) => to), description: '' };
@@ -169,7 +170,7 @@ export class RulesStore {
 			this.#push(r.folder, text, undo ?? null);
 		} catch (err) {
 			const msg = (err as { message?: string })?.message ?? String(err);
-			this.#push(r.folder, `${f.name}: non riuscito (${msg})`, null, true);
+			this.#push(r.folder, t('{0}: non riuscito ({1})', [f.name, msg]), null, true);
 		}
 	}
 
@@ -208,13 +209,13 @@ export class RulesStore {
 function logText(name: string, r: Rule, labelName: (id: ColorId) => string): string {
 	switch (r.then.type) {
 		case 'move':
-			return `${name} spostato in ${nameOf(r.then.dest)}`;
+			return t('{0} spostato in {1}', [name, nameOf(r.then.dest)]);
 		case 'copy':
-			return `${name} copiato in ${nameOf(r.then.dest)}`;
+			return t('{0} copiato in {1}', [name, nameOf(r.then.dest)]);
 		case 'trash':
-			return `${name} nel cestino`;
+			return t('{0} nel cestino', [name]);
 		case 'label':
-			return `${name}: etichetta ${labelName(r.then.color)}`;
+			return t('{0}: etichetta {1}', [name, labelName(r.then.color)]);
 	}
 }
 

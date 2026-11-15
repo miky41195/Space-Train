@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import type { KeyValueStore } from './favorites.svelte';
 import { onChangeOf } from './sync';
 
@@ -8,15 +9,15 @@ const MAX_NAME = 40;
 
 /** The colours a folder can get, in menu order. Ids are saved: they stay as they are. */
 export const FOLDER_COLORS = [
-	{ id: 'rosso', name: 'Rosso', hex: '#ef4444' },
-	{ id: 'arancione', name: 'Arancione', hex: '#f97316' },
-	{ id: 'giallo', name: 'Giallo', hex: '#eab308' },
-	{ id: 'verde', name: 'Verde', hex: '#22c55e' },
-	{ id: 'azzurro', name: 'Azzurro', hex: '#06b6d4' },
-	{ id: 'blu', name: 'Blu', hex: '#3b82f6' },
-	{ id: 'viola', name: 'Viola', hex: '#a855f7' },
-	{ id: 'rosa', name: 'Rosa', hex: '#ec4899' },
-	{ id: 'grigio', name: 'Grigio', hex: '#9ca3af' }
+	{ id: 'rosso', name: t('Rosso'), hex: '#ef4444' },
+	{ id: 'arancione', name: t('Arancione'), hex: '#f97316' },
+	{ id: 'giallo', name: t('Giallo'), hex: '#eab308' },
+	{ id: 'verde', name: t('Verde'), hex: '#22c55e' },
+	{ id: 'azzurro', name: t('Azzurro'), hex: '#06b6d4' },
+	{ id: 'blu', name: t('Blu'), hex: '#3b82f6' },
+	{ id: 'viola', name: t('Viola'), hex: '#a855f7' },
+	{ id: 'rosa', name: t('Rosa'), hex: '#ec4899' },
+	{ id: 'grigio', name: t('Grigio'), hex: '#9ca3af' }
 ] as const;
 
 export type ColorId = (typeof FOLDER_COLORS)[number]['id'];

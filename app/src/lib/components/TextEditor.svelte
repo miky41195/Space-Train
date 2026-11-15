@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import { tauriBackend, type Backend, type FsError, type TextFile } from '../ipc';
 
 	let {
@@ -91,37 +92,35 @@
 </script>
 
 <div class="backdrop" role="presentation" onkeydown={keys}>
-	<div class="dialog" role="dialog" aria-modal="true" aria-label="Modifica {name}">
+	<div class="dialog" role="dialog" aria-modal="true" aria-label={t('Modifica {0}', [name])}>
 		<div class="band">
-			<span class="title ellipsis" title={path}>{name}{#if dirty}<span class="dot" aria-label="modifiche non salvate"> ●</span>{/if}</span>
-			{#if file}<span class="detail">{lines} {lines === 1 ? 'riga' : 'righe'} · {file.crlf ? 'CRLF' : 'LF'}{file.bom ? ' · BOM' : ''}</span>{/if}
+			<span class="title ellipsis" title={path}>{name}{#if dirty}<span class="dot" aria-label={t('modifiche non salvate')}> ●</span>{/if}</span>
+			{#if file}<span class="detail">{lines} {lines === 1 ? 'riga' : 'righe'} · {file.crlf ? 'CRLF' : 'LF'}{file.bom ? t(' · BOM') : ''}</span>{/if}
 			<span class="spacer"></span>
-			<button onclick={close}>Chiudi</button>
-			<button class="primary" disabled={!dirty || saving} onclick={() => void save()} title="Ctrl+S">Salva</button>
+			<button onclick={close}>{t('Chiudi')}</button>
+			<button class="primary" disabled={!dirty || saving} onclick={() => void save()} title="Ctrl+S">{t('Salva')}</button>
 		</div>
 		{#if changedOnDisk}
-			<div class="notice">
-				Il file è cambiato su disco da quando l’hai aperto.
-				<button onclick={() => void save(true)}>Sovrascrivi</button>
-				<button onclick={() => (changedOnDisk = false)}>Annulla</button>
+			<div class="notice"> {t('Il file è cambiato su disco da quando l’hai aperto.')} <button onclick={() => void save(true)}>{t('Sovrascrivi')}</button>
+				<button onclick={() => (changedOnDisk = false)}>{t('Annulla')}</button>
 			</div>
 		{/if}
 		{#if error}<div class="error">{error}</div>{/if}
 		{#if file}
-			<textarea bind:this={area} bind:value={text} spellcheck="false" aria-label="Testo di {name}"></textarea>
+			<textarea bind:this={area} bind:value={text} spellcheck="false" aria-label={t('Testo di {0}', [name])}></textarea>
 		{:else if !error}
-			<div class="loading">Apro il file…</div>
+			<div class="loading">{t('Apro il file…')}</div>
 		{/if}
 	</div>
 
 	{#if asking}
-		<div class="ask" role="alertdialog" aria-modal="true" aria-label="Modifiche non salvate">
-			<p>Salvare le modifiche a «{name}»?</p>
+		<div class="ask" role="alertdialog" aria-modal="true" aria-label={t('Modifiche non salvate')}>
+			<p>{t('Salvare le modifiche a «{0}»?', [name])}</p>
 			<div class="actions">
-				<button onclick={() => (asking = false)}>Annulla</button>
-				<button class="danger" onclick={onclose}>Non salvare</button>
+				<button onclick={() => (asking = false)}>{t('Annulla')}</button>
+				<button class="danger" onclick={onclose}>{t('Non salvare')}</button>
 				<!-- svelte-ignore a11y_autofocus -->
-				<button class="primary" autofocus onclick={() => void saveAndClose()}>Salva</button>
+				<button class="primary" autofocus onclick={() => void saveAndClose()}>{t('Salva')}</button>
 			</div>
 		</div>
 	{/if}

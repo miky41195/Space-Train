@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import { KIND_LABELS, filterCommands, type Command } from '../palette';
 
 	/** Ctrl+Maiusc+P: type to find any action, folder, saved search, theme or setting. */
@@ -51,12 +52,12 @@
 </script>
 
 <div class="backdrop" role="presentation" onclick={(e) => e.target === e.currentTarget && onclose()}>
-	<div class="palette" role="dialog" aria-modal="true" aria-label="Palette dei comandi">
+	<div class="palette" role="dialog" aria-modal="true" aria-label={t('Palette dei comandi')}>
 		<input
 			bind:this={field}
 			bind:value={query}
 			onkeydown={onKeys}
-			placeholder="Cerca un’azione, una cartella, un tema…"
+			placeholder={t('Cerca un’azione, una cartella, un tema…')}
 			spellcheck="false"
 			autocomplete="off"
 			role="combobox"
@@ -64,7 +65,7 @@
 			aria-controls="palette-list"
 			aria-activedescendant={matches.length ? `palette-${active}` : undefined}
 		/>
-		<ul id="palette-list" role="listbox" aria-label="Comandi">
+		<ul id="palette-list" role="listbox" aria-label={t('Comandi')}>
 			{#each matches as t, i (i)}
 				<li
 					id="palette-{i}"
@@ -84,7 +85,7 @@
 					{#if t.command.keys}<kbd>{t.command.keys}</kbd>{/if}
 				</li>
 			{:else}
-				<li class="none">Nessun comando trovato.</li>
+				<li class="none">{t('Nessun comando trovato.')}</li>
 			{/each}
 		</ul>
 	</div>

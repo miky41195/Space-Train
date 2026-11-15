@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import type { WhatsNew } from '../whats-new';
 
 	let {
@@ -26,12 +27,12 @@
 </script>
 
 <div class="backdrop" role="presentation" onclick={(e) => e.target === e.currentTarget && onclose()}>
-	<div class="dialog" role="dialog" aria-modal="true" aria-label="Novità di Space Train">
-		{#if installed}<span class="installed">Versione installata {installed}</span>{/if}
-		<h2>{installed ? 'Novità' : `Novità di Space Train ${entries[0]?.version ?? ''}`}</h2>
+	<div class="dialog" role="dialog" aria-modal="true" aria-label={t('Novità di Space Train')}>
+		{#if installed}<span class="installed">{t('Versione installata {0}', [installed])}</span>{/if}
+		<h2>{installed ? t('Novità') : t('Novità di Space Train {0}', [entries[0]?.version ?? ''])}</h2>
 		<div class="list">
 			{#each shown as n (n.version)}
-				{#if shown.length > 1}<h3>Versione {n.version}</h3>{/if}
+				{#if shown.length > 1}<h3>{t('Versione {0}', [n.version])}</h3>{/if}
 				<ul>
 					{#each n.items as v, i (i)}
 						<li>{v}</li>
@@ -41,9 +42,9 @@
 		</div>
 		<div class="actions">
 			{#if previous.length > 0 && !all}
-				<button class="link" onclick={() => (all = true)}>Versioni precedenti</button>
+				<button class="link" onclick={() => (all = true)}>{t('Versioni precedenti')}</button>
 			{/if}
-			<button class="primary" bind:this={button} onclick={onclose}>Ho capito</button>
+			<button class="primary" bind:this={button} onclick={onclose}>{t('Ho capito')}</button>
 		</div>
 	</div>
 </div>

@@ -1,3 +1,4 @@
+import { t } from './i18n';
 /**
  * How a parade entry moves on the rail.
  *
@@ -154,5 +155,5 @@ export function loopKeyframes(name: string, m: Motion): string {
 	const start = 'translateX(calc(var(--from) * (100cqw - 100%) / 100))';
 	const far = m.direction === 'left' ? 'translateX(calc(-100% - 20px))' : 'translateX(calc(100cqw + 20px))';
 	const end = arrival < 100 ? `${(arrival + 0.01).toFixed(3)}%,100%{visibility:hidden;transform:${far}}` : '';
-	return `@keyframes ${name}{0%{visibility:visible;transform:${start}}${arrival.toFixed(3)}%{visibility:visible;transform:${far}}${end}}`;
+	return t('@keyframes {0}{0%{visibility:visible;transform:{1}}{2}%{visibility:visible;transform:{3}}{4}}', [name, start, arrival.toFixed(3), far, end]);
 }

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import type { Entry, ImageTarget } from '../ipc';
 
 	/**
@@ -48,40 +49,40 @@
 	onclick={(e) => e.target === e.currentTarget && onclose()}
 	onkeydown={(e) => e.key === 'Escape' && onclose()}
 >
-	<div bind:this={dialog} class="dialog" role="dialog" aria-modal="true" aria-label="Converti immagini">
-		<h2>{items.length === 1 ? `Converti «${items[0].name}»` : `Converti ${items.length} immagini`}</h2>
+	<div bind:this={dialog} class="dialog" role="dialog" aria-modal="true" aria-label={t('Converti immagini')}>
+		<h2>{items.length === 1 ? t('Converti «{0}»', [items[0].name]) : t('Converti {0} immagini', [items.length])}</h2>
 
 		<div class="fields">
-			<span>Formato</span>
-			<div class="choices" role="radiogroup" aria-label="Formato">
+			<span>{t('Formato')}</span>
+			<div class="choices" role="radiogroup" aria-label={t('Formato')}>
 				{#each FORMATS as f (f.id)}
 					<button role="radio" aria-checked={format === f.id} class:on={format === f.id} onclick={() => (format = f.id)}>{f.name}</button>
 				{/each}
 			</div>
 
-			<span>Lato massimo</span>
-			<div class="choices" role="radiogroup" aria-label="Lato massimo">
+			<span>{t('Lato massimo')}</span>
+			<div class="choices" role="radiogroup" aria-label={t('Lato massimo')}>
 				{#each SIDES as l (l)}
 					<button role="radio" aria-checked={side === l} class:on={side === l} onclick={() => (side = l)}
-						>{l ? `${l} px` : 'Originale'}</button
+						>{l ? `${l} px` : t('Originale')}</button
 					>
 				{/each}
 			</div>
 
 			{#if format === 'jpg'}
-				<label for="quality">Qualità</label>
+				<label for="quality">{t('Qualità')}</label>
 				<input id="quality" type="number" min="1" max="100" bind:value={quality} />
 			{/if}
 
-			<span>Nome</span>
+			<span>{t('Nome')}</span>
 			<span class="example">{example}</span>
 		</div>
 
-		<p class="note">Gli originali restano intatti: le immagini nuove vanno accanto.</p>
+		<p class="note">{t('Gli originali restano intatti: le immagini nuove vanno accanto.')}</p>
 
 		<div class="actions">
-			<button onclick={onclose}>Annulla</button>
-			<button class="primary" onclick={convert}>Converti</button>
+			<button onclick={onclose}>{t('Annulla')}</button>
+			<button class="primary" onclick={convert}>{t('Converti')}</button>
 		</div>
 	</div>
 </div>

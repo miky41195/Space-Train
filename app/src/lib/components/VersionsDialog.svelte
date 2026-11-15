@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import type { Backend, Version } from '../ipc';
 	import { formatBytes, nameOf } from '../locations';
 	import { REASON_TEXT, versionWhen } from '../versions';
@@ -54,7 +55,7 @@
 			await backend.versionRestore(path, selected.id);
 			onrestored();
 		} catch (e) {
-			error = (e as { message?: string })?.message ?? 'Ripristino non riuscito.';
+			error = (e as { message?: string })?.message ?? t('Ripristino non riuscito.');
 			busy = false;
 			asking = false;
 		}
@@ -75,34 +76,29 @@
 </script>
 
 <div class="backdrop" role="presentation" onclick={(e) => e.target === e.currentTarget && !busy && onclose()} onkeydown={keys}>
-	<div class="dialog" role="dialog" aria-modal="true" aria-label={`Versioni precedenti di ${nameOf(path)}`}>
+	<div class="dialog" role="dialog" aria-modal="true" aria-label={t('Versioni precedenti di {0}', [nameOf(path)])}>
 		<header>
-			<h2>Versioni precedenti · {nameOf(path)}</h2>
+			<h2>{t('Versioni precedenti · {0}', [nameOf(path)])}</h2>
 			{#if protectedFolder}
-				<span class="protected" title={protectedFolder}><span class="shield" aria-hidden="true"></span>Cartella protetta</span>
+				<span class="protected" title={protectedFolder}><span class="shield" aria-hidden="true"></span>{t('Cartella protetta')}</span>
 			{/if}
 		</header>
 
 		{#if versions === null}
-			<p class="dim">Cerco le versioni…</p>
+			<p class="dim">{t('Cerco le versioni…')}</p>
 		{:else if versions.length === 0}
 			<div class="empty">
-				<p>Nessuna versione precedente di questo file.</p>
+				<p>{t('Nessuna versione precedente di questo file.')}</p>
 				<p class="dim">
-					{#if protectedFolder}
-						La cartella è protetta: dalla prossima modifica Space Train tiene la versione di prima.
-					{:else}
-						Space Train tiene la copia di prima quando sovrascrive un file o lo salvi nell'editor. Per tenere ogni modifica, anche
-						fatta da altri programmi, proteggi la cartella.
-					{/if}
+					{#if protectedFolder} {t('La cartella è protetta: dalla prossima modifica Space Train tiene la versione di prima.')} {:else} {t('Space Train tiene la copia di prima quando sovrascrive un file o lo salvi nell\'editor. Per tenere ogni modifica, anche fatta da altri programmi, proteggi la cartella.')} {/if}
 				</p>
 			</div>
 		{:else}
 			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-			<ol class="versions" aria-label="Versioni" tabindex="0">
+			<ol class="versions" aria-label={t('Versioni')} tabindex="0">
 				<li class="v now">
-					<span class="when">Adesso</span><span class="size">{formatBytes(size)}</span>
-					<span class="meta">Versione attuale</span>
+					<span class="when">{t('Adesso')}</span><span class="size">{formatBytes(size)}</span>
+					<span class="meta">{t('Versione attuale')}</span>
 				</li>
 				{#each versions as v (v.id)}
 					<li>
@@ -116,24 +112,22 @@
 		{/if}
 
 		{#if asking && selected}
-			<p class="notice" role="alert">
-				Il file torna com'era {versionWhen(selected.at).toLowerCase()}. Quello di adesso resta fra le versioni, puoi riprenderlo.
-			</p>
+			<p class="notice" role="alert"> {t('Il file torna com\'era {0}. Quello di adesso resta fra le versioni, puoi riprenderlo.', [versionWhen(selected.at).toLowerCase()])} </p>
 		{/if}
 		{#if error}<p class="error" role="alert">{error}</p>{/if}
 
 		<div class="actions">
 			{#if !protectedFolder}
-				<button type="button" class="aside" onclick={onprotect} disabled={busy}>Proteggi la cartella</button>
+				<button type="button" class="aside" onclick={onprotect} disabled={busy}>{t('Proteggi la cartella')}</button>
 			{/if}
-			<button type="button" onclick={onclose} disabled={busy}>Chiudi</button>
+			<button type="button" onclick={onclose} disabled={busy}>{t('Chiudi')}</button>
 			{#if selected}
-				<button type="button" onclick={() => onopen(selected)} disabled={busy}>Apri</button>
-				<button type="button" onclick={() => oncompare(selected)} disabled={busy}>Confronta con l'attuale</button>
+				<button type="button" onclick={() => onopen(selected)} disabled={busy}>{t('Apri')}</button>
+				<button type="button" onclick={() => oncompare(selected)} disabled={busy}>{t('Confronta con l\'attuale')}</button>
 				{#if asking}
-					<button type="button" class="primary" onclick={restore} disabled={busy}>{busy ? 'Un momento…' : 'Ripristina'}</button>
+					<button type="button" class="primary" onclick={restore} disabled={busy}>{busy ? t('Un momento…') : t('Ripristina')}</button>
 				{:else}
-					<button type="button" class="primary" onclick={() => (asking = true)} disabled={busy}>Ripristina…</button>
+					<button type="button" class="primary" onclick={() => (asking = true)} disabled={busy}>{t('Ripristina…')}</button>
 				{/if}
 			{/if}
 		</div>

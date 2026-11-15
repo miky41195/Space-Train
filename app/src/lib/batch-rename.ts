@@ -1,3 +1,4 @@
+import { t } from './i18n';
 /**
  * Batch rename: from a rule to the new name of every selected item.
  *
@@ -102,17 +103,17 @@ const RESERVED = new Set([
 ]);
 
 export function nameProblem(name: string): string | undefined {
-	if (name.trim() === '') return 'nome vuoto';
-	if ([...name].length > 255) return 'nome troppo lungo';
+	if (name.trim() === '') return t('nome vuoto');
+	if ([...name].length > 255) return t('nome troppo lungo');
 	const bad = FORBIDDEN.exec(name);
-	if (bad) return `carattere non ammesso «${bad[0]}»`;
-	if (name.endsWith('.') || name.endsWith(' ')) return 'finisce con punto o spazio';
-	if (RESERVED.has(name.split('.')[0].toUpperCase())) return 'nome riservato da Windows';
+	if (bad) return t('carattere non ammesso «{0}»', [bad[0]]);
+	if (name.endsWith('.') || name.endsWith(' ')) return t('finisce con punto o spazio');
+	if (RESERVED.has(name.split('.')[0].toUpperCase())) return t('nome riservato da Windows');
 	return undefined;
 }
 
 function counter(pattern: string, n: number): string {
-	if (!pattern.includes('#')) return `${pattern} (${n})`;
+	if (!pattern.includes('#')) return t('{0} ({1})', [pattern, n]);
 	return pattern.replace(/#+/g, (run) => String(n).padStart(run.length, '0'));
 }
 
@@ -143,8 +144,8 @@ function apply(rule: RenameRule, item: RenameItem, index: number): { name: strin
 			// A slash in «AC/DC» would be a folder: it becomes a dash.
 			return v.text.replace(FORBIDDEN_GLOBAL, '-');
 		});
-		if (missing) return { name: item.name, note: `senza ${missing}, resta com’è` };
-		return { name: name + tail, note: fallback ? 'data di modifica' : undefined };
+		if (missing) return { name: item.name, note: t('senza {0}, resta com’è', [missing]) };
+		return { name: name + tail, note: fallback ? t('data di modifica') : undefined };
 	}
 	if (rule.find === '') return { name: item.name };
 	const re = new RegExp(escapeRegExp(rule.find), rule.matchCase ? 'g' : 'gi');
@@ -174,9 +175,9 @@ export function planRename(items: RenameItem[], rule: RenameRule, taken: Set<str
 		p.problem =
 			nameProblem(p.newName) ??
 			((seen.get(key) ?? 0) > 1
-				? 'nome ripetuto'
+				? t('nome ripetuto')
 				: taken.has(key) && !freed.has(key)
-					? 'esiste già'
+					? t('esiste già')
 					: undefined);
 	}
 	return plan;

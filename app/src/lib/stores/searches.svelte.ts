@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import type { KeyValueStore } from './favorites.svelte';
 import { onChangeOf } from './sync';
 import { NO_FILTERS, filtersFromStored, filtersToStored, type Filters } from '../filters';
@@ -17,8 +18,8 @@ export interface SavedSearch {
 
 /** Always there, searching the folder you are in. */
 export const READY_SEARCHES: SavedSearch[] = [
-	{ name: 'Modificati questa settimana', folder: null, text: '', content: false, filters: { ...NO_FILTERS, date: '7' } },
-	{ name: 'File oltre 1 GB', folder: null, text: '', content: false, filters: { ...NO_FILTERS, size: '1gb' } }
+	{ name: t('Modificati questa settimana'), folder: null, text: '', content: false, filters: { ...NO_FILTERS, date: '7' } },
+	{ name: t('File oltre 1 GB'), folder: null, text: '', content: false, filters: { ...NO_FILTERS, size: '1gb' } }
 ];
 
 /** One saved search as earlier versions wrote it → in memory. */

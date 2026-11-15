@@ -1,3 +1,4 @@
+import { t } from './i18n';
 /**
  * Spritesheet: an image with the frames of a character. On the sheet a free
  * rectangular zone is chosen, holding the walking frames in a row or in a
@@ -300,7 +301,7 @@ export function animation(seq: number[], columns = Infinity): string {
 	const stops = seq.map((k, i) => `${((i / seq.length) * 100).toFixed(4)}%{${step(k)}}`);
 	const el = document.createElement('style');
 	el.dataset.sprite = name;
-	el.textContent = `@keyframes ${name}{${stops.join('')}100%{${step(seq[seq.length - 1])}}}`;
+	el.textContent = t('@keyframes {0}{{1}100%{{2}}}', [name, stops.join(''), step(seq[seq.length - 1])]);
 	document.head.appendChild(el);
 	return name;
 }
@@ -328,7 +329,7 @@ export function boxAnimation(boxes: FrameBox[], seq: number[]): string {
 	const stops = seq.map((k, i) => `${((i / seq.length) * 100).toFixed(4)}%{${stop(k)}}`);
 	const el = document.createElement('style');
 	el.dataset.sprite = name;
-	el.textContent = `@keyframes ${name}{${stops.join('')}100%{${stop(seq[seq.length - 1])}}}`;
+	el.textContent = t('@keyframes {0}{{1}100%{{2}}}', [name, stops.join(''), stop(seq[seq.length - 1])]);
 	document.head.appendChild(el);
 	return name;
 }
@@ -453,8 +454,8 @@ export function style(s: Spritesheet, src: string, height?: number): string {
 			`width:${first.w * d.scaleX}px`,
 			`height:${first.h * d.scaleY}px`,
 			`background-image:url("${safe}")`,
-			`background-size:${d.sheetWidth}px ${d.sheetHeight}px`,
-			`background-position:${-first.x * d.scaleX}px ${-first.y * d.scaleY}px`,
+			t('background-size:{0}px {1}px', [d.sheetWidth, d.sheetHeight]),
+			t('background-position:{0}px {1}px', [-first.x * d.scaleX, -first.y * d.scaleY]),
 			`--sx:${d.scaleX}`,
 			`--sy:${d.scaleY}`,
 			`animation-name:${boxAnimation(s.boxes, seq)}`,
@@ -467,8 +468,8 @@ export function style(s: Spritesheet, src: string, height?: number): string {
 		`width:${d.width}px`,
 		`height:${d.height}px`,
 		`background-image:url("${safe}")`,
-		`background-size:${d.sheetWidth}px ${d.sheetHeight}px`,
-		`background-position:${d.x}px ${d.y}px`,
+		t('background-size:{0}px {1}px', [d.sheetWidth, d.sheetHeight]),
+		t('background-position:{0}px {1}px', [d.x, d.y]),
 		`--x:${d.x}px`,
 		`--end:${d.x - d.travel}px`,
 		`--y:${d.y}px`,

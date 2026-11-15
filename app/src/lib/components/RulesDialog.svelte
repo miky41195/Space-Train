@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import type { Backend, Entry } from '../ipc';
 	import { nameOf } from '../locations';
 	import { CATEGORIES, matches, parseExts, problem, type Action, type Condition, type Rule } from '../rules';
@@ -107,7 +108,7 @@
 
 	async function pickDest(r: Rule) {
 		if (r.then.type !== 'move' && r.then.type !== 'copy') return;
-		const chosen = await backend.pickFolder('Dove mettere i file', r.then.dest || folder).catch(() => null);
+		const chosen = await backend.pickFolder(t('Dove mettere i file'), r.then.dest || folder).catch(() => null);
 		if (chosen && (r.then.type === 'move' || r.then.type === 'copy')) r.then = { type: r.then.type, dest: chosen };
 	}
 
@@ -119,12 +120,12 @@
 </script>
 
 <div class="backdrop" role="presentation" onclick={(e) => e.target === e.currentTarget && onclose()} onkeydown={(e) => e.key === 'Escape' && onclose()}>
-	<div class="dialog" role="dialog" aria-modal="true" aria-label={`Regole di ${nameOf(folder) || folder}`}>
-		<h2>Regole di {nameOf(folder) || folder}</h2>
-		<p class="note">Valgono per i file di questa cartella, non per le sottocartelle. Non sovrascrivono mai niente e il cestino è il massimo: nessuna eliminazione definitiva.</p>
+	<div class="dialog" role="dialog" aria-modal="true" aria-label={t('Regole di {0}', [nameOf(folder) || folder])}>
+		<h2>{t('Regole di {0}', [nameOf(folder) || folder])}</h2>
+		<p class="note">{t('Valgono per i file di questa cartella, non per le sottocartelle. Non sovrascrivono mai niente e il cestino è il massimo: nessuna eliminazione definitiva.')}</p>
 
 		{#if rules.length === 0}
-			<p class="empty">Nessuna regola. Aggiungine una per mettere in ordine questa cartella da sola.</p>
+			<p class="empty">{t('Nessuna regola. Aggiungine una per mettere in ordine questa cartella da sola.')}</p>
 		{/if}
 
 		<ul class="rules">
@@ -132,89 +133,89 @@
 				{@const n = files ? matching(r).length : null}
 				<li class="rule" class:off={!r.enabled}>
 					<div class="sentence">
-						<select aria-label="Quando" value={r.when} onchange={(e) => (r.when = e.currentTarget.value as Rule['when'])}>
-							<option value="arrival">Quando arriva un file</option>
-							<option value="daily">Ogni giorno</option>
+						<select aria-label={t('Quando')} value={r.when} onchange={(e) => (r.when = e.currentTarget.value as Rule['when'])}>
+							<option value="arrival">{t('Quando arriva un file')}</option>
+							<option value="daily">{t('Ogni giorno')}</option>
 						</select>
-						<span class="kw">se</span>
-						<select aria-label="Condizione" value={r.if.type} onchange={(e) => setCondition(r, e.currentTarget.value as Condition['type'])}>
-							<option value="ext">ha estensione</option>
-							<option value="category">è del tipo</option>
-							<option value="name">il nome contiene</option>
-							<option value="olderThan">è più vecchio di (giorni)</option>
-							<option value="largerThan">è più grande di (MB)</option>
-							<option value="any">è un file qualsiasi</option>
+						<span class="kw">{t('se')}</span>
+						<select aria-label={t('Condizione')} value={r.if.type} onchange={(e) => setCondition(r, e.currentTarget.value as Condition['type'])}>
+							<option value="ext">{t('ha estensione')}</option>
+							<option value="category">{t('è del tipo')}</option>
+							<option value="name">{t('il nome contiene')}</option>
+							<option value="olderThan">{t('è più vecchio di (giorni)')}</option>
+							<option value="largerThan">{t('è più grande di (MB)')}</option>
+							<option value="any">{t('è un file qualsiasi')}</option>
 						</select>
 						{#if r.if.type === 'category'}
 							{@const c = r.if}
-							<select aria-label="Tipo di file" value={c.category} onchange={(e) => (r.if = { type: 'category', category: e.currentTarget.value as typeof c.category })}>
+							<select aria-label={t('Tipo di file')} value={c.category} onchange={(e) => (r.if = { type: 'category', category: e.currentTarget.value as typeof c.category })}>
 								{#each CATEGORIES as cat (cat.id)}<option value={cat.id}>{cat.plural}</option>{/each}
 							</select>
 						{:else if r.if.type !== 'any'}
 							<input
-								aria-label="Valore della condizione"
+								aria-label={t('Valore della condizione')}
 								class:number={r.if.type === 'olderThan' || r.if.type === 'largerThan'}
 								inputmode={r.if.type === 'olderThan' || r.if.type === 'largerThan' ? 'decimal' : 'text'}
 								value={typed[r.id] ?? ''}
 								oninput={(e) => setValue(r, e.currentTarget.value)}
 							/>
 						{/if}
-						<span class="kw">allora</span>
-						<select aria-label="Azione" value={r.then.type} onchange={(e) => setAction(r, e.currentTarget.value as Action['type'])}>
-							<option value="move">spostalo in</option>
-							<option value="copy">copialo in</option>
-							<option value="label">dagli l’etichetta</option>
-							<option value="trash">mandalo nel cestino</option>
+						<span class="kw">{t('allora')}</span>
+						<select aria-label={t('Azione')} value={r.then.type} onchange={(e) => setAction(r, e.currentTarget.value as Action['type'])}>
+							<option value="move">{t('spostalo in')}</option>
+							<option value="copy">{t('copialo in')}</option>
+							<option value="label">{t('dagli l’etichetta')}</option>
+							<option value="trash">{t('mandalo nel cestino')}</option>
 						</select>
 						{#if r.then.type === 'move' || r.then.type === 'copy'}
 							<button class="pick" title={r.then.dest || undefined} onclick={() => void pickDest(r)}>
-								{r.then.dest ? nameOf(r.then.dest) || r.then.dest : 'Scegli cartella…'}
+								{r.then.dest ? nameOf(r.then.dest) || r.then.dest : t('Scegli cartella…')}
 							</button>
 						{:else if r.then.type === 'label'}
 							{@const a = r.then}
-							<select aria-label="Etichetta" value={a.color} onchange={(e) => (r.then = { type: 'label', color: e.currentTarget.value as ColorId })}>
+							<select aria-label={t('Etichetta')} value={a.color} onchange={(e) => (r.then = { type: 'label', color: e.currentTarget.value as ColorId })}>
 								{#each FOLDER_COLORS as c (c.id)}<option value={c.id}>{labelName(c.id)}</option>{/each}
 							</select>
 						{/if}
 					</div>
 					<div class="footer">
-						<label class="enabled"><input type="checkbox" bind:checked={r.enabled} /> Attiva</label>
+						<label class="enabled"><input type="checkbox" bind:checked={r.enabled} /> {t('Attiva')}</label>
 						{#if problems[i]}
 							<span class="problem" role="alert">{problems[i]}</span>
 						{:else if n !== null}
 							<span class="preview">
-								{r.when === 'daily' ? 'Oggi agirebbe su' : 'Fra i file di adesso corrispondono'}
-								<b>{n === 1 ? '1 file' : `${n} file`}</b>
+								{r.when === 'daily' ? t('Oggi agirebbe su') : t('Fra i file di adesso corrispondono')}
+								<b>{n === 1 ? t('1 file') : t('{0} file', [n])}</b>
 								{#if n > 0}
 									· <button class="link" onclick={() => (shown = shown === r.id ? null : r.id)}>{shown === r.id ? 'nascondi' : 'mostra'}</button>
 								{/if}
 							</span>
 						{/if}
-						<button class="link remove" onclick={() => rules.splice(i, 1)}>Elimina regola</button>
+						<button class="link remove" onclick={() => rules.splice(i, 1)}>{t('Elimina regola')}</button>
 					</div>
 					{#if shown === r.id}
 						<ul class="list">
 							{#each matching(r).slice(0, 12) as f (f.path)}<li>{f.name}</li>{/each}
-							{#if matching(r).length > 12}<li class="rest">e altri {matching(r).length - 12}…</li>{/if}
+							{#if matching(r).length > 12}<li class="rest">{t('e altri {0}…', [matching(r).length - 12])}</li>{/if}
 						</ul>
 					{/if}
 				</li>
 			{/each}
 		</ul>
 
-		<button class="add" onclick={add}>+ Aggiungi regola</button>
+		<button class="add" onclick={add}>{t('+ Aggiungi regola')}</button>
 
 		{#if log.length > 0}
-			<h3>Ultime azioni</h3>
+			<h3>{t('Ultime azioni')}</h3>
 			<ul class="log">
 				{#each log.slice(0, 20) as l (l.id)}
 					<li class:failed={l.failed}>
 						<time>{timeOf(l.time)}</time>
 						<span class="text" title={l.text}>{l.text}</span>
 						{#if l.undo && !l.undone}
-							<button class="link" onclick={() => onundo(l.id)}>Annulla</button>
+							<button class="link" onclick={() => onundo(l.id)}>{t('Annulla')}</button>
 						{:else if l.undone}
-							<span class="undone">annullata</span>
+							<span class="undone">{t('annullata')}</span>
 						{/if}
 					</li>
 				{/each}
@@ -222,8 +223,8 @@
 		{/if}
 
 		<div class="actions">
-			<button onclick={onclose}>Annulla</button>
-			<button class="primary" disabled={!canSave} onclick={() => onsave($state.snapshot(rules) as Rule[])}>Salva</button>
+			<button onclick={onclose}>{t('Annulla')}</button>
+			<button class="primary" disabled={!canSave} onclick={() => onsave($state.snapshot(rules) as Rule[])}>{t('Salva')}</button>
 		</div>
 	</div>
 </div>

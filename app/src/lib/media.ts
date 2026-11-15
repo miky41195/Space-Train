@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import type { Entry, MediaProps } from './ipc';
 import { categoryFor } from './icons';
 
@@ -5,12 +6,12 @@ import { categoryFor } from './icons';
 export type MediaKey = 'taken' | 'duration' | 'pixels' | 'artist' | 'album' | 'camera';
 
 export const MEDIA_COLUMNS: ReadonlyArray<{ key: MediaKey; label: string; width: string; right: boolean }> = [
-	{ key: 'taken', label: 'Scattata il', width: '140px', right: true },
-	{ key: 'duration', label: 'Durata', width: '80px', right: true },
-	{ key: 'pixels', label: 'Dimensioni', width: '110px', right: true },
-	{ key: 'artist', label: 'Artista', width: '150px', right: false },
-	{ key: 'album', label: 'Album', width: '150px', right: false },
-	{ key: 'camera', label: 'Fotocamera', width: '140px', right: false }
+	{ key: 'taken', label: t('Scattata il'), width: '140px', right: true },
+	{ key: 'duration', label: t('Durata'), width: '80px', right: true },
+	{ key: 'pixels', label: t('Dimensioni'), width: '110px', right: true },
+	{ key: 'artist', label: t('Artista'), width: '150px', right: false },
+	{ key: 'album', label: t('Album'), width: '150px', right: false },
+	{ key: 'camera', label: t('Fotocamera'), width: '140px', right: false }
 ];
 
 const BY_KIND: Record<'image' | 'video' | 'audio', MediaKey[]> = {
@@ -49,18 +50,18 @@ const pad = (n: number) => String(n).padStart(2, '0');
 export function mediaLines(p: MediaProps | null | undefined): Array<[string, string]> {
 	if (!p) return [];
 	const out: Array<[string, string]> = [];
-	if (p.taken !== undefined) out.push(['Scattata il', formatMedia('taken', p)]);
-	if (p.camera) out.push(['Fotocamera', p.camera]);
-	if (p.width && p.height) out.push(['Dimensioni', `${p.width}×${p.height} px`]);
-	if (p.duration !== undefined) out.push(['Durata', formatDuration(p.duration)]);
-	if (p.artist) out.push(['Artista', p.artist]);
-	if (p.album) out.push(['Album', p.album]);
-	if (p.year) out.push(['Anno', String(p.year)]);
+	if (p.taken !== undefined) out.push([t('Scattata il'), formatMedia('taken', p)]);
+	if (p.camera) out.push([t('Fotocamera'), p.camera]);
+	if (p.width && p.height) out.push([t('Dimensioni'), `${p.width}×${p.height} px`]);
+	if (p.duration !== undefined) out.push([t('Durata'), formatDuration(p.duration)]);
+	if (p.artist) out.push([t('Artista'), p.artist]);
+	if (p.album) out.push([t('Album'), p.album]);
+	if (p.year) out.push([t('Anno'), String(p.year)]);
 	const quality = [
-		p.bitrate ? `${Math.round(p.bitrate / 1000)} kbps` : '',
-		p.sampleRate ? `${(p.sampleRate / 1000).toLocaleString('it-IT')} kHz` : ''
+		p.bitrate ? t('{0} kbps', [Math.round(p.bitrate / 1000)]) : '',
+		p.sampleRate ? t('{0} kHz', [(p.sampleRate / 1000).toLocaleString('it-IT')]) : ''
 	].filter(Boolean);
-	if (quality.length) out.push(['Qualità', quality.join(' · ')]);
+	if (quality.length) out.push([t('Qualità'), quality.join(' · ')]);
 	return out;
 }
 

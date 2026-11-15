@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { keyAction, SHORTCUT_GROUPS, type KeyAction, type KeyInput } from './shortcuts';
 
 /**
@@ -117,34 +118,34 @@ export function actionWithCustom(e: KeyInput & { metaKey?: boolean }, p: CustomS
 
 /** Windows takes these before any app sees them. */
 const WINDOWS_OWNED = new Map<string, string>([
-	['Ctrl+Alt+Canc', 'apre la schermata di sicurezza di Windows'],
-	['Ctrl+Maiusc+Esc', 'apre Gestione attività'],
-	['Ctrl+Esc', 'apre il menu Start'],
-	['Alt+Tab', 'passa da una finestra all’altra'],
-	['Alt+Maiusc+Tab', 'passa da una finestra all’altra'],
-	['Alt+Esc', 'passa da una finestra all’altra'],
-	['Win+L', 'blocca il PC'],
-	['Win+D', 'mostra il desktop'],
-	['Win+E', 'apre Esplora risorse'],
-	['Win+R', 'apre Esegui'],
-	['Win+I', 'apre Impostazioni di Windows'],
-	['Win+Tab', 'apre la visualizzazione attività'],
-	['Win+X', 'apre il menu Start avanzato'],
-	['Win+S', 'apre la ricerca di Windows'],
-	['Win+V', 'apre la cronologia degli appunti'],
-	['Win+Maiusc+S', 'cattura una parte dello schermo']
+	['Ctrl+Alt+Canc', t('apre la schermata di sicurezza di Windows')],
+	['Ctrl+Maiusc+Esc', t('apre Gestione attività')],
+	['Ctrl+Esc', t('apre il menu Start')],
+	['Alt+Tab', t('passa da una finestra all’altra')],
+	['Alt+Maiusc+Tab', t('passa da una finestra all’altra')],
+	['Alt+Esc', t('passa da una finestra all’altra')],
+	['Win+L', t('blocca il PC')],
+	['Win+D', t('mostra il desktop')],
+	['Win+E', t('apre Esplora risorse')],
+	['Win+R', t('apre Esegui')],
+	['Win+I', t('apre Impostazioni di Windows')],
+	['Win+Tab', t('apre la visualizzazione attività')],
+	['Win+X', t('apre il menu Start avanzato')],
+	['Win+S', t('apre la ricerca di Windows')],
+	['Win+V', t('apre la cronologia degli appunti')],
+	['Win+Maiusc+S', t('cattura una parte dello schermo')]
 ]);
 
 /** Keys that work, but that every Windows program gives the same meaning. */
 const CONVENTIONS = new Map<string, string>([
-	['Alt+F4', 'chiude la finestra'],
-	['F1', 'apre la guida'],
-	['Alt+Spazio', 'apre il menu della finestra'],
-	['F10', 'attiva la barra dei menu'],
-	['F11', 'mette a schermo intero'],
+	['Alt+F4', t('chiude la finestra')],
+	['F1', t('apre la guida')],
+	['Alt+Spazio', t('apre il menu della finestra')],
+	['F10', t('attiva la barra dei menu')],
+	['F11', t('mette a schermo intero')],
 	['Ctrl+P', 'stampa'],
 	['Ctrl+S', 'salva'],
-	['Ctrl+O', 'apre un file']
+	['Ctrl+O', t('apre un file')]
 ]);
 
 /** Plain keys the lists and dialogs need: they are not given away. */
@@ -162,20 +163,20 @@ export interface Check {
 
 /** What to tell before giving `combo` to `action`. «Taken by another program» is checked apart (it asks Windows). */
 export function check(combo: string, action: SimpleAction, p: CustomShortcuts, all: readonly SimpleAction[]): Check {
-	if (BASIC_KEYS.has(combo)) return { refusal: `${combo} serve a muoversi nelle liste e nei dialoghi: non si può cambiare.`, warnings: [], toRemove: [] };
+	if (BASIC_KEYS.has(combo)) return { refusal: t('{0} serve a muoversi nelle liste e nei dialoghi: non si può cambiare.', [combo]), warnings: [], toRemove: [] };
 	const withModifier = /^(Win|Ctrl|Alt)\+/.test(combo) || (combo.startsWith('Maiusc+') && ALLOWED_WITHOUT_MODIFIERS.test(combo.slice(7)));
 	if (!withModifier && !ALLOWED_WITHOUT_MODIFIERS.test(combo)) {
-		return { refusal: `${combo} da solo serve a scrivere: aggiungi Ctrl, Alt o Win.`, warnings: [], toRemove: [] };
+		return { refusal: t('{0} da solo serve a scrivere: aggiungi Ctrl, Alt o Win.', [combo]), warnings: [], toRemove: [] };
 	}
 	const windows = WINDOWS_OWNED.get(combo);
-	if (windows) return { refusal: `${combo} è riservata da Windows (${windows}): non arriverebbe mai a Space Train.`, warnings: [], toRemove: [] };
+	if (windows) return { refusal: t('{0} è riservata da Windows ({1}): non arriverebbe mai a Space Train.', [combo, windows]), warnings: [], toRemove: [] };
 
 	const warnings: string[] = [];
-	if (combo.startsWith('Win+')) warnings.push(`Windows usa molte combinazioni con il tasto Win: ${combo} potrebbe non arrivare a Space Train.`);
+	if (combo.startsWith('Win+')) warnings.push(t('Windows usa molte combinazioni con il tasto Win: {0} potrebbe non arrivare a Space Train.', [combo]));
 	const conv = CONVENTIONS.get(combo);
-	if (conv) warnings.push(`In Windows ${combo} di solito ${conv}: qui farebbe un’altra cosa.`);
+	if (conv) warnings.push(t('In Windows {0} di solito {1}: qui farebbe un’altra cosa.', [combo, conv]));
 	const toRemove = all.filter((a) => a !== action && keysOf(a, p).includes(combo));
-	for (const a of toRemove) warnings.push(`Già usata in Space Train per «${actionName(a)}»: confermando, quell’azione la perde.`);
+	for (const a of toRemove) warnings.push(t('Già usata in Space Train per «{0}»: confermando, quell’azione la perde.', [actionName(a)]));
 	return { warnings, toRemove };
 }
 
@@ -209,15 +210,15 @@ export function accelerator(combo: string): string | null {
 		PagSu: 'PageUp',
 		Spazio: 'Space',
 		Fine: 'End',
-		Ins: 'Insert',
+		Ins: t('Insert'),
 		Home: 'Home',
 		Backspace: 'Backspace',
 		Tab: 'Tab'
 	};
 	const code = /^[A-Z]$/.test(key)
-		? `Key${key}`
+		? t('Key{0}', [key])
 		: /^\d$/.test(key)
-			? `Digit${key}`
+			? t('Digit{0}', [key])
 			: /^F\d{1,2}$/.test(key)
 				? key
 				: special[key];

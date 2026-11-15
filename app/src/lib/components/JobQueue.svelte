@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	/** The transfer queue under the progress bar: the running job, then the waiting ones. */
 	let {
 		running,
@@ -19,17 +20,17 @@
 	} = $props();
 </script>
 
-<ul class="queue" aria-label="Coda dei trasferimenti">
+<ul class="queue" aria-label={t('Coda dei trasferimenti')}>
 	<li class="running">
-		<span class="title">{running.title}<small>{paused ? 'in pausa' : 'in corso'}</small></span>
-		<button onclick={onpause}>{paused ? 'Riprendi' : 'Pausa'}</button>
-		<button onclick={oncancelrunning} aria-label="Annulla il trasferimento in corso">✕</button>
+		<span class="title">{running.title}<small>{paused ? t('in pausa') : t('in corso')}</small></span>
+		<button onclick={onpause}>{paused ? t('Riprendi') : t('Pausa')}</button>
+		<button onclick={oncancelrunning} aria-label={t('Annulla il trasferimento in corso')}>✕</button>
 	</li>
 	{#each queue as l, i (l.id)}
 		<li>
-			<span class="title">{l.title}<small>in coda</small></span>
-			<button onclick={() => onup(l.id)} disabled={i === 0} aria-label={`Anticipa «${l.title}»`}>↑</button>
-			<button onclick={() => onremove(l.id)} aria-label={`Togli dalla coda «${l.title}»`}>✕</button>
+			<span class="title">{l.title}<small>{t('in coda')}</small></span>
+			<button onclick={() => onup(l.id)} disabled={i === 0} aria-label={t('Anticipa «{0}»', [l.title])}>↑</button>
+			<button onclick={() => onremove(l.id)} aria-label={t('Togli dalla coda «{0}»', [l.title])}>✕</button>
 		</li>
 	{/each}
 </ul>

@@ -1,3 +1,4 @@
+import { t } from './i18n';
 /**
  * Marquee selection and click on empty space, as in Explorer.
  *
@@ -87,7 +88,7 @@ export function marqueeSelection(node: HTMLElement, options: MarqueeOptions) {
 			const end = content(last.x, last.y);
 			const r = boxBetween(start.x, start.y, end.x, end.y);
 			if (box) {
-				box.style.transform = `translate(${r.x}px, ${r.y}px)`;
+				box.style.transform = t('translate({0}px, {1}px)', [r.x, r.y]);
 				box.style.width = `${r.w}px`;
 				box.style.height = `${r.h}px`;
 			}

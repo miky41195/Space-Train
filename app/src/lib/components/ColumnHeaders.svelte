@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import type { SortKey, SortSpec } from '../ipc';
 	import type { Columns } from '../stores/settings.svelte';
 	import { columnsGrid } from '../columns';
@@ -25,11 +26,11 @@
 
 	let columns = $derived(
 		[
-			{ key: 'kind' as SortKey, label: 'Tipo', cls: 'kind' },
-			{ key: 'name' as SortKey, label: 'Nome', cls: 'name' },
-			shown.type && { key: 'kind' as SortKey, label: 'Tipo', cls: 'description' },
-			shown.size && { key: 'size' as SortKey, label: 'Carico', cls: 'load' },
-			shown.date && { key: 'modified' as SortKey, label: 'Orario', cls: 'time' }
+			{ key: 'kind' as SortKey, label: t('Tipo'), cls: 'kind' },
+			{ key: 'name' as SortKey, label: t('Nome'), cls: 'name' },
+			shown.type && { key: 'kind' as SortKey, label: t('Tipo'), cls: 'description' },
+			shown.size && { key: 'size' as SortKey, label: t('Carico'), cls: 'load' },
+			shown.date && { key: 'modified' as SortKey, label: t('Orario'), cls: 'time' }
 		].filter((c): c is { key: SortKey; label: string; cls: string } => Boolean(c))
 	);
 
@@ -38,10 +39,10 @@
 	 * pressing: without it, a screen reader only announces «Nome, pulsante».
 	 */
 	function description(key: SortKey, label: string): string {
-		if (sort.key !== key) return `Ordina per ${label.toLowerCase()}`;
+		if (sort.key !== key) return t('Ordina per {0}', [label.toLowerCase()]);
 		return sort.ascending
-			? `${label}, ordine crescente. Premi per invertire`
-			: `${label}, ordine decrescente. Premi per invertire`;
+			? t('{0}, ordine crescente. Premi per invertire', [label])
+			: t('{0}, ordine decrescente. Premi per invertire', [label]);
 	}
 </script>
 
@@ -78,8 +79,8 @@
 			class:active
 			onclick={() => onsortmedia?.(c.key)}
 			aria-label={!active
-				? `Ordina per ${c.label.toLowerCase()}`
-				: `${c.label}, ordine ${mediaSort?.ascending ? 'crescente' : 'decrescente'}. Premi per invertire`}
+				? t('Ordina per {0}', [c.label.toLowerCase()])
+				: t('{0}, ordine {1}. Premi per invertire', [c.label, mediaSort?.ascending ? 'crescente' : 'decrescente'])}
 		>
 			<span class="text">{c.label}</span>
 			{#if active}

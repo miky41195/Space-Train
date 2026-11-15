@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import Icon from './Icon.svelte';
 	import { DATES, SIZES, TYPES, filtersActive, type Filters } from '../filters';
 	let {
@@ -63,25 +64,17 @@
 		bind:this={field}
 		type="text"
 		value={query}
-		placeholder={subfolders ? 'Cerca in tutte le sottocartelle…' : 'Filtra in questa cartella…'}
+		placeholder={subfolders ? t('Cerca in tutte le sottocartelle…') : t('Filtra in questa cartella…')}
 		spellcheck="false"
 		autocomplete="off"
-		aria-label="Filtra i file in questa cartella"
+		aria-label={t('Filtra i file in questa cartella')}
 		oninput={(e) => onchange(e.currentTarget.value)}
 	/>
 
 	<span class="counter" class:empty={query !== '' && results === 0}>
-		{#if subfolders && searching}
-			{results} trovati, ricerca in corso…
-		{:else if subfolders && query !== ''}
-			{results === 0 ? 'nessun risultato' : `${results} trovati`}
-		{:else if query === ''}
-			{total} elementi
-		{:else if results === 0}
-			nessun risultato
-		{:else}
-			{position} di {results}
-		{/if}
+		{#if subfolders && searching} {t('{0} trovati, ricerca in corso…', [results])} {:else if subfolders && query !== ''}
+			{results === 0 ? t('nessun risultato') : t('{0} trovati', [results])}
+		{:else if query === ''} {t('{0} elementi', [total])} {:else if results === 0} {t('nessun risultato')} {:else} {t('{0} di {1}', [position, results])} {/if}
 	</span>
 
 	{#if ontogglesubfolders}
@@ -90,7 +83,7 @@
 			class:on={subfolders}
 			aria-pressed={subfolders}
 			onclick={ontogglesubfolders}
-			title="Cerca anche nelle sottocartelle">Sottocartelle</button
+			title={t('Cerca anche nelle sottocartelle')}>{t('Sottocartelle')}</button
 		>
 	{/if}
 	{#if ontogglecontent && subfolders}
@@ -99,7 +92,7 @@
 			class:on={content}
 			aria-pressed={content}
 			onclick={ontogglecontent}
-			title="Cerca il testo anche dentro i file">Contenuto</button
+			title={t('Cerca il testo anche dentro i file')}>{t('Contenuto')}</button
 		>
 	{/if}
 	{#if onfilters && subfolders}
@@ -109,18 +102,18 @@
 			aria-pressed={filtersOpen}
 			aria-expanded={filtersOpen}
 			onclick={() => (filtersOpen = !filtersOpen)}
-			title="Filtra per tipo, peso e data">Filtri</button
+			title={t('Filtra per tipo, peso e data')}>{t('Filtri')}</button
 		>
 	{/if}
 	{#if onsave && subfolders && (query.trim() !== '' || hasFilters)}
-		<button class="option" onclick={onsave} title="Tieni questa ricerca nella barra laterale">Salva ricerca</button>
+		<button class="option" onclick={onsave} title={t('Tieni questa ricerca nella barra laterale')}>{t('Salva ricerca')}</button>
 	{/if}
-	<button onclick={onclose} aria-label="Chiudi la ricerca"><Icon name="close" /></button>
+	<button onclick={onclose} aria-label={t('Chiudi la ricerca')}><Icon name="close" /></button>
 </div>
 {#if filters && onfilters && subfolders && (filtersOpen || hasFilters)}
-	<div class="filters" role="group" aria-label="Filtri">
+	<div class="filters" role="group" aria-label={t('Filtri')}>
 		<span class="filter-group">
-			<span class="filter-name">Tipo</span>
+			<span class="filter-name">{t('Tipo')}</span>
 			{#each TYPES as t (t.id)}
 				<button class="option" class:on={filters.type === t.id} aria-pressed={filters.type === t.id} onclick={() => pick('type', t.id)}
 					>{t.name}</button
@@ -128,7 +121,7 @@
 			{/each}
 		</span>
 		<span class="filter-group">
-			<span class="filter-name">Peso</span>
+			<span class="filter-name">{t('Peso')}</span>
 			{#each SIZES as p (p.id)}
 				<button class="option" class:on={filters.size === p.id} aria-pressed={filters.size === p.id} onclick={() => pick('size', p.id)}
 					>{p.name}</button
@@ -136,7 +129,7 @@
 			{/each}
 		</span>
 		<span class="filter-group">
-			<span class="filter-name">Modificati</span>
+			<span class="filter-name">{t('Modificati')}</span>
 			{#each DATES as d (d.id)}
 				<button class="option" class:on={filters.date === d.id} aria-pressed={filters.date === d.id} onclick={() => pick('date', d.id)}
 					>{d.name}</button

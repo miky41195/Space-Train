@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import type { ConflictPolicy } from '../ipc';
 
 	let {
@@ -23,8 +24,8 @@
 
 	let title = $derived(
 		names.length === 1
-			? `«${names[0]}» esiste già qui`
-			: `${names.length} elementi esistono già qui`
+			? t('«{0}» esiste già qui', [names[0]])
+			: t('{0} elementi esistono già qui', [names.length])
 	);
 </script>
 
@@ -34,13 +35,10 @@
 	onclick={(e) => e.target === e.currentTarget && oncancel()}
 	onkeydown={(e) => e.key === 'Escape' && oncancel()}
 >
-	<div class="dialog" role="dialog" aria-modal="true" aria-label="Conflitto di nomi">
+	<div class="dialog" role="dialog" aria-modal="true" aria-label={t('Conflitto di nomi')}>
 		<h2>{title}</h2>
 
-		<p>
-			Stai {mode === 'move' ? 'spostando' : 'copiando'} elementi con nomi già presenti nella
-			cartella di destinazione. La scelta vale per tutti.
-		</p>
+		<p> {t('Stai {0} elementi con nomi già presenti nella cartella di destinazione. La scelta vale per tutti.', [mode === 'move' ? 'spostando' : 'copiando'])} </p>
 
 		{#if names.length > 1}
 			<ul>
@@ -48,30 +46,30 @@
 					<li>{n}</li>
 				{/each}
 				{#if names.length > 6}
-					<li class="rest">e altri {names.length - 6}…</li>
+					<li class="rest">{t('e altri {0}…', [names.length - 6])}</li>
 				{/if}
 			</ul>
 		{/if}
 
 		<div class="choices">
 			<button bind:this={button} onclick={() => onpick('rename')}>
-				<strong>Mantieni entrambi</strong>
-				<span>I nuovi arrivano numerati: «nota (2).txt»</span>
+				<strong>{t('Mantieni entrambi')}</strong>
+				<span>{t('I nuovi arrivano numerati: «nota (2).txt»')}</span>
 			</button>
 
 			<button onclick={() => onpick('skip')}>
-				<strong>Salta</strong>
-				<span>Non tocca gli elementi già presenti</span>
+				<strong>{t('Salta')}</strong>
+				<span>{t('Non tocca gli elementi già presenti')}</span>
 			</button>
 
 			<button class="danger" onclick={() => onpick('overwrite')}>
-				<strong>Sostituisci</strong>
-				<span>I file esistenti vengono persi, senza passare dal Cestino</span>
+				<strong>{t('Sostituisci')}</strong>
+				<span>{t('I file esistenti vengono persi, senza passare dal Cestino')}</span>
 			</button>
 		</div>
 
 		<div class="actions">
-			<button class="cancel" onclick={oncancel}>Annulla</button>
+			<button class="cancel" onclick={oncancel}>{t('Annulla')}</button>
 		</div>
 	</div>
 </div>

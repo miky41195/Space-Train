@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import type { Entry } from './ipc';
 import type { Columns } from './stores/settings.svelte';
 import { categoryFor } from './icons';
@@ -16,30 +17,30 @@ export function columnsGrid(c: Columns): string {
 }
 
 const TYPES: Record<string, string> = {
-	code: 'Codice sorgente',
-	markup: 'Pagina',
+	code: t('Codice sorgente'),
+	markup: t('Pagina'),
 	style: 'Foglio di stile',
-	data: 'Dati',
-	text: 'Documento di testo',
-	doc: 'Documento',
-	sheet: 'Foglio di calcolo',
-	slide: 'Presentazione',
-	image: 'Immagine',
-	video: 'Video',
-	audio: 'Audio',
-	archive: 'Archivio',
-	exec: 'Applicazione',
+	data: t('Dati'),
+	text: t('Documento di testo'),
+	doc: t('Documento'),
+	sheet: t('Foglio di calcolo'),
+	slide: t('Presentazione'),
+	image: t('Immagine'),
+	video: t('Video'),
+	audio: t('Audio'),
+	archive: t('Archivio'),
+	exec: t('Applicazione'),
 	font: 'Carattere',
-	config: 'Configurazione'
+	config: t('Configurazione')
 };
 
 /** Type description for the «Tipo» column, as Explorer would write it. */
 export function describeType(e: Entry): string {
-	if (e.total !== undefined) return 'Disco';
-	if (e.kind === 'dir') return 'Cartella';
-	if (e.kind === 'symlink') return 'Collegamento';
+	if (e.total !== undefined) return t('Disco');
+	if (e.kind === 'dir') return t('Cartella');
+	if (e.kind === 'symlink') return t('Collegamento');
 	const ext = extension(e.name);
 	const type = TYPES[categoryFor(e.name)];
-	if (type && ext) return `${type} ${ext.toUpperCase()}`;
-	return ext ? `File ${ext.toUpperCase()}` : 'File';
+	if (type && ext) return t('{0} {1}', [type, ext.toUpperCase()]);
+	return ext ? t('File {0}', [ext.toUpperCase()]) : t('File');
 }

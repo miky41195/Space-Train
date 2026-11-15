@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import type { FolderStyle } from '../icons';
 	import { marqueeSelection, type MarqueeOptions } from '../marquee';
 	import type { Entry } from '../ipc';
@@ -176,7 +177,7 @@
 			style:grid-template-columns="repeat({columns}, 1fr)"
 			style:justify-items={size.horizontal ? "start" : "center"}
 			role="grid"
-			aria-label={divided ? zones[z].label : 'Elementi della cartella'}
+			aria-label={divided ? zones[z].label : t('Elementi della cartella')}
 		>
 			{#each f.items as entry (entry.path)}
 				<Cell

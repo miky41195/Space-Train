@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import type { Backend } from '../ipc';
 	import {
 		THEMES,
@@ -95,14 +96,14 @@
 	 * that is, what you see. `--void` is only behind and in the fields.
 	 */
 	const COLORS = [
-		['hull', '--hull', 'Sfondo'],
-		['void', '--void', 'Campi di testo e bordi'],
-		['text', '--text', 'Testo'],
-		['dim', '--text-dim', 'Testo secondario'],
-		['plasma', '--plasma', 'Evidenziazione'],
-		['current', '--current', 'Luci e binario acceso'],
-		['signal', '--signal', 'Preferiti e segnali'],
-		['rail', '--rail-metal', 'Binario spento']
+		['hull', '--hull', t('Sfondo')],
+		['void', '--void', t('Campi di testo e bordi')],
+		['text', '--text', t('Testo')],
+		['dim', '--text-dim', t('Testo secondario')],
+		['plasma', '--plasma', t('Evidenziazione')],
+		['current', '--current', t('Luci e binario acceso')],
+		['signal', '--signal', t('Preferiti e segnali')],
+		['rail', '--rail-metal', t('Binario spento')]
 	] as const;
 
 	type ColorKey = (typeof COLORS)[number][0];
@@ -113,7 +114,7 @@
 	const editing = currentTheme.group === 'personal' ? currentTheme : null;
 
 	let id = $state(editing?.id ?? `personale-${Date.now()}`);
-	let name = $state(editing?.name ?? `Il mio tema`);
+	let name = $state(editing?.name ?? t('Il mio tema'));
 	let light = $state(false);
 	let palette = $state<Record<ColorKey, string>>({} as Record<ColorKey, string>);
 	let radius = $state(BASE_SHAPES.radius);
@@ -194,13 +195,13 @@
 	/** The full round of whoever crosses in a loop: travel plus pause. */
 	function roundOf(m: Motion): string {
 		const s = m.duration + m.pause;
-		return `${Number.isInteger(s) ? s : s.toFixed(1)} s`;
+		return t('{0} s', [Number.isInteger(s) ? s : s.toFixed(1)]);
 	}
 
 	const MOTION_KINDS: Array<[MotionKind, string]> = [
-		['walk', 'Cammina con gli altri'],
-		['still', 'Resta fermo in un punto'],
-		['cross', 'Attraversa da solo fino in fondo']
+		['walk', t('Cammina con gli altri')],
+		['still', t('Resta fermo in un punto')],
+		['cross', t('Attraversa da solo fino in fondo')]
 	];
 
 	/** The colour picker always wants `#rrggbb`. */
@@ -213,7 +214,7 @@
 
 	let theme = $derived<PersonalTheme>({
 		id,
-		name: name.trim() || 'Il mio tema',
+		name: name.trim() || t('Il mio tema'),
 		light,
 		group: 'personal',
 		variables: variablesFrom(palette, light),
@@ -274,7 +275,7 @@
 		const path = v.slice(4);
 		const d = await measure(path);
 		if (!d) {
-			error = 'Non riesco a leggere le dimensioni di questa immagine.';
+			error = t('Non riesco a leggere le dimensioni di questa immagine.');
 			return;
 		}
 		images[i] = encode(guess(path, d.w, d.h));
@@ -352,7 +353,7 @@
 			const img = await readPixels(await backend.readThemeImage(source));
 			const color = o.color ? fromHex(o.color) : backgroundColor(img);
 			if (!color) {
-				error = 'Lo sfondo di questa immagine è già trasparente.';
+				error = t('Lo sfondo di questa immagine è già trasparente.');
 				return;
 			}
 			const removed = removeBackground(img, { color, tolerance: o.tolerance, edgesOnly: o.edgesOnly });
@@ -360,9 +361,9 @@
 			const saved = await backend.saveThemeImage(`${base}-trasparente.png`, await writePng(img));
 			originals = { ...originals, [saved]: source };
 			images[i] = withImage(images[i], saved);
-			backgroundResult = removed > 0 ? `Sfondo tolto: ${removed} pixel ora trasparenti.` : 'Nessun pixel di quel colore.';
+			backgroundResult = removed > 0 ? t('Sfondo tolto: {0} pixel ora trasparenti.', [removed]) : t('Nessun pixel di quel colore.');
 		} catch (e) {
-			error = `Non riesco a togliere lo sfondo: ${e instanceof Error ? e.message : String(e)}`;
+			error = t('Non riesco a togliere lo sfondo: {0}', [e instanceof Error ? e.message : String(e)]);
 		} finally {
 			processing = null;
 		}
@@ -382,7 +383,7 @@
 			const img = await readPixels(await backend.readThemeImage(originals[path] ?? path));
 			setBackground(i, { color: toHex(pixelColor(img, x, y)) });
 		} catch (e) {
-			error = `Non riesco a leggere il colore: ${e instanceof Error ? e.message : String(e)}`;
+			error = t('Non riesco a leggere il colore: {0}', [e instanceof Error ? e.message : String(e)]);
 		}
 	}
 
@@ -417,7 +418,7 @@
 			}
 			paradeKind = 'images';
 		} catch {
-			error = 'Non è stato possibile salvare l’immagine.';
+			error = t('Non è stato possibile salvare l’immagine.');
 		} finally {
 			loading = false;
 			input.value = '';
@@ -442,40 +443,40 @@
 </script>
 
 <div class="backdrop" class:full={inWindow} role="presentation">
-	<div class="window" class:full={inWindow} role="dialog" aria-modal="true" aria-label="Editor dei temi"
+	<div class="window" class:full={inWindow} role="dialog" aria-modal="true" aria-label={t('Editor dei temi')}
 		use:makeDraggable={!inWindow}>
 		<!-- In a window Windows moves the header: even outside the app. -->
-		<header title="Trascina per spostare l'editor e vedere il tema dietro" data-tauri-drag-region={inWindow || undefined}>
-			<h2 data-tauri-drag-region={inWindow || undefined}>{editing ? 'Modifica tema' : 'Nuovo tema'}</h2>
-			<button class="close" onclick={onclose} aria-label="Chiudi l'editor"><Icon name="close" /></button>
+		<header title={t('Trascina per spostare l\'editor e vedere il tema dietro')} data-tauri-drag-region={inWindow || undefined}>
+			<h2 data-tauri-drag-region={inWindow || undefined}>{editing ? t('Modifica tema') : t('Nuovo tema')}</h2>
+			<button class="close" onclick={onclose} aria-label={t('Chiudi l\'editor')}><Icon name="close" /></button>
 		</header>
 
 		<div class="body">
 			<section>
 				<label class="row">
-					<span>Nome</span>
-					<input type="text" bind:value={name} maxlength="40" aria-label="Nome del tema" />
+					<span>{t('Nome')}</span>
+					<input type="text" bind:value={name} maxlength="40" aria-label={t('Nome del tema')} />
 				</label>
 				<label class="row">
-					<span>Parti da</span>
+					<span>{t('Parti da')}</span>
 					<select
-						aria-label="Parti da un tema"
+						aria-label={t('Parti da un tema')}
 						onchange={(e) => startFrom(themeById(e.currentTarget.value, personal))}
 					>
-						<option value="" selected disabled>Scegli un tema…</option>
+						<option value="" selected disabled>{t('Scegli un tema…')}</option>
 						{#each all as t (t.id)}
 							<option value={t.id}>{t.name}</option>
 						{/each}
 					</select>
 				</label>
 				<label class="row">
-					<span>Fondo chiaro</span>
-					<input type="checkbox" bind:checked={light} aria-label="Fondo chiaro" />
+					<span>{t('Fondo chiaro')}</span>
+					<input type="checkbox" bind:checked={light} aria-label={t('Fondo chiaro')} />
 				</label>
 			</section>
 
 			<section>
-				<h3>Colori</h3>
+				<h3>{t('Colori')}</h3>
 				<div class="colors">
 					{#each COLORS as [k, , label] (k)}
 						<!-- Not a label: it would take up the whole column and a click
@@ -490,109 +491,109 @@
 			</section>
 
 			<section>
-				<h3>Forme</h3>
+				<h3>{t('Forme')}</h3>
 				<label class="row">
-					<span>Arrotondamento finestre</span>
-					<input type="range" min="0" max="28" bind:value={radius} aria-label="Arrotondamento finestre" />
+					<span>{t('Arrotondamento finestre')}</span>
+					<input type="range" min="0" max="28" bind:value={radius} aria-label={t('Arrotondamento finestre')} />
 					<output>{radius}px</output>
 				</label>
 				<label class="row">
-					<span>Arrotondamento righe e pulsanti</span>
-					<input type="range" min="0" max="20" bind:value={radiusSmall} aria-label="Arrotondamento righe" />
+					<span>{t('Arrotondamento righe e pulsanti')}</span>
+					<input type="range" min="0" max="20" bind:value={radiusSmall} aria-label={t('Arrotondamento righe')} />
 					<output>{radiusSmall}px</output>
 				</label>
 				<label class="row">
-					<span>Angoli</span>
-					<select bind:value={corner} aria-label="Angoli">
+					<span>{t('Angoli')}</span>
+					<select bind:value={corner} aria-label={t('Angoli')}>
 						{#each CORNERS as a (a.value)}
 							<option value={a.value}>{a.name}</option>
 						{/each}
 					</select>
 				</label>
 				<label class="row">
-					<span>Schede</span>
-					<select bind:value={tab} aria-label="Schede">
+					<span>{t('Schede')}</span>
+					<select bind:value={tab} aria-label={t('Schede')}>
 						{#each TAB_SHAPES as s (s.value)}
 							<option value={s.value}>{s.name}</option>
 						{/each}
 					</select>
 				</label>
 				<label class="row">
-					<span>Cielo</span>
-					<select bind:value={sky} aria-label="Cielo">
+					<span>{t('Cielo')}</span>
+					<select bind:value={sky} aria-label={t('Cielo')}>
 						{#each SKIES as c (c.value)}
 							<option value={c.value}>{c.name}</option>
 						{/each}
 					</select>
 				</label>
 				<label class="row">
-					<span>Cornice della finestra</span>
-					<select bind:value={frame} aria-label="Cornice della finestra">
+					<span>{t('Cornice della finestra')}</span>
+					<select bind:value={frame} aria-label={t('Cornice della finestra')}>
 						{#each FRAMES as c (c.value)}
 							<option value={c.value}>{c.name}</option>
 						{/each}
 					</select>
 				</label>
 				<label class="row">
-					<span>Cartelle</span>
-					<select bind:value={folder} aria-label="Cartelle">
+					<span>{t('Cartelle')}</span>
+					<select bind:value={folder} aria-label={t('Cartelle')}>
 						{#each FOLDER_STYLES as f (f.value)}
 							<option value={f.value}>{f.name}</option>
 						{/each}
 					</select>
 				</label>
 				<label class="row">
-					<span>Dimensione del testo</span>
+					<span>{t('Dimensione del testo')}</span>
 					<input type="range" min={TEXT_SIZE_MIN} max={TEXT_SIZE_MAX} bind:value={size}
-						aria-label="Dimensione del testo" />
+						aria-label={t('Dimensione del testo')} />
 					<input class="pixel" type="number" min={TEXT_SIZE_MIN} max={TEXT_SIZE_MAX} value={size}
-						aria-label="Dimensione del testo in pixel"
+						aria-label={t('Dimensione del testo in pixel')}
 						onchange={(e) => {
 							size = validPixels(e.currentTarget.value);
 							e.currentTarget.value = String(size);
 						}} />
-					<span class="unit">px</span>
+					<span class="unit">{t('px')}</span>
 				</label>
 				<label class="row">
-					<span>Carattere del testo</span>
-					<select bind:value={font} aria-label="Carattere del testo">
+					<span>{t('Carattere del testo')}</span>
+					<select bind:value={font} aria-label={t('Carattere del testo')}>
 						{#each FONTS as c (c.value)}
 							<option value={c.value}>{c.name}</option>
 						{/each}
 					</select>
 				</label>
 				<label class="row">
-					<span>Carattere dei titoli</span>
-					<select bind:value={titleFont} aria-label="Carattere dei titoli">
+					<span>{t('Carattere dei titoli')}</span>
+					<select bind:value={titleFont} aria-label={t('Carattere dei titoli')}>
 						{#each FONTS as c (c.value)}
 							<option value={c.value}>{c.name}</option>
 						{/each}
 					</select>
 				</label>
 				<label class="row">
-					<span>Dimensione dei titoli</span>
+					<span>{t('Dimensione dei titoli')}</span>
 					<input type="range" min={TEXT_SIZE_MIN} max={TEXT_SIZE_MAX} bind:value={titleSize}
-						aria-label="Dimensione dei titoli" />
+						aria-label={t('Dimensione dei titoli')} />
 					<input class="pixel" type="number" min={TEXT_SIZE_MIN} max={TEXT_SIZE_MAX} value={titleSize}
-						aria-label="Dimensione dei titoli in pixel"
+						aria-label={t('Dimensione dei titoli in pixel')}
 						onchange={(e) => {
 							titleSize = validPixels(e.currentTarget.value);
 							e.currentTarget.value = String(titleSize);
 						}} />
-					<span class="unit">px</span>
+					<span class="unit">{t('px')}</span>
 				</label>
 			</section>
 
 			<section>
-				<h3>Sul binario passa…</h3>
-				<div class="choice" role="radiogroup" aria-label="Chi passa sul binario">
-					<label><input type="radio" bind:group={paradeKind} value="train" /> Il treno</label>
-					<label><input type="radio" bind:group={paradeKind} value="figures" /> Personaggi inclusi</label>
-					<label><input type="radio" bind:group={paradeKind} value="images" /> Le mie immagini</label>
+				<h3>{t('Sul binario passa…')}</h3>
+				<div class="choice" role="radiogroup" aria-label={t('Chi passa sul binario')}>
+					<label><input type="radio" bind:group={paradeKind} value="train" /> {t('Il treno')}</label>
+					<label><input type="radio" bind:group={paradeKind} value="figures" /> {t('Personaggi inclusi')}</label>
+					<label><input type="radio" bind:group={paradeKind} value="images" /> {t('Le mie immagini')}</label>
 				</div>
 
 				{#if paradeKind === 'figures'}
-					<p class="note">Scegli fino a 6 personaggi: sfilano nell’ordine in cui li selezioni.</p>
+					<p class="note">{t('Scegli fino a 6 personaggi: sfilano nell’ordine in cui li selezioni.')}</p>
 					<div class="figures">
 						{#each Object.entries(FIGURES) as [fid, f] (fid)}
 							<button
@@ -609,20 +610,16 @@
 						{/each}
 					</div>
 				{:else if paradeKind === 'images'}
-					<p class="note">
-						PNG, GIF animate o WebP, meglio con lo sfondo trasparente. Anche spritesheet: una
-						striscia o una griglia di fotogrammi, che l’app fa scorrere mentre il personaggio
-						cammina. Le immagini vengono copiate nell’app: puoi spostare o cancellare gli originali.
-					</p>
+					<p class="note"> {t('PNG, GIF animate o WebP, meglio con lo sfondo trasparente. Anche spritesheet: una striscia o una griglia di fotogrammi, che l’app fa scorrere mentre il personaggio cammina. Le immagini vengono copiate nell’app: puoi spostare o cancellare gli originali.')} </p>
 					<label class="upload">
 						<input
 							type="file"
 							accept="image/png,image/gif,image/webp,image/jpeg"
 							multiple
 							onchange={addImages}
-							aria-label="Aggiungi immagini"
+							aria-label={t('Aggiungi immagini')}
 						/>
-						{loading ? 'Copia in corso…' : 'Aggiungi immagini…'}
+						{loading ? t('Copia in corso…') : t('Aggiungi immagini…')}
 					</label>
 					<ul class="images">
 						{#each images as item, i (i)}
@@ -638,16 +635,14 @@
 											type="checkbox"
 											checked={sheet !== null}
 											onchange={() => toggleSprite(i)}
-											aria-label="Spritesheet {name}"
-										/>
-										Spritesheet
-									</label>
+											aria-label={t('Spritesheet {0}', [name])}
+										/> {t('Spritesheet')} </label>
 									<button
 										onclick={() => {
 											images = images.filter((_, j) => j !== i);
 											motions = motions.filter((_, j) => j !== i);
 										}}
-										aria-label="Togli {name}"><Icon name="close" /></button
+										aria-label={t('Togli {0}', [name])}><Icon name="close" /></button
 									>
 								</div>
 								<div class="background-tools">
@@ -655,43 +650,37 @@
 										class="remove-background"
 										disabled={processing !== null}
 										onclick={() => removeBackgroundOf(i)}
-										>{processing === i ? 'Elaboro…' : 'Togli lo sfondo'}</button
+										>{processing === i ? t('Elaboro…') : t('Togli lo sfondo')}</button
 									>
-									<label title="Quanto un colore può essere diverso dallo sfondo ed essere tolto lo stesso">
-										Tolleranza
-										<input type="range" min="0" max="128" value={o.tolerance}
-											aria-label="Tolleranza dello sfondo di {name}"
+									<label title={t('Quanto un colore può essere diverso dallo sfondo ed essere tolto lo stesso')}> {t('Tolleranza')} <input type="range" min="0" max="128" value={o.tolerance}
+											aria-label={t('Tolleranza dello sfondo di {0}', [name])}
 											oninput={(e) => setBackground(i, { tolerance: Number(e.currentTarget.value) })} />
 									</label>
-									<label title="Sfondo da togliere">
+									<label title={t('Sfondo da togliere')}>
 										<input type="color" value={o.color ?? '#ffffff'}
-											aria-label="Colore dello sfondo di {name}"
+											aria-label={t('Colore dello sfondo di {0}', [name])}
 											oninput={(e) => setBackground(i, { color: e.currentTarget.value })} />
-										{o.color ? o.color : 'dagli angoli'}
+										{o.color ? o.color : t('dagli angoli')}
 									</label>
 									{#if o.color}
 										<button class="small" onclick={() => setBackground(i, { color: undefined })}
-											title="Leggi il colore dello sfondo dagli angoli dell'immagine">Automatico</button>
+											title={t('Leggi il colore dello sfondo dagli angoli dell\'immagine')}>{t('Automatico')}</button>
 									{/if}
 									{#if sheet}
 										<button class="small" aria-pressed={eyedropper === i}
 											onclick={() => (eyedropper = eyedropper === i ? null : i)}
-											title="Clicca sul foglio per scegliere il colore dello sfondo">Contagocce</button>
+											title={t('Clicca sul foglio per scegliere il colore dello sfondo')}>{t('Contagocce')}</button>
 									{/if}
 									<label>
 										<input type="checkbox" checked={o.edgesOnly}
-											aria-label="Solo lo sfondo che tocca i bordi di {name}"
-											onchange={(e) => setBackground(i, { edgesOnly: e.currentTarget.checked })} />
-										Solo quello che tocca i bordi
-									</label>
+											aria-label={t('Solo lo sfondo che tocca i bordi di {0}', [name])}
+											onchange={(e) => setBackground(i, { edgesOnly: e.currentTarget.checked })} /> {t('Solo quello che tocca i bordi')} </label>
 									{#if originals[pathOf(item)]}
-										<button class="small" onclick={() => restoreOriginal(i)}>Ripristina originale</button>
+										<button class="small" onclick={() => restoreOriginal(i)}>{t('Ripristina originale')}</button>
 									{/if}
 								</div>
 								<div class="motion">
-									<label>
-										Movimento
-										<select value={m.kind} aria-label="Movimento di {name}"
+									<label> {t('Movimento')} <select value={m.kind} aria-label={t('Movimento di {0}', [name])}
 											onchange={(e) => setMotion(i, { kind: e.currentTarget.value as MotionKind })}>
 											{#each MOTION_KINDS as [kind, label] (kind)}
 												<option value={kind}>{label}</option>
@@ -699,68 +688,58 @@
 										</select>
 									</label>
 									{#if m.kind !== 'walk'}
-										<label title="Sempre: resta in scena senza durata, e chi attraversa riparte all'infinito. Col passaggio: compare solo quando passa il corteo.">
-											Quando
-											<select value={m.loop ? 'always' : 'pass'} aria-label="Quando compare {name}"
+										<label title={t('Sempre: resta in scena senza durata, e chi attraversa riparte all\'infinito. Col passaggio: compare solo quando passa il corteo.')}> {t('Quando')} <select value={m.loop ? 'always' : 'pass'} aria-label={t('Quando compare {0}', [name])}
 												onchange={(e) => setMotion(i, { loop: e.currentTarget.value === 'always' })}>
-												<option value="always">Sempre, in loop</option>
-												<option value="pass">Col passaggio del corteo</option>
+												<option value="always">{t('Sempre, in loop')}</option>
+												<option value="pass">{t('Col passaggio del corteo')}</option>
 											</select>
 										</label>
 										{#if m.kind === 'cross'}
-											<label title="Verso quale bordo va">
-												Verso
-												<select value={m.direction} aria-label="Verso di {name}"
+											<label title={t('Verso quale bordo va')}> {t('Verso')} <select value={m.direction} aria-label={t('Verso di {0}', [name])}
 													onchange={(e) => setMotion(i, { direction: e.currentTarget.value as 'right' | 'left' })}>
-													<option value="right">Destra</option>
-													<option value="left">Sinistra</option>
+													<option value="right">{t('Destra')}</option>
+													<option value="left">{t('Sinistra')}</option>
 												</select>
 											</label>
 										{/if}
-										<label title={m.kind === 'still' ? 'Dove sta sul binario' : 'Da dove parte: poi va fino al bordo'}>
-											{m.kind === 'still' ? 'Posizione' : 'Parte da'}
+										<label title={m.kind === 'still' ? t('Dove sta sul binario') : t('Da dove parte: poi va fino al bordo')}>
+											{m.kind === 'still' ? t('Posizione') : t('Parte da')}
 											<input type="range" min="0" max="100" value={m.position}
-												aria-label="{m.kind === 'still' ? 'Posizione' : 'Partenza'} di {name}"
+												aria-label={t('{0} di {1}', [m.kind === 'still' ? t('Posizione') : t('Partenza'), name])}
 												oninput={(e) => setMotion(i, { position: Number(e.currentTarget.value) })} />
 											{m.position}%
 										</label>
-										<label title="Pixel sopra il binario: per esempio un'onda all'altezza delle mani">
-											Altezza
-											<input type="range" min="0" max="200" value={m.height}
-												aria-label="Altezza di {name}"
+										<label title={t('Pixel sopra il binario: per esempio un\'onda all\'altezza delle mani')}> {t('Altezza')} <input type="range" min="0" max="200" value={m.height}
+												aria-label={t('Altezza di {0}', [name])}
 												oninput={(e) => setMotion(i, { height: Number(e.currentTarget.value) })} />
 											{m.height} px
 										</label>
-										<label title="Disegnato allo specchio, rivolto dall'altra parte">
-											<input type="checkbox" checked={m.mirror} aria-label="Specchia {name}"
-												onchange={(e) => setMotion(i, { mirror: e.currentTarget.checked })} />
-											Specchia
-										</label>
-										<label title={m.loop ? "Secondi dall'apertura prima della prima comparsa: sfasa più voci fra loro" : "Secondi dall'inizio del passaggio prima di comparire"}>
-											{m.loop ? 'Prima volta dopo' : 'Dopo'}
+										<label title={t('Disegnato allo specchio, rivolto dall\'altra parte')}>
+											<input type="checkbox" checked={m.mirror} aria-label={t('Specchia {0}', [name])}
+												onchange={(e) => setMotion(i, { mirror: e.currentTarget.checked })} /> {t('Specchia')} </label>
+										<label title={m.loop ? t('Secondi dall\'apertura prima della prima comparsa: sfasa più voci fra loro') : t('Secondi dall\'inizio del passaggio prima di comparire')}>
+											{m.loop ? t('Prima volta dopo') : t('Dopo')}
 											<input type="number" min="0" max="60" step="0.1" value={m.delay}
-												aria-label="Ritardo di {name}"
+												aria-label={t('Ritardo di {0}', [name])}
 												onchange={(e) => setMotion(i, { delay: Number(e.currentTarget.value) })} />
 											s
 										</label>
 										{#if !(m.loop && m.kind === 'still')}
-											<label title={m.kind === 'still' ? 'Quanto resta in scena' : 'Quanto ci mette ad arrivare in fondo: meno secondi, più veloce'}>
-												{m.kind === 'still' ? 'Per' : 'In'}
+											<label title={m.kind === 'still' ? t('Quanto resta in scena') : t('Quanto ci mette ad arrivare in fondo: meno secondi, più veloce')}>
+												{m.kind === 'still' ? t('Per') : t('In')}
 												<input type="number" min="0.5" max="120" step="0.1" value={m.duration}
-													aria-label="Durata di {name}"
+													aria-label={t('Durata di {0}', [name])}
 													onchange={(e) => setMotion(i, { duration: Number(e.currentTarget.value) })} />
 												s
 											</label>
 										{/if}
 										{#if m.loop && m.kind === 'cross'}
-											<label title="Attesa fra un lancio e l'altro: con viaggio + pausa uguali al ciclo dello spritesheet, l'onda parte sempre allo stesso gesto">
-												Pausa
-												<input type="number" min="0" max="120" step="0.1" value={m.pause}
-													aria-label="Pausa di {name}"
+											<label title={t('Attesa fra un lancio e l\'altro: con viaggio + pausa uguali al ciclo dello spritesheet, l\'onda parte sempre allo stesso gesto')}> {t('Pausa')} <input type="number" min="0" max="120" step="0.1" value={m.pause}
+													aria-label={t('Pausa di {0}', [name])}
 													onchange={(e) => setMotion(i, { pause: Number(e.currentTarget.value) })} />
 												s
 											</label>
-											<span title="Ogni quanto riparte">giro {roundOf(m)}</span>
+											<span title={t('Ogni quanto riparte')}>{t('giro {0}', [roundOf(m)])}</span>
 										{/if}
 									{/if}
 								</div>
@@ -775,147 +754,111 @@
 											<span
 												class="preview-sprite"
 												style={style(sheet, convertFileSrc(sheet.src), 48)}
-												aria-label="Anteprima di {name}"
+												aria-label={t('Anteprima di {0}', [name])}
 											></span>
 										</span>
 										<div class="fields">
 												<label class="by-hand-field">
 													<input type="checkbox" checked={!!sheet.boxes}
-														aria-label="Fotogrammi a mano di {name}"
+														aria-label={t('Fotogrammi a mano di {0}', [name])}
 														onchange={(e) =>
-															updateSprite(i, 'boxes', e.currentTarget.checked ? gridBoxes(sheet) : undefined)} />
-													Fotogrammi a mano, anche di misure diverse (un colpo, un'onda di energia)
-												</label>
+															updateSprite(i, 'boxes', e.currentTarget.checked ? gridBoxes(sheet) : undefined)} /> {t('Fotogrammi a mano, anche di misure diverse (un colpo, un\'onda di energia)')} </label>
 												{#if sheet.boxes}
-													<p class="snap-help">Vicino a un altro fotogramma i bordi si agganciano: tieni Alt per muoverlo libero.</p>
+													<p class="snap-help">{t('Vicino a un altro fotogramma i bordi si agganciano: tieni Alt per muoverlo libero.')}</p>
 												{/if}
 												{#if !sheet.boxes}
 												<label>
 													X
 													<input type="number" min="0" max={sheet.sheetWidth - 1} value={sheet.x}
-														aria-label="X della zona di {name}"
+														aria-label={t('X della zona di {0}', [name])}
 														onchange={(e) => zoneField(i, 'x', e.currentTarget)} />
 												</label>
 												<label>
 													Y
 													<input type="number" min="0" max={sheet.sheetHeight - 1} value={sheet.y}
-														aria-label="Y della zona di {name}"
+														aria-label={t('Y della zona di {0}', [name])}
 														onchange={(e) => zoneField(i, 'y', e.currentTarget)} />
 												</label>
-												<label>
-													Larghezza
-													<input type="number" min="1" max={sheet.sheetWidth} value={sheet.w}
-														aria-label="Larghezza della zona di {name}"
+												<label> {t('Larghezza')} <input type="number" min="1" max={sheet.sheetWidth} value={sheet.w}
+														aria-label={t('Larghezza della zona di {0}', [name])}
 														onchange={(e) => zoneField(i, 'w', e.currentTarget)} />
 												</label>
-												<label>
-													Altezza
-													<input type="number" min="1" max={sheet.sheetHeight} value={sheet.h}
-														aria-label="Altezza della zona di {name}"
+												<label> {t('Altezza')} <input type="number" min="1" max={sheet.sheetHeight} value={sheet.h}
+														aria-label={t('Altezza della zona di {0}', [name])}
 														onchange={(e) => zoneField(i, 'h', e.currentTarget)} />
 												</label>
-												<label>
-													Colonne
-													<input type="number" min="1" max={sheet.w} value={grid(sheet).columns}
-														aria-label="Colonne della griglia di {name}"
+												<label> {t('Colonne')} <input type="number" min="1" max={sheet.w} value={grid(sheet).columns}
+														aria-label={t('Colonne della griglia di {0}', [name])}
 														oninput={(e) => gridField(i, 'columns', Number(e.currentTarget.value))} />
 												</label>
-												<label>
-													Righe
-													<input type="number" min="1" max={sheet.h} value={grid(sheet).rows}
-														aria-label="Righe della griglia di {name}"
+												<label> {t('Righe')} <input type="number" min="1" max={sheet.h} value={grid(sheet).rows}
+														aria-label={t('Righe della griglia di {0}', [name])}
 														oninput={(e) => gridField(i, 'rows', Number(e.currentTarget.value))} />
 												</label>
-												<label>
-													Fotogrammi
-													<input type="number" min="1" max={grid(sheet).rows > 1 ? grid(sheet).columns * grid(sheet).rows : sheet.w}
+												<label> {t('Fotogrammi')} <input type="number" min="1" max={grid(sheet).rows > 1 ? grid(sheet).columns * grid(sheet).rows : sheet.w}
 														value={sheet.frames}
-														aria-label="Fotogrammi di {name}"
+														aria-label={t('Fotogrammi di {0}', [name])}
 														oninput={(e) => gridField(i, 'frames', Number(e.currentTarget.value))} />
 												</label>
-												<label title="Spazio vuoto fra una colonna e l'altra, in pixel del foglio">
-													Spazio orizzontale
-													<input type="number" min="0" max={sheet.w} value={sheet.gapX ?? 0}
-														aria-label="Spazio orizzontale fra i fotogrammi di {name}"
+												<label title={t('Spazio vuoto fra una colonna e l\'altra, in pixel del foglio')}> {t('Spazio orizzontale')} <input type="number" min="0" max={sheet.w} value={sheet.gapX ?? 0}
+														aria-label={t('Spazio orizzontale fra i fotogrammi di {0}', [name])}
 														oninput={(e) => updateSprite(i, 'gapX', Number(e.currentTarget.value))} />
 												</label>
-												<label title="Spazio vuoto fra una riga e l'altra, in pixel del foglio">
-													Spazio verticale
-													<input type="number" min="0" max={sheet.h} value={sheet.gapY ?? 0}
-														aria-label="Spazio verticale fra i fotogrammi di {name}"
+												<label title={t('Spazio vuoto fra una riga e l\'altra, in pixel del foglio')}> {t('Spazio verticale')} <input type="number" min="0" max={sheet.h} value={sheet.gapY ?? 0}
+														aria-label={t('Spazio verticale fra i fotogrammi di {0}', [name])}
 														oninput={(e) => updateSprite(i, 'gapY', Number(e.currentTarget.value))} />
 												</label>
 												{:else}
-												<p class="by-hand-note">
-													{sheet.frames} fotogrammi. Sul foglio clicca un fotogramma per spostarlo o
-													ridimensionarlo; trascina nello spazio vuoto per aggiungerne uno. Sul binario i
-													piedi restano sulla linea anche quando il fotogramma si allarga.
-												</p>
+												<p class="by-hand-note"> {t('{0} fotogrammi. Sul foglio clicca un fotogramma per spostarlo o ridimensionarlo; trascina nello spazio vuoto per aggiungerne uno. Sul binario i piedi restano sulla linea anche quando il fotogramma si allarga.', [sheet.frames])} </p>
 												{/if}
-												<label class="order-field">
-													Ordine
-													<input type="text" value={formatOrder(sheet)}
-														aria-label="Ordine dei fotogrammi di {name}"
-														placeholder="es. 2, 1, 3, 1"
+												<label class="order-field"> {t('Ordine')} <input type="text" value={formatOrder(sheet)}
+														aria-label={t('Ordine dei fotogrammi di {0}', [name])}
+														placeholder={t('es. 2, 1, 3, 1')}
 														onchange={(e) => orderField(i, e.currentTarget)} />
 												</label>
 												<div class="preset">
 														<button type="button" disabled={sheet.frames < 3}
-															title="Il primo fotogramma (fermo) tra ognuno degli altri: 2, 1, 3, 1…"
+															title={t('Il primo fotogramma (fermo) tra ognuno degli altri: 2, 1, 3, 1…')}
 															onclick={() => updateSprite(i, 'order', alternateWithFirst(sheet.frames))}
-															>Fermo tra i passi</button>
+															>{t('Fermo tra i passi')}</button>
 														<button type="button" disabled={sheet.frames < 3}
-															title="Avanti e indietro: 1, 2, 3, 2…"
+															title={t('Avanti e indietro: 1, 2, 3, 2…')}
 															onclick={() => updateSprite(i, 'order', pingPong(sheet.frames))}
-															>Avanti e indietro</button>
+															>{t('Avanti e indietro')}</button>
 														<button type="button"
-															title="Tutti di fila: 1, 2, 3…"
+															title={t('Tutti di fila: 1, 2, 3…')}
 															onclick={() => updateSprite(i, 'order', [])}
-															>Di fila</button>
+															>{t('Di fila')}</button>
 												</div>
-												<label>
-													Velocità (fps)
-													<input type="number" min="1" max="30" value={sheet.fps}
-														aria-label="Velocità di {name}"
+												<label> {t('Velocità (fps)')} <input type="number" min="1" max="30" value={sheet.fps}
+														aria-label={t('Velocità di {0}', [name])}
 														oninput={(e) => updateSprite(i, 'fps', Number(e.currentTarget.value))} />
 												</label>
 												<label class="crisp-check">
 													<input type="checkbox" checked={sheet.crisp}
-														aria-label="Pixel nitidi per {name}"
-														onchange={(e) => updateSprite(i, 'crisp', e.currentTarget.checked)} />
-													Pixel art nitida
-												</label>
+														aria-label={t('Pixel nitidi per {0}', [name])}
+														onchange={(e) => updateSprite(i, 'crisp', e.currentTarget.checked)} /> {t('Pixel art nitida')} </label>
 												<span class="frame-size">
 													Fotogramma {+frameSize(sheet).width.toFixed(1)}×{+frameSize(sheet).height.toFixed(1)} px
 												</span>
 												<div class="rail-field">
-													<span class="rail-title">Sul binario</span>
-													<label>
-														Altezza
-														<input type="range" min={RAIL_HEIGHT_MIN} max={RAIL_HEIGHT_MAX} value={railSize(sheet).height}
-															aria-label="Altezza sul binario di {name}"
+													<span class="rail-title">{t('Sul binario')}</span>
+													<label> {t('Altezza')} <input type="range" min={RAIL_HEIGHT_MIN} max={RAIL_HEIGHT_MAX} value={railSize(sheet).height}
+															aria-label={t('Altezza sul binario di {0}', [name])}
 															oninput={(e) => updateSprite(i, 'railHeight', Number(e.currentTarget.value))} />
 														<input type="number" min={RAIL_HEIGHT_MIN} max={RAIL_HEIGHT_MAX} value={railSize(sheet).height}
-															aria-label="Altezza in pixel sul binario di {name}"
-															onchange={(e) => updateSprite(i, 'railHeight', Number(e.currentTarget.value))} />
-														px
-													</label>
-													<label>
-														Larghezza
-														<input type="number" min={RAIL_WIDTH_MIN} max={RAIL_WIDTH_MAX}
+															aria-label={t('Altezza in pixel sul binario di {0}', [name])}
+															onchange={(e) => updateSprite(i, 'railHeight', Number(e.currentTarget.value))} /> {t('px')} </label>
+													<label> {t('Larghezza')} <input type="number" min={RAIL_WIDTH_MIN} max={RAIL_WIDTH_MAX}
 															value={Math.round(railSize(sheet).width)}
 															disabled={sheet.railWidth === undefined}
-															aria-label="Larghezza sul binario di {name}"
-															onchange={(e) => updateSprite(i, 'railWidth', Number(e.currentTarget.value))} />
-														px
-													</label>
+															aria-label={t('Larghezza sul binario di {0}', [name])}
+															onchange={(e) => updateSprite(i, 'railWidth', Number(e.currentTarget.value))} /> {t('px')} </label>
 													<label>
 														<input type="checkbox" checked={sheet.railWidth === undefined}
-															aria-label="Larghezza proporzionale di {name}"
+															aria-label={t('Larghezza proporzionale di {0}', [name])}
 															onchange={(e) =>
-																updateSprite(i, 'railWidth', e.currentTarget.checked ? undefined : Math.round(railSize(sheet).width))} />
-														Proporzionale
-													</label>
+																updateSprite(i, 'railWidth', e.currentTarget.checked ? undefined : Math.round(railSize(sheet).width))} /> {t('Proporzionale')} </label>
 												</div>
 											</div>
 										</div>
@@ -938,10 +881,10 @@
 			</section>
 
 			<section>
-				<h3>Animazioni</h3>
+				<h3>{t('Animazioni')}</h3>
 				<label class="row">
-					<span>All’avvio</span>
-					<select bind:value={animations.intro} aria-label="Animazione all’avvio">
+					<span>{t('All’avvio')}</span>
+					<select bind:value={animations.intro} aria-label={t('Animazione all’avvio')}>
 						{#each INTRO_ANIMATIONS as a (a.value)}
 							<option value={a.value}>{a.name}</option>
 						{/each}
@@ -949,9 +892,9 @@
 				</label>
 				{#if animations.intro === 'custom'}
 					<label class="row">
-						<span>Chi passa</span>
-						<select bind:value={animations.figure} aria-label="Chi passa all’avvio">
-							<option value={undefined}>Il treno</option>
+						<span>{t('Chi passa')}</span>
+						<select bind:value={animations.figure} aria-label={t('Chi passa all’avvio')}>
+							<option value={undefined}>{t('Il treno')}</option>
 							{#each images as v (v)}
 								<option value={v}>{imageName(v)}</option>
 							{/each}
@@ -961,34 +904,34 @@
 						</select>
 					</label>
 					<label class="row">
-						<span>Movimento</span>
-						<select bind:value={animations.motion} aria-label="Movimento all’avvio">
+						<span>{t('Movimento')}</span>
+						<select bind:value={animations.motion} aria-label={t('Movimento all’avvio')}>
 							{#each INTRO_MOTIONS as m (m.value)}
 								<option value={m.value}>{m.name}</option>
 							{/each}
 						</select>
 					</label>
 					<label class="row">
-						<span>Durata</span>
-						<input type="range" min="0.5" max="3" step="0.25" bind:value={animations.duration} aria-label="Durata dell’animazione all’avvio" />
+						<span>{t('Durata')}</span>
+						<input type="range" min="0.5" max="3" step="0.25" bind:value={animations.duration} aria-label={t('Durata dell’animazione all’avvio')} />
 						<output>{animations.duration.toLocaleString('it-IT')} s</output>
 					</label>
 				{/if}
 				<label class="row">
-					<span>Aprendo una cartella</span>
-					<select bind:value={animations.folder} aria-label="Animazione aprendo una cartella">
+					<span>{t('Aprendo una cartella')}</span>
+					<select bind:value={animations.folder} aria-label={t('Animazione aprendo una cartella')}>
 						{#each FOLDER_ANIMATIONS as a (a.value)}
 							<option value={a.value}>{a.name}</option>
 						{/each}
 					</select>
 				</label>
-				<p class="note">L’animazione all’avvio parte se è accesa in Impostazioni; con «riduci movimento» di Windows non parte nessuna.</p>
+				<p class="note">{t('L’animazione all’avvio parte se è accesa in Impostazioni; con «riduci movimento» di Windows non parte nessuna.')}</p>
 			</section>
 
 			<section>
-				<h3>Sfondo decorativo</h3>
-				<select bind:value={pattern} aria-label="Sfondo decorativo">
-					<option value="">Nessuno</option>
+				<h3>{t('Sfondo decorativo')}</h3>
+				<select bind:value={pattern} aria-label={t('Sfondo decorativo')}>
+					<option value="">{t('Nessuno')}</option>
 					{#each Object.entries(FIGURES) as [fid, f] (fid)}
 						<option value={fid}>{f.name}</option>
 					{/each}
@@ -998,11 +941,11 @@
 
 		<footer>
 			{#if editing}
-				<button class="danger" onclick={() => ondelete(id)}>Elimina tema</button>
+				<button class="danger" onclick={() => ondelete(id)}>{t('Elimina tema')}</button>
 			{/if}
 			<span class="spacer"></span>
-			<button onclick={onclose}>Annulla</button>
-			<button class="primary" onclick={() => onsave(theme)}>Salva tema</button>
+			<button onclick={onclose}>{t('Annulla')}</button>
+			<button class="primary" onclick={() => onsave(theme)}>{t('Salva tema')}</button>
 		</footer>
 	</div>
 </div>

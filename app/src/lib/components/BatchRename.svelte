@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import type { Entry, MediaProps } from '../ipc';
 	import { availablePlaceholders, planRename, type Placeholder, type RenameRule } from '../batch-rename';
 
@@ -94,13 +95,13 @@
 	<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="batch-title">
 	<form onsubmit={submit}>
 		<header>
-			<h2 id="batch-title">Rinomina {entries.length} elementi</h2>
-			<div class="modes" role="tablist" aria-label="Modo di rinomina">
+			<h2 id="batch-title">{t('Rinomina {0} elementi', [entries.length])}</h2>
+			<div class="modes" role="tablist" aria-label={t('Modo di rinomina')}>
 				<button type="button" role="tab" aria-selected={mode === 'pattern'} class:on={mode === 'pattern'} onclick={() => (mode = 'pattern')}
-					>Schema</button
+					>{t('Schema')}</button
 				>
 				<button type="button" role="tab" aria-selected={mode === 'replace'} class:on={mode === 'replace'} onclick={() => (mode = 'replace')}
-					>Trova e sostituisci</button
+					>{t('Trova e sostituisci')}</button
 				>
 			</div>
 		</header>
@@ -108,7 +109,7 @@
 		{#if mode === 'pattern'}
 			<div class="fields">
 				<label class="wide">
-					<span>Nome</span>
+					<span>{t('Nome')}</span>
 					<span class="placeholder-field">
 						<span class="mirror" aria-hidden="true" bind:this={mirror}
 							>{#each parts as p, i (i)}{#if p.startsWith('[') && p.endsWith(']')}<mark>{p}</mark>{:else}{p}{/if}{/each}</span
@@ -116,7 +117,7 @@
 						<input
 							bind:this={first}
 							bind:value={pattern}
-							placeholder="Vacanze_###"
+							placeholder={t('Vacanze_###')}
 							spellcheck="false"
 							autocomplete="off"
 							onscroll={(e) => mirror && (mirror.scrollLeft = e.currentTarget.scrollLeft)}
@@ -124,12 +125,12 @@
 					</span>
 				</label>
 				<label>
-					<span>Parti da</span>
+					<span>{t('Parti da')}</span>
 					<input type="number" min="0" bind:value={start} />
 				</label>
 			</div>
-			<p class="help">Ogni <kbd>#</kbd> è una cifra del contatore: <b>###</b> diventa 001, 002, 003…</p>
-			<div class="placeholders" aria-label="Dati dei file da inserire nel nome">
+			<p class="help">{t('Ogni')} <kbd>#</kbd> {t('è una cifra del contatore:')} <b>###</b> {t('diventa 001, 002, 003…')}</p>
+			<div class="placeholders" aria-label={t('Dati dei file da inserire nel nome')}>
 				{#each placeholders as t (t)}
 					<button type="button" onclick={() => insert(t)}>{t.slice(1, -1)}</button>
 				{/each}
@@ -137,24 +138,24 @@
 		{:else}
 			<div class="fields">
 				<label>
-					<span>Trova</span>
+					<span>{t('Trova')}</span>
 					<input bind:this={first} bind:value={find} spellcheck="false" autocomplete="off" />
 				</label>
 				<label>
-					<span>Sostituisci con</span>
+					<span>{t('Sostituisci con')}</span>
 					<input bind:value={replace} spellcheck="false" autocomplete="off" />
 				</label>
 			</div>
 		{/if}
 
 		<div class="options">
-			<label class="check"><input type="checkbox" bind:checked={keepExtension} />Lascia com’è l’estensione</label>
+			<label class="check"><input type="checkbox" bind:checked={keepExtension} />{t('Lascia com’è l’estensione')}</label>
 			{#if mode === 'replace'}
-				<label class="check"><input type="checkbox" bind:checked={matchCase} />Maiuscole e minuscole</label>
+				<label class="check"><input type="checkbox" bind:checked={matchCase} />{t('Maiuscole e minuscole')}</label>
 			{/if}
 		</div>
 
-		<ol class="preview" aria-label="Anteprima dei nuovi nomi">
+		<ol class="preview" aria-label={t('Anteprima dei nuovi nomi')}>
 			{#each plan as p (p.item.path)}
 				{@const [before, middle, after] = changed(p.item.name, p.newName)}
 				<li class:problem={p.problem} class:same={!p.problem && p.newName === p.item.name}>
@@ -163,7 +164,7 @@
 						><path d="M2 8h11M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" /></svg
 					>
 					<span class="new" title={p.newName}>
-						{#if p.problem}{p.newName} · {p.problem}{:else if p.newName === p.item.name}{p.note ?? 'invariato'}{:else}{before}<b>{middle}</b>{after}{#if p.note}<i>{` · ${p.note}`}</i>{/if}{/if}
+						{#if p.problem}{p.newName} · {p.problem}{:else if p.newName === p.item.name}{p.note ?? 'invariato'}{:else}{before}<b>{middle}</b>{after}{#if p.note}<i>{t(' · {0}', [p.note])}</i>{/if}{/if}
 					</span>
 				</li>
 			{/each}
@@ -171,11 +172,11 @@
 
 		<footer>
 			<span class="status" aria-live="polite">
-				{#if problems > 0}{problems === 1 ? '1 nome non va bene' : `${problems} nomi non vanno bene`}{:else if changes > 0}{changes === 1 ? '1 nome cambia' : `${changes} nomi cambiano`}{/if}
+				{#if problems > 0}{problems === 1 ? t('1 nome non va bene') : t('{0} nomi non vanno bene', [problems])}{:else if changes > 0}{changes === 1 ? t('1 nome cambia') : t('{0} nomi cambiano', [changes])}{/if}
 			</span>
 			<span class="actions">
-				<button type="button" onclick={oncancel}>Annulla</button>
-				<button type="submit" class="primary" disabled={!ready}>Rinomina</button>
+				<button type="button" onclick={oncancel}>{t('Annulla')}</button>
+				<button type="submit" class="primary" disabled={!ready}>{t('Rinomina')}</button>
 			</span>
 		</footer>
 	</form>

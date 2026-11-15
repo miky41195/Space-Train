@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import { ZONE_HEADER } from '../virtual';
 
 	let {
@@ -23,7 +24,7 @@
 	style:top="{top}px"
 	style:height="{ZONE_HEADER}px"
 	role="separator"
-	aria-label="{label}, {count}"
+	aria-label={t('{0}, {1}', [label, count])}
 >
 	<span class="label">
 		{#if tone === 'favorites'}

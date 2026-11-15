@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import type { Entry } from '../ipc';
 	import { iconFor, categoryFor, folderIcon, drawnFolder, type FolderStyle } from '../icons';
 	import type { IconsStore } from '../stores/icons.svelte';
@@ -124,7 +125,7 @@
 			<span class="info">{describeType(entry)}</span>
 			{#if entry.kind !== 'dir' || entry.free !== undefined}
 				<span class="info">
-					{entry.free !== undefined ? `${formatBytes(entry.free)} liberi` : formatBytes(entry.size)}
+					{entry.free !== undefined ? t('{0} liberi', [formatBytes(entry.free)]) : formatBytes(entry.size)}
 				</span>
 			{/if}
 		{/if}

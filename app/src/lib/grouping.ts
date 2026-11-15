@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import type { Entry } from './ipc';
 import { categoryFor } from './icons';
 import { formatBytes } from './locations';
@@ -29,50 +30,50 @@ export interface Layout {
 
 /** Groups by type, in the order they appear. */
 const TYPE_GROUPS: Array<{ label: string; categories: string[] }> = [
-	{ label: 'Cartelle', categories: ['dir'] },
-	{ label: 'Documenti', categories: ['doc', 'text', 'sheet', 'slide'] },
-	{ label: 'Immagini', categories: ['image'] },
-	{ label: 'Video', categories: ['video'] },
-	{ label: 'Audio', categories: ['audio'] },
-	{ label: 'Archivi', categories: ['archive'] },
-	{ label: 'Programmi', categories: ['exec'] },
-	{ label: 'Codice e dati', categories: ['code', 'markup', 'style', 'data', 'config'] },
-	{ label: 'Caratteri', categories: ['font'] },
-	{ label: 'Altri file', categories: ['plain'] }
+	{ label: t('Cartelle'), categories: ['dir'] },
+	{ label: t('Documenti'), categories: ['doc', 'text', 'sheet', 'slide'] },
+	{ label: t('Immagini'), categories: ['image'] },
+	{ label: t('Video'), categories: ['video'] },
+	{ label: t('Audio'), categories: ['audio'] },
+	{ label: t('Archivi'), categories: ['archive'] },
+	{ label: t('Programmi'), categories: ['exec'] },
+	{ label: t('Codice e dati'), categories: ['code', 'markup', 'style', 'data', 'config'] },
+	{ label: t('Caratteri'), categories: ['font'] },
+	{ label: t('Altri file'), categories: ['plain'] }
 ];
 
 function typeGroup(e: Entry): string {
 	const category = e.kind === 'dir' ? 'dir' : categoryFor(e.name);
-	return TYPE_GROUPS.find((g) => g.categories.includes(category))?.label ?? 'Altri file';
+	return TYPE_GROUPS.find((g) => g.categories.includes(category))?.label ?? t('Altri file');
 }
 
 const DATE_GROUPS = [
-	'Oggi',
-	'Ieri',
-	'Questa settimana',
-	'Questo mese',
-	'Quest’anno',
-	'Più di un anno fa',
-	'Senza data'
+	t('Oggi'),
+	t('Ieri'),
+	t('Questa settimana'),
+	t('Questo mese'),
+	t('Quest’anno'),
+	t('Più di un anno fa'),
+	t('Senza data')
 ] as const;
 
 function dateGroup(e: Entry, now: number): string {
-	if (e.modified === null) return 'Senza data';
+	if (e.modified === null) return t('Senza data');
 
 	const today = new Date(now);
 	today.setHours(0, 0, 0, 0);
 	const start = today.getTime();
 	const day = 24 * 60 * 60 * 1000;
 
-	if (e.modified >= start) return 'Oggi';
-	if (e.modified >= start - day) return 'Ieri';
-	if (e.modified >= start - 6 * day) return 'Questa settimana';
-	if (e.modified >= start - 30 * day) return 'Questo mese';
-	if (e.modified >= start - 365 * day) return 'Quest’anno';
-	return 'Più di un anno fa';
+	if (e.modified >= start) return t('Oggi');
+	if (e.modified >= start - day) return t('Ieri');
+	if (e.modified >= start - 6 * day) return t('Questa settimana');
+	if (e.modified >= start - 30 * day) return t('Questo mese');
+	if (e.modified >= start - 365 * day) return t('Quest’anno');
+	return t('Più di un anno fa');
 }
 
-const NAME_GROUPS = ['0–9', 'A–H', 'I–P', 'Q–Z', 'Altri'] as const;
+const NAME_GROUPS = ['0–9', 'A–H', 'I–P', 'Q–Z', t('Altri')] as const;
 
 /** Name ranges as in Explorer: by initial, in blocks. */
 function nameGroup(e: Entry): string {
@@ -81,45 +82,45 @@ function nameGroup(e: Entry): string {
 	if (c >= 'A' && c <= 'H') return 'A–H';
 	if (c >= 'I' && c <= 'P') return 'I–P';
 	if (c >= 'Q' && c <= 'Z') return 'Q–Z';
-	return 'Altri';
+	return t('Altri');
 }
 
 const SIZE_GROUPS = [
-	'Cartelle',
-	'Vuoto',
-	'Minuscolo (0–16 KB)',
-	'Piccolo (16 KB–1 MB)',
-	'Medio (1–128 MB)',
-	'Grande (128 MB–1 GB)',
-	'Enorme (1–4 GB)',
-	'Gigantesco (> 4 GB)'
+	t('Cartelle'),
+	t('Vuoto'),
+	t('Minuscolo (0–16 KB)'),
+	t('Piccolo (16 KB–1 MB)'),
+	t('Medio (1–128 MB)'),
+	t('Grande (128 MB–1 GB)'),
+	t('Enorme (1–4 GB)'),
+	t('Gigantesco (> 4 GB)')
 ] as const;
 
 /** The same size ranges as Explorer. */
 function sizeGroup(e: Entry): string {
-	if (e.kind === 'dir') return 'Cartelle';
+	if (e.kind === 'dir') return t('Cartelle');
 	const kb = 1024;
 	const mb = 1024 * kb;
 	const gb = 1024 * mb;
-	if (e.size === 0) return 'Vuoto';
-	if (e.size < 16 * kb) return 'Minuscolo (0–16 KB)';
-	if (e.size < mb) return 'Piccolo (16 KB–1 MB)';
-	if (e.size < 128 * mb) return 'Medio (1–128 MB)';
-	if (e.size < gb) return 'Grande (128 MB–1 GB)';
-	if (e.size < 4 * gb) return 'Enorme (1–4 GB)';
-	return 'Gigantesco (> 4 GB)';
+	if (e.size === 0) return t('Vuoto');
+	if (e.size < 16 * kb) return t('Minuscolo (0–16 KB)');
+	if (e.size < mb) return t('Piccolo (16 KB–1 MB)');
+	if (e.size < 128 * mb) return t('Medio (1–128 MB)');
+	if (e.size < gb) return t('Grande (128 MB–1 GB)');
+	if (e.size < 4 * gb) return t('Enorme (1–4 GB)');
+	return t('Gigantesco (> 4 GB)');
 }
 
 /** The periods of the «Recenti» slider, in days. */
 export const RECENT_PERIODS = [
-	{ days: 1, name: 'Ultimo giorno' },
-	{ days: 3, name: 'Ultimi 3 giorni' },
-	{ days: 7, name: 'Ultima settimana' },
-	{ days: 14, name: 'Ultime 2 settimane' },
-	{ days: 30, name: 'Ultimo mese' },
-	{ days: 90, name: 'Ultimi 3 mesi' },
-	{ days: 180, name: 'Ultimi 6 mesi' },
-	{ days: 365, name: 'Ultimo anno' }
+	{ days: 1, name: t('Ultimo giorno') },
+	{ days: 3, name: t('Ultimi 3 giorni') },
+	{ days: 7, name: t('Ultima settimana') },
+	{ days: 14, name: t('Ultime 2 settimane') },
+	{ days: 30, name: t('Ultimo mese') },
+	{ days: 90, name: t('Ultimi 3 mesi') },
+	{ days: 180, name: t('Ultimi 6 mesi') },
+	{ days: 365, name: t('Ultimo anno') }
 ] as const;
 
 /**
@@ -147,9 +148,9 @@ export function layout(
 
 	// The recent zone is there even empty: it says nothing changed in the
 	// chosen period, instead of making the button just pressed disappear.
-	const zones: Zone[] = [{ label: 'Modificati di recente', count: recent.length, tone: 'recent' }];
+	const zones: Zone[] = [{ label: t('Modificati di recente'), count: recent.length, tone: 'recent' }];
 	if (base.zones.length > 0) zones.push(...base.zones);
-	else if (rest.length > 0) zones.push({ label: 'Tutti gli altri', count: rest.length });
+	else if (rest.length > 0) zones.push({ label: t('Tutti gli altri'), count: rest.length });
 
 	return { items: [...recent, ...base.items], zones };
 }
@@ -167,8 +168,8 @@ function baseLayout(items: readonly Entry[], favorites: ReadonlySet<string>, mod
 		return {
 			items: [...above, ...below],
 			zones: [
-				{ label: 'Preferiti', count: above.length, tone: 'favorites' },
-				{ label: 'Comuni', count: below.length }
+				{ label: t('Preferiti'), count: above.length, tone: 'favorites' },
+				{ label: t('Comuni'), count: below.length }
 			]
 		};
 	}
@@ -186,7 +187,7 @@ function baseLayout(items: readonly Entry[], favorites: ReadonlySet<string>, mod
 	const zones: Zone[] = [];
 	const sorted: Entry[] = [];
 	if (above.length > 0) {
-		zones.push({ label: 'Preferiti', count: above.length, tone: 'favorites' });
+		zones.push({ label: t('Preferiti'), count: above.length, tone: 'favorites' });
 		sorted.push(...above);
 	}
 	for (const [label, members] of groups) {
@@ -201,7 +202,7 @@ function baseLayout(items: readonly Entry[], favorites: ReadonlySet<string>, mod
 /** One zone per group of identical files: size of each copy and the space the extra copies take. */
 export function duplicateZones(groups: Array<{ size: number; count: number }>): Zone[] {
 	return groups.map((g) => ({
-		label: `${formatBytes(g.size)} ciascuna · recuperabili ${formatBytes(g.size * (g.count - 1))}`,
+		label: t('{0} ciascuna · recuperabili {1}', [formatBytes(g.size), formatBytes(g.size * (g.count - 1))]),
 		count: g.count
 	}));
 }

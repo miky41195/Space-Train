@@ -1,3 +1,4 @@
+import { t } from './i18n';
 /**
  * List views as in Windows 11 File Explorer.
  *
@@ -22,10 +23,10 @@ export const SIDE_MAX = 256;
 
 /** The sizes with a name, as in Windows' View menu. */
 export const SIZES = [
-	{ name: 'Icone molto grandi', side: 256 },
-	{ name: 'Icone grandi', side: 128 },
-	{ name: 'Icone medie', side: 64 },
-	{ name: 'Icone piccole', side: 24 }
+	{ name: t('Icone molto grandi'), side: 256 },
+	{ name: t('Icone grandi'), side: 128 },
+	{ name: t('Icone medie'), side: 64 },
+	{ name: t('Icone piccole'), side: 24 }
 ] as const;
 
 export interface ViewState {

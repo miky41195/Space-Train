@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import type { Progress } from '../ipc';
 	import type { ProgressMode } from '../progress-mode';
 
@@ -29,36 +30,36 @@
 	);
 
 	const LABELS = {
-		copy: 'Copia',
-		move: 'Spostamento',
-		compress: 'Compressione',
-		extract: 'Estrazione',
-		send: 'Invio in rete locale',
-		receive: 'Ricezione dalla rete locale',
-		trash: 'Spostamento nel Cestino',
-		delete: 'Eliminazione',
-		duplicates: 'Confronto dei file',
-		images: 'Conversione delle immagini',
-		backup: 'Backup sul server'
+		copy: t('Copia'),
+		move: t('Spostamento'),
+		compress: t('Compressione'),
+		extract: t('Estrazione'),
+		send: t('Invio in rete locale'),
+		receive: t('Ricezione dalla rete locale'),
+		trash: t('Spostamento nel Cestino'),
+		delete: t('Eliminazione'),
+		duplicates: t('Confronto dei file'),
+		images: t('Conversione delle immagini'),
+		backup: t('Backup sul server')
 	} as const;
 
 	/** Deletions count items: bytes would say nothing about how long is left. */
 	let byItems = $derived(mode === 'trash' || mode === 'delete' || mode === 'images');
 
 	function itemsText(n: number): string {
-		return n === 1 ? '1 elemento' : `${n} elementi`;
+		return n === 1 ? t('1 elemento') : t('{0} elementi', [n]);
 	}
 
 	function formatBytes(n: number): string {
-		if (n < 1024) return `${n} B`;
-		if (n < 1024 ** 2) return `${(n / 1024).toFixed(0)} KB`;
-		if (n < 1024 ** 3) return `${(n / 1024 ** 2).toFixed(1)} MB`;
-		return `${(n / 1024 ** 3).toFixed(2)} GB`;
+		if (n < 1024) return t('{0} B', [n]);
+		if (n < 1024 ** 2) return t('{0} KB', [(n / 1024).toFixed(0)]);
+		if (n < 1024 ** 3) return t('{0} MB', [(n / 1024 ** 2).toFixed(1)]);
+		return t('{0} GB', [(n / 1024 ** 3).toFixed(2)]);
 	}
 </script>
 
 <div class="bar">
-	<span class="label">{LABELS[mode]} {paused ? 'in pausa' : 'in corso…'}</span>
+	<span class="label">{LABELS[mode]} {paused ? t('in pausa') : t('in corso…')}</span>
 
 	<div
 		class="track"
@@ -73,20 +74,16 @@
 	</div>
 
 	<span class="numbers">
-		{#if byItems}
-			{progress.transferred} di {itemsText(progress.total)} · {percent}%
-		{:else}
-			{formatBytes(progress.transferred)} di {formatBytes(progress.total)} · {percent}%
-		{/if}
+		{#if byItems} {t('{0} di {1} · {2}%', [progress.transferred, itemsText(progress.total), percent])} {:else} {t('{0} di {1} · {2}%', [formatBytes(progress.transferred), formatBytes(progress.total), percent])} {/if}
 	</span>
 
 	{#if onqueue && queued > 0}
-		<button class="queue" onclick={onqueue}>+{queued} in coda</button>
+		<button class="queue" onclick={onqueue}>{t('+{0} in coda', [queued])}</button>
 	{/if}
 	{#if onpause}
-		<button onclick={onpause}>{paused ? 'Riprendi' : 'Pausa'}</button>
+		<button onclick={onpause}>{paused ? t('Riprendi') : t('Pausa')}</button>
 	{/if}
-	<button onclick={oncancel}>Annulla</button>
+	<button onclick={oncancel}>{t('Annulla')}</button>
 </div>
 
 <style>

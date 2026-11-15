@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import type { Entry } from '../ipc';
 	import { iconFor, categoryFor, folderIcon, drawnFolder, type FolderStyle } from '../icons';
 	import type { IconsStore } from '../stores/icons.svelte';
@@ -8,10 +9,10 @@
 	import type { GitMark, MediaProps } from '../ipc';
 
 	const GIT_LETTER: Record<GitMark, { letter: string; label: string }> = {
-		modified: { letter: 'M', label: 'Modificato' },
-		new: { letter: 'N', label: 'Nuovo' },
-		conflict: { letter: '!', label: 'In conflitto' },
-		ignored: { letter: '', label: 'Ignorato da git' }
+		modified: { letter: 'M', label: t('Modificato') },
+		new: { letter: 'N', label: t('Nuovo') },
+		conflict: { letter: '!', label: t('In conflitto') },
+		ignored: { letter: '', label: t('Ignorato da git') }
 	};
 	import { formatBytes, withoutExtension, extension } from '../locations';
 	import { growthText, type Growth } from '../growth';
@@ -180,7 +181,7 @@
 	let spans = $derived(segments(shownName, positions));
 
 	function sizeText(e: Entry): string {
-		if (e.free !== undefined) return `${formatBytes(e.free)} liberi`;
+		if (e.free !== undefined) return t('{0} liberi', [formatBytes(e.free)]);
 		if (e.kind === 'dir') return '—';
 		return formatBytes(e.size);
 	}
@@ -262,7 +263,7 @@
 			value={shownName}
 			spellcheck="false"
 			autocomplete="off"
-			aria-label="Nuovo nome"
+			aria-label={t('Nuovo nome')}
 			onclick={(e) => e.stopPropagation()}
 			ondblclick={(e) => e.stopPropagation()}
 			onblur={confirmRename}
@@ -282,10 +283,10 @@
 					class="growth"
 					class:down={growth.delta < 0}
 					class:flat={growthText(growth.delta, formatBytes) === '='}
-					title="Dal {new Date(growth.since).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}"
+					title={t('Dal {0}', [new Date(growth.since).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })])}
 					>{growthText(growth.delta, formatBytes)}</span
 				>{/if}
-			{#if hasRules}<span class="has-rules" title="Ha regole automatiche" aria-label="Ha regole automatiche"
+			{#if hasRules}<span class="has-rules" title={t('Ha regole automatiche')} aria-label={t('Ha regole automatiche')}
 					><svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"
 						><path d="M13 6.5A5 5 0 0 0 3.6 5M3 9.5A5 5 0 0 0 12.4 11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /><path
 							d="M3.4 2.4 3.6 5l2.6-.3M12.6 13.6l-.2-2.6-2.6.3"
@@ -302,7 +303,7 @@
 				<span class="snippet" title={entry.snippet.text}
 					><span class="line-num">{entry.snippet.line}</span>{snippet.before}<mark>{snippet.found}</mark
 					>{snippet.after}{#if entry.snippet.more > 0}<span class="more"
-							>+{entry.snippet.more} {entry.snippet.more === 1 ? 'altra riga' : 'altre righe'}</span
+							>+{entry.snippet.more} {entry.snippet.more === 1 ? t('altra riga') : t('altre righe')}</span
 						>{/if}</span
 				>
 			{/if}
@@ -324,7 +325,7 @@
 	{#if columns.size}
 		<span class="size">
 			{#if entry.kind === 'dir' && entry.free === undefined && folderSize === 'computing'}
-				<span class="computing" role="img" aria-label="Calcolo della dimensione"></span>
+				<span class="computing" role="img" aria-label={t('Calcolo della dimensione')}></span>
 			{:else if entry.kind === 'dir' && entry.free === undefined && typeof folderSize === 'number'}
 				{formatBytes(folderSize)}
 			{:else if entry.kind === 'dir' && entry.free === undefined && oncompute}
@@ -334,7 +335,7 @@
 						e.stopPropagation();
 						oncompute(entry);
 					}}
-					ondblclick={(e) => e.stopPropagation()}>Calcola</button
+					ondblclick={(e) => e.stopPropagation()}>{t('Calcola')}</button
 				>
 			{:else}
 				{sizeText(entry)}

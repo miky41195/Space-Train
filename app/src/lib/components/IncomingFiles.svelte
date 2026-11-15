@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import type { SendRequest } from '../ipc';
 	import { formatBytes } from '../locations';
 
@@ -38,26 +39,21 @@
 </script>
 
 <div class="backdrop" role="presentation">
-	<div class="dialog" role="dialog" aria-modal="true" aria-label="File in arrivo">
-		<h2>File in arrivo da {request.from}</h2>
-		<p>
-			{request.from} vuole inviarti
-			{request.count === 1 ? '1 elemento' : `${request.count} elementi`}
-			({formatBytes(request.total)}).
-		</p>
+	<div class="dialog" role="dialog" aria-modal="true" aria-label={t('File in arrivo')}>
+		<h2>{t('File in arrivo da {0}', [request.from])}</h2>
+		<p> {t('{0} vuole inviarti {1} ({2}).', [request.from, request.count === 1 ? t('1 elemento') : t('{0} elementi', [request.count]), formatBytes(request.total)])} </p>
 		<ul>
 			{#each request.names as n (n)}
 				<li>{n}</li>
 			{/each}
-			{#if others > 0}<li class="rest">e altri {others}…</li>{/if}
+			{#if others > 0}<li class="rest">{t('e altri {0}…', [others])}</li>{/if}
 		</ul>
-		<p class="note">
-			Se accetti arriveranno in <strong>{where}</strong>.
-			<button class="change" onclick={change}>Cambia cartella…</button>
+		<p class="note"> {t('Se accetti arriveranno in')} <strong>{where}</strong>.
+			<button class="change" onclick={change}>{t('Cambia cartella…')}</button>
 		</p>
 		<div class="actions">
-			<button bind:this={button} onclick={() => onanswer(false, null)}>Rifiuta</button>
-			<button class="primary" onclick={() => onanswer(true, where === folder ? null : where)}>Accetta</button>
+			<button bind:this={button} onclick={() => onanswer(false, null)}>{t('Rifiuta')}</button>
+			<button class="primary" onclick={() => onanswer(true, where === folder ? null : where)}>{t('Accetta')}</button>
 		</div>
 	</div>
 </div>

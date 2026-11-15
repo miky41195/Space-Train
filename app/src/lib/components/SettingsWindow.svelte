@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import type { VersionsOverview } from '../ipc';
 	import { formatBytes } from '../locations';
 	import type { SettingsStore, FolderSizes } from '../stores/settings.svelte';
@@ -109,7 +110,7 @@
 		const warnings = [...v.warnings];
 		const acc = accelerator(combo);
 		const free = acc && ontestshortcut ? await ontestshortcut(acc).catch(() => null) : null;
-		if (free === false) warnings.unshift(`Un altro programma tiene già ${combo} per sé: la intercetta prima che arrivi a Space Train.`);
+		if (free === false) warnings.unshift(t('Un altro programma tiene già {0} per sé: la intercetta prima che arrivi a Space Train.', [combo]));
 		const name = SHORTCUT_GROUPS.flatMap((g) => g.items).find((i) => i.action === action)?.label ?? action;
 		pending = { action, name, combo, warnings, toRemove: v.toRemove };
 	}
@@ -121,29 +122,29 @@
 	}
 
 	const SECTIONS = [
-		{ id: 'general', name: 'Generale' },
-		{ id: 'files', name: 'File e cartelle' },
-		{ id: 'appearance', name: 'Aspetto' },
-		{ id: 'shortcuts', name: 'Scorciatoie' },
-		{ id: 'network', name: 'Rete e amici' },
-		{ id: 'info', name: 'Informazioni' }
+		{ id: 'general', name: t('Generale') },
+		{ id: 'files', name: t('File e cartelle') },
+		{ id: 'appearance', name: t('Aspetto') },
+		{ id: 'shortcuts', name: t('Scorciatoie') },
+		{ id: 'network', name: t('Rete e amici') },
+		{ id: 'info', name: t('Informazioni') }
 	] as const;
 	let section = $state<(typeof SECTIONS)[number]['id']>('general');
 
 	const START_PAGES = [
-		{ value: '::pc', name: 'Questo PC' },
-		{ value: DEFAULT_START_PAGE, name: ON_LINUX ? 'File system (/)' : 'Disco C:' },
-		{ value: LAST_FOLDER_START_PAGE, name: 'L’ultima cartella aperta' }
+		{ value: '::pc', name: t('Questo PC') },
+		{ value: DEFAULT_START_PAGE, name: ON_LINUX ? t('File system (/)') : t('Disco C:') },
+		{ value: LAST_FOLDER_START_PAGE, name: t('L’ultima cartella aperta') }
 	];
 	const FOLDER_SIZES: { value: FolderSizes; name: string }[] = [
-		{ value: 'never', name: 'Mai, come Esplora' },
-		{ value: 'open', name: 'Per la cartella aperta' },
-		{ value: 'onRequest', name: 'Solo quando la chiedo' }
+		{ value: 'never', name: t('Mai, come Esplora') },
+		{ value: 'open', name: t('Per la cartella aperta') },
+		{ value: 'onRequest', name: t('Solo quando la chiedo') }
 	];
 	const DAYS = [3, 7, 14, 30];
 
 	async function changeReceived() {
-		const choice = await onpickfolder('Dove salvare i file in arrivo', receivedFolder || null).catch(() => null);
+		const choice = await onpickfolder(t('Dove salvare i file in arrivo'), receivedFolder || null).catch(() => null);
 		if (choice) onreceived(choice);
 	}
 
@@ -179,9 +180,9 @@
 {/snippet}
 
 <div class="backdrop" role="presentation" onclick={(e) => e.target === e.currentTarget && onclose()}>
-	<div class="dialog" role="dialog" aria-modal="true" aria-label="Impostazioni" bind:this={dialog}>
-		<nav class="sections" aria-label="Sezioni delle impostazioni">
-			<h2>Impostazioni</h2>
+	<div class="dialog" role="dialog" aria-modal="true" aria-label={t('Impostazioni')} bind:this={dialog}>
+		<nav class="sections" aria-label={t('Sezioni delle impostazioni')}>
+			<h2>{t('Impostazioni')}</h2>
 			{#each SECTIONS as s (s.id)}
 				<button class:on={section === s.id} aria-current={section === s.id ? 'page' : undefined} onclick={() => (section = s.id)}
 					>{s.name}</button
@@ -190,16 +191,16 @@
 		</nav>
 
 		<div class="body">
-			<button class="close" onclick={onclose} aria-label="Chiudi le impostazioni">
+			<button class="close" onclick={onclose} aria-label={t('Chiudi le impostazioni')}>
 				<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"
 					><path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.5" /></svg
 				>
 			</button>
 
 			{#if section === 'general'}
-				<h3>Generale</h3>
+				<h3>{t('Generale')}</h3>
 				<label class="item">
-					<span class="text">All’avvio apri</span>
+					<span class="text">{t('All’avvio apri')}</span>
 					<select
 						value={settings.startPage}
 						onchange={(e) => settings.set('startPage', e.currentTarget.value)}
@@ -211,26 +212,26 @@
 					</select>
 				</label>
 				<div class="item">
-					<span class="text">Riprendi le schede della volta scorsa</span>
-					{@render toggle(settings.session, 'Riprendi le schede della volta scorsa', () =>
+					<span class="text">{t('Riprendi le schede della volta scorsa')}</span>
+					{@render toggle(settings.session, t('Riprendi le schede della volta scorsa'), () =>
 						settings.set('session', !settings.session)
 					)}
 				</div>
 				{#if !ON_LINUX}
 					<div class="item">
 						<span class="text"
-							>Apri le cartelle con Space Train<small
-								>{isDefault ? 'Ora le cartelle si aprono qui invece che in Esplora risorse.' : 'Ora le cartelle si aprono in Esplora risorse.'}</small
+							>{t('Apri le cartelle con Space Train')}<small
+								>{isDefault ? t('Ora le cartelle si aprono qui invece che in Esplora risorse.') : t('Ora le cartelle si aprono in Esplora risorse.')}</small
 							></span
 						>
-						<button class="button" onclick={ondefault}>{isDefault ? 'Ripristina Esplora risorse' : 'Imposta come predefinito'}</button>
+						<button class="button" onclick={ondefault}>{isDefault ? t('Ripristina Esplora risorse') : t('Imposta come predefinito')}</button>
 					</div>
 				{/if}
 			{:else if section === 'files'}
-				<h3>File e cartelle</h3>
+				<h3>{t('File e cartelle')}</h3>
 				<label class="item">
 					<span class="text"
-						>Dimensione delle cartelle<small>Va letta tutta la cartella: su quelle enormi ci vuole un po’.</small></span
+						>{t('Dimensione delle cartelle')}<small>{t('Va letta tutta la cartella: su quelle enormi ci vuole un po’.')}</small></span
 					>
 					<select
 						value={settings.folderSizes}
@@ -240,117 +241,117 @@
 					</select>
 				</label>
 				<div class="item">
-					<span class="text">Estensioni dei nomi file</span>
-					{@render toggle(settings.extensions, 'Estensioni dei nomi file', () =>
+					<span class="text">{t('Estensioni dei nomi file')}</span>
+					{@render toggle(settings.extensions, t('Estensioni dei nomi file'), () =>
 						settings.set('extensions', !settings.extensions)
 					)}
 				</div>
 				<div class="item">
-					<span class="text">Elementi nascosti</span>
-					{@render toggle(showHidden, 'Elementi nascosti', onhidden)}
+					<span class="text">{t('Elementi nascosti')}</span>
+					{@render toggle(showHidden, t('Elementi nascosti'), onhidden)}
 				</div>
 				<div class="item">
-					<span class="text">Visualizzazione compatta</span>
-					{@render toggle(settings.compact, 'Visualizzazione compatta', () =>
+					<span class="text">{t('Visualizzazione compatta')}</span>
+					{@render toggle(settings.compact, t('Visualizzazione compatta'), () =>
 						settings.set('compact', !settings.compact)
 					)}
 				</div>
 				<div class="item">
-					<span class="text">Apri con un clic<small>Come l’opzione di Esplora. Ctrl e Maiusc selezionano.</small></span>
-					{@render toggle(settings.singleClick, 'Apri con un clic', () => settings.set('singleClick', !settings.singleClick))}
+					<span class="text">{t('Apri con un clic')}<small>{t('Come l’opzione di Esplora. Ctrl e Maiusc selezionano.')}</small></span>
+					{@render toggle(settings.singleClick, t('Apri con un clic'), () => settings.set('singleClick', !settings.singleClick))}
 				</div>
 				<label class="item">
-					<span class="text">Chiudi le casseforti dopo<small>Minuti senza usarle; si chiudono anche uscendo da Space Train.</small></span>
+					<span class="text">{t('Chiudi le casseforti dopo')}<small>{t('Minuti senza usarle; si chiudono anche uscendo da Space Train.')}</small></span>
 					<select
 						value={String(settings.vaultAutoLock)}
 						onchange={(e) => settings.set('vaultAutoLock', Number(e.currentTarget.value))}
 					>
-						{#each [1, 5, 15, 30, 60] as m (m)}<option value={String(m)}>{m === 1 ? '1 minuto' : `${m} minuti`}</option>{/each}
+						{#each [1, 5, 15, 30, 60] as m (m)}<option value={String(m)}>{m === 1 ? t('1 minuto') : t('{0} minuti', [m])}</option>{/each}
 					</select>
 				</label>
 				<label class="item">
-					<span class="text">Avvisa quando un disco è quasi pieno<small>Una banda sopra l’elenco, al massimo una volta al giorno, con il collegamento alla Pulizia.</small></span>
+					<span class="text">{t('Avvisa quando un disco è quasi pieno')}<small>{t('Una banda sopra l’elenco, al massimo una volta al giorno, con il collegamento alla Pulizia.')}</small></span>
 					<select value={String(settings.diskThreshold)} onchange={(e) => settings.set('diskThreshold', Number(e.currentTarget.value))}>
-						{#each [0, 5, 10, 15, 20] as p (p)}<option value={String(p)}>{p === 0 ? 'Mai' : `Sotto il ${p}% libero`}</option>{/each}
+						{#each [0, 5, 10, 15, 20] as p (p)}<option value={String(p)}>{p === 0 ? t('Mai') : t('Sotto il {0}% libero', [p])}</option>{/each}
 					</select>
 				</label>
 				<div class="item">
-					<span class="text">Stato Git nelle cartelle dei progetti<small>Segna i file modificati e nuovi e mostra il ramo. Serve git installato.</small></span>
-					{@render toggle(settings.git, 'Stato Git nelle cartelle dei progetti', () => settings.set('git', !settings.git))}
+					<span class="text">{t('Stato Git nelle cartelle dei progetti')}<small>{t('Segna i file modificati e nuovi e mostra il ramo. Serve git installato.')}</small></span>
+					{@render toggle(settings.git, t('Stato Git nelle cartelle dei progetti'), () => settings.set('git', !settings.git))}
 				</div>
 				<div class="item">
-					<span class="text">Chiedi conferma prima di spostare nel cestino</span>
-					{@render toggle(settings.confirmTrash, 'Chiedi conferma prima di spostare nel cestino', () =>
+					<span class="text">{t('Chiedi conferma prima di spostare nel cestino')}</span>
+					{@render toggle(settings.confirmTrash, t('Chiedi conferma prima di spostare nel cestino'), () =>
 						settings.set('confirmTrash', !settings.confirmTrash)
 					)}
 				</div>
 				<div class="item">
-					<span class="text">Modificati di recente in cima</span>
+					<span class="text">{t('Modificati di recente in cima')}</span>
 					<span class="together">
 						<select
-							aria-label="Giorni dei modificati di recente"
+							aria-label={t('Giorni dei modificati di recente')}
 							value={settings.recentDays}
 							disabled={!settings.recent}
 							onchange={(e) => settings.set('recentDays', Number(e.currentTarget.value))}
 						>
-							{#each DAYS as g (g)}<option value={g}>{g} giorni</option>{/each}
+							{#each DAYS as g (g)}<option value={g}>{t('{0} giorni', [g])}</option>{/each}
 							{#if !DAYS.includes(settings.recentDays)}
-								<option value={settings.recentDays}>{settings.recentDays} giorni</option>
+								<option value={settings.recentDays}>{t('{0} giorni', [settings.recentDays])}</option>
 							{/if}
 						</select>
-						{@render toggle(settings.recent, 'Modificati di recente in cima', () =>
+						{@render toggle(settings.recent, t('Modificati di recente in cima'), () =>
 							settings.set('recent', !settings.recent)
 						)}
 					</span>
 				</div>
 				{#if versions}
 					{@const v = versions}
-					<h4>Versioni precedenti</h4>
+					<h4>{t('Versioni precedenti')}</h4>
 					<label class="item">
-						<span class="text">Tieni le versioni per<small>La più recente di ogni file resta sempre.</small></span>
+						<span class="text">{t('Tieni le versioni per')}<small>{t('La più recente di ogni file resta sempre.')}</small></span>
 						<select value={String(v.days)} onchange={(e) => onversionlimits?.(Number(e.currentTarget.value), v.maxBytes)}>
-							{#each [7, 14, 30, 90, 365] as d (d)}<option value={String(d)}>{d === 365 ? '1 anno' : `${d} giorni`}</option>{/each}
-							{#if ![7, 14, 30, 90, 365].includes(v.days)}<option value={String(v.days)}>{v.days} giorni</option>{/if}
+							{#each [7, 14, 30, 90, 365] as d (d)}<option value={String(d)}>{d === 365 ? t('1 anno') : t('{0} giorni', [d])}</option>{/each}
+							{#if ![7, 14, 30, 90, 365].includes(v.days)}<option value={String(v.days)}>{t('{0} giorni', [v.days])}</option>{/if}
 						</select>
 					</label>
 					<label class="item">
-						<span class="text">Spazio massimo<small>Usati {formatBytes(v.used)}. Oltre il limite vanno via le versioni più vecchie.</small></span>
+						<span class="text">{t('Spazio massimo')}<small>{t('Usati {0}. Oltre il limite vanno via le versioni più vecchie.', [formatBytes(v.used)])}</small></span>
 						<select value={String(v.maxBytes)} onchange={(e) => onversionlimits?.(v.days, Number(e.currentTarget.value))}>
-							{#each [1, 2, 5, 10, 20, 50] as g (g)}<option value={String(g * GB)}>{g} GB</option>{/each}
+							{#each [1, 2, 5, 10, 20, 50] as g (g)}<option value={String(g * GB)}>{t('{0} GB', [g])}</option>{/each}
 							{#if ![1, 2, 5, 10, 20, 50].some((g) => g * GB === v.maxBytes)}<option value={String(v.maxBytes)}>{formatBytes(v.maxBytes)}</option>{/if}
 						</select>
 					</label>
 					<div class="item column">
-						<span class="text">Cartelle protette<small>Ogni modifica dei file qui dentro, anche da altri programmi, lascia una versione. Si aggiungono col tasto destro su una cartella.</small></span>
+						<span class="text">{t('Cartelle protette')}<small>{t('Ogni modifica dei file qui dentro, anche da altri programmi, lascia una versione. Si aggiungono col tasto destro su una cartella.')}</small></span>
 						{#if v.protected.length === 0}
-							<span class="dim">Nessuna.</span>
+							<span class="dim">{t('Nessuna.')}</span>
 						{:else}
 							<ul class="protected-list">
 								{#each v.protected as f (f)}
-									<li><span title={f}>{f}</span><button class="button" onclick={() => onunprotect?.(f)}>Togli</button></li>
+									<li><span title={f}>{f}</span><button class="button" onclick={() => onunprotect?.(f)}>{t('Togli')}</button></li>
 								{/each}
 							</ul>
 						{/if}
 					</div>
 				{/if}
 			{:else if section === 'appearance'}
-				<h3>Aspetto</h3>
+				<h3>{t('Aspetto')}</h3>
 				<div class="item">
-					<span class="text">Tema e colore d’evidenziazione</span>
-					<button class="button" onclick={ongallery}>Scegli un tema…</button>
+					<span class="text">{t('Tema e colore d’evidenziazione')}</span>
+					<button class="button" onclick={ongallery}>{t('Scegli un tema…')}</button>
 				</div>
 				<div class="item">
-					<span class="text">I tuoi temi</span>
-					<button class="button" onclick={oneditor}>Crea o modifica un tema…</button>
+					<span class="text">{t('I tuoi temi')}</span>
+					<button class="button" onclick={oneditor}>{t('Crea o modifica un tema…')}</button>
 				</div>
 				<div class="item">
-					<span class="text">Animazione all’avvio</span>
-					{@render toggle(settings.introAnimation, 'Animazione all’avvio', () =>
+					<span class="text">{t('Animazione all’avvio')}</span>
+					{@render toggle(settings.introAnimation, t('Animazione all’avvio'), () =>
 						settings.set('introAnimation', !settings.introAnimation)
 					)}
 				</div>
 				<label class="item">
-					<span class="text">Passaggi del treno e dei personaggi</span>
+					<span class="text">{t('Passaggi del treno e dei personaggi')}</span>
 					<select
 						value={settings.trainPause}
 						onchange={(e) => settings.set('trainPause', Number(e.currentTarget.value))}
@@ -359,16 +360,16 @@
 					</select>
 				</label>
 			{:else if section === 'shortcuts'}
-				<h3>Scorciatoie</h3>
+				<h3>{t('Scorciatoie')}</h3>
 				<input
 					class="key-search"
 					type="search"
-					placeholder="Cerca un’azione o un tasto…"
-					aria-label="Cerca fra le scorciatoie"
+					placeholder={t('Cerca un’azione o un tasto…')}
+					aria-label={t('Cerca fra le scorciatoie')}
 					bind:value={shortcutQuery}
 				/>
 				<div class="global">
-					<span class="text">{GLOBAL_SHORTCUT.label}<small>Da qualsiasi programma</small></span>
+					<span class="text">{GLOBAL_SHORTCUT.label}<small>{t('Da qualsiasi programma')}</small></span>
 					<span class="keys">{#each GLOBAL_SHORTCUT.keys as k (k)}<kbd>{k}</kbd>{/each}</span>
 				</div>
 				{#each shortcutGroups as g (g.name)}
@@ -379,21 +380,21 @@
 							<li class:recording={action !== null && recording === action}>
 								<span
 									>{i.label}{#if action && recording === action}<small class="recording-note"
-											>Premi la combinazione nuova… (Esc annulla)</small
+											>{t('Premi la combinazione nuova… (Esc annulla)')}</small
 										>{/if}{#if action && refusal?.action === action}<small class="refusal">{refusal.text}</small>{/if}</span
 								>
 								<span class="keys"
-									>{#each itemKeys(i) as k (k)}<kbd>{k}</kbd>{:else}{#if action}<span class="none">nessuna</span>{/if}{/each}</span
+									>{#each itemKeys(i) as k (k)}<kbd>{k}</kbd>{:else}{#if action}<span class="none">{t('nessuna')}</span>{/if}{/each}</span
 								>
 								<span class="change">
 									{#if action}
 										{#if settings.shortcuts[action] !== undefined}
 											<button class="link" onclick={() => settings.set('shortcuts', restore(settings.shortcuts, action))}
-												>Ripristina</button
+												>{t('Ripristina')}</button
 											>
 										{/if}
-										<button class="button small" onclick={() => startRecording(action)} aria-label={`Cambia la scorciatoia di «${i.label}»`}
-											>Cambia</button
+										<button class="button small" onclick={() => startRecording(action)} aria-label={t('Cambia la scorciatoia di «{0}»', [i.label])}
+											>{t('Cambia')}</button
 										>
 									{/if}
 								</span>
@@ -401,50 +402,50 @@
 						{/each}
 					</ul>
 				{:else}
-					<p class="note">Nessuna scorciatoia per «{shortcutQuery.trim()}».</p>
+					<p class="note">{t('Nessuna scorciatoia per «{0}».', [shortcutQuery.trim()])}</p>
 				{/each}
 				{#if Object.keys(settings.shortcuts).length > 0}
-					<button class="button restore-all" onclick={() => settings.set('shortcuts', {})}>Ripristina tutte</button>
+					<button class="button restore-all" onclick={() => settings.set('shortcuts', {})}>{t('Ripristina tutte')}</button>
 				{/if}
 				{#if pending}
-					<div class="confirm" role="alertdialog" aria-modal="true" aria-label="Conferma scorciatoia">
-						<h4>Usare {pending.combo} per «{pending.name}»?</h4>
+					<div class="confirm" role="alertdialog" aria-modal="true" aria-label={t('Conferma scorciatoia')}>
+						<h4>{t('Usare {0} per «{1}»?', [pending.combo, pending.name])}</h4>
 						{#each pending.warnings as a, k (k)}
 							<p class="notice">{a}</p>
 						{:else}
-							<p>La combinazione è libera.</p>
+							<p>{t('La combinazione è libera.')}</p>
 						{/each}
 						<div class="actions">
-							<button class="button" onclick={() => (pending = null)}>Annulla</button>
-							<button class="button primary" onclick={confirmShortcut}>Usa {pending.combo}</button>
+							<button class="button" onclick={() => (pending = null)}>{t('Annulla')}</button>
+							<button class="button primary" onclick={confirmShortcut}>{t('Usa {0}', [pending.combo])}</button>
 						</div>
 					</div>
 				{/if}
 			{:else if section === 'network'}
-				<h3>Rete e amici</h3>
+				<h3>{t('Rete e amici')}</h3>
 				<div class="item">
 					<span class="text"
-						>Cartella dei file ricevuti<small class="path"
-							>{receivedFolder || 'Quella predefinita di Space Train'}</small
+						>{t('Cartella dei file ricevuti')}<small class="path"
+							>{receivedFolder || t('Quella predefinita di Space Train')}</small
 						></span
 					>
 					<span class="together">
 						{#if receivedChosen}
-							<button class="button" onclick={() => onreceived(null)}>Predefinita</button>
+							<button class="button" onclick={() => onreceived(null)}>{t('Predefinita')}</button>
 						{/if}
-						<button class="button" onclick={changeReceived}>Cambia…</button>
+						<button class="button" onclick={changeReceived}>{t('Cambia…')}</button>
 					</span>
 				</div>
-				<p class="note">Ogni volta che arrivano file puoi comunque sceglierne un’altra nel riquadro «File in arrivo».</p>
+				<p class="note">{t('Ogni volta che arrivano file puoi comunque sceglierne un’altra nel riquadro «File in arrivo».')}</p>
 			{:else}
-				<h3>Informazioni</h3>
+				<h3>{t('Informazioni')}</h3>
 				<div class="item">
-					<span class="text">Versione installata</span>
+					<span class="text">{t('Versione installata')}</span>
 					<span class="number">{version || '—'}</span>
 				</div>
 				<div class="item">
-					<span class="text">Cosa è cambiato</span>
-					<button class="button" onclick={onwhatsnew}>Novità…</button>
+					<span class="text">{t('Cosa è cambiato')}</span>
+					<button class="button" onclick={onwhatsnew}>{t('Novità…')}</button>
 				</div>
 			{/if}
 		</div>

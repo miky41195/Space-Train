@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import type { Entry } from '../ipc';
 	import type { Tab } from '../stores/tabs.svelte';
 	import type { IconsStore } from '../stores/icons.svelte';
@@ -46,7 +47,7 @@
 <!-- A drop anywhere on the passive pane lands in its folder. -->
 <section
 	class="pane passive"
-	aria-label="Altro pannello"
+	aria-label={t('Altro pannello')}
 	data-folder={isVirtual(tab.path) ? undefined : tab.path}
 	class:drop-target={dropTarget === tab.path}
 	onpointerdowncapture={onactivatepane}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import type { Backend, Drive, KnownFolder, Peer, FriendsStatus, LanStatus } from '../ipc';
 	import type { TabsStore } from '../stores/tabs.svelte';
 	import Icon from './Icon.svelte';
@@ -147,15 +148,15 @@
 
 	// «Rete» lists Windows network shares: there is nothing to show elsewhere.
 	const locations = [
-		{ path: THIS_PC, label: 'Questo PC' },
-		...(ON_LINUX ? [] : [{ path: NETWORK, label: 'Rete' }]),
-		{ path: TRASH, label: 'Cestino' }
+		{ path: THIS_PC, label: t('Questo PC') },
+		...(ON_LINUX ? [] : [{ path: NETWORK, label: t('Rete') }]),
+		{ path: TRASH, label: t('Cestino') }
 	];
 </script>
 
 <nav class="sidebar">
 	<div class="group">
-		<div class="title">Posizioni</div>
+		<div class="title">{t('Posizioni')}</div>
 		{#each locations as p (p.path)}
 			<button
 				class="item"
@@ -171,7 +172,7 @@
 	{#if lan}
 		<div class="group">
 			<div class="title title-row">
-				<span>Rete locale</span>
+				<span>{t('Rete locale')}</span>
 				<!-- Switch: while it is off this PC does not announce itself and does not
 				     answer anyone. -->
 				<button
@@ -179,16 +180,15 @@
 					class:on={lan.visible}
 					role="switch"
 					aria-checked={lan.visible}
-					aria-label="Rendi visibile questo PC in rete locale"
-					title={lan.visible ? 'Visibile agli altri PC con Space Train' : 'Invisibile in rete locale'}
+					aria-label={t('Rendi visibile questo PC in rete locale')}
+					title={lan.visible ? t('Visibile agli altri PC con Space Train') : t('Invisibile in rete locale')}
 					onclick={ontogglevisible}
 				><span></span></button>
 			</div>
 			<div class="lan-status">
-				{lan.visible ? `Visibile come ${lan.name}` : 'Questo PC è invisibile'}
+				{lan.visible ? t('Visibile come {0}', [lan.name]) : t('Questo PC è invisibile')}
 				{#if lan.visible && lan.shared}
-					<br />Condivide «{nameOf(lan.shared)}»
-				{/if}
+					<br />{t('Condivide «{0}»', [nameOf(lan.shared)])} {/if}
 			</div>
 			{#each peers as p (p.id)}
 				<!-- A PC found on the network answers: its stop is online. -->
@@ -197,22 +197,22 @@
 					class:current={store.activeTab?.path.toLowerCase().startsWith(peerPath(p).toLowerCase())}
 					onclick={() => go(peerPath(p))}
 					oncontextmenu={menuOn(peerPath(p), 'place')}
-					title={p.shared ? `${p.name} — condivide «${p.shared}»` : `${p.name} — nessuna cartella condivisa`}
+					title={p.shared ? t('{0} — condivide «{1}»', [p.name, p.shared]) : t('{0} — nessuna cartella condivisa', [p.name])}
 				>
 					{p.name}
 				</button>
 			{:else}
 				<div class="lan-empty">
-					{lan.visible ? 'Nessun altro PC con Space Train trovato.' : 'Accendi per trovare gli altri PC.'}
+					{lan.visible ? t('Nessun altro PC con Space Train trovato.') : t('Accendi per trovare gli altri PC.')}
 				</div>
 			{/each}
 			<!-- Distant PCs, reached by address: for example through a VPN
 			     like Tailscale, which does not carry announcements to the whole network. -->
 			{#each lan.addresses ?? [] as i (i)}
-				<div class="address" title={reached(i) ? 'Raggiunto' : 'In attesa di risposta: Space Train acceso e visibile anche dall’altra parte?'}>
+				<div class="address" title={reached(i) ? t('Raggiunto') : t('In attesa di risposta: Space Train acceso e visibile anche dall’altra parte?')}>
 					<span class="status-dot" class:on={reached(i)}></span>
 					<span class="address-text">{i}</span>
-					<button class="remove" aria-label="Togli {i}" onclick={() => removeAddress(i)}
+					<button class="remove" aria-label={t('Togli {0}', [i])} onclick={() => removeAddress(i)}
 						><svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"
 							><path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.5" /></svg
 						></button
@@ -224,28 +224,28 @@
 					<!-- svelte-ignore a11y_autofocus -->
 					<input
 						bind:value={newAddress}
-						placeholder="IP o nome, es. 100.64.0.2"
-						aria-label="Indirizzo del PC da aggiungere"
+						placeholder={t('IP o nome, es. 100.64.0.2')}
+						aria-label={t('Indirizzo del PC da aggiungere')}
 						autofocus
 						onkeydown={(e) => e.key === 'Escape' && (adding = false)}
 						onblur={() => !newAddress.trim() && (adding = false)}
 					/>
 				</form>
 			{:else}
-				<button class="item add-pc" onclick={() => (adding = true)}>Aggiungi PC per indirizzo</button>
+				<button class="item add-pc" onclick={() => (adding = true)}>{t('Aggiungi PC per indirizzo')}</button>
 			{/if}
 		</div>
 	{/if}
 
 	{#if servers}
 		<div class="group">
-			<div class="title">Server</div>
+			<div class="title">{t('Server')}</div>
 			{#each servers as s (s.id)}
 				{@const path = `${SERVER}\\${s.id}`}
 				<button
 					class="item"
 					class:current={store.activeTab?.path === path || (store.activeTab?.path.startsWith(path + '\\') ?? false)}
-					title={`${s.protocol.toUpperCase()} · ${s.user ? s.user + '@' : ''}${s.host}`}
+					title={t('{0} · {1}{2}', [s.protocol.toUpperCase(), s.user ? s.user + '@' : '', s.host])}
 					onclick={() => go(path)}
 					oncontextmenu={(e) => {
 						e.preventDefault();
@@ -256,14 +256,14 @@
 				</button>
 			{/each}
 			{#if onaddserver}
-				<button class="item add-pc" onclick={onaddserver}>Aggiungi server</button>
+				<button class="item add-pc" onclick={onaddserver}>{t('Aggiungi server')}</button>
 			{/if}
 		</div>
 	{/if}
 
 	{#if friends}
 		<div class="group">
-			<div class="title">Amici</div>
+			<div class="title">{t('Amici')}</div>
 			{#each confirmed as a (a.id)}
 				<!-- Online or not is told by the colour of the stop's node. -->
 				<button
@@ -272,24 +272,24 @@
 					class:current={isWithin(FRIENDS + '\\' + a.id)}
 					onclick={() => go(FRIENDS + '\\' + a.id)}
 					oncontextmenu={menuOn(FRIENDS + '\\' + a.id, 'place')}
-					title={a.online ? `${a.name} — in linea` : `${a.name} — non in linea`}
+					title={a.online ? t('{0} — in linea', [a.name]) : t('{0} — non in linea', [a.name])}
 				>
 					{a.name}
 				</button>
 			{/each}
 			{#if pending > 0}
 				<button class="item requests" onclick={onopenfriends}>
-					{pending === 1 ? '1 richiesta d’amicizia' : `${pending} richieste d’amicizia`}
+					{pending === 1 ? t('1 richiesta d’amicizia') : t('{0} richieste d’amicizia', [pending])}
 				</button>
 			{/if}
 			<button class="item add-pc" onclick={onopenfriends}>
-				{confirmed.length === 0 ? 'Aggiungi amici' : 'Gestisci amici'}
+				{confirmed.length === 0 ? t('Aggiungi amici') : t('Gestisci amici')}
 			</button>
 		</div>
 	{/if}
 
 	<div class="group">
-		<div class="title">Cartelle</div>
+		<div class="title">{t('Cartelle')}</div>
 		{#each folders as f (f.path)}
 			<button
 				class="item"
@@ -327,14 +327,14 @@
 
 	{#if onsearch && searches.length > 0}
 		<div class="group">
-			<div class="title">Ricerche</div>
+			<div class="title">{t('Ricerche')}</div>
 			{#each searches as r (r.name)}
 				<div class="saved-search">
-					<button class="item" title={r.folder ? `${r.name}` : `${r.name}, nella cartella aperta`} onclick={() => onsearch(r)}>
+					<button class="item" title={r.folder ? `${r.name}` : t('{0}, nella cartella aperta', [r.name])} onclick={() => onsearch(r)}>
 						{r.name}
 					</button>
 					{#if r.folder && onremovesearch}
-						<button class="remove" aria-label={`Togli la ricerca «${r.name}»`} onclick={() => onremovesearch(r.name)}
+						<button class="remove" aria-label={t('Togli la ricerca «{0}»', [r.name])} onclick={() => onremovesearch(r.name)}
 							><Icon name="close" side={10} /></button
 						>
 					{/if}
@@ -345,7 +345,7 @@
 
 	{#if labels.length > 0}
 		<div class="group">
-			<div class="title">Etichette</div>
+			<div class="title">{t('Etichette')}</div>
 			{#each labels as e (e.id)}
 				{#if renamingLabel === e.id}
 					<label class="item rename-label">
@@ -353,7 +353,7 @@
 						<input
 							value={e.name}
 							maxlength="40"
-							aria-label={`Nome dell'etichetta ${e.name}`}
+							aria-label={t('Nome dell\'etichetta {0}', [e.name])}
 							{@attach (el: HTMLInputElement) => {
 								el.focus();
 								el.select();
@@ -376,7 +376,7 @@
 					<button
 						class="item"
 						class:current={openLabel === e.name}
-						title={onrenamelabel ? 'Clic destro per rinominare' : undefined}
+						title={onrenamelabel ? t('Clic destro per rinominare') : undefined}
 						onclick={() => onlabel?.(e.id)}
 						oncontextmenu={(ev) => {
 							if (!onrenamelabel) return;
@@ -394,7 +394,7 @@
 	{/if}
 
 	<div class="group">
-		<div class="title">Unità</div>
+		<div class="title">{t('Unità')}</div>
 		{#each drives as d (d.path)}
 			{@const used = d.total && d.free !== null ? 1 - d.free / d.total : null}
 			<button
@@ -404,14 +404,14 @@
 				data-folder={d.path}
 				onclick={() => go(d.path)}
 				oncontextmenu={menuOn(d.path, 'drive')}
-				title={d.free !== null && d.total ? `${formatBytes(d.free)} liberi di ${formatBytes(d.total)}` : d.label}
+				title={d.free !== null && d.total ? t('{0} liberi di {1}', [formatBytes(d.free), formatBytes(d.total)]) : d.label}
 			>
 				<span class="label">{d.label}</span>
 				{#if used !== null && d.free !== null}
 					<span class="fill" class:full={used > 0.9}>
 						<span style:width="{Math.round(used * 100)}%"></span>
 					</span>
-					<span class="free">{formatBytes(d.free)} liberi</span>
+					<span class="free">{t('{0} liberi', [formatBytes(d.free)])}</span>
 				{/if}
 			</button>
 		{/each}

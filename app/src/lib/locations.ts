@@ -1,3 +1,4 @@
+import { t } from './i18n';
 /**
  * Locations that are not disk folders, and small readings of paths that
  * only serve to show things: composing paths stays in Rust.
@@ -20,12 +21,12 @@ export const SERVER = '::server';
 export const NEW_TAB = '::new-tab';
 
 const VIRTUAL_NAMES: Record<string, string> = {
-	[THIS_PC]: 'Questo PC',
-	[NETWORK]: 'Rete',
-	[TRASH]: 'Cestino',
-	[LAN]: 'Rete locale',
-	[FRIENDS]: 'Amici',
-	[SERVER]: 'Server'
+	[THIS_PC]: t('Questo PC'),
+	[NETWORK]: t('Rete'),
+	[TRASH]: t('Cestino'),
+	[LAN]: t('Rete locale'),
+	[FRIENDS]: t('Amici'),
+	[SERVER]: t('Server')
 };
 
 /**
@@ -82,7 +83,7 @@ export function breadcrumbs(path: string): Crumb[] {
 		parts.forEach((p, i) => {
 			current = `${current}\\${p}`;
 			const name =
-				root === FRIENDS && i === 0 ? (friendNames[p] ?? 'Amico') : root === SERVER && i === 0 ? (serverNames[p] ?? 'Server') : p;
+				root === FRIENDS && i === 0 ? (friendNames[p] ?? t('Amico')) : root === SERVER && i === 0 ? (serverNames[p] ?? t('Server')) : p;
 			out.push({ name, path: current });
 		});
 		return out;
@@ -93,7 +94,7 @@ export function breadcrumbs(path: string): Crumb[] {
 
 	if (path.startsWith('\\\\')) {
 		const parts = path.slice(2).split('\\').filter(Boolean);
-		const out: Crumb[] = [{ name: 'Rete', path: NETWORK }];
+		const out: Crumb[] = [{ name: t('Rete'), path: NETWORK }];
 		let current = '\\\\';
 		parts.forEach((p, i) => {
 			current = i === 0 ? `\\\\${p}` : `${current}\\${p}`;
@@ -105,7 +106,7 @@ export function breadcrumbs(path: string): Crumb[] {
 	if (isPosix(path)) {
 		const out: Crumb[] = [
 			{ name: VIRTUAL_NAMES[THIS_PC], path: THIS_PC },
-			{ name: 'File system', path: '/' }
+			{ name: t('File system'), path: '/' }
 		];
 		let current = '';
 		for (const p of path.split('/').filter(Boolean)) {
@@ -118,7 +119,7 @@ export function breadcrumbs(path: string): Crumb[] {
 	const parts = path.split(/[\\/]/).filter(Boolean);
 	if (parts.length === 0) return [{ name: path, path }];
 
-	const out: Crumb[] = [{ name: 'Questo PC', path: THIS_PC }];
+	const out: Crumb[] = [{ name: t('Questo PC'), path: THIS_PC }];
 	let current = '';
 	parts.forEach((p, i) => {
 		current = i === 0 ? `${p}\\` : current.endsWith('\\') ? current + p : `${current}\\${p}`;
@@ -235,9 +236,9 @@ export function samePath(a: string, b: string): boolean {
 
 /** Bytes in readable form. */
 export function formatBytes(n: number): string {
-	if (n < 1024) return `${n} B`;
-	if (n < 1024 ** 2) return `${(n / 1024).toFixed(0)} KB`;
-	if (n < 1024 ** 3) return `${(n / 1024 ** 2).toFixed(1)} MB`;
-	if (n < 1024 ** 4) return `${(n / 1024 ** 3).toFixed(1)} GB`;
-	return `${(n / 1024 ** 4).toFixed(2)} TB`;
+	if (n < 1024) return t('{0} B', [n]);
+	if (n < 1024 ** 2) return t('{0} KB', [(n / 1024).toFixed(0)]);
+	if (n < 1024 ** 3) return t('{0} MB', [(n / 1024 ** 2).toFixed(1)]);
+	if (n < 1024 ** 4) return t('{0} GB', [(n / 1024 ** 3).toFixed(1)]);
+	return t('{0} TB', [(n / 1024 ** 4).toFixed(2)]);
 }

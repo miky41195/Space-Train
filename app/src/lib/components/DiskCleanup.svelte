@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import { onDestroy, untrack } from 'svelte';
 	import { tauriBackend, type CleanupCategory, type Program, type CleanupCandidate } from '../ipc';
 	import { formatBytes } from '../locations';
@@ -106,7 +107,7 @@
 	}
 
 	async function addRoot() {
-		const c = await tauriBackend.pickFolder('Cerca progetti in…', roots[0] ?? null).catch(() => null);
+		const c = await tauriBackend.pickFolder(t('Cerca progetti in…'), roots[0] ?? null).catch(() => null);
 		if (c && !roots.some((r) => r.toLowerCase() === c.toLowerCase())) onroots([...roots, c]);
 	}
 
@@ -129,7 +130,7 @@
 		try {
 			await tauriBackend.programUninstall(p.id);
 		} catch (e) {
-			error = `«${p.name}»: ${describeError(e)}`;
+			error = t('«{0}»: {1}', [p.name, describeError(e)]);
 		}
 	}
 
@@ -142,7 +143,7 @@
 			searchPrograms();
 			void search(['leftovers']);
 		} catch (e) {
-			error = `«${p.name}»: ${describeError(e)}`;
+			error = t('«{0}»: {1}', [p.name, describeError(e)]);
 		} finally {
 			removing = null;
 		}
@@ -156,13 +157,11 @@
 
 <div class="cleanup">
 	<div class="band" role="status">
-		<span><b>{formatBytes(toDo.bytes)}</b> scelti su <b>{formatBytes(total)}</b> trovati</span>
-		{#if running > 0}<span class="weighing">pesando {running} {running === 1 ? 'categoria' : 'categorie'}…</span>{/if}
+		<span><b>{formatBytes(toDo.bytes)}</b> {t('scelti su')} <b>{formatBytes(total)}</b> {t('trovati')}</span>
+		{#if running > 0}<span class="weighing">{t('pesando {0} {1}…', [running, running === 1 ? 'categoria' : 'categorie'])}</span>{/if}
 		<span class="spacer"></span>
-		<button onclick={onclose}>Chiudi</button>
-		<button class="primary" disabled={toDo.bytes === 0 || freeing} onclick={() => (confirming = true)}>
-			Libera {formatBytes(toDo.bytes)}
-		</button>
+		<button onclick={onclose}>{t('Chiudi')}</button>
+		<button class="primary" disabled={toDo.bytes === 0 || freeing} onclick={() => (confirming = true)}> {t('Libera {0}', [formatBytes(toDo.bytes)])} </button>
 	</div>
 	{#if error}<div class="error">{error}</div>{/if}
 
@@ -192,7 +191,7 @@
 						<span class="pill {c.kind}">{KIND_LABELS[c.kind]}</span>
 					</div>
 					<div class="detail">
-						{#if !items}pesando…{:else if c.kind === 'trash'}{items.length} {items.length === 1 ? 'elemento' : 'elementi'}{:else if items.length === 0}niente da togliere{:else}{c.detail}{/if}
+						{#if !items}{t('pesando…')}{:else if c.kind === 'trash'}{items.length} {items.length === 1 ? 'elemento' : 'elementi'}{:else if items.length === 0}{t('niente da togliere')}{:else}{c.detail}{/if}
 					</div>
 					<div class="track"><span style:width="{(weight(items) / max) * 100}%"></span></div>
 				</div>
@@ -200,13 +199,13 @@
 			</div>
 			{#if c.id === 'projects'}
 				<div class="roots">
-					<span class="sig">Cerca progetti in</span>
+					<span class="sig">{t('Cerca progetti in')}</span>
 					{#each roots as r (r)}
 						<span class="chip"
-							>{r}<button aria-label="Togli {r}" onclick={() => onroots(roots.filter((x) => x !== r))}>×</button></span
+							>{r}<button aria-label={t('Togli {0}', [r])} onclick={() => onroots(roots.filter((x) => x !== r))}>×</button></span
 						>
 					{/each}
-					<button class="chip add" onclick={addRoot}>+ Aggiungi cartella</button>
+					<button class="chip add" onclick={addRoot}>{t('+ Aggiungi cartella')}</button>
 				</div>
 			{/if}
 			{#if isOpen && items}
@@ -224,26 +223,23 @@
 		{/each}
 
 		{#if programs === null || programs.length > 0}
-			<div class="section sig">Programmi più grandi</div>
-			<p class="note">
-				Space Train non li tocca: «Disinstalla» avvia il programma di disinstallazione ufficiale. Se un programma è già stato
-				rimosso a metà, «Togli i resti» manda la sua cartella nel Cestino e lo toglie dall’elenco.
-			</p>
+			<div class="section sig">{t('Programmi più grandi')}</div>
+			<p class="note"> {t('Space Train non li tocca: «Disinstalla» avvia il programma di disinstallazione ufficiale. Se un programma è già stato rimosso a metà, «Togli i resti» manda la sua cartella nel Cestino e lo toglie dall’elenco.')} </p>
 			{#if programs === null}
-				<div class="prog"><span class="detail">pesando…</span></div>
+				<div class="prog"><span class="detail">{t('pesando…')}</span></div>
 			{:else}
 				{#each programs as p (p.id)}
 					<div class="prog">
 						<span class="ellipsis"
-							>{p.name}{#if p.gone}<span class="detail"> · già rimosso</span>{:else if p.publisher}<span class="detail"
-									>{` · ${p.publisher}`}</span
+							>{p.name}{#if p.gone}<span class="detail"> {t('· già rimosso')}</span>{:else if p.publisher}<span class="detail"
+									>{t(' · {0}', [p.publisher])}</span
 								>{/if}</span
 						>
 						<span class="weight">{p.size > 0 ? formatBytes(p.size) : '—'}</span>
 						{#if p.gone}
-							<button disabled={removing !== null} onclick={() => void removeLeftovers(p)}>Togli i resti</button>
+							<button disabled={removing !== null} onclick={() => void removeLeftovers(p)}>{t('Togli i resti')}</button>
 						{:else}
-							<button onclick={() => void uninstall(p)}>Disinstalla</button>
+							<button onclick={() => void uninstall(p)}>{t('Disinstalla')}</button>
 						{/if}
 					</div>
 				{/each}
@@ -259,25 +255,25 @@
 		onclick={(e) => e.target === e.currentTarget && (confirming = false)}
 		onkeydown={(e) => e.key === 'Escape' && (confirming = false)}
 	>
-		<div class="dialog" role="dialog" aria-modal="true" aria-label="Conferma pulizia">
-			<h2>Liberare {formatBytes(toDo.bytes)}?</h2>
+		<div class="dialog" role="dialog" aria-modal="true" aria-label={t('Conferma pulizia')}>
+			<h2>{t('Liberare {0}?', [formatBytes(toDo.bytes)])}</h2>
 			{#if toDo.permanent.length > 0}
-				<p><b>{toDo.permanent.length}</b> {toDo.permanent.length === 1 ? 'elemento si ricrea' : 'elementi si ricreano'} da soli: eliminati per sempre.</p>
+				<p><b>{toDo.permanent.length}</b> {t('{0} da soli: eliminati per sempre.', [toDo.permanent.length === 1 ? t('elemento si ricrea') : t('elementi si ricreano')])}</p>
 			{/if}
 			{#if toDo.trash.length + toDo.asAdmin.length > 0}
 				{@const n = toDo.trash.length + toDo.asAdmin.length}
-				<p><b>{n}</b> da guardare: {n === 1 ? 'va' : 'vanno'} nel Cestino.</p>
+				<p><b>{n}</b> {t('da guardare: {0} nel Cestino.', [n === 1 ? 'va' : 'vanno'])}</p>
 			{/if}
-			{#if toDo.asAdmin.length > 0}<p>Per i resti di programmi Windows chiederà il permesso di amministratore.</p>{/if}
-			{#if toDo.emptyTrash}<p>Il Cestino si svuota.</p>{/if}
+			{#if toDo.asAdmin.length > 0}<p>{t('Per i resti di programmi Windows chiederà il permesso di amministratore.')}</p>{/if}
+			{#if toDo.emptyTrash}<p>{t('Il Cestino si svuota.')}</p>{/if}
 			<ul>
 				{#each listed.slice(0, 6) as p (p)}<li>{p}</li>{/each}
-				{#if listed.length > 6}<li class="rest">e altri {listed.length - 6}…</li>{/if}
+				{#if listed.length > 6}<li class="rest">{t('e altri {0}…', [listed.length - 6])}</li>{/if}
 			</ul>
-			<p class="note">I file in uso si saltano e te lo dico.</p>
+			<p class="note">{t('I file in uso si saltano e te lo dico.')}</p>
 			<div class="actions">
-				<button bind:this={cancelButton} onclick={() => (confirming = false)}>Annulla</button>
-				<button class="danger" onclick={() => void free()}>Libera</button>
+				<button bind:this={cancelButton} onclick={() => (confirming = false)}>{t('Annulla')}</button>
+				<button class="danger" onclick={() => void free()}>{t('Libera')}</button>
 			</div>
 		</div>
 	</div>

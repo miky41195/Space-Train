@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import type { KeyValueStore } from './favorites.svelte';
 import { onChangeOf } from './sync';
 
@@ -83,7 +84,7 @@ export class WorkspacesStore {
 	#freeName(name: string): string {
 		if (!this.get(name)) return name;
 		for (let n = 2; ; n++) {
-			const candidate = `${name} (${n})`;
+			const candidate = t('{0} ({1})', [name, n]);
 			if (!this.get(candidate)) return candidate;
 		}
 	}

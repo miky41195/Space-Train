@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import { convertFileSrc } from '@tauri-apps/api/core';
 	import { tauriBackend, type Entry } from '../ipc';
 	import { categoryFor } from '../icons';
@@ -121,31 +122,31 @@
 <div class="compare">
 	<div class="band" role="status">
 		{#if view.mode === 'loading'}
-			<span>Confronto in corso…</span>
+			<span>{t('Confronto in corso…')}</span>
 		{:else if view.mode === 'text'}
 			{#if changes.length === 0}
-				<span><b>Identici</b> riga per riga</span>
+				<span><b>{t('Identici')}</b> {t('riga per riga')}</span>
 			{:else}
-				{#if view.changed}<span><b>{view.changed}</b> {view.changed === 1 ? 'riga diversa' : 'righe diverse'}</span>{/if}
-				{#if view.removed}<span><b>{view.removed}</b> solo a sinistra</span>{/if}
-				{#if view.added}<span><b>{view.added}</b> solo a destra</span>{/if}
+				{#if view.changed}<span><b>{view.changed}</b> {view.changed === 1 ? t('riga diversa') : t('righe diverse')}</span>{/if}
+				{#if view.removed}<span><b>{view.removed}</b> {t('solo a sinistra')}</span>{/if}
+				{#if view.added}<span><b>{view.added}</b> {t('solo a destra')}</span>{/if}
 			{/if}
-			{#if a.size > TEXT_LIMIT || b.size > TEXT_LIMIT}<span class="note">confrontati i primi 256 KB</span>{/if}
+			{#if a.size > TEXT_LIMIT || b.size > TEXT_LIMIT}<span class="note">{t('confrontati i primi 256 KB')}</span>{/if}
 		{:else if view.mode === 'image'}
-			<span>Trascina il confine, o usa le frecce, per passare da una all’altra.</span>
+			<span>{t('Trascina il confine, o usa le frecce, per passare da una all’altra.')}</span>
 		{:else if view.mode === 'binary'}
-			<span><b>{view.equal ? 'Uguali' : 'Diversi'}</b> {view.equal ? 'byte per byte' : 'nel contenuto'}</span>
+			<span><b>{view.equal ? t('Uguali') : t('Diversi')}</b> {view.equal ? t('byte per byte') : t('nel contenuto')}</span>
 		{:else if view.mode === 'tooDifferent'}
-			<span>Troppo diversi per un confronto riga per riga.</span>
+			<span>{t('Troppo diversi per un confronto riga per riga.')}</span>
 		{:else if view.mode === 'error'}
 			<span class="error">{view.message}</span>
 		{/if}
 		<span class="spacer"></span>
 		{#if changes.length > 0}
-			<button onclick={() => go(-1)} title="Differenza precedente (Maiusc+F7)">↑</button>
-			<button onclick={() => go(1)} title="Differenza successiva (F7)">↓</button>
+			<button onclick={() => go(-1)} title={t('Differenza precedente (Maiusc+F7)')}>↑</button>
+			<button onclick={() => go(1)} title={t('Differenza successiva (F7)')}>↓</button>
 		{/if}
-		<button onclick={onclose}>Chiudi</button>
+		<button onclick={onclose}>{t('Chiudi')}</button>
 	</div>
 
 	{#if view.mode === 'text'}
@@ -156,7 +157,7 @@
 		<div class="lines" bind:this={list}>
 			{#each view.rows as r, i (i)}
 				{#if r.kind === 'gap'}
-					<div class="gap">⋯ {r.count} {r.count === 1 ? 'riga uguale' : 'righe uguali'}</div>
+					<div class="gap">⋯ {r.count} {r.count === 1 ? t('riga uguale') : t('righe uguali')}</div>
 				{:else}
 					<div class="line {r.kind}" data-line={i} class:current={changes[current] === i}>
 						{#each [r.left, r.right] as side, j (j)}
@@ -179,7 +180,7 @@
 			bind:this={stage}
 			role="slider"
 			tabindex="0"
-			aria-label="Confine fra le due immagini"
+			aria-label={t('Confine fra le due immagini')}
 			aria-valuenow={Math.round(cut)}
 			aria-valuemin={0}
 			aria-valuemax={100}

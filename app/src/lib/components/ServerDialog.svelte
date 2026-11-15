@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import type { ServerConfig, ServerProtocol } from '../ipc';
 	import { nameOf } from '../locations';
 	import { backupStatus } from '../server-backup';
@@ -79,13 +80,13 @@
 	let title = $derived(
 		mode.kind === 'edit'
 			? mode.server
-				? `Modifica «${mode.server.name}»`
-				: 'Aggiungi server'
+				? t('Modifica «{0}»', [mode.server.name])
+				: t('Aggiungi server')
 			: mode.kind === 'key'
 				? mode.changed
-					? 'La chiave del server è cambiata'
-					: `Primo collegamento a ${mode.server.host}`
-				: `Password per «${mode.server.name}»`
+					? t('La chiave del server è cambiata')
+					: t('Primo collegamento a {0}', [mode.server.host])
+				: t('Password per «{0}»', [mode.server.name])
 	);
 
 	function submit(e: SubmitEvent) {
@@ -103,7 +104,7 @@
 			<h2>{title}</h2>
 
 			{#if mode.kind === 'edit'}
-				<div class="protocols" role="radiogroup" aria-label="Protocollo">
+				<div class="protocols" role="radiogroup" aria-label={t('Protocollo')}>
 					{#each PROTOCOLS as p (p.id)}
 						<button type="button" role="radio" aria-checked={config.protocol === p.id} class:on={config.protocol === p.id} onclick={() => setProtocol(p.id)}
 							>{p.name}</button
@@ -112,54 +113,54 @@
 				</div>
 				<div class="two">
 					<label>
-						<span class="label">Indirizzo</span>
+						<span class="label">{t('Indirizzo')}</span>
 						<input bind:this={first} bind:value={config.host} placeholder={config.protocol === 'webdav' ? 'https://nas.example.it/dav' : 'server.example.it'} spellcheck="false" />
 					</label>
 					<label class="port">
-						<span class="label">Porta</span>
+						<span class="label">{t('Porta')}</span>
 						<input type="number" min="0" max="65535" bind:value={config.port} />
 					</label>
 				</div>
 				<div class="two even">
 					<label>
-						<span class="label">Utente</span>
+						<span class="label">{t('Utente')}</span>
 						<input bind:value={config.user} spellcheck="false" autocomplete="username" />
 					</label>
 					<label>
-						<span class="label">Password</span>
-						<input type="password" bind:value={password} autocomplete="current-password" placeholder={mode.server ? 'lascia vuota per non cambiarla' : ''} />
+						<span class="label">{t('Password')}</span>
+						<input type="password" bind:value={password} autocomplete="current-password" placeholder={mode.server ? t('lascia vuota per non cambiarla') : ''} />
 					</label>
 				</div>
 				<div class="two even">
 					<label>
-						<span class="label">Nome</span>
-						<input bind:value={config.name} placeholder={config.host || 'Il mio server'} />
+						<span class="label">{t('Nome')}</span>
+						<input bind:value={config.name} placeholder={config.host || t('Il mio server')} />
 					</label>
 					<label>
-						<span class="label">Cartella iniziale</span>
+						<span class="label">{t('Cartella iniziale')}</span>
 						<input bind:value={config.path} spellcheck="false" />
 					</label>
 				</div>
-				<label class="choice"><input type="checkbox" bind:checked={remember} /> Ricorda la password (Gestore credenziali di Windows)</label>
+				<label class="choice"><input type="checkbox" bind:checked={remember} /> {t('Ricorda la password (Gestore credenziali di Windows)')}</label>
 				{#if config.protocol === 'ftp' || config.host.startsWith('http://')}
-					<p class="notice">Questo collegamento non è cifrato: password e file viaggiano in chiaro. Usalo solo nella rete di casa.</p>
+					<p class="notice">{t('Questo collegamento non è cifrato: password e file viaggiano in chiaro. Usalo solo nella rete di casa.')}</p>
 				{/if}
-				<section class="backup" aria-label="Backup automatico">
+				<section class="backup" aria-label={t('Backup automatico')}>
 					<label class="choice head">
 						<input type="checkbox" bind:checked={backingUp} />
-						<span>Backup automatico</span>
+						<span>{t('Backup automatico')}</span>
 					</label>
 					{#if backingUp}
 						<div class="route">
 							<label>
-								<span class="label">Dal PC</span>
+								<span class="label">{t('Dal PC')}</span>
 								<button type="button" class="pick" onclick={pickFolder} title={config.backup?.folder ?? ''}>
-									{config.backup?.folder ? nameOf(config.backup.folder) : 'Scegli la cartella…'}
+									{config.backup?.folder ? nameOf(config.backup.folder) : t('Scegli la cartella…')}
 								</button>
 							</label>
 							<span class="arrow" aria-hidden="true">→</span>
 							<label>
-								<span class="label">Sul server</span>
+								<span class="label">{t('Sul server')}</span>
 								<input
 									value={config.backup?.target ?? ''}
 									oninput={(e) => config.backup && (config.backup.target = e.currentTarget.value)}
@@ -171,29 +172,23 @@
 						<p class="hint">
 							{#if config.backup?.folder}
 								{backupStatus(config.backup)}
-							{:else}
-								Una volta al giorno, mentre Space Train è aperto: solo i file nuovi o cambiati, sul server non si cancella niente.
-							{/if}
+							{:else} {t('Una volta al giorno, mentre Space Train è aperto: solo i file nuovi o cambiati, sul server non si cancella niente.')} {/if}
 						</p>
 					{/if}
 				</section>
 			{:else if mode.kind === 'key'}
 				{#if mode.changed}
-					<p class="notice">
-						Il server risponde con una chiave diversa da quella che avevi confermato. Può essere un aggiornamento del server, ma
-						anche qualcuno che si mette in mezzo. Space Train non si collega. Se sei sicuro che il server è stato reinstallato,
-						rimuovilo e aggiungilo di nuovo.
-					</p>
+					<p class="notice"> {t('Il server risponde con una chiave diversa da quella che avevi confermato. Può essere un aggiornamento del server, ma anche qualcuno che si mette in mezzo. Space Train non si collega. Se sei sicuro che il server è stato reinstallato, rimuovilo e aggiungilo di nuovo.')} </p>
 				{:else}
-					<p>Controlla che l'impronta sia quella del tuo server. Se un giorno cambia, Space Train si ferma e ti avvisa.</p>
+					<p>{t('Controlla che l\'impronta sia quella del tuo server. Se un giorno cambia, Space Train si ferma e ti avvisa.')}</p>
 				{/if}
 				<code class="fingerprint">{mode.fingerprint}</code>
 			{:else}
 				<label>
-					<span class="label">Password{mode.server.user ? ` di ${mode.server.user}` : ''}</span>
+					<span class="label">{t('Password{0}', [mode.server.user ? t(' di {0}', [mode.server.user]) : ''])}</span>
 					<input bind:this={first} type="password" bind:value={password} autocomplete="current-password" />
 				</label>
-				<label class="choice"><input type="checkbox" bind:checked={remember} /> Ricorda la password</label>
+				<label class="choice"><input type="checkbox" bind:checked={remember} /> {t('Ricorda la password')}</label>
 			{/if}
 
 			{#if error}<p class="error" role="alert">{error}</p>{/if}
@@ -201,18 +196,18 @@
 			<div class="actions">
 				{#if mode.kind === 'edit' && mode.server && onremove}
 					{@const id = mode.server.id}
-					<button type="button" class="route" onclick={() => onremove(id)} disabled={busy}>Rimuovi</button>
+					<button type="button" class="route" onclick={() => onremove(id)} disabled={busy}>{t('Rimuovi')}</button>
 				{/if}
-				<button type="button" onclick={oncancel} disabled={busy}>{mode.kind === 'key' && mode.changed ? 'Chiudi' : 'Annulla'}</button>
+				<button type="button" onclick={oncancel} disabled={busy}>{mode.kind === 'key' && mode.changed ? t('Chiudi') : t('Annulla')}</button>
 				{#if mode.kind === 'edit' && backingUp && config.backup?.folder && onbackupnow}
-					<button type="button" onclick={() => onbackupnow(toSave(), password || null)} disabled={busy || !config.host.trim()}>Fai il backup ora</button>
+					<button type="button" onclick={() => onbackupnow(toSave(), password || null)} disabled={busy || !config.host.trim()}>{t('Fai il backup ora')}</button>
 				{/if}
 				{#if mode.kind === 'edit'}
-					<button type="submit" class="primary" disabled={busy || !config.host.trim()}>{busy ? 'Un momento…' : mode.server ? 'Salva' : 'Aggiungi'}</button>
+					<button type="submit" class="primary" disabled={busy || !config.host.trim()}>{busy ? t('Un momento…') : mode.server ? t('Salva') : t('Aggiungi')}</button>
 				{:else if mode.kind === 'key' && !mode.changed}
-					<button bind:this={first} type="submit" class="primary" disabled={busy}>È il mio server</button>
+					<button bind:this={first} type="submit" class="primary" disabled={busy}>{t('È il mio server')}</button>
 				{:else if mode.kind === 'password'}
-					<button type="submit" class="primary" disabled={busy || !password}>{busy ? 'Un momento…' : 'Collegati'}</button>
+					<button type="submit" class="primary" disabled={busy || !password}>{busy ? t('Un momento…') : t('Collegati')}</button>
 				{/if}
 			</div>
 		</form>

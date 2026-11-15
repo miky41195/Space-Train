@@ -1,3 +1,4 @@
+import { t } from './i18n';
 /**
  * Theme animations: at startup and when a folder opens.
  *
@@ -22,23 +23,23 @@ export interface Animations {
 }
 
 export const INTRO_ANIMATIONS: readonly { value: IntroAnimation; name: string }[] = [
-	{ value: 'none', name: 'Nessuna' },
-	{ value: 'train', name: 'Treno che arriva' },
-	{ value: 'current', name: 'Corrente' },
-	{ value: 'stars', name: 'Pioggia di stelle' },
-	{ value: 'custom', name: 'Personalizzata' }
+	{ value: 'none', name: t('Nessuna') },
+	{ value: 'train', name: t('Treno che arriva') },
+	{ value: 'current', name: t('Corrente') },
+	{ value: 'stars', name: t('Pioggia di stelle') },
+	{ value: 'custom', name: t('Personalizzata') }
 ];
 export const INTRO_MOTIONS: readonly { value: IntroMotion; name: string }[] = [
-	{ value: 'enter', name: 'Entra da un lato' },
-	{ value: 'cross', name: 'Attraversa' },
-	{ value: 'center', name: 'Compare al centro' }
+	{ value: 'enter', name: t('Entra da un lato') },
+	{ value: 'cross', name: t('Attraversa') },
+	{ value: 'center', name: t('Compare al centro') }
 ];
 export const FOLDER_ANIMATIONS: readonly { value: FolderAnimation; name: string }[] = [
-	{ value: 'none', name: 'Nessuna' },
-	{ value: 'wagons', name: 'Vagoni' },
-	{ value: 'fade', name: 'Dissolvenza' },
-	{ value: 'slide', name: 'Scorrimento' },
-	{ value: 'current', name: 'Corrente sul percorso' }
+	{ value: 'none', name: t('Nessuna') },
+	{ value: 'wagons', name: t('Vagoni') },
+	{ value: 'fade', name: t('Dissolvenza') },
+	{ value: 'slide', name: t('Scorrimento') },
+	{ value: 'current', name: t('Corrente sul percorso') }
 ];
 
 export const BASE_ANIMATIONS: Animations = { intro: 'train', motion: 'cross', duration: 1.25, folder: 'none' };

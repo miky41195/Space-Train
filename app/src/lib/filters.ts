@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { extensionsOf } from './icons';
 import type { SearchCriteria } from './ipc';
 
@@ -11,27 +12,27 @@ export interface Filters {
 export const NO_FILTERS: Filters = { type: null, size: null, date: null };
 
 export const TYPES = [
-	{ id: 'videos', name: 'Video', categories: ['video'] },
-	{ id: 'images', name: 'Immagini', categories: ['image'] },
-	{ id: 'audio', name: 'Audio', categories: ['audio'] },
-	{ id: 'documents', name: 'Documenti', categories: ['doc', 'sheet', 'slide', 'text'] },
-	{ id: 'archives', name: 'Archivi', categories: ['archive'] }
+	{ id: 'videos', name: t('Video'), categories: ['video'] },
+	{ id: 'images', name: t('Immagini'), categories: ['image'] },
+	{ id: 'audio', name: t('Audio'), categories: ['audio'] },
+	{ id: 'documents', name: t('Documenti'), categories: ['doc', 'sheet', 'slide', 'text'] },
+	{ id: 'archives', name: t('Archivi'), categories: ['archive'] }
 ] as const;
 export type TypeFilter = (typeof TYPES)[number]['id'];
 
 const MB = 1024 * 1024;
 export const SIZES = [
-	{ id: '100mb', name: 'oltre 100 MB', bytes: 100 * MB },
-	{ id: '1gb', name: 'oltre 1 GB', bytes: 1024 * MB }
+	{ id: '100mb', name: t('oltre 100 MB'), bytes: 100 * MB },
+	{ id: '1gb', name: t('oltre 1 GB'), bytes: 1024 * MB }
 ] as const;
 export type SizeFilter = (typeof SIZES)[number]['id'];
 
 const DAY = 24 * 60 * 60 * 1000;
 export const DATES = [
 	{ id: 'today', name: 'oggi' },
-	{ id: '7', name: 'negli ultimi 7 giorni' },
-	{ id: '30', name: 'negli ultimi 30 giorni' },
-	{ id: 'year', name: 'più di un anno fa' }
+	{ id: '7', name: t('negli ultimi 7 giorni') },
+	{ id: '30', name: t('negli ultimi 30 giorni') },
+	{ id: 'year', name: t('più di un anno fa') }
 ] as const;
 export type DateFilter = (typeof DATES)[number]['id'];
 
@@ -57,12 +58,12 @@ export function filterCriteria(f: Filters, now: Date = new Date()): Partial<Sear
 export function describeSearch(text: string, f: Filters): string {
 	const parts: string[] = [];
 	const type = TYPES.find((t) => t.id === f.type);
-	parts.push(type ? type.name : text ? `«${text}»` : 'File');
-	if (type && text) parts.push(`con «${text}»`);
+	parts.push(type ? type.name : text ? t('«{0}»', [text]) : t('File'));
+	if (type && text) parts.push(t('con «{0}»', [text]));
 	const size = SIZES.find((p) => p.id === f.size);
 	if (size) parts.push(size.name);
 	const date = DATES.find((d) => d.id === f.date);
-	if (date) parts.push(`modificati ${date.name}`);
+	if (date) parts.push(t('modificati {0}', [date.name]));
 	return parts.join(' ');
 }
 

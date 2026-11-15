@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import type { TabsStore } from '../stores/tabs.svelte';
 	import { breadcrumbs, isVirtual, nameOf, locationName } from '../locations';
 
@@ -42,9 +43,9 @@
 	let branchTitle = $derived(
 		branchInfo
 			? [
-					`Ramo git ${branchInfo.branch}`,
-					branchInfo.ahead ? `${branchInfo.ahead} commit da inviare` : '',
-					branchInfo.behind ? `${branchInfo.behind} da ricevere` : ''
+					t('Ramo git {0}', [branchInfo.branch]),
+					branchInfo.ahead ? t('{0} commit da inviare', [branchInfo.ahead]) : '',
+					branchInfo.behind ? t('{0} da ricevere', [branchInfo.behind]) : ''
 				]
 					.filter(Boolean)
 					.join(', ')
@@ -55,13 +56,13 @@
 	// Duplicates and folder comparison are one more stop after their folder: clicking the folder goes back to it.
 	let extraStop = $derived(
 		stop ?? (store.activeTab?.duplicates
-			? 'Duplicati'
+			? t('Duplicati')
 			: store.activeTab?.comparison
-				? `Confronto con ${locationName(store.activeTab.comparison.other)}`
+				? t('Confronto con {0}', [locationName(store.activeTab.comparison.other)])
 				: store.activeTab?.archive
 					? [nameOf(store.activeTab.archive.file), ...store.activeTab.archive.inner.split('/').filter(Boolean)].join(' › ')
 					: store.activeTab?.label
-					? `Etichetta ${store.activeTab.label}`
+					? t('Etichetta {0}', [store.activeTab.label])
 					: store.activeTab?.space
 						? 'Spazio'
 						: null)
@@ -124,15 +125,15 @@
 		class="nav"
 		disabled={!store.activeTab || store.activeTab.historyIndex === 0}
 		onclick={() => id !== null && store.goBack(id)}
-		aria-label="Indietro"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.5" /></svg></button
+		aria-label={t('Indietro')}><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.5" /></svg></button
 	>
 	<button
 		class="nav"
 		disabled={!store.activeTab || store.activeTab.historyIndex >= store.activeTab.history.length - 1}
 		onclick={() => id !== null && store.goForward(id)}
-		aria-label="Avanti"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.5" /></svg></button
+		aria-label={t('Avanti')}><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.5" /></svg></button
 	>
-	<button class="nav" onclick={() => id !== null && store.goUp(id)} aria-label="Su"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.5" /></svg></button>
+	<button class="nav" onclick={() => id !== null && store.goUp(id)} aria-label={t('Su')}><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.5" /></svg></button>
 
 	<!-- Line map: every folder is a station, the last one is where you
 	     are. The track joining them is the same route you took
@@ -144,7 +145,7 @@
 			value={fieldText}
 			spellcheck="false"
 			autocomplete="off"
-			aria-label="Indirizzo"
+			aria-label={t('Indirizzo')}
 			onkeydown={(e) => {
 				e.stopPropagation();
 				if (e.key === 'Enter') submitAddress();
@@ -160,7 +161,7 @@
 			bind:this={line}
 			role="button"
 			tabindex="-1"
-			aria-label="Modifica l'indirizzo"
+			aria-label={t('Modifica l\'indirizzo')}
 			onclick={() => (editing = true)}
 			onkeydown={(e) => e.key === 'Enter' && (editing = true)}
 		>
@@ -184,8 +185,8 @@
 	{/if}
 
 	{#if lockIn && !editing}
-		<button class="lock-in" onclick={onlock} title="La cassaforte si chiude da sola. Premi per chiuderla adesso."
-			>si chiude fra {lockIn}</button
+		<button class="lock-in" onclick={onlock} title={t('La cassaforte si chiude da sola. Premi per chiuderla adesso.')}
+			>{t('si chiude fra {0}', [lockIn])}</button
 		>
 	{/if}
 
@@ -197,13 +198,11 @@
 	{/if}
 
 	{#if onsearch}
-		<button class="search" onclick={onsearch} title="Cerca (Ctrl+F)">
+		<button class="search" onclick={onsearch} title={t('Cerca (Ctrl+F)')}>
 			<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
 				<circle cx="6.5" cy="6.5" r="4.5" fill="none" stroke="currentColor" stroke-width="1.4" />
 				<path d="M10 10l4 4" stroke="currentColor" stroke-width="1.4" />
-			</svg>
-			Cerca in {stations[stations.length - 1]?.name ?? ''}
-		</button>
+			</svg> {t('Cerca in {0}', [stations[stations.length - 1]?.name ?? ''])} </button>
 	{/if}
 </div>
 

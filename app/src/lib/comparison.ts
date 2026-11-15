@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import type { Entry } from './ipc';
 import { folderOf, locationName, separator } from './locations';
 import type { Zone } from './grouping';
@@ -9,9 +10,9 @@ type Comparison = NonNullable<Tab['comparison']>;
 export function compareZones(c: Comparison): Zone[] {
 	const other = locationName(c.other);
 	return [
-		{ label: `Mancano in ${other}`, count: c.onlyHere },
-		{ label: 'Diversi', count: c.different.length },
-		{ label: 'Mancano qui', count: c.onlyThere }
+		{ label: t('Mancano in {0}', [other]), count: c.onlyHere },
+		{ label: t('Diversi'), count: c.different.length },
+		{ label: t('Mancano qui'), count: c.onlyThere }
 	].filter((z) => z.count > 0);
 }
 

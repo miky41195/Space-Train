@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import type { Entry } from './ipc';
 import { categoryFor } from './icons';
 import { extension, nameOf } from './locations';
@@ -33,12 +34,12 @@ export interface Rule {
 }
 
 export const CATEGORIES: ReadonlyArray<{ id: Category; name: string; plural: string }> = [
-	{ id: 'image', name: 'un’immagine', plural: 'Immagini' },
-	{ id: 'video', name: 'un video', plural: 'Video' },
-	{ id: 'audio', name: 'un file audio', plural: 'Audio' },
-	{ id: 'doc', name: 'un documento', plural: 'Documenti' },
-	{ id: 'archive', name: 'un archivio', plural: 'Archivi' },
-	{ id: 'exec', name: 'un programma', plural: 'Programmi' }
+	{ id: 'image', name: t('un’immagine'), plural: t('Immagini') },
+	{ id: 'video', name: t('un video'), plural: t('Video') },
+	{ id: 'audio', name: t('un file audio'), plural: t('Audio') },
+	{ id: 'doc', name: t('un documento'), plural: t('Documenti') },
+	{ id: 'archive', name: t('un archivio'), plural: t('Archivi') },
+	{ id: 'exec', name: t('un programma'), plural: t('Programmi') }
 ];
 
 /** Files still being written by a browser or a download manager: never touched. */
@@ -78,53 +79,53 @@ export function matches(c: Condition, e: Entry, now: number): boolean {
 
 /** What is wrong with a rule, in words for the user; null when it can be saved. */
 export function problem(r: Rule): string | null {
-	if ((r.then.type === 'move' || r.then.type === 'copy') && !r.then.dest.trim()) return 'Scegli la cartella di destinazione.';
+	if ((r.then.type === 'move' || r.then.type === 'copy') && !r.then.dest.trim()) return t('Scegli la cartella di destinazione.');
 	if ((r.then.type === 'move' || r.then.type === 'copy') && samePath(r.then.dest, r.folder)) {
-		return 'La destinazione è la cartella stessa.';
+		return t('La destinazione è la cartella stessa.');
 	}
-	if (r.if.type === 'ext' && r.if.exts.length === 0) return 'Scrivi almeno un’estensione, per esempio pdf.';
-	if (r.if.type === 'name' && !r.if.text.trim()) return 'Scrivi il testo da cercare nel nome.';
+	if (r.if.type === 'ext' && r.if.exts.length === 0) return t('Scrivi almeno un’estensione, per esempio pdf.');
+	if (r.if.type === 'name' && !r.if.text.trim()) return t('Scrivi il testo da cercare nel nome.');
 	if ((r.if.type === 'olderThan' && !(r.if.days > 0)) || (r.if.type === 'largerThan' && !(r.if.mb > 0))) {
-		return 'Scrivi un numero maggiore di zero.';
+		return t('Scrivi un numero maggiore di zero.');
 	}
 	// A slip of the mouse must not empty a whole folder into the Recycle Bin.
-	if (r.then.type === 'trash' && r.if.type === 'any') return 'Per il cestino serve una condizione: scegli quali file.';
+	if (r.then.type === 'trash' && r.if.type === 'any') return t('Per il cestino serve una condizione: scegli quali file.');
 	return null;
 }
 
 export function describeCondition(c: Condition): string {
 	switch (c.type) {
 		case 'any':
-			return 'è un file qualsiasi';
+			return t('è un file qualsiasi');
 		case 'category':
-			return `è ${CATEGORIES.find((x) => x.id === c.category)?.name ?? c.category}`;
+			return t('è {0}', [CATEGORIES.find((x) => x.id === c.category)?.name ?? c.category]);
 		case 'ext':
-			return `ha estensione ${c.exts.map((e) => e.toUpperCase()).join(', ')}`;
+			return t('ha estensione {0}', [c.exts.map((e) => e.toUpperCase()).join(', ')]);
 		case 'name':
-			return `il nome contiene «${c.text}»`;
+			return t('il nome contiene «{0}»', [c.text]);
 		case 'olderThan':
-			return `è più vecchio di ${c.days} ${c.days === 1 ? 'giorno' : 'giorni'}`;
+			return t('è più vecchio di {0} {1}', [c.days, c.days === 1 ? 'giorno' : 'giorni']);
 		case 'largerThan':
-			return `è più grande di ${c.mb} MB`;
+			return t('è più grande di {0} MB', [c.mb]);
 	}
 }
 
 export function describeAction(a: Action, labelName: (id: ColorId) => string = defaultLabel): string {
 	switch (a.type) {
 		case 'move':
-			return `spostalo in ${nameOf(a.dest) || a.dest}`;
+			return t('spostalo in {0}', [nameOf(a.dest) || a.dest]);
 		case 'copy':
-			return `copialo in ${nameOf(a.dest) || a.dest}`;
+			return t('copialo in {0}', [nameOf(a.dest) || a.dest]);
 		case 'label':
-			return `dagli l’etichetta ${labelName(a.color)}`;
+			return t('dagli l’etichetta {0}', [labelName(a.color)]);
 		case 'trash':
-			return 'mandalo nel cestino';
+			return t('mandalo nel cestino');
 	}
 }
 
 export function describeRule(r: Rule, labelName?: (id: ColorId) => string): string {
-	const when = r.when === 'arrival' ? 'Quando arriva un file' : 'Ogni giorno';
-	return `${when}, se ${describeCondition(r.if)}, ${describeAction(r.then, labelName)}`;
+	const when = r.when === 'arrival' ? t('Quando arriva un file') : t('Ogni giorno');
+	return t('{0}, se {1}, {2}', [when, describeCondition(r.if), describeAction(r.then, labelName)]);
 }
 
 function defaultLabel(id: ColorId): string {

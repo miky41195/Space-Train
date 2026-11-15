@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import TrainSvg from './TrainSvg.svelte';
 	import type { Appearance } from '../appearance';
 	import type { IntroAnimation, IntroMotion } from '../animations';
@@ -88,7 +89,7 @@
 		</div>
 	{/if}
 
-	<div class="sign">Space Train</div>
+	<div class="sign">{t('Space Train')}</div>
 </div>
 
 <style>

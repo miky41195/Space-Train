@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import type { Entry } from '../ipc';
 
 	let {
@@ -22,7 +23,7 @@
 	});
 
 	let description = $derived(
-		items.length === 1 ? `«${items[0].name}»` : `${items.length} elementi`
+		items.length === 1 ? t('«{0}»', [items[0].name]) : t('{0} elementi', [items.length])
 	);
 </script>
 
@@ -32,16 +33,12 @@
 	onclick={(e) => e.target === e.currentTarget && oncancel()}
 	onkeydown={(e) => e.key === 'Escape' && oncancel()}
 >
-	<div class="dialog" role="dialog" aria-modal="true" aria-label="Conferma eliminazione">
-		<h2>{permanent ? 'Eliminare definitivamente?' : 'Spostare nel Cestino?'}</h2>
+	<div class="dialog" role="dialog" aria-modal="true" aria-label={t('Conferma eliminazione')}>
+		<h2>{permanent ? t('Eliminare definitivamente?') : t('Spostare nel Cestino?')}</h2>
 
 		<p>
 			{description}
-			{#if permanent}
-				{items.length === 1 ? 'verrà eliminato' : 'verranno eliminati'} per sempre.
-			{:else}
-				{items.length === 1 ? 'verrà spostato' : 'verranno spostati'} nel Cestino di Windows.
-			{/if}
+			{#if permanent} {t('{0} per sempre.', [items.length === 1 ? t('verrà eliminato') : t('verranno eliminati')])} {:else} {t('{0} nel Cestino di Windows.', [items.length === 1 ? t('verrà spostato') : t('verranno spostati')])} {/if}
 		</p>
 
 		{#if items.length > 1}
@@ -50,21 +47,21 @@
 					<li>{v.name}</li>
 				{/each}
 				{#if items.length > 5}
-					<li class="rest">e altri {items.length - 5}…</li>
+					<li class="rest">{t('e altri {0}…', [items.length - 5])}</li>
 				{/if}
 			</ul>
 		{/if}
 
 		<p class="note">
 			{permanent
-				? 'L’operazione non si può annullare e non passa dal Cestino.'
-				: 'Puoi recuperarli dal Cestino finché non lo svuoti.'}
+				? t('L’operazione non si può annullare e non passa dal Cestino.')
+				: t('Puoi recuperarli dal Cestino finché non lo svuoti.')}
 		</p>
 
 		<div class="actions">
-			<button bind:this={button} onclick={oncancel}>Annulla</button>
+			<button bind:this={button} onclick={oncancel}>{t('Annulla')}</button>
 			<button class="danger" onclick={onconfirm}
-				>{permanent ? 'Elimina definitivamente' : 'Sposta nel Cestino'}</button
+				>{permanent ? t('Elimina definitivamente') : t('Sposta nel Cestino')}</button
 			>
 		</div>
 	</div>

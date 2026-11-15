@@ -1,3 +1,4 @@
+import { t } from './i18n';
 /**
  * Makes a dialog movable by dragging it by its header, so it can be moved
  * aside to look at what is behind it (a theme's preview).
@@ -51,7 +52,7 @@ export function draggable(dialog: HTMLElement, handle = 'header') {
 			});
 			x = d.dx;
 			y = d.dy;
-			dialog.style.translate = `${x}px ${y}px`;
+			dialog.style.translate = t('{0}px {1}px', [x, y]);
 		}
 
 		function up() {
@@ -82,7 +83,7 @@ export function draggable(dialog: HTMLElement, handle = 'header') {
 		if (d.dx === x && d.dy === y) return;
 		x = d.dx;
 		y = d.dy;
-		dialog.style.translate = `${x}px ${y}px`;
+		dialog.style.translate = t('{0}px {1}px', [x, y]);
 	}
 
 	const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(realign);

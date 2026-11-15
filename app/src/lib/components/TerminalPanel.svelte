@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import { onMount } from 'svelte';
 	import '@xterm/xterm/css/xterm.css';
 	import { tauriBackend, type Backend } from '../ipc';
@@ -65,7 +66,7 @@
 					else ended = true;
 				});
 			} catch (e) {
-				error = 'Il terminale non è partito.';
+				error = t('Il terminale non è partito.');
 				term.dispose();
 				return;
 			}
@@ -116,13 +117,13 @@
 
 <div class="terminal" bind:this={panel} style:height="{height}px">
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div class="grip" onpointerdown={startResize} title="Trascina per cambiare l’altezza"></div>
+	<div class="grip" onpointerdown={startResize} title={t('Trascina per cambiare l’altezza')}></div>
 	<div class="band">
-		<span class="title">Terminale</span>
-		{#if ended}<span class="detail">sessione terminata</span>{/if}
+		<span class="title">{t('Terminale')}</span>
+		{#if ended}<span class="detail">{t('sessione terminata')}</span>{/if}
 		<span class="spacer"></span>
-		{#if folder && !ended}<button onclick={goHere} title={folder}>Vai alla cartella aperta</button>{/if}
-		<button onclick={onclose} aria-label="Chiudi il terminale" title="Chiudi (Ctrl+Maiusc+T)">×</button>
+		{#if folder && !ended}<button onclick={goHere} title={folder}>{t('Vai alla cartella aperta')}</button>{/if}
+		<button onclick={onclose} aria-label={t('Chiudi il terminale')} title={t('Chiudi (Ctrl+Maiusc+T)')}>×</button>
 	</div>
 	{#if error}<div class="error">{error}</div>{/if}
 	<!-- Keys typed here belong to the shell, not to the list. -->

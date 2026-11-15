@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import type { CleanupCategory, CleanupCandidate } from './ipc';
 
 /** How a category goes away: rebuilt by its program, worth a look first, or already deleted. */
@@ -11,25 +12,25 @@ export interface Category {
 }
 
 export const CATEGORIES: readonly Category[] = [
-	{ id: 'temp', name: 'File temporanei', detail: 'Cartella dei temporanei, solo ciò che ha più di un giorno', kind: 'rebuilt' },
-	{ id: 'cache', name: 'Cache dei programmi', detail: 'npm, Cargo, pip, NuGet, Gradle, VS Code, schede video', kind: 'rebuilt' },
-	{ id: 'projects', name: 'Cartelle di compilazione', detail: 'node_modules, target, bin e obj dei progetti', kind: 'projects' },
-	{ id: 'models', name: 'Modelli di IA scaricati', detail: 'Hugging Face, Ollama, LM Studio', kind: 'review' },
-	{ id: 'download', name: 'Download vecchi', detail: 'Installer e archivi non aperti da 90 giorni', kind: 'review' },
+	{ id: 'temp', name: t('File temporanei'), detail: t('Cartella dei temporanei, solo ciò che ha più di un giorno'), kind: 'rebuilt' },
+	{ id: 'cache', name: t('Cache dei programmi'), detail: t('npm, Cargo, pip, NuGet, Gradle, VS Code, schede video'), kind: 'rebuilt' },
+	{ id: 'projects', name: t('Cartelle di compilazione'), detail: t('node_modules, target, bin e obj dei progetti'), kind: 'projects' },
+	{ id: 'models', name: t('Modelli di IA scaricati'), detail: t('Hugging Face, Ollama, LM Studio'), kind: 'review' },
+	{ id: 'download', name: t('Download vecchi'), detail: t('Installer e archivi non aperti da 90 giorni'), kind: 'review' },
 	{
 		id: 'leftovers',
-		name: 'Resti di programmi',
-		detail: 'Cartelle in Programmi e ProgramData di programmi non più installati: controlla prima di toglierle',
+		name: t('Resti di programmi'),
+		detail: t('Cartelle in Programmi e ProgramData di programmi non più installati: controlla prima di toglierle'),
 		kind: 'review'
 	},
-	{ id: 'trash', name: 'Cestino', detail: 'Già eliminato: si svuota tutto', kind: 'trash' }
+	{ id: 'trash', name: t('Cestino'), detail: t('Già eliminato: si svuota tutto'), kind: 'trash' }
 ];
 
 export const KIND_LABELS: Record<CleanupKind, string> = {
-	rebuilt: 'si ricrea',
+	rebuilt: t('si ricrea'),
 	projects: 'progetti',
-	review: 'da guardare',
-	trash: 'già eliminato'
+	review: t('da guardare'),
+	trash: t('già eliminato')
 };
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -78,20 +79,20 @@ export function age(used: number, now: number): string {
 	if (used <= 0) return '';
 	if (days < 1) return 'oggi';
 	if (days < 2) return 'ieri';
-	if (days < 60) return `${days} giorni`;
-	if (days < 730) return `${Math.floor(days / 30)} mesi`;
-	return `${Math.floor(days / 365)} anni`;
+	if (days < 60) return t('{0} giorni', [days]);
+	if (days < 730) return t('{0} mesi', [Math.floor(days / 30)]);
+	return t('{0} anni', [Math.floor(days / 365)]);
 }
 
 /** «ultimo accesso ieri · ultima modifica 3 mesi fa»; the access only when newer than the change. */
 export function lastUse(used: number, opened: number, now: number): string {
-	const ago = (t: number) => {
-		const a = age(t, now);
-		return a === 'oggi' || a === 'ieri' ? a : `${a} fa`;
+	const ago = (at: number) => {
+		const a = age(at, now);
+		return a === 'oggi' || a === 'ieri' ? a : t('{0} fa', [a]);
 	};
 	const parts: string[] = [];
-	if (opened > used) parts.push(`ultimo accesso ${ago(opened)}`);
-	if (used > 0) parts.push(`ultima modifica ${ago(used)}`);
+	if (opened > used) parts.push(t('ultimo accesso {0}', [ago(opened)]));
+	if (used > 0) parts.push(t('ultima modifica {0}', [ago(used)]));
 	return parts.join(' · ');
 }
 

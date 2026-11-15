@@ -1,9 +1,10 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	let {
 		title,
 		label,
 		value = '',
-		confirm = 'Salva',
+		confirm = t('Salva'),
 		error = null,
 		onconfirm,
 		oncancel
@@ -48,7 +49,7 @@
 		</label>
 		{#if error}<p class="error" role="alert">{error}</p>{/if}
 		<div class="actions">
-			<button type="button" onclick={oncancel}>Annulla</button>
+			<button type="button" onclick={oncancel}>{t('Annulla')}</button>
 			<button type="submit" class="primary" disabled={!name.trim()}>{confirm}</button>
 		</div>
 	</form>

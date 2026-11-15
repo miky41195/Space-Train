@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import type { Backend, Entry } from '../ipc';
 
 	/**
@@ -63,10 +64,10 @@
 	onclick={(e) => e.target === e.currentTarget && onclose()}
 	onkeydown={(e) => e.key === 'Escape' && onclose()}
 >
-	<div class="dialog" role="dialog" aria-modal="true" aria-label="Somma di controllo">
-		<h2>Somma di controllo · <span class="name">{item.name}</span></h2>
+	<div class="dialog" role="dialog" aria-modal="true" aria-label={t('Somma di controllo')}>
+		<h2>{t('Somma di controllo ·')} <span class="name">{item.name}</span></h2>
 
-		<div class="algorithms" role="radiogroup" aria-label="Algoritmo">
+		<div class="algorithms" role="radiogroup" aria-label={t('Algoritmo')}>
 			{#each ALGORITHMS as a (a.id)}
 				<button
 					role="radio"
@@ -83,24 +84,24 @@
 			{:else if value}
 				<code>{value}</code>
 			{:else}
-				<span class="computing">Calcolo in corso…</span>
+				<span class="computing">{t('Calcolo in corso…')}</span>
 			{/if}
 		</div>
 
 		<label class="compare">
-			<span>Confronta con il valore pubblicato</span>
-			<input bind:this={field} bind:value={compareText} spellcheck="false" autocomplete="off" placeholder="Incolla qui" />
+			<span>{t('Confronta con il valore pubblicato')}</span>
+			<input bind:this={field} bind:value={compareText} spellcheck="false" autocomplete="off" placeholder={t('Incolla qui')} />
 		</label>
 
 		{#if outcome === 'same'}
-			<p class="outcome same" role="status">Coincide: il file è quello pubblicato.</p>
+			<p class="outcome same" role="status">{t('Coincide: il file è quello pubblicato.')}</p>
 		{:else if outcome === 'different'}
-			<p class="outcome different" role="status">Non coincide: il file è diverso da quello pubblicato.</p>
+			<p class="outcome different" role="status">{t('Non coincide: il file è diverso da quello pubblicato.')}</p>
 		{/if}
 
 		<div class="actions">
-			<button onclick={copy} disabled={!value}>{copied ? 'Copiato' : 'Copia'}</button>
-			<button class="primary" onclick={onclose}>Chiudi</button>
+			<button onclick={copy} disabled={!value}>{copied ? t('Copiato') : t('Copia')}</button>
+			<button class="primary" onclick={onclose}>{t('Chiudi')}</button>
 		</div>
 	</div>
 </div>

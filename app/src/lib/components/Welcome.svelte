@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import { WELCOME_STEPS } from '../welcome';
 
 	let { onclose }: { onclose: () => void } = $props();
@@ -25,8 +26,8 @@
 <svelte:window onkeydown={keys} />
 
 <div class="backdrop" role="presentation">
-	<div class="dialog" role="dialog" aria-modal="true" aria-label="Benvenuto in Space Train">
-		<span class="count">{step + 1} di {WELCOME_STEPS.length}</span>
+	<div class="dialog" role="dialog" aria-modal="true" aria-label={t('Benvenuto in Space Train')}>
+		<span class="count">{t('{0} di {1}', [step + 1, WELCOME_STEPS.length])}</span>
 		<h2>{current.title}</h2>
 		<p>{current.text}</p>
 		{#if current.keys.length > 0}
@@ -41,9 +42,9 @@
 			{#each WELCOME_STEPS as s, i (s.title)}<span class:on={i === step} class:passed={i < step}></span>{/each}
 		</div>
 		<div class="actions">
-			{#if !last}<button class="link" onclick={onclose}>Salta</button>{/if}
-			{#if step > 0}<button onclick={() => step--}>Indietro</button>{/if}
-			<button class="primary" bind:this={next} onclick={() => (last ? onclose() : step++)}>{last ? 'Inizia' : 'Avanti'}</button>
+			{#if !last}<button class="link" onclick={onclose}>{t('Salta')}</button>{/if}
+			{#if step > 0}<button onclick={() => step--}>{t('Indietro')}</button>{/if}
+			<button class="primary" bind:this={next} onclick={() => (last ? onclose() : step++)}>{last ? t('Inizia') : t('Avanti')}</button>
 		</div>
 	</div>
 </div>

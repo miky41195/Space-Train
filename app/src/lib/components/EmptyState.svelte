@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	/**
 	 * Screen for a list that has nothing to show.
 	 *
@@ -17,28 +18,28 @@
 
 	const texts = {
 		emptyFolder: {
-			title: 'Deposito vuoto',
-			body: 'Qui non c’è ancora niente. Crea una cartella o incolla quello che hai copiato.'
+			title: t('Deposito vuoto'),
+			body: t('Qui non c’è ancora niente. Crea una cartella o incolla quello che hai copiato.')
 		},
 		noResults: {
-			title: 'Nessuna corrispondenza',
-			body: 'Nessun elemento di questa cartella corrisponde alla ricerca.'
+			title: t('Nessuna corrispondenza'),
+			body: t('Nessun elemento di questa cartella corrisponde alla ricerca.')
 		},
 		noDuplicates: {
-			title: 'Nessun doppione',
-			body: 'In questa cartella e nelle sue sottocartelle non ci sono file con lo stesso contenuto.'
+			title: t('Nessun doppione'),
+			body: t('In questa cartella e nelle sue sottocartelle non ci sono file con lo stesso contenuto.')
 		},
 		sameFolders: {
-			title: 'Binari paralleli',
-			body: 'Le due cartelle hanno gli stessi file, con la stessa dimensione e la stessa data.'
+			title: t('Binari paralleli'),
+			body: t('Le due cartelle hanno gli stessi file, con la stessa dimensione e la stessa data.')
 		},
 		accessDenied: {
-			title: 'Segnale rosso',
-			body: 'Windows non concede l’accesso a questa cartella con i permessi attuali.'
+			title: t('Segnale rosso'),
+			body: t('Windows non concede l’accesso a questa cartella con i permessi attuali.')
 		},
 		notReady: {
-			title: 'Binario interrotto',
-			body: 'L’unità non risponde. Controlla che il supporto sia inserito o la rete raggiungibile.'
+			title: t('Binario interrotto'),
+			body: t('L’unità non risponde. Controlla che il supporto sia inserito o la rete raggiungibile.')
 		}
 	} as const;
 </script>

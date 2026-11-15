@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import { ACCENTS, CATEGORIES, THEMES, THEME_ACCENT, CUSTOM_ACCENT, categoryOf, type AccentId, type CategoryId, type Theme } from '../themes';
 	import type { MenuAction } from '../menu';
 	import Icon from './Icon.svelte';
@@ -57,12 +58,12 @@
 <div
 	class="gallery"
 	role="dialog"
-	aria-label="Temi"
+	aria-label={t('Temi')}
 	bind:this={panel}
 	style:right="{x}px"
 	style:top="{y}px"
 >
-	<div class="categories" role="tablist" aria-label="Categorie di temi" aria-orientation="vertical">
+	<div class="categories" role="tablist" aria-label={t('Categorie di temi')} aria-orientation="vertical">
 		{#each CATEGORIES as c (c.id)}
 			<button
 				role="tab"
@@ -77,7 +78,7 @@
 
 	<div class="themes" role="tabpanel">
 		{#if shown.length === 0}
-			<p class="empty">Non hai ancora temi tuoi. Creane uno con «Crea o modifica un tema…».</p>
+			<p class="empty">{t('Non hai ancora temi tuoi. Creane uno con «Crea o modifica un tema…».')}</p>
 		{/if}
 		{#each shown as t (t.id)}
 			<button
@@ -100,8 +101,8 @@
 	</div>
 
 	<div class="footer">
-		<span class="label">Colore d’evidenziazione</span>
-		<div class="swatches" role="group" aria-label="Colore d’evidenziazione">
+		<span class="label">{t('Colore d’evidenziazione')}</span>
+		<div class="swatches" role="group" aria-label={t('Colore d’evidenziazione')}>
 			{#each ACCENTS as a (a.id)}
 				<button
 					class="swatch"
@@ -116,7 +117,7 @@
 				></button>
 			{/each}
 		</div>
-		<button class="create" onclick={() => onpick('themeEditor')}>Crea o modifica un tema…</button>
+		<button class="create" onclick={() => onpick('themeEditor')}>{t('Crea o modifica un tema…')}</button>
 	</div>
 </div>
 

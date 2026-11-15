@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '../i18n';
 	import { RECENT_PERIODS } from '../grouping';
 	import Icon from './Icon.svelte';
 
@@ -26,25 +27,25 @@
 	let period = $derived(RECENT_PERIODS[index]);
 </script>
 
-<div class="recent" role="group" aria-label="Periodo dei recenti">
+<div class="recent" role="group" aria-label={t('Periodo dei recenti')}>
 	<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
 		<circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.3" />
 		<path d="M8 4v4.5l3 1.8" fill="none" stroke="currentColor" stroke-width="1.3" />
 	</svg>
-	<span class="label">Modificati</span>
+	<span class="label">{t('Modificati')}</span>
 	<input
 		type="range"
 		min="0"
 		max={RECENT_PERIODS.length - 1}
 		step="1"
 		value={index}
-		aria-label="Periodo"
+		aria-label={t('Periodo')}
 		aria-valuetext={period.name}
 		oninput={(e) => onchange(RECENT_PERIODS[Number(e.currentTarget.value)].days)}
 	/>
 	<span class="period">{period.name}</span>
-	<span class="count">{count === 0 ? 'nessun elemento' : count === 1 ? '1 elemento' : `${count} elementi`}</span>
-	<button onclick={onclose} aria-label="Nascondi i recenti" title="Nascondi i recenti"><Icon name="close" /></button>
+	<span class="count">{count === 0 ? t('nessun elemento') : count === 1 ? t('1 elemento') : t('{0} elementi', [count])}</span>
+	<button onclick={onclose} aria-label={t('Nascondi i recenti')} title={t('Nascondi i recenti')}><Icon name="close" /></button>
 </div>
 
 <style>
