@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { t } from '../i18n';
 	import type { Entry, ImageTarget } from '../ipc';
+	import { formatBytes } from '../locations';
 
 	/**
 	 * Convert and resize images into new files beside the originals, which
@@ -12,34 +13,57 @@
 		onclose
 	}: {
 		items: Entry[];
-		onconvert: (o: { target: ImageTarget; maxSide: number | null; quality: number }) => void;
+		onconvert: (o: { target: ImageTarget; maxSide: number | null; quality: number; tag: string }) => void;
 		onclose: () => void;
 	} = $props();
 
 	const FORMATS: Array<{ id: ImageTarget; name: string }> = [
+		{ id: 'same', name: t('Uguale') },
 		{ id: 'jpg', name: 'JPG' },
 		{ id: 'png', name: 'PNG' },
 		{ id: 'webp', name: 'WebP' }
 	];
 	const SIDES: Array<number | null> = [null, 3840, 1920, 1280, 640];
 
-	let format = $state<ImageTarget>('jpg');
-	let side = $state<number | null>(1920);
-	let quality = $state(85);
+	/** The last choices, offered again next time. */
+	const KEY = 'space-train.image-convert';
+	const last = (() => {
+		try {
+			return JSON.parse(localStorage.getItem(KEY) ?? '{}') as { format?: ImageTarget; side?: number | null; quality?: number };
+		} catch {
+			return {};
+		}
+	})();
+
+	let format = $state<ImageTarget>(FORMATS.some((f) => f.id === last.format) ? last.format! : 'jpg');
+	let side = $state<number | null>(last.side === undefined || !SIDES.includes(last.side) ? 1920 : last.side);
+	let quality = $state(last.quality ?? 85);
 	let dialog = $state<HTMLElement | null>(null);
+	const tag = t('senza dati');
+	let totalSize = $derived(items.reduce((sum, e) => sum + (e.size ?? 0), 0));
 
 	$effect(() => {
 		dialog?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
 	});
 
-	/** Same rule as Rust: «stem (side).ext», numbered there if taken. */
+	/** Same rule as Rust: «stem (side).ext», or «stem (tag).ext» for a same-format copy. */
 	let example = $derived.by(() => {
 		const stem = items[0].name.replace(/\.[^.]+$/, '');
-		return `${stem}${side ? ` (${side})` : ''}.${format}`;
+		const own = items[0].name.split('.').pop()!.toLowerCase();
+		const writable = own === 'jpeg' ? 'jpg' : ['jpg', 'png', 'webp', 'gif', 'bmp'].includes(own) ? own : 'jpg';
+		const ext = format === 'same' ? writable : format;
+		const same = ext === own || (ext === 'jpg' && own === 'jpeg');
+		return `${stem}${side ? ` (${side})` : same ? ` (${tag})` : ''}.${ext}`;
 	});
 
 	function convert() {
-		onconvert({ target: format, maxSide: side, quality: Math.min(100, Math.max(1, Math.round(quality) || 85)) });
+		const q = Math.min(100, Math.max(1, Math.round(quality) || 85));
+		try {
+			localStorage.setItem(KEY, JSON.stringify({ format, side, quality: q }));
+		} catch {
+			// Not remembered: the defaults come back next time.
+		}
+		onconvert({ target: format, maxSide: side, quality: q, tag });
 	}
 </script>
 
@@ -51,6 +75,7 @@
 >
 	<div bind:this={dialog} class="dialog" role="dialog" aria-modal="true" aria-label={t('Converti immagini')}>
 		<h2>{items.length === 1 ? t('Converti «{0}»', [items[0].name]) : t('Converti {0} immagini', [items.length])}</h2>
+		{#if totalSize > 0}<span class="total">{formatBytes(totalSize)}</span>{/if}
 
 		<div class="fields">
 			<span>{t('Formato')}</span>
@@ -69,7 +94,7 @@
 				{/each}
 			</div>
 
-			{#if format === 'jpg'}
+			{#if format === 'jpg' || format === 'same'}
 				<label for="quality">{t('Qualità')}</label>
 				<input id="quality" type="number" min="1" max="100" bind:value={quality} />
 			{/if}
@@ -78,7 +103,7 @@
 			<span class="example">{example}</span>
 		</div>
 
-		<p class="note">{t('Gli originali restano intatti: le immagini nuove vanno accanto.')}</p>
+		<p class="note">{t('Gli originali restano intatti: le immagini nuove vanno accanto, senza posizione GPS né dati della fotocamera.')}</p>
 
 		<div class="actions">
 			<button onclick={onclose}>{t('Annulla')}</button>
@@ -116,6 +141,12 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+	.total {
+		margin-top: -10px;
+		color: var(--text-dim);
+		font-size: calc(12px * var(--text-scale, 1));
+		font-variant-numeric: tabular-nums;
 	}
 	.fields {
 		display: grid;

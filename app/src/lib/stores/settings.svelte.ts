@@ -73,6 +73,8 @@ interface Values {
 	singleClick: boolean;
 	/** Show git marks and branch in folders that are repositories. */
 	git: boolean;
+	/** Remember folders' items between visits and mark what changed. */
+	folderChanges: boolean;
 	/** Minutes without using an open vault before it locks itself. */
 	vaultAutoLock: number;
 	/** Custom shortcuts: action → key combinations, in place of its defaults. */
@@ -105,6 +107,7 @@ const DEFAULTS: Values = {
 	confirmTrash: true,
 	singleClick: false,
 	git: true,
+	folderChanges: true,
 	vaultAutoLock: 5,
 	shortcuts: {}
 };
@@ -138,6 +141,7 @@ const STORED_KEYS: Record<Exclude<keyof Values, 'columns'>, string> & { columns:
 	confirmTrash: 'confermaCestino',
 	singleClick: 'unClic',
 	git: 'git',
+	folderChanges: 'folderChanges',
 	vaultAutoLock: 'chiusuraCassaforte',
 	shortcuts: 'scorciatoie'
 };
@@ -187,6 +191,7 @@ export class SettingsStore {
 	confirmTrash = $state(DEFAULTS.confirmTrash);
 	singleClick = $state(DEFAULTS.singleClick);
 	git = $state(DEFAULTS.git);
+	folderChanges = $state(DEFAULTS.folderChanges);
 	vaultAutoLock = $state(DEFAULTS.vaultAutoLock);
 
 	constructor(private storage: KeyValueStore | null = defaultStorage()) {
@@ -248,6 +253,7 @@ export class SettingsStore {
 			this.confirmTrash = bool('confirmTrash') ?? this.confirmTrash;
 			this.singleClick = bool('singleClick') ?? this.singleClick;
 			this.git = bool('git') ?? this.git;
+			this.folderChanges = bool('folderChanges') ?? this.folderChanges;
 			const lock = v('vaultAutoLock');
 			if (typeof lock === 'number' && lock >= 1 && lock <= 120) this.vaultAutoLock = lock;
 			const shortcuts = v('shortcuts');
@@ -324,6 +330,7 @@ export class SettingsStore {
 			confirmTrash: this.confirmTrash,
 			singleClick: this.singleClick,
 			git: this.git,
+			folderChanges: this.folderChanges,
 			vaultAutoLock: this.vaultAutoLock,
 			shortcuts: this.shortcuts
 		};

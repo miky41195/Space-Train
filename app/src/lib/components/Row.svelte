@@ -16,6 +16,7 @@
 	};
 	import { formatBytes, withoutExtension, extension } from '../locations';
 	import { growthText, type Growth } from '../growth';
+	import type { ChangeMark } from '../folder-changes';
 	import { onDrag, hoverSelect, cancelHoverSelect } from '../drag';
 
 	let {
@@ -31,6 +32,7 @@
 		color = undefined,
 		share = undefined,
 		growth = undefined,
+		change = undefined,
 		height = 32,
 		dropTarget = false,
 		folderSize = undefined,
@@ -68,6 +70,8 @@
 		share?: number;
 		/** Space view: how much the folder grew since an earlier day. */
 		growth?: Growth;
+		/** New or modified since the last visit of the folder. */
+		change?: ChangeMark;
 		/** Row height in pixels: must match the list's. */
 		height?: number;
 		/** A drag is passing over this folder. */
@@ -286,6 +290,7 @@
 					title={t('Dal {0}', [new Date(growth.since).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })])}
 					>{growthText(growth.delta, formatBytes)}</span
 				>{/if}
+			{#if change}<span class="change {change}">{change === 'new' ? t('nuovo') : t('modificato')}</span>{/if}
 			{#if hasRules}<span class="has-rules" title={t('Ha regole automatiche')} aria-label={t('Ha regole automatiche')}
 					><svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"
 						><path d="M13 6.5A5 5 0 0 0 3.6 5M3 9.5A5 5 0 0 0 12.4 11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /><path
@@ -476,6 +481,23 @@
 		font-family: var(--font-ui);
 		font-size: calc(12px * var(--text-scale, 1));
 		font-variant-numeric: tabular-nums;
+		color: var(--signal, #ffb454);
+	}
+	.change {
+		flex: none;
+		margin-left: 8px;
+		padding: 1px 6px;
+		border-radius: 4px;
+		font: 600 calc(9.5px * var(--text-scale, 1)) var(--font-display);
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+	}
+	.change.new {
+		background: color-mix(in srgb, var(--online, #22c55e) 16%, transparent);
+		color: var(--online, #22c55e);
+	}
+	.change.modified {
+		background: color-mix(in srgb, var(--signal, #ffb454) 16%, transparent);
 		color: var(--signal, #ffb454);
 	}
 	.growth.down {

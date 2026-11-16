@@ -15,6 +15,10 @@ export function fakeBackend(over: Partial<Backend> = {}): Backend {
 		async folderSize() {
 			return 0;
 		},
+		async folderVisit() {
+			return null;
+		},
+		async folderVisitsForget() {},
 		async sizeTurn() {},
 		async cleanupRound() {},
 		async cleanupScan() {
@@ -265,6 +269,20 @@ export function fakeBackend(over: Partial<Backend> = {}): Backend {
 		async imageConvert() {
 			return [];
 		},
+		async indexSearch() {
+			return { total: 0, entries: [] };
+		},
+		async indexStatus() {
+			return { files: 0, building: false, foldersRead: 0 };
+		},
+		async phoneStart() {
+			return { url: 'http://192.168.1.2:7311/token/', qr: '<svg></svg>' };
+		},
+		async phoneStop() {},
+		async phoneKeep() {
+			return '';
+		},
+		async phoneDiscard() {},
 		async extract() {
 			return '';
 		},

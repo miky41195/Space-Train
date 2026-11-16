@@ -288,6 +288,14 @@
 					{@render toggle(settings.git, t('Stato Git nelle cartelle dei progetti'), () => settings.set('git', !settings.git))}
 				</div>
 				<div class="item">
+					<span class="text"
+						>{t('Cosa è cambiato dall’ultima visita')}<small
+							>{t('Segna i file nuovi, modificati e spariti. Space Train ricorda nomi, dimensioni e date delle cartelle che apri, mai il contenuto; spegnendo dimentica tutto.')}</small
+						></span
+					>
+					{@render toggle(settings.folderChanges, t('Cosa è cambiato dall’ultima visita'), () => settings.set('folderChanges', !settings.folderChanges))}
+				</div>
+				<div class="item">
 					<span class="text">{t('Chiedi conferma prima di spostare nel cestino')}</span>
 					{@render toggle(settings.confirmTrash, t('Chiedi conferma prima di spostare nel cestino'), () =>
 						settings.set('confirmTrash', !settings.confirmTrash)

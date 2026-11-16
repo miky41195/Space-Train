@@ -169,6 +169,10 @@ pub fn move_all(
     let dest = Path::new(destination);
     let mut outcome = CopyOutcome::default();
     let mut done = 0u64;
+    // Undoing a merge sends items back to a folder the merge removed.
+    if !paths::extended(dest).exists() {
+        std::fs::create_dir_all(paths::extended(dest)).map_err(|e| from_io(&e))?;
+    }
 
     for source in sources {
         if crate::fs::pause::stopped(cancel) {
@@ -198,10 +202,9 @@ pub fn move_all(
         if policy == ConflictPolicy::Overwrite && paths::extended(&arrival).exists() {
             crate::versions::keep_overwritten(origin, &arrival);
         }
-        move_one(origin, &arrival, cancel, &mut done, progress)?;
+        move_one(origin, &arrival, cancel, &mut done, progress, &mut outcome.pairs)?;
 
         outcome.copied += 1;
-        outcome.pairs.push([source.clone(), paths::display(&arrival)]);
     }
 
     Ok(outcome)
@@ -209,13 +212,15 @@ pub fn move_all(
 
 /// Moves `origin` to `arrival`, replacing what is there. Two folders merge,
 /// as with copying: files only at the destination stay, same-named files
-/// are replaced.
+/// are replaced. `pairs` gets what really moved: inside a merge, each item
+/// and not the folder, so undo leaves the destination's own files where they are.
 fn move_one(
     origin: &Path,
     arrival: &Path,
     cancel: &AtomicBool,
     done: &mut u64,
     progress: &mut dyn FnMut(u64),
+    pairs: &mut Vec<[String; 2]>,
 ) -> Result<(), FsError> {
     if crate::fs::pause::stopped(cancel) {
         return Ok(());
@@ -226,7 +231,7 @@ fn move_one(
     if both_folders && !link {
         let items = std::fs::read_dir(paths::extended(origin)).map_err(|e| from_io(&e))?;
         for item in items.filter_map(|v| v.ok()) {
-            move_one(&item.path(), &arrival.join(item.file_name()), cancel, done, progress)?;
+            move_one(&item.path(), &arrival.join(item.file_name()), cancel, done, progress, pairs)?;
         }
         // Not empty only when stopped halfway: what is left stays at the origin.
         if !crate::fs::pause::stopped(cancel) {
@@ -250,6 +255,7 @@ fn move_one(
             remove(origin)?;
         }
     }
+    pairs.push([paths::display(origin), paths::display(arrival)]);
     Ok(())
 }
 
@@ -539,6 +545,40 @@ mod tests {
         assert_eq!(fs::read_to_string(old.join("sub").join("b.txt")).unwrap(), "nuovo");
         assert_eq!(fs::read_to_string(old.join("solo.txt")).unwrap(), "resta");
         assert_eq!(fs::read_to_string(old.join("sub").join("c.txt")).unwrap(), "resta");
+    }
+
+    #[test]
+    fn undoing_a_merge_leaves_the_destination_files() {
+        let origin = tempdir().unwrap();
+        let dest = tempdir().unwrap();
+        let src = origin.path().join("foto");
+        let old = dest.path().join("foto");
+        fs::create_dir_all(src.join("sub")).unwrap();
+        fs::create_dir_all(&old).unwrap();
+        fs::write(src.join("sub").join("b.txt"), b"nuovo").unwrap();
+        fs::write(old.join("solo.txt"), b"resta").unwrap();
+
+        let sources = vec![src.to_string_lossy().into_owned()];
+        let outcome = move_all(
+            &sources,
+            &dest.path().to_string_lossy(),
+            ConflictPolicy::Overwrite,
+            &never(),
+            &mut silent(),
+        )
+        .unwrap();
+        // Only the item that moved, never the merged folder.
+        assert_eq!(outcome.pairs.len(), 1);
+
+        // What undo does: every arrival back to its origin's folder.
+        for [from, to] in outcome.pairs.iter().rev() {
+            let parent = Path::new(from).parent().unwrap().to_string_lossy().into_owned();
+            move_all(&[to.clone()], &parent, ConflictPolicy::Skip, &never(), &mut silent()).unwrap();
+        }
+
+        assert_eq!(fs::read_to_string(src.join("sub").join("b.txt")).unwrap(), "nuovo");
+        assert!(!old.join("sub").join("b.txt").exists());
+        assert_eq!(fs::read_to_string(old.join("solo.txt")).unwrap(), "resta");
     }
 
     #[test]

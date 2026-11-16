@@ -7,7 +7,8 @@ import {
 	quickAccessItems,
 	sidebarItems,
 	placeMenu,
-	isEditableText
+	isEditableText,
+	isConvertibleImage
 } from './menu';
 import type { Entry } from './ipc';
 
@@ -196,6 +197,15 @@ describe('menuItems', () => {
 
 		expect(one?.label).toBe('Copia percorso');
 		expect(two?.label).toBe('Copia percorsi');
+	});
+});
+
+describe('isConvertibleImage', () => {
+	it('takes HEIC through the Windows codecs, never on Linux', () => {
+		expect(isConvertibleImage('IMG_1.HEIC', false)).toBe(true);
+		expect(isConvertibleImage('IMG_1.heic', true)).toBe(false);
+		expect(isConvertibleImage('a.png', true)).toBe(true);
+		expect(isConvertibleImage('a.txt', false)).toBe(false);
 	});
 });
 

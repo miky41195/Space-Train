@@ -37,6 +37,7 @@ export type MenuAction =
 	| 'space'
 	| 'cleanup'
 	| 'compareFiles'
+	| 'sendToPhone'
 	| 'compareFileOtherPane'
 	| 'rules'
 	| 'newVault'
@@ -284,6 +285,12 @@ export function isEditableImage(name: string): boolean {
 	return EDITABLE_IMAGES.includes(name.split('.').pop()?.toLowerCase() ?? '');
 }
 
+/** Read through Windows' own codecs: they can be converted, not rotated in place. */
+const WINDOWS_IMAGES = ['heic', 'heif', 'avif', 'tif', 'tiff', 'jxr'];
+export function isConvertibleImage(name: string, linux = ON_LINUX): boolean {
+	return isEditableImage(name) || (!linux && WINDOWS_IMAGES.includes(name.split('.').pop()?.toLowerCase() ?? ''));
+}
+
 function selectionItems({
 	selection,
 	clipboardFull,
@@ -374,11 +381,16 @@ function selectionItems({
 	if (count === 2 && selection.every((e) => e.kind === 'file')) {
 		items.push({ action: 'compareFiles', label: t('Confronta i due file') });
 	}
+	if (!search && selection.every((e) => e.kind === 'file' && !e.path.startsWith('::'))) {
+		items.push({ action: 'sendToPhone', label: t('Invia al telefono…') });
+	}
 
 	if (selection.every((e) => e.kind === 'file' && isEditableImage(e.name))) {
 		items.push({ action: 'rotateRight', label: t('Ruota a destra'), separator: true });
 		items.push({ action: 'rotateLeft', label: t('Ruota a sinistra') });
 		items.push({ action: 'convertImages', label: t('Converti e ridimensiona…') });
+	} else if (selection.every((e) => e.kind === 'file' && isConvertibleImage(e.name))) {
+		items.push({ action: 'convertImages', label: t('Converti e ridimensiona…'), separator: true });
 	}
 
 	if (!search) {

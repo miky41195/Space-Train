@@ -14,6 +14,9 @@ pub mod vault;
 pub mod server;
 pub mod terminal;
 pub mod versions;
+pub mod visits;
+pub mod phone;
+pub mod index;
 
 /// System-wide hotkey that brings the window back to the front.
 ///
@@ -112,6 +115,8 @@ pub fn run() {
             server::install(servers.clone());
             server::schedule_backups(app.handle().clone(), servers.clone());
             std::sync::Arc::new(versions::Versions::load(data.join("versions"))).install();
+            visits::install(data.join("visits"));
+            index::install(data.join("index"));
             app.manage(servers);
             // Friends use the same shared folder and the same name as the
             // lan, but travel over the internet, encrypted.
@@ -227,6 +232,14 @@ pub fn run() {
             server::server_password,
             server::server_test,
             transfer::server_backup,
+            visits::folder_visit,
+            phone::phone_start,
+            index::index_search,
+            index::index_status,
+            phone::phone_stop,
+            phone::phone_keep,
+            phone::phone_discard,
+            visits::folder_visits_forget,
             versions::versions_list,
             versions::version_extract,
             versions::version_restore,

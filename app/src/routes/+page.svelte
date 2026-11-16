@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { t, tr, RESUME_KEY } from '$lib/i18n';
+	import { t, tr, RESUME_KEY, locale as i18nLocale } from '$lib/i18n';
 	import { invoke } from '@tauri-apps/api/core';
 	import { tick, untrack } from 'svelte';
 	import { listen } from '@tauri-apps/api/event';
@@ -55,6 +55,7 @@
 	import { sortByMedia, type MediaKey } from '$lib/media';
 	import ChecksumDialog from '$lib/components/ChecksumDialog.svelte';
 	import ImageConvert from '$lib/components/ImageConvert.svelte';
+	import PhoneDialog from '$lib/components/PhoneDialog.svelte';
 	import Palette from '$lib/components/Palette.svelte';
 	import JobQueue from '$lib/components/JobQueue.svelte';
 	import type { Command } from '$lib/palette';
@@ -77,7 +78,7 @@
 	import { QuickAccessStore } from '$lib/stores/quickAccess.svelte';
 	import { SettingsStore, type Columns } from '$lib/stores/settings.svelte';
 	import { UndoStore } from '$lib/stores/undo.svelte';
-	import type { Deleted, ImageTarget, DeleteMode, ConflictPolicy, Progress, SortKey } from '$lib/ipc';
+	import type { IndexStatus, Deleted, ImageTarget, DeleteMode, ConflictPolicy, Progress, SortKey } from '$lib/ipc';
 	import ContextMenu from '$lib/components/ContextMenu.svelte';
 	import ThemeGallery from '$lib/components/ThemeGallery.svelte';
 	import SettingsWindow from '$lib/components/SettingsWindow.svelte';
@@ -86,6 +87,7 @@
 	import Intro from '$lib/components/Intro.svelte';
 	import TextEditor from '$lib/components/TextEditor.svelte';
 	import TerminalPanel from '$lib/components/TerminalPanel.svelte';
+	import HistoryPanel from '$lib/components/HistoryPanel.svelte';
 	import Welcome from '$lib/components/Welcome.svelte';
 	import { WELCOME_KEY } from '$lib/welcome';
 	import { reducedMotion } from '$lib/reduced-motion';
@@ -139,6 +141,7 @@
 		sameVolume
 	} from '$lib/locations';
 	import { SYSTEM_ROOT, ON_LINUX } from '$lib/platform';
+	import { folderChanges, seenOf, changeOf, changeCount, type Visit } from '$lib/folder-changes';
 	import { sentText } from '$lib/server-backup';
 	import { protectedFolderOf, versionWhen } from '$lib/versions';
 	import VersionsDialog from '$lib/components/VersionsDialog.svelte';
@@ -261,7 +264,7 @@
 	function itemColor(e: Entry): string | undefined {
 		return colors.of(e.path);
 	}
-	const undo = new UndoStore(tauriBackend);
+	const undo = new UndoStore(tauriBackend, true);
 	const clipboard = new ClipboardStore();
 	const icons = new IconsStore(tauriBackend);
 	const updates = new UpdatesStore(tauriSource);
@@ -312,6 +315,7 @@
 	let checksumOf = $state<Entry | null>(null);
 	/** Images waiting in the «Converti e ridimensiona» dialog. */
 	let toConvert = $state<Entry[] | null>(null);
+	let toPhone = $state<Entry[] | null>(null);
 
 	// ── Command palette ──────────────────────────────────────────────
 	let paletteOpen = $state(false);
@@ -460,6 +464,10 @@
 
 	let searchOpen = $state(false);
 	let recursiveSearch = $state(false);
+	/** «Ovunque»: names on every drive, from the index. */
+	let everywhereSearch = $state(false);
+	let everywhereTotal = $state(0);
+	let indexStatus = $state<IndexStatus | null>(null);
 	let contentSearch = $state(false);
 	/** Smart folder filters of the subfolder search. */
 	let filters = $state<Filters>(NO_FILTERS);
@@ -838,6 +846,8 @@
 				: itemSize;
 			return { items: [...filtered].sort((a, b) => key(b) - key(a)), zones: [] };
 		}
+		if (tab && changes && visitNow?.only && !tab.results)
+			return { items: filtered.filter((e) => changeOf(changes, e)), zones: [] };
 		if (!tab || tab.query !== '' || tab.results) return { items: filtered, zones: [] };
 		const prefs = location === 'normal' ? favorites.of(tab.path) : NONE;
 		// Recent items apply where the items have a real date: not in This
@@ -849,6 +859,58 @@
 		return layout(sorted, prefs, settings.grouping, Date.now(), recentSince);
 	});
 	let visibleItems = $derived(laidOut.items);
+
+	// ── Since the last visit ──
+	//
+	// Entering a folder, what it holds is saved and the previous visit comes
+	// back: the difference marks the rows and fills the band. Reloads within
+	// the same visit keep comparing with that same previous visit.
+	interface VisitState {
+		path: string;
+		before: Visit | null;
+		dismissed: boolean;
+		only: boolean;
+	}
+	let visits = $state<Record<number, VisitState>>({});
+	$effect(() => {
+		const tab = store.activeTab;
+		if (!settings.folderChanges || !tab || location !== 'normal' || tab.loading || tab.error || tab.archive || tab.results) return;
+		const { id, path } = tab;
+		if (untrack(() => visits[id]?.path) === path) return;
+		visits[id] = { path, before: null, dismissed: false, only: false };
+		const seen = seenOf(untrack(() => tab.entries));
+		void tauriBackend
+			.folderVisit(path, seen)
+			.then((before) => {
+				if (visits[id]?.path === path) visits[id] = { ...visits[id], before };
+			})
+			.catch(() => {});
+	});
+	$effect(() => {
+		if (!settings.folderChanges) void tauriBackend.folderVisitsForget().catch(() => {});
+	});
+	let visitNow = $derived(store.activeTab ? visits[store.activeTab.id] : undefined);
+	let changes = $derived.by(() => {
+		const tab = store.activeTab;
+		const v = visitNow;
+		if (!settings.folderChanges || !tab || !v?.before || v.path !== tab.path || location !== 'normal' || tab.results) return null;
+		return folderChanges(v.before, tab.entries, !ON_LINUX);
+	});
+
+	function setVisit(change: Partial<VisitState>) {
+		const id = store.activeId;
+		if (id !== null && visits[id]) visits[id] = { ...visits[id], ...change };
+	}
+
+	/** «2 giorni fa», «3 ore fa»: how long since the previous visit. */
+	function agoText(at: number): string {
+		const rtf = new Intl.RelativeTimeFormat(i18nLocale, { numeric: 'auto' });
+		const minutes = Math.round((at - Date.now()) / 60_000);
+		if (Math.abs(minutes) < 60) return rtf.format(minutes, 'minute');
+		const hours = Math.round(minutes / 60);
+		if (Math.abs(hours) < 24) return rtf.format(hours, 'hour');
+		return rtf.format(Math.round(hours / 24), 'day');
+	}
 
 	// ── Folder size ──
 	//
@@ -1201,7 +1263,7 @@
 	 */
 	$effect(() => {
 		const tab = store.activeTab;
-		if (!searchOpen || !recursiveSearch || !tab) return;
+		if (!searchOpen || !recursiveSearch || everywhereSearch || !tab) return;
 		const id = tab.id;
 		const text = tab.query.trim();
 		const content = contentSearch;
@@ -1245,6 +1307,61 @@
 			filters: { ...filters }
 		});
 		notify(t('Ricerca salvata nella barra laterale.'));
+	}
+
+	// The index answers in milliseconds: a short pause is enough to not ask at every key.
+	$effect(() => {
+		const tab = store.activeTab;
+		if (!searchOpen || !everywhereSearch || !tab) return;
+		const id = tab.id;
+		const text = tab.query.trim();
+		if (text === '') {
+			void store.stopSearch(id);
+			everywhereTotal = 0;
+			return;
+		}
+		const wait = setTimeout(() => {
+			void store
+				.searchIndex(id, text)
+				.then((n) => (everywhereTotal = n))
+				.catch((e) => (opError = describeError(e)));
+		}, 120);
+		return () => clearTimeout(wait);
+	});
+	// While the index is being built its count grows: read every second; when ready, once.
+	$effect(() => {
+		if (!searchOpen || !everywhereSearch) return;
+		let alive = true;
+		let round: ReturnType<typeof setTimeout>;
+		const read = () =>
+			void tauriBackend
+				.indexStatus()
+				.then((s) => {
+					if (!alive) return;
+					indexStatus = s;
+					if (s.building) round = setTimeout(read, 1000);
+				})
+				.catch(() => {});
+		read();
+		return () => {
+			alive = false;
+			clearTimeout(round);
+		};
+	});
+	// New results while building: search again when the count grows, at most every 2 s.
+	$effect(() => {
+		const tab = store.activeTab;
+		if (!searchOpen || !everywhereSearch || !tab || !indexStatus?.building) return;
+		const id = tab.id;
+		const text = tab.query.trim();
+		if (text === '') return;
+		const round = setInterval(() => void store.searchIndex(id, text).then((n) => (everywhereTotal = n)).catch(() => {}), 2000);
+		return () => clearInterval(round);
+	});
+
+	function toggleEverywhere() {
+		everywhereSearch = !everywhereSearch;
+		if (store.activeId !== null) void store.stopSearch(store.activeId);
 	}
 
 	function toggleRecursive() {
@@ -1666,6 +1783,20 @@
 		} catch (e) {
 			opError = describeError(e);
 		}
+	}
+
+	let historyOpen = $state(false);
+
+	/** One entry of the history panel, even an older one. */
+	async function undoFromHistory(id: string) {
+		opError = null;
+		try {
+			const undone = await undo.undoEntry(id);
+			if (undone) notify(t('Annullata: {0}.', [undone]));
+		} catch (e) {
+			opError = describeError(e);
+		}
+		await reload();
 	}
 
 	async function undoLast() {
@@ -2189,7 +2320,7 @@
 		await reload();
 	}
 
-	function convertImages(items: Entry[], o: { target: ImageTarget; maxSide: number | null; quality: number }) {
+	function convertImages(items: Entry[], o: { target: ImageTarget; maxSide: number | null; quality: number; tag: string }) {
 		toConvert = null;
 		const folder = store.activeTab?.path;
 		if (!folder) return;
@@ -2582,6 +2713,9 @@
 				return openPalette();
 			case 'toggleTerminal':
 				return toggleTerminal();
+			case 'history':
+				historyOpen = !historyOpen;
+				return;
 			case 'otherPane': {
 				const other = otherPane(split, id);
 				if (other !== null) store.setActive(other);
@@ -3505,6 +3639,9 @@
 				case 'convertImages':
 					toConvert = choices;
 					break;
+				case 'sendToPhone':
+					toPhone = choices;
+					break;
 				case 'extract':
 					await archive('extract');
 					break;
@@ -3810,6 +3947,10 @@
 					content={contentSearch}
 					searching={store.activeTab.searching}
 					ontogglesubfolders={location === 'normal' ? toggleRecursive : undefined}
+					everywhere={everywhereSearch}
+					ontoggleeverywhere={toggleEverywhere}
+					everywhereTotal={everywhereTotal}
+					index={indexStatus}
 					ontogglecontent={() => (contentSearch = !contentSearch)}
 					filters={filters}
 					onfilters={(f) => (filters = f)}
@@ -3829,6 +3970,26 @@
 					mode="duplicates"
 					oncancel={() => store.activeId !== null && store.stopSearch(store.activeId, { keepResults: true })}
 				/>
+			{/if}
+			{#if changes && changeCount(changes) > 0 && !visitNow?.dismissed}
+				{@const c = changes}
+				<div class="duplicates-summary">
+					<span>{t('Dall’ultima visita, {0}', [agoText(c.since)])}</span>
+					{#if c.added.size > 0}<span><b>{c.added.size}</b> {c.added.size === 1 ? t('nuovo') : t('nuovi')}</span>{/if}
+					{#if c.modified.size > 0}<span><b>{c.modified.size}</b> {c.modified.size === 1 ? t('modificato') : t('modificati')}</span>{/if}
+					{#if c.removed.length > 0}<span
+							title={c.removed
+								.slice(0, 20)
+								.map((s) => s.name)
+								.join('\n') + (c.removed.length > 20 ? '\n…' : '')}><b>{c.removed.length}</b> {c.removed.length === 1 ? t('sparito') : t('spariti')}</span
+						>{/if}
+					{#if c.added.size + c.modified.size > 0}
+						<button class:on={visitNow?.only} aria-pressed={visitNow?.only ?? false} onclick={() => setVisit({ only: !visitNow?.only })}
+							>{t('Solo i cambiati')}</button
+						>
+					{/if}
+					<button onclick={() => setVisit({ dismissed: true, only: false })}>{t('Nascondi')}</button>
+				</div>
 			{/if}
 			{#if duplicateSummary.groups > 0}
 				<div class="duplicates-summary">
@@ -4031,6 +4192,7 @@
 						rowHeight={withSnippets ? Math.round(rowHeight * 1.55) : rowHeight}
 						shareOf={inSpace ? itemShare : undefined}
 						growthOf={inSpace ? (e: Entry) => growths[e.path] : undefined}
+						changeOf={changes ? (e: Entry) => changeOf(changes, e) : undefined}
 						dropTarget={dropTarget}
 						selection={selectionSet}
 						matches={store.activeTab.query === '' || inSearch ? undefined : highlights}
@@ -4079,6 +4241,10 @@
 						backend={tauriBackend}
 						media={previewItem ? media.of(previewItem) : undefined}
 					/>
+				{/if}
+
+				{#if historyOpen}
+					<HistoryPanel entries={undo.history} onundo={undoFromHistory} onclose={() => (historyOpen = false)} />
 				{/if}
 			</div>
 			{#if terminalAt !== null}
@@ -4253,6 +4419,18 @@
 	{/if}
 	{#if paletteOpen}
 		<Palette commands={paletteCommands()} onclose={() => (paletteOpen = false)} />
+	{/if}
+	{#if toPhone}
+		<PhoneDialog
+			files={toPhone}
+			backend={tauriBackend}
+			receivedFolder={lanState?.receivedFolder ?? ''}
+			onopenfolder={(path) => {
+				toPhone = null;
+				if (store.activeId !== null) void store.navigate(store.activeId, path);
+			}}
+			onclose={() => (toPhone = null)}
+		/>
 	{/if}
 	{#if toConvert}
 		{@const items = toConvert}

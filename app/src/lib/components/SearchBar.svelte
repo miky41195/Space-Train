@@ -1,7 +1,10 @@
 <script lang="ts">
-	import { t } from '../i18n';
+	import { t, locale } from '../i18n';
 	import Icon from './Icon.svelte';
 	import { DATES, SIZES, TYPES, filtersActive, type Filters } from '../filters';
+	import type { IndexStatus } from '../ipc';
+
+	const number = (n: number) => n.toLocaleString(locale);
 	let {
 		query,
 		results,
@@ -14,6 +17,10 @@
 		searching = false,
 		ontogglesubfolders = undefined,
 		ontogglecontent = undefined,
+		everywhere = false,
+		ontoggleeverywhere = undefined,
+		everywhereTotal = 0,
+		index = null,
 		filters = undefined,
 		onfilters = undefined,
 		onsave = undefined
@@ -33,6 +40,12 @@
 		searching?: boolean;
 		ontogglesubfolders?: () => void;
 		ontogglecontent?: () => void;
+		/** Searches the names on every drive, through the index. */
+		everywhere?: boolean;
+		ontoggleeverywhere?: () => void;
+		/** Every name that matches, also beyond the ones shown. */
+		everywhereTotal?: number;
+		index?: IndexStatus | null;
 		/** Smart folder filters (subfolder search only). */
 		filters?: Filters;
 		onfilters?: (f: Filters) => void;
@@ -64,7 +77,7 @@
 		bind:this={field}
 		type="text"
 		value={query}
-		placeholder={subfolders ? t('Cerca in tutte le sottocartelle…') : t('Filtra in questa cartella…')}
+		placeholder={everywhere ? t('Cerca in tutti i dischi…') : subfolders ? t('Cerca in tutte le sottocartelle…') : t('Filtra in questa cartella…')}
 		spellcheck="false"
 		autocomplete="off"
 		aria-label={t('Filtra i file in questa cartella')}
@@ -72,12 +85,23 @@
 	/>
 
 	<span class="counter" class:empty={query !== '' && results === 0}>
-		{#if subfolders && searching} {t('{0} trovati, ricerca in corso…', [results])} {:else if subfolders && query !== ''}
+		{#if everywhere}
+			{#if query.trim() !== ''}{everywhereTotal > results ? t('primi {0} di {1}', [number(results), number(everywhereTotal)]) : everywhereTotal === 0 ? t('nessun risultato') : t('{0} trovati', [number(everywhereTotal)])} · {/if}{#if index?.building}{t('indice in costruzione: {0} elementi letti', [number(index.files)])}{:else if index}{t('{0} elementi nei dischi', [number(index.files)])}{/if}
+		{:else if subfolders && searching} {t('{0} trovati, ricerca in corso…', [results])} {:else if subfolders && query !== ''}
 			{results === 0 ? t('nessun risultato') : t('{0} trovati', [results])}
 		{:else if query === ''} {t('{0} elementi', [total])} {:else if results === 0} {t('nessun risultato')} {:else} {t('{0} di {1}', [position, results])} {/if}
 	</span>
 
-	{#if ontogglesubfolders}
+	{#if ontoggleeverywhere}
+		<button
+			class="option"
+			class:on={everywhere}
+			aria-pressed={everywhere}
+			onclick={ontoggleeverywhere}
+			title={t('Cerca per nome in tutti i dischi, all’istante')}>{t('Ovunque')}</button
+		>
+	{/if}
+	{#if ontogglesubfolders && !everywhere}
 		<button
 			class="option"
 			class:on={subfolders}
@@ -86,7 +110,7 @@
 			title={t('Cerca anche nelle sottocartelle')}>{t('Sottocartelle')}</button
 		>
 	{/if}
-	{#if ontogglecontent && subfolders}
+	{#if ontogglecontent && subfolders && !everywhere}
 		<button
 			class="option"
 			class:on={content}
@@ -95,7 +119,7 @@
 			title={t('Cerca il testo anche dentro i file')}>{t('Contenuto')}</button
 		>
 	{/if}
-	{#if onfilters && subfolders}
+	{#if onfilters && subfolders && !everywhere}
 		<button
 			class="option"
 			class:on={filtersOpen || hasFilters}
@@ -105,12 +129,12 @@
 			title={t('Filtra per tipo, peso e data')}>{t('Filtri')}</button
 		>
 	{/if}
-	{#if onsave && subfolders && (query.trim() !== '' || hasFilters)}
+	{#if onsave && subfolders && !everywhere && (query.trim() !== '' || hasFilters)}
 		<button class="option" onclick={onsave} title={t('Tieni questa ricerca nella barra laterale')}>{t('Salva ricerca')}</button>
 	{/if}
 	<button onclick={onclose} aria-label={t('Chiudi la ricerca')}><Icon name="close" /></button>
 </div>
-{#if filters && onfilters && subfolders && (filtersOpen || hasFilters)}
+{#if filters && onfilters && subfolders && !everywhere && (filtersOpen || hasFilters)}
 	<div class="filters" role="group" aria-label={t('Filtri')}>
 		<span class="filter-group">
 			<span class="filter-name">{t('Tipo')}</span>

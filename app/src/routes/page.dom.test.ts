@@ -882,6 +882,55 @@ describe('automatic refresh', () => {
 
 // ── Undo ──────────────────────────────────────────────────────────
 
+describe('since the last visit', () => {
+	it('marks what is new and counts what is gone when coming back to a folder', async () => {
+		await mount();
+		await enter('Dati');
+		await waitFor(() => expect(names()).toContain('interno.txt'));
+		add('C:\\nuovo.txt');
+		disk.nodes.delete('C:\\beta.txt');
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Indietro' }));
+		await waitFor(() => expect(row('nuovo.txt').querySelector('.change')?.textContent).toBe('nuovo'));
+		const band = document.querySelector('.duplicates-summary')!;
+		expect(band.textContent).toContain('1 nuovo');
+		expect(band.textContent).toContain('1 sparito');
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Solo i cambiati' }));
+		await waitFor(() => expect(names()).toEqual(['nuovo.txt']));
+	});
+
+	it('switched off it marks nothing', async () => {
+		localStorage.setItem('space-train.impostazioni', JSON.stringify({ folderChanges: false }));
+		await mount();
+		await enter('Dati');
+		await waitFor(() => expect(names()).toContain('interno.txt'));
+		add('C:\\nuovo.txt');
+		await fireEvent.click(screen.getByRole('button', { name: 'Indietro' }));
+		await waitFor(() => expect(names()).toContain('nuovo.txt'));
+		expect(document.querySelector('.change')).toBeNull();
+	});
+});
+
+describe('operation history (Ctrl+H)', () => {
+	it('lists an operation and undoes it from the panel', async () => {
+		await mount();
+		await fireEvent.click(row('alfa.txt'));
+		key('F2');
+		const field = await renameField();
+		field.value = 'zeta.txt';
+		await fireEvent.keyDown(field, { key: 'Enter' });
+		await waitFor(() => expect(names()).toContain('zeta.txt'));
+
+		key('h', { ctrl: true });
+		const panel = await screen.findByRole('complementary', { name: 'Cronologia' });
+		expect(panel.textContent).toContain('Rinomina di «zeta.txt»');
+		await fireEvent.click(within(panel).getByRole('button', { name: 'Annulla operazione' }));
+		await waitFor(() => expect(names()).toContain('alfa.txt'));
+		expect(panel.textContent).toContain('Annullata');
+	});
+});
+
 describe('undo (Ctrl+Z)', () => {
 	it('undoes a rename', async () => {
 		await mount();
@@ -986,6 +1035,17 @@ describe('search in subfolders', () => {
 
 		await search('introvabile', { content: true });
 		await waitFor(() => expect(names()).toEqual(['note.txt']));
+	});
+
+	it('«Ovunque» finds by name on every drive, through the index', async () => {
+		await mount();
+		await enter('Vuota');
+		key('f', { ctrl: true });
+		await fireEvent.click(await screen.findByRole('button', { name: 'Ovunque' }));
+		expect(screen.queryByRole('button', { name: 'Sottocartelle' })).toBeNull();
+		await fireEvent.input(screen.getByLabelText('Filtra i file in questa cartella'), { target: { value: 'INTERNO' } });
+		await waitFor(() => expect(names()).toEqual(['interno.txt']));
+		expect(document.querySelector('.row .folder-hint')?.textContent).toBe('C:\\Dati');
 	});
 
 	it('with no results it says so', async () => {

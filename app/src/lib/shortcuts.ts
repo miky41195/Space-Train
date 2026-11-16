@@ -36,6 +36,7 @@ export type KeyAction =
 	| 'moveToOtherPane'
 	| 'palette'
 	| 'toggleTerminal'
+	| 'history'
 	| { tab: number }
 	/** Ctrl+Shift+1…8: Explorer's eight views, from the largest icons. */
 	| { view: number };
@@ -83,6 +84,8 @@ export function keyAction(e: KeyInput): KeyAction | null {
 				return 'favorite';
 			case 'z':
 				return 'undo';
+			case 'h':
+				return 'history';
 			case 'f':
 				return 'search';
 			case 'r':
@@ -167,6 +170,7 @@ export const SHORTCUT_GROUPS: { name: string; items: ShortcutItem[] }[] = [
 			{ label: t('Sposta nel Cestino'), keys: ['Canc'], action: 'trash' },
 			{ label: t('Elimina definitivamente'), keys: ['Maiusc+Canc'], action: 'deletePermanently' },
 			{ label: t('Annulla'), keys: ['Ctrl+Z'], action: 'undo' },
+			{ label: t('Cronologia delle operazioni'), keys: ['Ctrl+H'], action: 'history' },
 			{ label: t('Proprietà'), keys: ['Alt+Invio'], action: 'properties' },
 			{ label: t('Anteprima'), keys: ['Alt+P'], action: 'preview' },
 			{ label: t('Aggiungi ai preferiti'), keys: ['Ctrl+D'], action: 'favorite' }

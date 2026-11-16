@@ -103,6 +103,6 @@ describe('SettingsStore', () => {
 		expect([s.startPage, s.projectFolders, s.diskThreshold]).toEqual(['::ultima', ['D:\\Progetti'], 15]);
 
 		s.set('trainPause', -1);
-		expect(JSON.parse(a.data['space-train.impostazioni'])).toEqual(saved);
+		expect(JSON.parse(a.data['space-train.impostazioni'])).toEqual({ ...saved, folderChanges: true }); // the only key added after 0.9
 	});
 });

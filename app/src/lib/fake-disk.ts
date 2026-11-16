@@ -9,6 +9,7 @@ import type {
 	ConflictPolicy,
 	SortSpec
 } from './ipc';
+import type { Seen, Visit } from './folder-changes';
 
 type DiskNode = { kind: 'dir' | 'file'; size: number; hidden: boolean; modified: number };
 
@@ -138,6 +139,11 @@ export class FakeDisk {
 	 */
 	folderSizes = 2048;
 	sized: string[] = [];
+	/** Remembered visits by folder, like Rust's `visits`. */
+	visits = new Map<string, Visit>();
+	visitClock = 1;
+	/** Files offered to the phone; null when its page is off. */
+	phoneFiles: string[] | null = null;
 
 	/** The version the app says it has; empty = unknown. */
 	appVersion = '';
@@ -392,8 +398,10 @@ export class FakeDisk {
 				const done: string[] = [];
 				for (const p of args.paths as string[]) {
 					const base = name(p).replace(/\.[^.]+$/, '');
-					const side = args.maxSide ? ` (${args.maxSide})` : '';
-					const newItem = this.#free(parent(p), `${base}${side}.${args.target}`);
+					const own = name(p).split('.').pop()!.toLowerCase();
+					const ext = args.target === 'same' ? (['png', 'webp', 'gif', 'bmp'].includes(own) ? own : 'jpg') : (args.target as string);
+					const side = args.maxSide ? ` (${args.maxSide})` : ext === own ? ` (${args.tag})` : '';
+					const newItem = this.#free(parent(p), `${base}${side}.${ext}`);
 					this.nodes.set(newItem, node('file'));
 					done.push(newItem);
 				}
@@ -528,6 +536,33 @@ export class FakeDisk {
 			case 'folder_size':
 				this.sized.push(args.path as string);
 				return this.folderSizes;
+			case 'folder_visit': {
+				const key = (args.path as string).toLowerCase();
+				const before = this.visits.get(key) ?? null;
+				this.visits.set(key, { at: this.visitClock++, entries: args.entries as Seen[] });
+				return before;
+			}
+			case 'folder_visits_forget':
+				this.visits.clear();
+				return;
+			case 'index_search': {
+				const words = (args.query as string).toLowerCase().split(/\s+/).filter(Boolean);
+				const hits = [...this.nodes.keys()].filter(
+					(p) => p !== 'C:\\' && words.length > 0 && words.every((w) => name(p).toLowerCase().includes(w))
+				);
+				return { total: hits.length, entries: hits.map((p) => this.#item(p)) };
+			}
+			case 'index_status':
+				return { files: this.nodes.size - 1, building: false, foldersRead: 0 };
+			case 'phone_start':
+				this.phoneFiles = args.files as string[];
+				return { url: 'http://192.168.1.2:7311/token/', qr: '<svg></svg>' };
+			case 'phone_stop':
+				this.phoneFiles = null;
+				return;
+			case 'phone_keep':
+			case 'phone_discard':
+				return '';
 			case 'size_turn':
 				return;
 			case 'plugin:app|version':
@@ -706,6 +741,10 @@ export class FakeDisk {
 		let copied = 0;
 		let skipped = 0;
 		const pairs: Array<[string, string]> = [];
+		// Undoing a merge sends items back to a folder the merge removed.
+		if (mode === 'move' && !this.exists(dest)) {
+			this.#createAncestors(join(dest, 'x'));
+		}
 
 		for (const src of sources) {
 			let destination = join(dest, name(src));
@@ -716,13 +755,15 @@ export class FakeDisk {
 					continue;
 				}
 				if (policy === 'rename') destination = this.#free(dest, name(src));
-				else this.#remove(destination);
+				else if (mode === 'copy') this.#remove(destination);
 			}
 
-			if (mode === 'move') this.#move(src, destination);
-			else this.#copy(src, destination);
 			copied++;
-			pairs.push([src, destination]);
+			if (mode === 'move') this.#moveMerging(src, destination, pairs);
+			else {
+				this.#copy(src, destination);
+				pairs.push([src, destination]);
+			}
 		}
 
 		return { copied, skipped, cancelled: false, pairs };
@@ -752,6 +793,19 @@ export class FakeDisk {
 	#move(from: string, a: string): void {
 		this.#copy(from, a);
 		this.#remove(from);
+	}
+
+	/** Like the backend: two folders merge, and `pairs` gets each item that moved. */
+	#moveMerging(from: string, a: string, pairs: Array<[string, string]>): void {
+		if (this.nodes.get(from)?.kind === 'dir' && this.nodes.get(a)?.kind === 'dir') {
+			const children = [...this.nodes.keys()].filter((p) => parent(p) === from);
+			for (const c of children) this.#moveMerging(c, join(a, name(c)), pairs);
+			this.nodes.delete(from);
+			return;
+		}
+		this.#remove(a);
+		this.#move(from, a);
+		pairs.push([from, a]);
 	}
 
 	#remove(path: string): void {

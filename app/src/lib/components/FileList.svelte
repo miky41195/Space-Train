@@ -11,6 +11,7 @@
 	import type { FolderStyle } from '../icons';
 	import type { MediaKey } from '../media';
 	import type { Growth } from '../growth';
+	import type { ChangeMark } from '../folder-changes';
 	import { marqueeSelection, type MarqueeOptions } from '../marquee';
 	import type { Entry, GitMark, MediaProps, SortKey, SortSpec } from '../ipc';
 	import ColumnHeaders from './ColumnHeaders.svelte';
@@ -31,6 +32,7 @@
 		colorOf = undefined,
 		shareOf = undefined,
 		growthOf = undefined,
+		changeOf = undefined,
 		rowHeight = ROW_HEIGHT,
 		dropTarget = null,
 		selection = undefined,
@@ -81,6 +83,8 @@
 		/** Space view: share of the largest item, for the bar. */
 		shareOf?: (e: Entry) => number | undefined;
 		growthOf?: (e: Entry) => Growth | undefined;
+		/** New or modified since the last visit. */
+		changeOf?: (e: Entry) => ChangeMark | undefined;
 		/** Row height: lower in the compact view. */
 		rowHeight?: number;
 		/** Folder a drag is passing over. */
@@ -234,6 +238,7 @@
 							color={colorOf?.(entry)}
 							share={shareOf?.(entry)}
 							growth={growthOf?.(entry)}
+							change={changeOf?.(entry)}
 							media={mediaOf?.(entry)}
 							git={gitOf?.(entry)}
 							hasRules={entry.kind === 'dir' && (rulesOf?.(entry) ?? false)}

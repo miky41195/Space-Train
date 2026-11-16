@@ -289,6 +289,36 @@ export class TabsStore {
 	}
 
 	/**
+	 * Searches the whole-disk index («Ovunque»): an answer in milliseconds,
+	 * so no batches. Returns how many names match in all.
+	 */
+	async searchIndex(id: number, text: string): Promise<number> {
+		const tab = this.#get(id);
+		if (!tab) return 0;
+		await this.stopSearch(id, { keepResults: true });
+		const op = nextSearch++;
+		tab.searchOp = op;
+		tab.duplicates = null;
+		tab.comparison = null;
+		tab.label = null;
+		tab.archive = null;
+		tab.searching = true;
+		try {
+			const found = await this.backend.indexSearch(text);
+			if (tab.searchOp !== op) return 0;
+			tab.results = found.entries;
+			tab.selection = [];
+			tab.anchor = null;
+			return found.total;
+		} finally {
+			if (tab.searchOp === op) {
+				tab.searching = false;
+				tab.searchOp = null;
+			}
+		}
+	}
+
+	/**
 	 * Looks for identical files under the tab's folder. Results replace the
 	 * list like a recursive search, grouped by copy set as they are proven.
 	 */

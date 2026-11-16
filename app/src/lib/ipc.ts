@@ -1,4 +1,5 @@
 import { invoke, Channel } from '@tauri-apps/api/core';
+import type { Seen, Visit } from './folder-changes';
 
 export type EntryKind = 'dir' | 'file' | 'symlink';
 
@@ -190,7 +191,21 @@ export interface ArchiveItem {
 	modified: number | null;
 }
 
-export type ImageTarget = 'jpg' | 'png' | 'webp';
+/** `same` keeps each image's own format (JPG for those Space Train cannot write). */
+/** The whole-disk index of «Ovunque». */
+export interface IndexStatus {
+	files: number;
+	/** A drive is being read. */
+	building: boolean;
+	foldersRead: number;
+}
+
+export type PhoneEvent =
+	| { kind: 'visit' }
+	| { kind: 'downloaded'; name: string }
+	| { kind: 'upload'; id: number; name: string; size: number };
+
+export type ImageTarget = 'jpg' | 'png' | 'webp' | 'same';
 
 export interface SearchCriteria {
 	text: string;
@@ -317,6 +332,10 @@ export interface Backend {
 	openEntry(path: string): Promise<void>;
 	/** Bytes of a folder's whole tree; null if a newer turn stopped it. */
 	folderSize(path: string, turn: number): Promise<number | null>;
+	/** Saves what the folder holds now; gives back the previous visit, if any. */
+	folderVisit(path: string, entries: Seen[]): Promise<Visit | null>;
+	/** Forgets every remembered visit. */
+	folderVisitsForget(): Promise<void>;
 	/** Starts a turn of size computations and stops the previous one. */
 	sizeTurn(turn: number): Promise<void>;
 	/** Starts a new cleanup scan; the previous one stops. */
@@ -498,12 +517,24 @@ export interface Backend {
 	vaultExtract(path: string, items: string[], dest: string): Promise<string[]>;
 	vaultOpenItem(path: string, item: string): Promise<string>;
 	vaultDelete(path: string, items: string[]): Promise<void>;
+	/** Searches the whole-disk index: the best 300 matches, and how many there are in all. */
+	indexSearch(query: string): Promise<{ total: number; entries: Entry[] }>;
+	/** Starts the index on first call. */
+	indexStatus(): Promise<IndexStatus>;
+	/** Starts the phone page for these files; `onEvent` tells visits, downloads and uploads. */
+	phoneStart(files: string[], texts: Record<string, string>, onEvent: (e: PhoneEvent) => void): Promise<{ url: string; qr: string }>;
+	phoneStop(): Promise<void>;
+	/** Moves a file uploaded by the phone into `dest`, through the antivirus. */
+	phoneKeep(id: number, dest: string): Promise<string>;
+	phoneDiscard(id: number): Promise<void>;
 	imageConvert(opts: {
 		opId: number;
 		paths: string[];
 		target: ImageTarget;
 		maxSide: number | null;
 		quality: number;
+		/** Names a same-format copy at full size: «stem (tag).ext». */
+		tag: string;
 		onProgress: (p: Progress) => void;
 	}): Promise<string[]>;
 	/**
@@ -537,6 +568,14 @@ export const tauriBackend: Backend = {
 	listDir: (path, sort, showHidden) => invoke('list_dir', { path, sort, showHidden }),
 	openEntry: (path) => invoke('open_entry', { path }),
 	folderSize: (path, turn) => invoke('folder_size', { path, turn }),
+	folderVisit: (path, entries) => invoke('folder_visit', { path, entries }),
+	folderVisitsForget: () => invoke('folder_visits_forget'),
+	indexSearch: (query) => invoke('index_search', { query }),
+	indexStatus: () => invoke('index_status'),
+	phoneStart: (files, texts, onEvent) => invoke('phone_start', { files, texts, onEvent: channel(onEvent) }),
+	phoneStop: () => invoke('phone_stop'),
+	phoneKeep: (id, dest) => invoke('phone_keep', { id, dest }),
+	phoneDiscard: (id) => invoke('phone_discard', { id }),
 	sizeTurn: (turn) => invoke('size_turn', { turn }),
 	cleanupRound: (round) => invoke('cleanup_round', { round }),
 	cleanupScan: (category, drive, roots, round) => invoke('cleanup_scan', { category, drive, roots, round }),
@@ -656,8 +695,8 @@ export const tauriBackend: Backend = {
 	vaultExtract: (path, items, dest) => invoke('vault_extract', { path, items, dest }),
 	vaultOpenItem: (path, item) => invoke('vault_open_item', { path, item }),
 	vaultDelete: (path, items) => invoke('vault_delete', { path, items }),
-	imageConvert: ({ opId, paths, target, maxSide, quality, onProgress }) =>
-		invoke('image_convert', { opId, paths, target, maxSide, quality, onProgress: channel(onProgress) }),
+	imageConvert: ({ opId, paths, target, maxSide, quality, tag, onProgress }) =>
+		invoke('image_convert', { opId, paths, target, maxSide, quality, tag, onProgress: channel(onProgress) }),
 	deleteItems: ({ opId, mode, paths, onProgress }) =>
 		invoke('delete_items', { opId, mode, paths, onProgress: channel(onProgress) })
 };

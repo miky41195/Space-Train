@@ -22,25 +22,158 @@ pub enum Target {
     Jpg,
     Png,
     Webp,
+    /// The source's own format, when it can be written (else JPG).
+    Same,
 }
 
 impl Target {
-    fn ext(self) -> &'static str {
+    /// Extension of the new file made from `source`.
+    fn ext_for(self, source: &Path) -> &'static str {
         match self {
             Target::Jpg => "jpg",
             Target::Png => "png",
             Target::Webp => "webp",
+            Target::Same => match ext_of(source).as_str() {
+                "png" => "png",
+                "webp" => "webp",
+                "gif" => "gif",
+                "bmp" => "bmp",
+                _ => "jpg",
+            },
         }
     }
 }
 
+fn ext_of(p: &Path) -> String {
+    p.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default()
+}
+
+/// Decodes and turns the pixels the way the camera's EXIF orientation says:
+/// the new files carry no EXIF, so the turn must be in the pixels.
 fn open(path: &Path) -> Result<DynamicImage, FsError> {
+    use image::ImageDecoder;
+    let read = || -> image::ImageResult<DynamicImage> {
+        let mut decoder = image::ImageReader::open(paths::extended(path))?.with_guessed_format()?.into_decoder()?;
+        let orientation = decoder.orientation()?;
+        let mut img = DynamicImage::from_decoder(decoder)?;
+        img.apply_orientation(orientation);
+        Ok(img)
+    };
+    match read() {
+        Ok(img) => Ok(img),
+        // HEIC, AVIF, TIFF and the rest: the codecs installed in Windows.
+        #[cfg(windows)]
+        Err(_) if !matches!(ext_of(path).as_str(), "jpg" | "jpeg" | "png" | "webp" | "gif" | "bmp") => open_with_windows(path),
+        Err(e) => Err(FsError::Io { message: format!("Immagine non leggibile: {e}") }),
+    }
+}
+
+#[cfg(windows)]
+fn open_with_windows(path: &Path) -> Result<DynamicImage, FsError> {
+    use windows::core::HSTRING;
+    use windows::Win32::Foundation::GENERIC_READ;
+    use windows::Win32::Graphics::Imaging::*;
+    use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED};
+    let unreadable = |e: windows::core::Error| FsError::Io {
+        message: format!("Immagine non leggibile (per HEIC serve l'estensione HEIF di Microsoft Store): {}", e.message()),
+    };
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        let factory: IWICImagingFactory =
+            CoCreateInstance(&CLSID_WICImagingFactory, None, CLSCTX_INPROC_SERVER).map_err(unreadable)?;
+        let decoder = factory
+            .CreateDecoderFromFilename(
+                &HSTRING::from(paths::display(path)),
+                None,
+                GENERIC_READ,
+                WICDecodeMetadataCacheOnDemand,
+            )
+            .map_err(unreadable)?;
+        let frame = decoder.GetFrame(0).map_err(unreadable)?;
+        let rgba = factory.CreateFormatConverter().map_err(unreadable)?;
+        rgba.Initialize(&frame, &GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone, None, 0.0, WICBitmapPaletteTypeCustom)
+            .map_err(unreadable)?;
+        let (mut w, mut h) = (0u32, 0u32);
+        rgba.GetSize(&mut w, &mut h).map_err(unreadable)?;
+        let mut pixels = vec![0u8; w as usize * h as usize * 4];
+        rgba.CopyPixels(std::ptr::null(), w * 4, &mut pixels).map_err(unreadable)?;
+        image::RgbaImage::from_raw(w, h, pixels)
+            .map(DynamicImage::ImageRgba8)
+            .ok_or_else(|| io("Immagine non leggibile"))
+    }
+}
+
+/// True when the file's EXIF asks for no turn, so its bytes can be kept.
+fn upright(path: &Path) -> bool {
+    use image::ImageDecoder;
     image::ImageReader::open(paths::extended(path))
-        .map_err(io)?
-        .with_guessed_format()
-        .map_err(io)?
-        .decode()
-        .map_err(|e| FsError::Io { message: format!("Immagine non leggibile: {e}") })
+        .ok()
+        .and_then(|r| r.with_guessed_format().ok())
+        .and_then(|r| r.into_decoder().ok())
+        .and_then(|mut d| d.orientation().ok())
+        .is_some_and(|o| o == image::metadata::Orientation::NoTransforms)
+}
+
+/// A copy without GPS position, camera data and comments, pixels untouched.
+/// `None` when the format has no lossless way here.
+fn strip_metadata(bytes: &[u8], ext: &str) -> Option<Vec<u8>> {
+    match ext {
+        "jpg" | "jpeg" => strip_jpeg(bytes),
+        "png" => strip_png(bytes),
+        _ => None,
+    }
+}
+
+/// Drops APP1 (EXIF, XMP), APP13 (IPTC) and comments; keeps the colour profile.
+fn strip_jpeg(b: &[u8]) -> Option<Vec<u8>> {
+    if b.get(..2)? != [0xFF, 0xD8] {
+        return None;
+    }
+    let mut out = vec![0xFF, 0xD8];
+    let mut i = 2;
+    loop {
+        if *b.get(i)? != 0xFF {
+            return None;
+        }
+        let marker = *b.get(i + 1)?;
+        // Start of scan: the rest is image data.
+        if marker == 0xDA {
+            out.extend_from_slice(&b[i..]);
+            return Some(out);
+        }
+        let len = u16::from_be_bytes([*b.get(i + 2)?, *b.get(i + 3)?]) as usize;
+        let end = i + 2 + len;
+        if len < 2 || end > b.len() {
+            return None;
+        }
+        if !matches!(marker, 0xE1 | 0xED | 0xFE) {
+            out.extend_from_slice(&b[i..end]);
+        }
+        i = end;
+    }
+}
+
+/// Drops the eXIf, text and time chunks.
+fn strip_png(b: &[u8]) -> Option<Vec<u8>> {
+    const SIGNATURE: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
+    if b.get(..8)? != SIGNATURE {
+        return None;
+    }
+    let mut out = SIGNATURE.to_vec();
+    let mut i = 8;
+    while i < b.len() {
+        let len = u32::from_be_bytes(b.get(i..i + 4)?.try_into().ok()?) as usize;
+        let end = i.checked_add(12)?.checked_add(len)?;
+        let kind = b.get(i + 4..i + 8)?;
+        if end > b.len() {
+            return None;
+        }
+        if !matches!(kind, b"eXIf" | b"tEXt" | b"iTXt" | b"zTXt" | b"tIME") {
+            out.extend_from_slice(&b[i..end]);
+        }
+        i = end;
+    }
+    Some(out)
 }
 
 fn save(img: &DynamicImage, to: &Path, format: ImageFormat, quality: u8) -> Result<(), FsError> {
@@ -68,12 +201,17 @@ pub fn rotate(path: &str, clockwise: bool) -> Result<(), FsError> {
 }
 
 /// Converts (and optionally shrinks) each image into a new file beside it.
+/// The new files never carry GPS position or camera data: re-encoding drops
+/// them, and a same-format copy without resizing has them cut out with the
+/// pixels untouched. `tag` names that copy («stem (tag).ext»), since its
+/// name would otherwise be the original's.
 /// Returns the new paths; stops between files when cancelled.
 pub fn convert(
     sources: &[String],
     target: Target,
     max_side: Option<u32>,
     quality: u8,
+    tag: &str,
     cancel: &AtomicBool,
     progress: &mut dyn FnMut(u64),
 ) -> Result<Vec<String>, FsError> {
@@ -83,21 +221,34 @@ pub fn convert(
             break;
         }
         let p = Path::new(s);
-        let mut img = open(p)?;
-        if let Some(m) = max_side {
-            if img.width() > m || img.height() > m {
-                img = img.resize(m, m, image::imageops::FilterType::Lanczos3);
-            }
-        }
+        let ext = target.ext_for(p);
         let stem = p.file_stem().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        let same_format = ext == ext_of(p) || (ext == "jpg" && ext_of(p) == "jpeg");
         let base = match max_side {
-            Some(m) => format!("{stem} ({m}).{}", target.ext()),
-            None => format!("{stem}.{}", target.ext()),
+            Some(m) => format!("{stem} ({m}).{ext}"),
+            None if same_format => format!("{stem} ({tag}).{ext}"),
+            None => format!("{stem}.{ext}"),
         };
         let dir = p.parent().ok_or(FsError::NotFound)?;
         let to: PathBuf = dir.join(unique_name(dir, &base));
-        let format = ImageFormat::from_extension(target.ext()).ok_or_else(|| io("formato"))?;
-        save(&img, &to, format, quality.clamp(1, 100))?;
+
+        let lossless = (max_side.is_none() && same_format && upright(p))
+            .then(|| std::fs::read(paths::extended(p)).ok())
+            .flatten()
+            .and_then(|bytes| strip_metadata(&bytes, &ext_of(p)));
+        match lossless {
+            Some(clean) => std::fs::write(paths::extended(&to), clean).map_err(io)?,
+            None => {
+                let mut img = open(p)?;
+                if let Some(m) = max_side {
+                    if img.width() > m || img.height() > m {
+                        img = img.resize(m, m, image::imageops::FilterType::Lanczos3);
+                    }
+                }
+                let format = ImageFormat::from_extension(ext).ok_or_else(|| io("formato"))?;
+                save(&img, &to, format, quality.clamp(1, 100))?;
+            }
+        }
         out.push(paths::display(&to));
         progress(i as u64 + 1);
     }
@@ -139,11 +290,40 @@ mod tests {
         let d = tempdir().unwrap();
         let p = d.path().join("big.png");
         sample(&p, 400, 200);
-        let made = convert(&[p.to_string_lossy().into_owned()], Target::Jpg, Some(100), 80, &AtomicBool::new(false), &mut |_| {}).unwrap();
+        let made = convert(&[p.to_string_lossy().into_owned()], Target::Jpg, Some(100), 80, "x", &AtomicBool::new(false), &mut |_| {}).unwrap();
         assert!(made[0].ends_with("big (100).jpg"));
         let small = image::open(&made[0]).unwrap();
         assert_eq!((small.width(), small.height()), (100, 50));
         assert!(p.exists());
+    }
+
+    #[test]
+    fn a_same_format_copy_loses_gps_and_keeps_the_pixels() {
+        let d = tempdir().unwrap();
+        let p = d.path().join("foto.jpg");
+        sample(&p, 32, 16);
+        // An APP1 «Exif» segment right after SOI, as a camera writes it.
+        let plain = std::fs::read(&p).unwrap();
+        let app1: &[u8] = &[0xFF, 0xE1, 0x00, 0x0A, b'E', b'x', b'i', b'f', 0, 0, b'G', b'P'];
+        let with_exif = [&plain[..2], app1, &plain[2..]].concat();
+        std::fs::write(&p, &with_exif).unwrap();
+
+        let made = convert(&[p.to_string_lossy().into_owned()], Target::Same, None, 85, "senza dati", &AtomicBool::new(false), &mut |_| {}).unwrap();
+        assert!(made[0].ends_with("foto (senza dati).jpg"));
+        assert_eq!(std::fs::read(&made[0]).unwrap(), plain, "only the EXIF segment goes");
+        assert_eq!(std::fs::read(&p).unwrap(), with_exif, "the original stays");
+    }
+
+    #[test]
+    fn png_text_chunks_go_and_the_rest_stays() {
+        let d = tempdir().unwrap();
+        let p = d.path().join("a.png");
+        sample(&p, 8, 8);
+        let plain = std::fs::read(&p).unwrap();
+        // A tEXt chunk after IHDR (signature 8 + IHDR 25 bytes); the CRC is not checked here.
+        let text: &[u8] = &[0, 0, 0, 3, b't', b'E', b'X', b't', b'a', 0, b'b', 0, 0, 0, 0];
+        let with_text = [&plain[..33], text, &plain[33..]].concat();
+        assert_eq!(strip_png(&with_text).unwrap(), plain);
     }
 
     #[test]

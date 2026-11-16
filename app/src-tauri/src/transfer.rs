@@ -380,11 +380,12 @@ pub async fn image_convert(
     target: crate::fs::images::Target,
     max_side: Option<u32>,
     quality: u8,
+    tag: String,
     on_progress: Channel<Progress>,
 ) -> Result<Vec<String>, FsError> {
     let total = paths.len() as u64;
     with_progress(&state, op_id, move || total, on_progress, move |cancel, progress| {
-        crate::fs::images::convert(&paths, target, max_side, quality, cancel, progress)
+        crate::fs::images::convert(&paths, target, max_side, quality, &tag, cancel, progress)
     })
     .await
 }
