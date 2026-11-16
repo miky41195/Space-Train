@@ -15,6 +15,17 @@ export interface WhatsNew {
 
 export const WHATS_NEW: WhatsNew[] = [
 	{
+		version: '0.12.0',
+		items: [
+			t('Ricerca «Ovunque»: nella barra di ricerca un pulsante cerca per nome in tutti i dischi mentre scrivi. Space Train prepara l’indice da solo la prima volta, senza permessi di amministratore, e poi lo tiene aggiornato.'),
+			t('Invia al telefono: dal menu dei file compare un QR; il telefono, sulla stessa rete, apre una pagina nel browser per scaricarli, senza app. Dal telefono si possono anche mandare foto e file al PC: si tengono o si scartano dal PC.'),
+			t('Cronologia delle operazioni (Ctrl+H): un pannello con spostamenti, copie, rinomine ed eliminazioni degli ultimi 30 giorni, ognuna annullabile da sola.'),
+			t('Dall’ultima visita: tornando in una cartella, una barra dice quali file sono nuovi, modificati o spariti, e «Solo i cambiati» mostra soltanto quelli. Si spegne nelle impostazioni.'),
+			t('Converti e ridimensiona: il formato «Uguale» fa una copia senza posizione GPS né dati della fotocamera; si convertono anche le foto HEIC; le foto girate dal telefono escono dritte; le ultime scelte restano.'),
+			t('Annullando uno spostamento che aveva unito due cartelle, i file che c’erano già nella destinazione restano dove sono.')
+		]
+	},
+	{
 		version: '0.11.0',
 		items: [
 			t('Versioni precedenti: prima di sovrascrivere un file (incollando, allineando, salvando nell’editor) Space Train tiene la versione di prima. Dal menu del file, «Versioni precedenti…» le mostra in fila: si aprono, si confrontano con quella attuale e si ripristinano. Con «Proteggi le versioni dei file» su una cartella si tiene ogni modifica, anche fatta da altri programmi.'),
