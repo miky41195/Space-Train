@@ -126,6 +126,16 @@ try {
 	});
 	session = s.sessionId;
 
+	// The interface follows the system language and the runner's is English,
+	// while the steps look for the Italian text: Italian is chosen in the app,
+	// as Settings does, then the page reloads. The seen version is forgotten
+	// so the reload still counts as a first start (welcome guide).
+	await until('first listing', async () => (await names()).includes('alfa.txt'));
+	await run(
+		`localStorage.setItem('space-train.language', 'it'); localStorage.removeItem('space-train.versione-vista'); sessionStorage.setItem('space-train.resume-tabs', '1'); location.reload()`
+	);
+	await until('Italian interface', () => run(`return document.body.innerText.includes('Questo PC')`), 20000);
+
 	await step('opens the folder passed on the command line', async () => {
 		await until('alfa.txt listed', async () => (await names()).includes('alfa.txt'));
 		const n = await names();
