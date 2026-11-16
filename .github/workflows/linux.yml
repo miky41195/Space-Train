@@ -90,6 +90,10 @@ jobs:
 
       - name: Run end-to-end
         working-directory: app
+        # The interface follows the system language; the steps look for the Italian text.
+        env:
+          LANG: it_IT.UTF-8
+          LANGUAGE: it
         run: dbus-run-session -- xvfb-run -a --server-args="-screen 0 1280x800x24" node e2e/linux.mjs src-tauri/target/debug/app
 
       - name: Screenshots
