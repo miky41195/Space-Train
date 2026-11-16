@@ -276,7 +276,7 @@ export function fakeBackend(over: Partial<Backend> = {}): Backend {
 			return { files: 0, building: false, foldersRead: 0 };
 		},
 		async phoneStart() {
-			return { url: 'http://192.168.1.2:7311/token/', qr: '<svg></svg>' };
+			return { url: 'http://192.168.1.2:7311/token/', qr: '<svg></svg>', remoteUrl: null, remoteQr: null };
 		},
 		async phoneStop() {},
 		async phoneKeep() {

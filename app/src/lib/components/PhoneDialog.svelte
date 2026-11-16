@@ -32,7 +32,9 @@
 		error?: string;
 	}
 
-	let link = $state<{ url: string; qr: string } | null>(null);
+	let link = $state<{ url: string; qr: string; remoteUrl: string | null; remoteQr: string | null } | null>(null);
+	/** Showing the Tailscale address, for a phone away from home. */
+	let away = $state(false);
 	let failure = $state<string | null>(null);
 	let connected = $state(false);
 	let downloads = $state(0);
@@ -97,11 +99,21 @@
 		{#if failure}
 			<p class="error">{failure}</p>
 		{:else if link}
+			{#if link.remoteUrl}
+				<div class="where" role="radiogroup" aria-label={t('Dove è il telefono')}>
+					<button role="radio" aria-checked={!away} class:on={!away} onclick={() => (away = false)}>{t('In casa')}</button>
+					<button role="radio" aria-checked={away} class:on={away} onclick={() => (away = true)}>{t('Fuori casa (Tailscale)')}</button>
+				</div>
+			{/if}
 			<div class="link">
-				<div class="qr" aria-label={t('QR code dell’indirizzo')}>{@html link.qr}</div>
+				<div class="qr" aria-label={t('QR code dell’indirizzo')}>{@html away && link.remoteQr ? link.remoteQr : link.qr}</div>
 				<div class="how">
-					<p>{t('Inquadra il codice con la fotocamera del telefono. Telefono e PC devono essere sulla stessa rete.')}</p>
-					<p class="url">{link.url}</p>
+					<p>
+						{away
+							? t('Inquadra il codice con la fotocamera del telefono. Il telefono deve avere Tailscale acceso, nella stessa rete Tailscale di questo PC.')
+							: t('Inquadra il codice con la fotocamera del telefono. Telefono e PC devono essere sulla stessa rete.')}
+					</p>
+					<p class="url">{away && link.remoteUrl ? link.remoteUrl : link.url}</p>
 					<p class="dim">{t('Dal telefono puoi anche mandare file al PC: li tieni o li scarti qui sotto.')}</p>
 				</div>
 			</div>
@@ -186,6 +198,18 @@
 		color: var(--text-dim);
 		font-size: calc(12px * var(--text-scale, 1));
 		font-variant-numeric: tabular-nums;
+	}
+	.where {
+		display: flex;
+		gap: 4px;
+	}
+	.where button {
+		height: 24px;
+		padding: 0 10px;
+	}
+	.where button.on {
+		background: var(--accent-soft);
+		border-color: transparent;
 	}
 	.link {
 		display: grid;

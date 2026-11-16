@@ -522,7 +522,11 @@ export interface Backend {
 	/** Starts the index on first call. */
 	indexStatus(): Promise<IndexStatus>;
 	/** Starts the phone page for these files; `onEvent` tells visits, downloads and uploads. */
-	phoneStart(files: string[], texts: Record<string, string>, onEvent: (e: PhoneEvent) => void): Promise<{ url: string; qr: string }>;
+	phoneStart(
+		files: string[],
+		texts: Record<string, string>,
+		onEvent: (e: PhoneEvent) => void
+	): Promise<{ url: string; qr: string; remoteUrl: string | null; remoteQr: string | null }>;
 	phoneStop(): Promise<void>;
 	/** Moves a file uploaded by the phone into `dest`, through the antivirus. */
 	phoneKeep(id: number, dest: string): Promise<string>;

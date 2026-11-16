@@ -556,7 +556,7 @@ export class FakeDisk {
 				return { files: this.nodes.size - 1, building: false, foldersRead: 0 };
 			case 'phone_start':
 				this.phoneFiles = args.files as string[];
-				return { url: 'http://192.168.1.2:7311/token/', qr: '<svg></svg>' };
+				return { url: 'http://192.168.1.2:7311/token/', qr: '<svg></svg>', remoteUrl: null, remoteQr: null };
 			case 'phone_stop':
 				this.phoneFiles = null;
 				return;

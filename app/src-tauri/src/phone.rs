@@ -38,10 +38,14 @@ pub enum PhoneEvent {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PhoneLink {
     pub url: String,
     /// The QR of the address, as SVG.
     pub qr: String,
+    /// The same page through Tailscale, reachable away from home, when it is on.
+    pub remote_url: Option<String>,
+    pub remote_qr: Option<String>,
 }
 
 struct Staged {
@@ -79,6 +83,21 @@ fn lan_ip() -> Option<std::net::IpAddr> {
     s.connect("192.168.1.1:9").ok()?;
     let ip = s.local_addr().ok()?.ip();
     (!ip.is_loopback() && !ip.is_unspecified()).then_some(ip)
+}
+
+/// Tailscale's addresses: 100.64.0.0/10.
+fn is_tailscale(ip: std::net::IpAddr) -> bool {
+    matches!(ip, std::net::IpAddr::V4(v) if v.octets()[0] == 100 && v.octets()[1] & 0xC0 == 64)
+}
+
+/// This PC's Tailscale address, if Tailscale is on: the interface that
+/// would reach Tailscale's own resolver. Without it the route goes through
+/// the home router and the address is not a Tailscale one.
+fn tailscale_ip() -> Option<std::net::IpAddr> {
+    let s = UdpSocket::bind("0.0.0.0:0").ok()?;
+    s.connect("100.100.100.100:53").ok()?;
+    let ip = s.local_addr().ok()?.ip();
+    is_tailscale(ip).then_some(ip)
 }
 
 fn token() -> String {
@@ -137,8 +156,10 @@ pub fn start(
     }
     let url = format!("http://{}/{}/", std::net::SocketAddr::new(ip, port), token);
     let qr = crate::friends::qr(&url)?;
+    let remote_url = tailscale_ip().filter(|t| *t != ip).map(|t| format!("http://{}/{}/", std::net::SocketAddr::new(t, port), token));
+    let remote_qr = remote_url.as_deref().map(crate::friends::qr).transpose()?;
     *SESSION.lock().unwrap() = Some(Session { stop: stop_flag, shared });
-    Ok(PhoneLink { url, qr })
+    Ok(PhoneLink { url, qr, remote_url, remote_qr })
 }
 
 /// Stops the server and throws away the files not kept.
@@ -383,6 +404,14 @@ pub fn phone_discard(id: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tailscale_addresses_are_recognised() {
+        assert!(is_tailscale("100.101.102.103".parse().unwrap()));
+        assert!(is_tailscale("100.127.0.1".parse().unwrap()));
+        assert!(!is_tailscale("100.128.0.1".parse().unwrap()));
+        assert!(!is_tailscale("192.168.1.24".parse().unwrap()));
+    }
 
     #[test]
     fn names_from_the_phone_are_made_safe() {
