@@ -131,6 +131,8 @@ try {
 	// as Settings does, then the page reloads. The seen version is forgotten
 	// so the reload still counts as a first start (welcome guide).
 	await until('first listing', async () => (await names()).includes('alfa.txt'));
+	// Written a moment after the listing: forgetting it earlier, the first page would write it again.
+	await until('seen version saved', () => run(`return localStorage.getItem('space-train.versione-vista') !== null`), 20000);
 	await run(
 		`localStorage.setItem('space-train.language', 'it'); localStorage.removeItem('space-train.versione-vista'); sessionStorage.setItem('space-train.resume-tabs', '1'); location.reload()`
 	);
