@@ -244,6 +244,33 @@ mod tests {
         assert!(!a.exists() && !f.exists());
     }
 
+    /// pnpm fills node_modules with junctions: deleting the folder must
+    /// remove the links, never what they point to.
+    #[cfg(windows)]
+    #[test]
+    fn permanent_delete_does_not_follow_junctions() {
+        let dir = tempfile::tempdir().unwrap();
+        let outside = dir.path().join("sources");
+        std::fs::create_dir_all(&outside).unwrap();
+        std::fs::write(outside.join("keep.txt"), "x").unwrap();
+        let modules = dir.path().join("node_modules");
+        std::fs::create_dir_all(&modules).unwrap();
+        let link = modules.join("pkg");
+        let made = std::process::Command::new("cmd")
+            .args(["/C", "mklink", "/J"])
+            .arg(&link)
+            .arg(&outside)
+            .output()
+            .unwrap();
+        assert!(made.status.success());
+
+        let done = delete_from_disk(&[s(&modules)], &AtomicBool::new(false), &mut |_| {}).unwrap();
+
+        assert!(done.failed.is_empty());
+        assert!(!modules.exists());
+        assert!(outside.join("keep.txt").exists());
+    }
+
     #[test]
     fn cancelled_permanent_delete_keeps_the_rest() {
         let dir = tempfile::tempdir().unwrap();
