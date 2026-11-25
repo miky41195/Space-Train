@@ -288,17 +288,18 @@ pub async fn extract(
     state: tauri::State<'_, Operations>,
     op_id: u64,
     archive: String,
+    password: Option<String>,
     on_progress: Channel<Progress>,
 ) -> Result<String, FsError> {
-    let for_size = archive.clone();
+    let for_size = (archive.clone(), password.clone());
     with_progress(
         &state,
         op_id,
-        move || crate::fs::archive_formats::unpacked_size(&for_size),
+        move || crate::fs::archive_formats::unpacked_size(&for_size.0, for_size.1.as_deref()),
         on_progress,
         move |cancel, advance| match crate::fs::archive_formats::format_of(&archive) {
-            Some(crate::fs::archive_formats::Format::Zip) | None => crate::fs::archives::extract(&archive, cancel, advance),
-            Some(_) => crate::fs::archive_formats::extract_beside(&archive, cancel, advance),
+            Some(crate::fs::archive_formats::Format::Zip) | None => crate::fs::archives::extract(&archive, password.as_deref(), cancel, advance),
+            Some(_) => crate::fs::archive_formats::extract_beside(&archive, password.as_deref(), cancel, advance),
         },
     )
     .await
@@ -306,8 +307,8 @@ pub async fn extract(
 
 /// Every item inside an archive (any format Space Train reads).
 #[tauri::command]
-pub async fn archive_list(archive: String) -> Result<Vec<crate::fs::archive_formats::ArchiveItem>, FsError> {
-    tauri::async_runtime::spawn_blocking(move || crate::fs::archive_formats::list(&archive))
+pub async fn archive_list(archive: String, password: Option<String>) -> Result<Vec<crate::fs::archive_formats::ArchiveItem>, FsError> {
+    tauri::async_runtime::spawn_blocking(move || crate::fs::archive_formats::list(&archive, password.as_deref()))
         .await
         .map_err(|e| FsError::Io { message: e.to_string() })?
 }
@@ -320,15 +321,16 @@ pub async fn archive_extract(
     archive: String,
     items: Vec<String>,
     dest: String,
+    password: Option<String>,
     on_progress: Channel<Progress>,
 ) -> Result<(), FsError> {
-    let for_size = (archive.clone(), items.clone());
+    let for_size = (archive.clone(), items.clone(), password.clone());
     with_progress(
         &state,
         op_id,
         move || {
-            let (a, chosen) = for_size;
-            crate::fs::archive_formats::list(&a)
+            let (a, chosen, password) = for_size;
+            crate::fs::archive_formats::list(&a, password.as_deref())
                 .map(|v| {
                     v.iter()
                         .filter(|i| chosen.iter().any(|c| i.path == *c || i.path.starts_with(&format!("{c}/"))))
@@ -339,7 +341,7 @@ pub async fn archive_extract(
         },
         on_progress,
         move |cancel, progress| {
-            crate::fs::archive_formats::extract(&archive, std::path::Path::new(&dest), Some(&items), cancel, progress)
+            crate::fs::archive_formats::extract(&archive, std::path::Path::new(&dest), Some(&items), password.as_deref(), cancel, progress)
         },
     )
     .await
@@ -348,12 +350,12 @@ pub async fn archive_extract(
 /// Extracts one file of an archive into a temporary folder (one per archive)
 /// and returns its path, so it can be opened like any file.
 #[tauri::command]
-pub async fn archive_open_item(archive: String, item: String) -> Result<String, FsError> {
+pub async fn archive_open_item(archive: String, item: String, password: Option<String>) -> Result<String, FsError> {
     tauri::async_runtime::spawn_blocking(move || {
         let key = blake3::hash(archive.to_lowercase().as_bytes()).to_hex();
         let dir = std::env::temp_dir().join("space-train-archivi").join(&key.as_str()[..16]);
         let flag = AtomicBool::new(false);
-        crate::fs::archive_formats::extract(&archive, &dir, Some(std::slice::from_ref(&item)), &flag, &mut |_| {})?;
+        crate::fs::archive_formats::extract(&archive, &dir, Some(std::slice::from_ref(&item)), password.as_deref(), &flag, &mut |_| {})?;
         let name = item.rsplit('/').next().unwrap_or(&item);
         Ok(crate::fs::paths::display(&dir.join(name)))
     })

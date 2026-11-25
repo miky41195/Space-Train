@@ -3418,6 +3418,57 @@ describe('archive as a folder', () => {
 	});
 });
 
+describe('password-protected archive', () => {
+	async function type(password: string) {
+		const dialog = await screen.findByRole('dialog', { name: 'Apri «p.zip»' });
+		await fireEvent.input(dialog.querySelector('input[type="password"]')!, { target: { value: password } });
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Apri' }));
+	}
+
+	it('«Estrai tutto» asks for the password, again when wrong, then extracts', async () => {
+		add('C:\\p.zip');
+		disk.archivePasswords.set('C:\\p.zip', 'segreta');
+		await mount();
+		await fireEvent.contextMenu(row('p.zip'));
+		await fireEvent.click(await screen.findByRole('menuitem', { name: 'Estrai tutto' }));
+		await type('sbagliata');
+		await screen.findByText('Password sbagliata, o archivio danneggiato.');
+		expect(disk.exists('C:\\p')).toBe(false);
+		await type('segreta');
+		await waitFor(() => expect(disk.exists('C:\\p')).toBe(true));
+		expect(screen.queryByRole('dialog', { name: 'Apri «p.zip»' })).toBeNull();
+	});
+
+	it('opened like a folder it asks once, and giving up shows no error', async () => {
+		add('C:\\p.zip');
+		disk.archives.set('C:\\p.zip', [{ path: 'a.txt', size: 5, dir: false, modified: 1 }]);
+		disk.archivePasswords.set('C:\\p.zip', 'segreta');
+		await mount();
+		await fireEvent.dblClick(row('p.zip'));
+		const dialog = await screen.findByRole('dialog', { name: 'Apri «p.zip»' });
+		await fireEvent.click(within(dialog).getByRole('button', { name: 'Annulla' }));
+		expect(names()).toContain('p.zip');
+		expect(screen.queryByText('L’archivio è protetto da password.')).toBeNull();
+
+		await fireEvent.dblClick(row('p.zip'));
+		await type('segreta');
+		await waitFor(() => expect(names()).toEqual(['a.txt']));
+		await fireEvent.contextMenu(row('a.txt'));
+		await fireEvent.click(await screen.findByRole('menuitem', { name: 'Estrai accanto all’archivio' }));
+		await waitFor(() => expect(disk.exists('C:\\a.txt')).toBe(true));
+	});
+});
+
+describe('low-disk reminder', () => {
+	it('its button opens the disk cleanup', async () => {
+		disk.freeOnC = 5;
+		await mount();
+		await fireEvent.click(await screen.findByRole('button', { name: 'Apri la Pulizia' }));
+		await waitFor(() => expect(document.querySelector('.cleanup')).toBeTruthy());
+		expect(screen.queryByRole('button', { name: 'Apri la Pulizia' })).toBeNull();
+	});
+});
+
 describe('transfer queue', () => {
 	it('queues copies behind the running one: count, list, move up, remove, pause', async () => {
 		let unblock = () => {};

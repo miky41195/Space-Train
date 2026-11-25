@@ -86,6 +86,7 @@ pub fn text(e: &crate::fs::error::FsError) -> String {
         Io { message } => message.clone(),
         ServerKey { .. } => "Chiave del server da confermare.".into(),
         ServerPassword => "Il server chiede la password.".into(),
+        ArchivePassword => "L’archivio è protetto da password.".into(),
         Changed => "Il file è cambiato su disco nel frattempo.".into(),
     }
 }

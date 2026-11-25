@@ -1344,6 +1344,8 @@ export const EN: Record<string, string> = {
 	'Backup su {0}': 'Backup to {0}',
 	'Backup su «{0}»: {1}.': 'Backup to “{0}”: {1}.',
 	'Password sbagliata.': 'Wrong password.',
+	'Password sbagliata, o archivio danneggiato.': 'Wrong password, or damaged archive.',
+	'L’archivio è protetto da password.': 'The archive is password-protected.',
 	'Prima scarica i file dall’altro PC, poi mettili nella cassaforte.': 'First download the files from the other PC, then put them in the vault.',
 	'«{0}» protetta: Space Train copia i file e da ora tiene ogni loro modifica.': '“{0}” protected: Space Train copies the files and from now on keeps every change to them.',
 	'«{0}» non è più protetta. Le versioni già tenute restano finché scadono.': '“{0}” is no longer protected. The versions already kept stay until they expire.',

@@ -103,6 +103,8 @@ export type FsError =
 	| { kind: 'serverKey'; fingerprint: string; changed: boolean }
 	/** The remote server wants a password. */
 	| { kind: 'serverPassword' }
+	/** The archive is encrypted: password missing or wrong. */
+	| { kind: 'archivePassword' }
 	/** The file changed on disk after it was read. */
 	| { kind: 'changed' };
 
@@ -464,18 +466,19 @@ export interface Backend {
 		dest: string;
 		onProgress: (p: Progress) => void;
 	}): Promise<string>;
-	extract(opts: { opId: number; archive: string; onProgress: (p: Progress) => void }): Promise<string>;
+	extract(opts: { opId: number; archive: string; password: string | null; onProgress: (p: Progress) => void }): Promise<string>;
 	/** Hex checksum of a file; `null` when cancelled. */
 	fileChecksum(opts: { opId: number; path: string; algorithm: 'sha256' | 'sha1' | 'md5' }): Promise<string | null>;
-	archiveList(archive: string): Promise<ArchiveItem[]>;
+	archiveList(archive: string, password?: string | null): Promise<ArchiveItem[]>;
 	/** Extracts one inner file to a temporary folder and returns its path, to open it. */
-	archiveOpenItem(archive: string, item: string): Promise<string>;
+	archiveOpenItem(archive: string, item: string, password: string | null): Promise<string>;
 	/** Extracts chosen inner items (folders with their contents) into `dest`. */
 	archiveExtract(opts: {
 		opId: number;
 		archive: string;
 		items: string[];
 		dest: string;
+		password: string | null;
 		onProgress: (p: Progress) => void;
 	}): Promise<void>;
 	/** Pauses or resumes a running job between items. */
@@ -665,13 +668,13 @@ export const tauriBackend: Backend = {
 		invoke('compare_folders', { opId, here, there, content, hidden }),
 	compress: ({ opId, sources, dest, onProgress }) =>
 		invoke('compress', { opId, sources, dest, onProgress: channel(onProgress) }),
-	extract: ({ opId, archive, onProgress }) =>
-		invoke('extract', { opId, archive, onProgress: channel(onProgress) }),
+	extract: ({ opId, archive, password, onProgress }) =>
+		invoke('extract', { opId, archive, password, onProgress: channel(onProgress) }),
 	fileChecksum: ({ opId, path, algorithm }) => invoke('file_checksum', { opId, path, algorithm }),
-	archiveList: (archive) => invoke('archive_list', { archive }),
-	archiveOpenItem: (archive, item) => invoke('archive_open_item', { archive, item }),
-	archiveExtract: ({ opId, archive, items, dest, onProgress }) =>
-		invoke('archive_extract', { opId, archive, items, dest, onProgress: channel(onProgress) }),
+	archiveList: (archive, password = null) => invoke('archive_list', { archive, password }),
+	archiveOpenItem: (archive, item, password) => invoke('archive_open_item', { archive, item, password }),
+	archiveExtract: ({ opId, archive, items, dest, password, onProgress }) =>
+		invoke('archive_extract', { opId, archive, items, dest, password, onProgress: channel(onProgress) }),
 	pauseTransfer: (opId, paused) => invoke('pause_transfer', { opId, paused }),
 	shortcutFree: (accelerator) => invoke('shortcut_free', { accelerator }),
 	imageRotate: (paths, clockwise) => invoke('image_rotate', { paths, clockwise }),

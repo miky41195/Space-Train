@@ -17,6 +17,8 @@ pub enum FsError {
     ServerKey { fingerprint: String, changed: bool },
     /// The remote server wants a password (none known, or the one known was refused).
     ServerPassword,
+    /// The archive is encrypted: password missing or wrong.
+    ArchivePassword,
     /// The file changed on disk after it was read: saving would overwrite someone else's work.
     Changed,
 }

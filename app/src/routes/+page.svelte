@@ -1461,12 +1461,41 @@
 	}
 
 	// ── Archives opened like folders ─────────────────────────────────
+	/** Password requests in line: the first is on screen. */
+	let passwordAsks = $state<Array<{ file: string; error: string | null; answer: (password: string | null) => void }>>([]);
+	/** Passwords that worked, for this session only: never saved. */
+	const archivePasswords: Record<string, string> = {};
+
+	function answerPassword(password: string | null) {
+		const [ask, ...rest] = passwordAsks;
+		passwordAsks = rest;
+		ask?.answer(password);
+	}
+
+	/** Runs `run`, asking for the password as long as the archive refuses it; `undefined` = the user gave up. */
+	async function withArchivePassword<T>(file: string, run: (password: string | null) => Promise<T>): Promise<T | undefined> {
+		let password: string | null = archivePasswords[file] ?? null;
+		for (;;) {
+			try {
+				const result = await run(password);
+				if (password !== null) archivePasswords[file] = password;
+				return result;
+			} catch (err) {
+				if ((err as FsError)?.kind !== 'archivePassword') throw err;
+				delete archivePasswords[file];
+				const error = password === null ? null : t('Password sbagliata, o archivio danneggiato.');
+				password = await new Promise<string | null>((answer) => (passwordAsks = [...passwordAsks, { file, error, answer }]));
+				if (password === null) return undefined;
+			}
+		}
+	}
+
 	async function openArchive(file: string) {
 		const id = store.activeId;
 		if (id === null) return;
 		try {
-			const items = await tauriBackend.archiveList(file);
-			await store.showArchive(id, file, '', items);
+			const items = await withArchivePassword(file, (pw) => tauriBackend.archiveList(file, pw));
+			if (items) await store.showArchive(id, file, '', items);
 		} catch (err) {
 			opError = describeError(err);
 		}
@@ -1501,7 +1530,13 @@
 			if (store.activeTab?.archive?.vault && store.activeTab.archive.file === file) {
 				await tauriBackend.vaultExtract(file, items, dest);
 				touch(file);
-			} else await tauriBackend.archiveExtract({ opId, archive: file, items, dest, onProgress: (p) => (progress = p) });
+			} else {
+				const done = await withArchivePassword(file, async (password) => {
+					await tauriBackend.archiveExtract({ opId, archive: file, items, dest, password, onProgress: (p) => (progress = p) });
+					return true;
+				});
+				if (!done) return;
+			}
 			notify(t('Estratto in {0}.', [dest]));
 			void store.refreshFolder(dest);
 			drivesRefresh++;
@@ -2367,11 +2402,15 @@
 							dest: folder,
 							onProgress: (p) => (progress = p)
 						})
-					: await tauriBackend.extract({
-							opId,
-							archive: choices[0].path,
-							onProgress: (p) => (progress = p)
-						});
+					: await withArchivePassword(choices[0].path, (password) =>
+							tauriBackend.extract({
+								opId,
+								archive: choices[0].path,
+								password,
+								onProgress: (p) => (progress = p)
+							})
+						);
+			if (createdFile === undefined) return;
 			undo.record({
 				kind: 'create',
 				paths: [createdFile],
@@ -2991,8 +3030,8 @@
 			if (arc.vault) touch(arc.file);
 			if (e.kind === 'dir') void store.showArchive(store.activeId, arc.file, innerOf(e.path), arc.items, arc.vault);
 			else
-				(arc.vault ? tauriBackend.vaultOpenItem(arc.file, innerOf(e.path)) : tauriBackend.archiveOpenItem(arc.file, innerOf(e.path)))
-					.then((p) => tauriBackend.openEntry(p))
+				(arc.vault ? tauriBackend.vaultOpenItem(arc.file, innerOf(e.path)) : withArchivePassword(arc.file, (pw) => tauriBackend.archiveOpenItem(arc.file, innerOf(e.path), pw)))
+					.then((p) => (p === undefined ? undefined : tauriBackend.openEntry(p)))
 					.catch((err) => (opError = describeError(err)));
 			return;
 		}
@@ -3797,6 +3836,8 @@
 				return err.changed ? t('La chiave del server è cambiata: Space Train non si collega.') : t('Conferma la chiave del server per collegarti.');
 			case 'serverPassword':
 				return t('Il server chiede la password.');
+			case 'archivePassword':
+				return t('L’archivio è protetto da password.');
 			case 'changed':
 				return t('Il file è cambiato su disco nel frattempo.');
 			default:
@@ -4084,8 +4125,9 @@
 					<button
 						class="primary"
 						onclick={() => {
-							reminder = null;
+							// `p` follows `reminder`: read it before clearing.
 							void openCleanup(p.drive.path);
+							reminder = null;
 						}}>{t('Apri la Pulizia')}</button
 					>
 				</div>
@@ -4337,8 +4379,9 @@
 			onopen={(v) => void openVersion(file, v)}
 			oncompare={(v) => void compareVersion(file, v)}
 			onrestored={() => {
-				versionsOf = null;
+				// `file` follows `versionsOf`: read it before clearing.
 				notify(t('«{0}» ripristinato. La versione di prima resta fra le versioni.', [file.name]));
+				versionsOf = null;
 				void reload();
 			}}
 			onprotect={() => void protectVersions(folderOf(file.path), true)}
@@ -4374,6 +4417,18 @@
 			onadd={(t) => void confirmAdd(t)}
 			oncancel={() => (vaultDialog = null)}
 		/>
+	{/if}
+
+	{#if passwordAsks.length > 0}
+		{#key passwordAsks[0].answer}
+			<VaultDialog
+				mode="unlock"
+				name={nameOf(passwordAsks[0].file)}
+				error={passwordAsks[0].error}
+				onunlock={answerPassword}
+				oncancel={() => answerPassword(null)}
+			/>
+		{/key}
 	{/if}
 
 	{#if vaultToDelete}

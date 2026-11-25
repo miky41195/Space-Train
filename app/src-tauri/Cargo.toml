@@ -26,7 +26,7 @@ tauri-plugin-global-shortcut = "2.3.2"
 trash = "5.2.6"
 notify = "8"
 tauri-plugin-single-instance = "2"
-zip = { version = "2", default-features = false, features = ["deflate"] }
+zip = { version = "2", default-features = false, features = ["deflate", "aes-crypto"] }
 png = "0.18.1"
 base64 = "0.23.1"
 tauri-plugin-updater = "2"

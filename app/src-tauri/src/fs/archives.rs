@@ -127,6 +127,7 @@ fn add(
 /// Returns the path of the created folder.
 pub fn extract(
     archive: &str,
+    password: Option<&str>,
     cancel: &AtomicBool,
     progress: &mut dyn FnMut(u64),
 ) -> Result<String, FsError> {
@@ -142,12 +143,33 @@ pub fn extract(
     let mut z = zip::ZipArchive::new(f).map_err(zip_error)?;
     std::fs::create_dir_all(paths::extended(&arrival)).map_err(|e| from_io(&e))?;
 
+    let outcome = extract_into(&mut z, &arrival, password, cancel, progress);
+    discard_if_locked(&arrival, &outcome);
+    outcome?;
+    Ok(paths::display(&arrival))
+}
+
+/// A refused password leaves no half-made folder behind. `arrival` must have been created by this extraction.
+pub fn discard_if_locked(arrival: &Path, outcome: &Result<(), FsError>) {
+    if *outcome == Err(FsError::ArchivePassword) {
+        let _ = std::fs::remove_dir_all(paths::extended(arrival));
+    }
+}
+
+fn extract_into(
+    z: &mut zip::ZipArchive<std::fs::File>,
+    arrival: &Path,
+    password: Option<&str>,
+    cancel: &AtomicBool,
+    progress: &mut dyn FnMut(u64),
+) -> Result<(), FsError> {
     let mut done = 0u64;
     for i in 0..z.len() {
         if crate::fs::pause::stopped(cancel) {
             break;
         }
-        let mut item = z.by_index(i).map_err(zip_error)?;
+        let mut item = super::archive_formats::zip_entry(z, i, password)?;
+        let locked = item.encrypted();
         // `enclosed_name` rejects names with `..` or absolute ones: without
         // it, a malicious archive could write outside the folder.
         let Some(relative) = item.enclosed_name() else {
@@ -168,7 +190,8 @@ pub fn extract(
             std::fs::File::create(paths::extended(&target)).map_err(|e| from_io(&e))?;
         let mut buf = vec![0u8; 256 * 1024];
         loop {
-            let n = item.read(&mut buf).map_err(|e| from_io(&e))?;
+            // ZipCrypto checks one byte only: a wrong password can also surface here.
+            let n = item.read(&mut buf).map_err(|e| if locked { FsError::ArchivePassword } else { from_io(&e) })?;
             if n == 0 {
                 break;
             }
@@ -177,8 +200,7 @@ pub fn extract(
             progress(done);
         }
     }
-
-    Ok(paths::display(&arrival))
+    Ok(())
 }
 
 #[cfg(test)]
@@ -205,7 +227,7 @@ mod tests {
         .unwrap();
         assert!(zip.ends_with("progetto.zip"));
 
-        let folder = extract(&zip, &no, &mut |_| {}).unwrap();
+        let folder = extract(&zip, None, &no, &mut |_| {}).unwrap();
         // «progetto» already exists: the extraction gets numbered instead of mixing in.
         assert!(folder.ends_with("progetto (2)"));
         let inside = Path::new(&folder).join("progetto");
@@ -225,11 +247,36 @@ mod tests {
     }
 
     #[test]
+    fn an_encrypted_zip_asks_for_the_password_and_opens_with_it() {
+        use zip::unstable::write::FileOptionsExt;
+        let d = tempdir().unwrap();
+        let plain = SimpleFileOptions::default();
+        for (name, options) in [
+            ("aes", plain.with_aes_encryption(zip::AesMode::Aes256, "segreta")),
+            ("legacy", plain.with_deprecated_encryption(b"segreta")),
+        ] {
+            let path = d.path().join(format!("{name}.zip"));
+            let mut w = zip::ZipWriter::new(fs::File::create(&path).unwrap());
+            w.start_file("a.txt", options).unwrap();
+            w.write_all(b"alfa").unwrap();
+            w.finish().unwrap();
+            let arc = path.to_string_lossy().into_owned();
+            let no = AtomicBool::new(false);
+            for wrong in [None, Some("sbagliata")] {
+                assert_eq!(extract(&arc, wrong, &no, &mut |_| {}).unwrap_err(), FsError::ArchivePassword);
+                assert!(!d.path().join(name).exists());
+            }
+            let folder = extract(&arc, Some("segreta"), &no, &mut |_| {}).unwrap();
+            assert_eq!(fs::read_to_string(Path::new(&folder).join("a.txt")).unwrap(), "alfa");
+        }
+    }
+
+    #[test]
     fn a_corrupt_archive_gives_a_readable_error() {
         let d = tempdir().unwrap();
         let f = d.path().join("rotto.zip");
         fs::write(&f, b"non sono uno zip").unwrap();
-        let err = extract(&f.to_string_lossy(), &AtomicBool::new(false), &mut |_| {}).unwrap_err();
+        let err = extract(&f.to_string_lossy(), None, &AtomicBool::new(false), &mut |_| {}).unwrap_err();
         assert!(matches!(err, FsError::Io { .. }));
     }
 }

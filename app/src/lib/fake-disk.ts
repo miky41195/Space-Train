@@ -74,6 +74,8 @@ export class FakeDisk {
 	media = new Map<string, import('./ipc').MediaProps>();
 	/** Archive contents by archive path, for archive_list / archive_extract. */
 	archives = new Map<string, Array<{ path: string; size: number; dir: boolean; modified: number | null }>>();
+	/** Password of the encrypted archives. */
+	archivePasswords = new Map<string, string>();
 	/** Key combinations another program holds (shortcut_free answers false). */
 	takenShortcuts = new Set<string>();
 	/** Images rotated, with the direction. */
@@ -299,8 +301,10 @@ export class FakeDisk {
 				// Like a real digest: lowercase, no prefix.
 				return `${args.algorithm}ff${this.contents.get(args.path as string) ?? ''}`.toLowerCase();
 			case 'archive_list':
+				this.#unlockArchive(args);
 				return this.archives.get(args.archive as string) ?? [];
 			case 'archive_extract': {
+				this.#unlockArchive(args);
 				const items = this.archives.get(args.archive as string) ?? [];
 				const chosen = args.items as string[];
 				const dest = args.dest as string;
@@ -408,6 +412,7 @@ export class FakeDisk {
 				return done;
 			}
 			case 'extract': {
+				this.#unlockArchive(args);
 				const archive = args.archive as string;
 				const folder = this.#free(parent(archive), name(archive).replace(/\.zip$/i, ''));
 				this.nodes.set(folder, node('dir'));
@@ -767,6 +772,11 @@ export class FakeDisk {
 		}
 
 		return { copied, skipped, cancelled: false, pairs };
+	}
+
+	#unlockArchive(args: Record<string, unknown>) {
+		const password = this.archivePasswords.get(args.archive as string);
+		if (password !== undefined && password !== args.password) throw { kind: 'archivePassword' };
 	}
 
 	#free(dest: string, n: string): string {
