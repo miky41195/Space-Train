@@ -34,23 +34,42 @@ fn io(e: impl std::fmt::Display) -> FsError {
     FsError::Io { message: format!("Terminale non disponibile: {}", e) }
 }
 
-/// The shell: PowerShell 7 if installed, else Windows PowerShell; `$SHELL` elsewhere.
-fn shell() -> CommandBuilder {
+/// PowerShell 7 if installed, else Windows PowerShell.
+#[cfg(windows)]
+pub fn powershell() -> &'static str {
+    let found = std::env::var_os("PATH")
+        .map(|p| std::env::split_paths(&p).any(|d| d.join("pwsh.exe").is_file()))
+        .unwrap_or(false);
+    if found { "pwsh.exe" } else { "powershell.exe" }
+}
+
+/// The shell: PowerShell on Windows, `$SHELL` elsewhere. `run` is executed
+/// first; it travels in a variable, so nothing re-reads its quotes.
+fn shell(run: Option<String>) -> CommandBuilder {
     #[cfg(windows)]
-    {
-        let on_path = |exe: &str| {
-            std::env::var_os("PATH")
-                .map(|p| std::env::split_paths(&p).any(|d| d.join(exe).is_file()))
-                .unwrap_or(false)
-        };
-        let mut c = CommandBuilder::new(if on_path("pwsh.exe") { "pwsh.exe" } else { "powershell.exe" });
+    let mut c = {
+        let mut c = CommandBuilder::new(powershell());
         c.arg("-NoLogo");
+        if run.is_some() {
+            c.args(["-NoExit", "-Command", "Write-Host $env:SPACE_TRAIN_ACTION; Invoke-Expression $env:SPACE_TRAIN_ACTION"]);
+        }
         c
-    }
+    };
     #[cfg(not(windows))]
-    {
-        CommandBuilder::new(std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".into()))
+    let mut c = {
+        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".into());
+        if run.is_some() {
+            let mut c = CommandBuilder::new("/bin/sh");
+            c.args(["-c", "printf '%s\\n' \"$SPACE_TRAIN_ACTION\"; eval \"$SPACE_TRAIN_ACTION\"; exec \"$0\"", &shell]);
+            c
+        } else {
+            CommandBuilder::new(shell)
+        }
+    };
+    if let Some(line) = run {
+        c.env("SPACE_TRAIN_ACTION", line);
     }
+    c
 }
 
 /// The longest prefix of `buf` that is whole UTF-8; the rest waits for more bytes.
@@ -67,11 +86,14 @@ pub fn take_text(buf: &mut Vec<u8>) -> String {
     text
 }
 
-pub fn open(cwd: &str, cols: u16, rows: u16, events: Channel<TerminalEvent>) -> Result<u32, FsError> {
+pub fn open(cwd: &str, cols: u16, rows: u16, run: Option<String>, events: Channel<TerminalEvent>) -> Result<u32, FsError> {
     let pty = native_pty_system()
         .openpty(PtySize { rows: rows.max(2), cols: cols.max(10), pixel_width: 0, pixel_height: 0 })
         .map_err(io)?;
-    let mut cmd = shell();
+    if run.as_ref().is_some_and(|r| r.len() > 30_000) {
+        return Err(FsError::Io { message: "Troppi file insieme: il comando diventa troppo lungo.".into() });
+    }
+    let mut cmd = shell(run);
     if std::path::Path::new(cwd).is_dir() {
         cmd.cwd(cwd);
     }

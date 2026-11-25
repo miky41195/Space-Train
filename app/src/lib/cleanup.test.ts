@@ -5,14 +5,14 @@ const DAY = 24 * 60 * 60 * 1000;
 const NOW = 1_000 * DAY;
 
 describe('cleanup', () => {
-	it('never preselects what needs a look, nor projects used this week', () => {
+	it('never preselects what needs a look, nor projects', () => {
 		const items = [
 			{ path: 'a', size: 1, used: NOW - DAY, opened: 0 },
 			{ path: 'b', size: 1, used: NOW - 30 * DAY, opened: 0 }
 		];
-		expect(preselection('review', items, NOW)).toEqual([]);
-		expect(preselection('projects', items, NOW)).toEqual(['b']);
-		expect(preselection('rebuilt', items, NOW)).toEqual(['a', 'b']);
+		expect(preselection('review', items)).toEqual([]);
+		expect(preselection('projects', items)).toEqual([]);
+		expect(preselection('rebuilt', items)).toEqual(['a', 'b']);
 	});
 
 	it('splits the plan: rebuilt for good, to look at into the Trash', () => {
@@ -32,7 +32,7 @@ describe('cleanup', () => {
 
 	it('program leftovers go to the Trash as administrator, never ticked by default', () => {
 		const items = [{ path: 'C:\\Program Files\\Old', size: 50, used: 0, opened: 0 }];
-		expect(preselection('review', items, NOW)).toEqual([]);
+		expect(preselection('review', items)).toEqual([]);
 		const p = plan({ leftovers: items }, { leftovers: ['C:\\Program Files\\Old'] });
 		expect(p.asAdmin).toEqual(['C:\\Program Files\\Old']);
 		expect(p.trash).toEqual([]);

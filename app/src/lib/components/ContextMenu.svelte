@@ -122,7 +122,7 @@
 			<span
 				>{#if v.checked !== undefined}<span class="check" aria-hidden="true"
 						>{#if v.checked}<Icon name="check" />{/if}</span
-					>{/if}{v.label}</span
+					>{/if}{#if v.glyph}<i class="glyph" class:terminal={v.glyph === 'terminal'} aria-hidden="true"></i>{/if}{v.label}</span
 			>
 			{#if v.shortcut}<kbd>{v.shortcut}</kbd>{/if}
 		</button>
@@ -200,6 +200,19 @@
 		vertical-align: -1px;
 		width: 18px;
 		color: var(--current);
+	}
+
+	/* Amber: opens the terminal; cyan: runs in the background. */
+	.glyph {
+		display: inline-block;
+		width: 10px;
+		height: 10px;
+		margin-right: 8px;
+		border: 1.5px solid var(--current);
+		border-radius: 3px;
+	}
+	.glyph.terminal {
+		border-color: var(--signal, #ffb454);
 	}
 
 	.section {

@@ -17,6 +17,7 @@
 	--surface: var(--hull);
 	--surface-glass: var(--hull-glass);
 	--accent: var(--plasma);
+	--on-accent: #fff;
 	--accent-soft: rgba(139, 92, 246, 0.18);
 	--border: rgba(255, 255, 255, 0.08);
 	--text: #e9e6f0;

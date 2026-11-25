@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { t, languageChoice, setLanguage, type LanguageChoice } from '../i18n';
-	import type { VersionsOverview } from '../ipc';
+	import { tauriBackend, type Backend, type VersionsOverview } from '../ipc';
+	import type { ActionsStore } from '../stores/actions.svelte';
+	import ActionsSettings from './ActionsSettings.svelte';
 	import { formatBytes } from '../locations';
 	import type { SettingsStore, FolderSizes } from '../stores/settings.svelte';
 	import { TRAIN_PAUSES, DEFAULT_START_PAGE, LAST_FOLDER_START_PAGE } from '../menu';
@@ -34,7 +36,11 @@
 		ontestshortcut = undefined,
 		versions = null,
 		onversionlimits = undefined,
-		onunprotect = undefined
+		onunprotect = undefined,
+		actions,
+		selection = [],
+		backend = tauriBackend,
+		initialSection = 'general'
 	}: {
 		settings: SettingsStore;
 		/** Hidden items live in the tabs store, not here. */
@@ -61,6 +67,11 @@
 		versions?: VersionsOverview | null;
 		onversionlimits?: (days: number, maxBytes: number) => void;
 		onunprotect?: (folder: string) => void;
+		/** The user's own commands, and the files selected now for their preview. */
+		actions: ActionsStore;
+		selection?: string[];
+		backend?: Backend;
+		initialSection?: SectionId;
 	} = $props();
 
 	const GB = 1024 ** 3;
@@ -121,15 +132,18 @@
 		pending = null;
 	}
 
+	type SectionId = 'general' | 'files' | 'appearance' | 'shortcuts' | 'actions' | 'network' | 'info';
 	const SECTIONS = [
 		{ id: 'general', name: t('Generale') },
 		{ id: 'files', name: t('File e cartelle') },
 		{ id: 'appearance', name: t('Aspetto') },
 		{ id: 'shortcuts', name: t('Scorciatoie') },
+		{ id: 'actions', name: t('Azioni') },
 		{ id: 'network', name: t('Rete e amici') },
 		{ id: 'info', name: t('Informazioni') }
 	] as const;
-	let section = $state<(typeof SECTIONS)[number]['id']>('general');
+	// svelte-ignore state_referenced_locally
+	let section = $state<SectionId>(initialSection);
 
 	const START_PAGES = [
 		{ value: '::pc', name: t('Questo PC') },
@@ -437,6 +451,8 @@
 						</div>
 					</div>
 				{/if}
+			{:else if section === 'actions'}
+				<ActionsSettings {actions} {selection} {backend} shortcuts={settings.shortcuts} all={ACTIONS} />
 			{:else if section === 'network'}
 				<h3>{t('Rete e amici')}</h3>
 				<div class="item">
@@ -769,7 +785,7 @@
 	.button.primary {
 		border-color: var(--accent);
 		background: var(--accent);
-		color: #fff;
+		color: var(--on-accent, #fff);
 	}
 	.keys {
 		display: flex;

@@ -49,7 +49,7 @@
 				.then((items) => {
 					if (!items || mine !== round) return;
 					found[id] = items;
-					chosen[id] = preselection(c.kind, items, Date.now());
+					chosen[id] = preselection(c.kind, items);
 				})
 				.catch(() => {
 					if (mine === round) found[id] = [];
@@ -259,6 +259,9 @@
 			<h2>{t('Liberare {0}?', [formatBytes(toDo.bytes)])}</h2>
 			{#if toDo.permanent.length > 0}
 				<p><b>{toDo.permanent.length}</b> {t('{0} da soli: eliminati per sempre.', [toDo.permanent.length === 1 ? t('elemento si ricrea') : t('elementi si ricreano')])}</p>
+			{/if}
+			{#if (chosen.projects?.length ?? 0) > 0}
+				<p>{t('I progetti scelti andranno installati e compilati di nuovo prima di usarli (npm install, cargo build…): serve internet.')}</p>
 			{/if}
 			{#if toDo.trash.length + toDo.asAdmin.length > 0}
 				{@const n = toDo.trash.length + toDo.asAdmin.length}
@@ -507,7 +510,7 @@
 	.primary {
 		background: var(--accent) !important;
 		border-color: var(--accent) !important;
-		color: #fff !important;
+		color: var(--on-accent, #fff) !important;
 	}
 	.primary:disabled {
 		opacity: 0.45;

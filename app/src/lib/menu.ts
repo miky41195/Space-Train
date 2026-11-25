@@ -9,6 +9,7 @@ import type { AccentId } from './themes';
 import { FOLDER_COLORS, type ColorId } from './stores/colors.svelte';
 import { MEDIA_COLUMNS, type MediaKey } from './media';
 import { categoryFor } from './icons';
+import type { ActionMode, CustomAction } from './stores/actions.svelte';
 
 export type MenuAction =
 	| 'open'
@@ -48,6 +49,9 @@ export type MenuAction =
 	| 'rotateRight'
 	| 'rotateLeft'
 	| 'convertImages'
+	| `action:${string}`
+	| 'moreActions'
+	| 'shelf'
 	| 'extractHere'
 	| 'extractTo'
 	| 'setStartPage'
@@ -115,6 +119,8 @@ export interface MenuItem {
 	/** Separator before this item. */
 	separator?: boolean;
 	danger?: boolean;
+	/** Custom action: runs in the terminal or in the background. */
+	glyph?: ActionMode;
 	/** Check item: present = it can be turned on and off. */
 	checked?: boolean;
 	/** Section title shown above the item, like «Raggruppa per». */
@@ -178,6 +184,8 @@ export interface MenuContext {
 	otherPane?: string | null;
 	/** The menu's folder is protected: every change of its files leaves a version. */
 	protectedFolder?: boolean;
+	/** The user's actions that fit the selection. */
+	actions?: readonly CustomAction[];
 }
 
 function protectItem(on: boolean): MenuItem {
@@ -291,6 +299,20 @@ export function isConvertibleImage(name: string, linux = ON_LINUX): boolean {
 	return isEditableImage(name) || (!linux && WINDOWS_IMAGES.includes(name.split('.').pop()?.toLowerCase() ?? ''));
 }
 
+/** Actions shown straight in the menu; the others go under «Altre azioni». */
+export const MENU_ACTIONS = 4;
+
+export function actionItems(actions: readonly CustomAction[], heading = false): MenuItem[] {
+	return actions.map((a, i) => ({
+		action: `action:${a.id}` as MenuAction,
+		label: a.name,
+		glyph: a.mode,
+		shortcut: a.keys ?? undefined,
+		separator: heading && i === 0,
+		section: heading && i === 0 ? t('Le tue azioni') : undefined
+	}));
+}
+
 function selectionItems({
 	selection,
 	clipboardFull,
@@ -304,7 +326,8 @@ function selectionItems({
 	isStartPage = false,
 	atStartup = false,
 	otherPane = null,
-	protectedFolder = false
+	protectedFolder = false,
+	actions = []
 }: MenuContext): MenuItem[] {
 	const items: MenuItem[] = [];
 	const count = selection.length;
@@ -340,6 +363,9 @@ function selectionItems({
 		if (search) items.push({ action: 'openFileLocation', label: t('Apri percorso file') });
 	}
 
+	items.push(...actionItems(actions.slice(0, MENU_ACTIONS), true));
+	if (actions.length > MENU_ACTIONS) items.push({ action: 'moreActions', label: t('Altre azioni ▸') });
+
 	items.push({ action: 'copy', label: t('Copia'), shortcut: 'Ctrl+C', separator: true });
 	items.push({ action: 'cut', label: t('Taglia'), shortcut: 'Ctrl+X' });
 
@@ -374,6 +400,10 @@ function selectionItems({
 		label: count === 1 ? t('Copia percorso') : t('Copia percorsi'),
 		separator: count > 1 && search
 	});
+
+	if (selection.every((e) => !e.path.startsWith('::'))) {
+		items.push({ action: 'shelf', label: t('Metti sulla mensola'), shortcut: 'Ctrl+Maiusc+M' });
+	}
 
 	if (single) {
 		items.push({ action: 'revealInExplorer', label: t('Mostra in Esplora risorse') });
@@ -486,14 +516,18 @@ function trashItems({ selection }: MenuContext): MenuItem[] {
 	];
 }
 
+function extractLabel(count: number, one: string, all: string, many: string): string {
+	return count === 0 ? all : count === 1 ? one : t(many, [count]);
+}
+const extractToLabel = (count: number) => extractLabel(count, t('Estrai in…'), t('Estrai tutto in…'), 'Estrai {0} elementi in…');
+
 /** Inside an archive opened like a folder: open and extract, nothing that writes into it. A vault also takes files in. */
 function archiveItems({ selection, vault = false, clipboardFull = false }: MenuContext): MenuItem[] {
 	if (vault) return vaultItems(selection, clipboardFull);
 	const items: MenuItem[] = [];
 	if (selection.length === 1) items.push({ action: 'open', label: t('Apri'), shortcut: 'Invio' });
-	const what = selection.length === 0 ? 'tutto' : selection.length === 1 ? '' : t('{0} elementi', [selection.length]);
-	items.push({ action: 'extractHere', label: `Estrai ${what} accanto all’archivio`.replace('  ', ' '), separator: items.length > 0 });
-	items.push({ action: 'extractTo', label: `Estrai ${what} in…`.replace('  ', ' ') });
+	items.push({ action: 'extractHere', label: extractLabel(selection.length, t('Estrai accanto all’archivio'), t('Estrai tutto accanto all’archivio'), 'Estrai {0} elementi accanto all’archivio'), separator: items.length > 0 });
+	items.push({ action: 'extractTo', label: extractToLabel(selection.length) });
 	return items;
 }
 
@@ -526,8 +560,7 @@ function virtualItems({ selection, isStartPage = false }: MenuContext, location:
 function vaultItems(selection: MenuContext['selection'], clipboardFull: boolean): MenuItem[] {
 	const items: MenuItem[] = [];
 	if (selection.length === 1) items.push({ action: 'open', label: t('Apri'), shortcut: 'Invio' });
-	const what = selection.length === 0 ? 'tutto' : selection.length === 1 ? '' : t('{0} elementi', [selection.length]);
-	items.push({ action: 'extractTo', label: `Estrai ${what} in…`.replace('  ', ' '), separator: items.length > 0 });
+	items.push({ action: 'extractTo', label: extractToLabel(selection.length), separator: items.length > 0 });
 	if (clipboardFull) items.push({ action: 'addToVault', label: t('Metti qui i file copiati'), shortcut: 'Ctrl+V' });
 	if (selection.length > 0) {
 		items.push({ action: 'deleteFromVault', label: t('Elimina dalla cassaforte'), shortcut: 'Canc', danger: true, separator: true });

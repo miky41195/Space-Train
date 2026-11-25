@@ -357,7 +357,12 @@ export interface Backend {
 	/** Saves an edited text file with its own line endings; refused with `changed` if it changed on disk, unless `force`. Returns the new modified time. */
 	textWrite(path: string, file: Omit<TextFile, 'modified'>, expected: number, force: boolean): Promise<number>;
 	/** Starts a shell in `cwd` for the integrated terminal; returns its id. */
-	terminalOpen(cwd: string, cols: number, rows: number, onEvent: (e: TerminalEvent) => void): Promise<number>;
+	/** `run`: a command executed first, in the shell that stays open. */
+	terminalOpen(cwd: string, cols: number, rows: number, run: string | null, onEvent: (e: TerminalEvent) => void): Promise<number>;
+	/** What a custom action would run on these files. */
+	actionLines(template: string, paths: string[]): Promise<string[]>;
+	/** Runs a custom action with no window. */
+	actionRun(template: string, paths: string[], cwd: string): Promise<{ total: number; failed: number; detail: string }>;
 	terminalWrite(id: number, data: string): Promise<void>;
 	terminalResize(id: number, cols: number, rows: number): Promise<void>;
 	terminalClose(id: number): Promise<void>;
@@ -592,7 +597,9 @@ export const tauriBackend: Backend = {
 	cleanupRecycleLeftovers: (paths) => invoke('cleanup_recycle_leftovers', { paths }),
 	textRead: (path) => invoke('text_read', { path }),
 	textWrite: (path, f, expected, force) => invoke('text_write', { path, text: f.text, crlf: f.crlf, bom: f.bom, expected, force }),
-	terminalOpen: (cwd, cols, rows, onEvent) => invoke('terminal_open', { cwd, cols, rows, events: channel(onEvent) }),
+	terminalOpen: (cwd, cols, rows, run, onEvent) => invoke('terminal_open', { cwd, cols, rows, run, events: channel(onEvent) }),
+	actionLines: (template, paths) => invoke('action_lines', { template, paths }),
+	actionRun: (template, paths, cwd) => invoke('action_run', { template, paths, cwd }),
 	terminalWrite: (id, data) => invoke('terminal_write', { id, data }),
 	terminalResize: (id, cols, rows) => invoke('terminal_resize', { id, cols, rows }),
 	terminalClose: (id) => invoke('terminal_close', { id }),

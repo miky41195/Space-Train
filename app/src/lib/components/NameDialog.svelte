@@ -141,7 +141,7 @@
 	.primary {
 		border-color: transparent;
 		background: var(--accent);
-		color: #fff;
+		color: var(--on-accent, #fff);
 	}
 	.primary:hover:not(:disabled) {
 		background: var(--accent);

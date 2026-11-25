@@ -169,7 +169,7 @@
 		clip-path: var(--shape-sm, none);
 		mask: var(--mask-sm, none);
 		background: var(--accent);
-		color: #fff;
+		color: var(--on-accent, #fff);
 		font: inherit;
 		cursor: default;
 	}

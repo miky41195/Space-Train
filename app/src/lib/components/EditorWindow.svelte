@@ -11,7 +11,7 @@
 
 	const settings = new SettingsStore();
 	const currentTheme = themeById(settings.theme, settings.personalThemes);
-	applyTheme(currentTheme, accentColor(currentTheme, settings.accent, settings.accentColor));
+	applyTheme(settings.withAccentText(currentTheme), accentColor(currentTheme, settings.accent, settings.accentColor));
 
 	function send(m: EditorMessage): Promise<void> {
 		return emitTo(from, EDITOR_EVENT, m).catch(() => {});
@@ -25,7 +25,7 @@
 
 <ThemeEditor
 	inWindow
-	{currentTheme}
+	currentTheme={settings.withAccentText(currentTheme)}
 	personal={settings.personalThemes}
 	backend={tauriBackend}
 	onpreview={(t: PersonalTheme) => {

@@ -1,14 +1,18 @@
 <script lang="ts">
 	import { t } from '../i18n';
-	import { ACCENTS, CATEGORIES, THEMES, THEME_ACCENT, CUSTOM_ACCENT, categoryOf, type AccentId, type CategoryId, type Theme } from '../themes';
+	import { ACCENTS, CATEGORIES, THEMES, THEME_ACCENT, CUSTOM_ACCENT, categoryOf, type AccentId, type AccentText, type CategoryId, type Theme } from '../themes';
 	import type { MenuAction } from '../menu';
 	import Icon from './Icon.svelte';
+	import AccentTextChoice from './AccentTextChoice.svelte';
 
 	let {
 		theme,
 		personal = [],
 		accent,
 		accentColor,
+		accentValue,
+		accentText = 'auto',
+		onaccenttext,
 		x,
 		y,
 		onpick,
@@ -20,6 +24,11 @@
 		accent: AccentId;
 		/** The colour chosen for the custom accent. */
 		accentColor: string;
+		/** The accent in use, as a colour. */
+		accentValue: string;
+		/** Text over the accent, for the theme in use. */
+		accentText?: AccentText;
+		onaccenttext: (choice: AccentText) => void;
 		/** Right edge and top edge, in pixels: the gallery opens under the button. */
 		x: number;
 		y: number;
@@ -117,6 +126,7 @@
 				></button>
 			{/each}
 		</div>
+		<AccentTextChoice accent={accentValue} value={accentText} onchange={onaccenttext} />
 		<button class="create" onclick={() => onpick('themeEditor')}>{t('Crea o modifica un tema…')}</button>
 	</div>
 </div>

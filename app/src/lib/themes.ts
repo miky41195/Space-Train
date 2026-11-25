@@ -86,6 +86,9 @@ function pick<T extends string>(value: unknown, allowed: readonly { value: T }[]
 	return allowed.some((a) => a.value === value) ? (value as T) : base;
 }
 
+/** Text over the accent: chosen by contrast, fixed, or a colour of the user's (`#rrggbb`). */
+export type AccentText = 'auto' | 'light' | 'dark' | `#${string}`;
+
 export interface Theme {
 	id: string;
 	name: string;
@@ -104,6 +107,8 @@ export interface Theme {
 	pattern?: string;
 	/** Startup and folder-opening animations. Missing = the train, no folder animation. */
 	animations?: Partial<Animations>;
+	/** Text over the accent colour. Missing = automatic. */
+	accentText?: AccentText;
 }
 
 /** The categories of the theme gallery, in the order they appear. */
@@ -441,6 +446,38 @@ export function accentColor(theme: Theme, accent: AccentId, custom: string): str
 	return ACCENTS.find((a) => a.id === accent)?.color ?? theme.variables['--plasma'];
 }
 
+const LIGHT_TEXT = '#ffffff';
+const DARK_TEXT = '#0c0a13';
+
+/** A saved or typed choice, `undefined` when it is not one. */
+export function accentTextFrom(v: unknown): AccentText | undefined {
+	return v === 'auto' || v === 'light' || v === 'dark' || (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v))
+		? (v as AccentText)
+		: undefined;
+}
+
+function luminance(hex: string): number {
+	const [r, g, b] = [1, 3, 5].map((i) => {
+		const v = parseInt(hex.slice(i, i + 2), 16) / 255;
+		return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+	});
+	return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** WCAG contrast between two `#rrggbb` colours, 1…21. */
+export function contrast(a: string, b: string): number {
+	const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p);
+	return (x + 0.05) / (y + 0.05);
+}
+
+/** The text colour over `accent` for the user's choice. */
+export function textOnAccent(accent: string, choice: AccentText = 'auto'): string {
+	if (choice === 'light') return LIGHT_TEXT;
+	if (choice === 'dark') return DARK_TEXT;
+	if (choice !== 'auto') return choice;
+	return contrast(accent, DARK_TEXT) > contrast(accent, LIGHT_TEXT) ? DARK_TEXT : LIGHT_TEXT;
+}
+
 /** Every variable to write on the root for the chosen theme and accent. */
 export function variablesFor(theme: Theme, accent: string): Record<string, string> {
 	const shapes = { ...BASE_SHAPES, ...theme.shapes };
@@ -451,6 +488,7 @@ export function variablesFor(theme: Theme, accent: string): Record<string, strin
 		'--folder': theme.variables['--plasma'] ?? accent,
 		'--plasma': accent,
 		'--accent': accent,
+		'--on-accent': textOnAccent(accent, theme.accentText),
 		// On a light background the selection tint must be stronger to stand
 		// out from the white.
 		'--accent-soft': withAlpha(accent, theme.light ? 0.18 : 0.26),
@@ -654,6 +692,8 @@ export function themeFromStored(stored: unknown): PersonalTheme | null {
 	if (isDict(stored.forme)) theme.shapes = shapesFromStored(stored.forme);
 	if (Array.isArray(stored.corteo)) theme.parade = stored.corteo.filter((c): c is string => typeof c === 'string');
 	if (typeof stored.motivo === 'string') theme.pattern = stored.motivo;
+	const accentText = accentTextFrom(stored.accentText);
+	if (accentText) theme.accentText = accentText;
 	if (isDict(stored.animazioni)) theme.animations = animationsFromStored(stored.animazioni);
 	return theme;
 }
@@ -670,6 +710,7 @@ export function themeToStored(theme: PersonalTheme): Dict {
 	if (theme.shapes) out.forme = shapesToStored(theme.shapes);
 	if (theme.parade) out.corteo = theme.parade;
 	if (theme.pattern !== undefined) out.motivo = theme.pattern;
+	if (theme.accentText) out.accentText = theme.accentText;
 	if (theme.animations) out.animazioni = animationsToStored(theme.animations);
 	return out;
 }

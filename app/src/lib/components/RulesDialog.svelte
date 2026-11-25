@@ -442,7 +442,7 @@
 	.actions .primary {
 		border-color: transparent;
 		background: var(--accent);
-		color: #fff;
+		color: var(--on-accent, #fff);
 	}
 	button:focus-visible,
 	select:focus-visible,

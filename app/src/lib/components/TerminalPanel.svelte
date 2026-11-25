@@ -8,6 +8,7 @@
 	let {
 		cwd,
 		folder,
+		run = null,
 		onclose,
 		backend = tauriBackend
 	}: {
@@ -15,6 +16,8 @@
 		cwd: string;
 		/** The folder open now: «Vai qui» takes the shell there. */
 		folder: string | null;
+		/** A command executed first. */
+		run?: string | null;
 		onclose: () => void;
 		backend?: Backend;
 	} = $props();
@@ -61,7 +64,7 @@
 			term.open(host);
 			fit.fit();
 			try {
-				id = await backend.terminalOpen(cwd, term.cols, term.rows, (e) => {
+				id = await backend.terminalOpen(cwd, term.cols, term.rows, run, (e) => {
 					if (e.kind === 'data') term.write(e.text);
 					else ended = true;
 				});

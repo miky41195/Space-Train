@@ -182,9 +182,10 @@ pub fn terminal_open(
     cwd: String,
     cols: u16,
     rows: u16,
+    run: Option<String>,
     events: tauri::ipc::Channel<crate::terminal::TerminalEvent>,
 ) -> Result<u32, FsError> {
-    crate::terminal::open(&cwd, cols, rows, events)
+    crate::terminal::open(&cwd, cols, rows, run, events)
 }
 
 #[tauri::command]

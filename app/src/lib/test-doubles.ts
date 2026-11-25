@@ -36,6 +36,12 @@ export function fakeBackend(over: Partial<Backend> = {}): Backend {
 		async textWrite() {
 			return 0;
 		},
+		async actionLines() {
+			return [];
+		},
+		async actionRun() {
+			return { total: 1, failed: 0, detail: '' };
+		},
 		async terminalOpen() {
 			return 1;
 		},

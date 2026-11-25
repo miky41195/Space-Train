@@ -427,7 +427,7 @@
 	button.primary {
 		border-color: var(--accent);
 		background: var(--accent);
-		color: #fff;
+		color: var(--on-accent, #fff);
 	}
 	button.primary:hover:not(:disabled) {
 		background: var(--accent);

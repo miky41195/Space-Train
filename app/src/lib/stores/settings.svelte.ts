@@ -1,6 +1,6 @@
 import type { SortSpec } from '../ipc';
 import { STORED_GROUP_MODES, type GroupMode } from '../grouping';
-import { themeFromStored, themeToStored, type AccentId, type PersonalTheme } from '../themes';
+import { accentTextFrom, themeFromStored, themeToStored, type AccentId, type AccentText, type PersonalTheme, type Theme } from '../themes';
 import { clampSide, STORED_VIEW_NAMES, type View } from '../view';
 import type { KeyValueStore } from './favorites.svelte';
 import { onChangeOf } from './sync';
@@ -50,6 +50,8 @@ interface Values {
 	trainPause: number;
 	/** The colour picked with the picker when the accent is «personalizzato». */
 	accentColor: string;
+	/** Text over the accent, by built-in theme; personal themes carry their own. */
+	accentTexts: Record<string, AccentText>;
 	/** The themes made with the editor. */
 	personalThemes: PersonalTheme[];
 	/**
@@ -97,6 +99,7 @@ const DEFAULTS: Values = {
 	introAnimation: false,
 	trainPause: 30,
 	accentColor: '#8b5cf6',
+	accentTexts: {},
 	personalThemes: [],
 	startPage: SYSTEM_ROOT,
 	session: false,
@@ -131,6 +134,7 @@ const STORED_KEYS: Record<Exclude<keyof Values, 'columns'>, string> & { columns:
 	introAnimation: 'animazioneAvvio',
 	trainPause: 'pausaTreno',
 	accentColor: 'coloreAccento',
+	accentTexts: 'accentTexts',
 	personalThemes: 'temiPersonali',
 	startPage: 'paginaIniziale',
 	session: 'sessione',
@@ -180,6 +184,7 @@ export class SettingsStore {
 	introAnimation = $state(DEFAULTS.introAnimation);
 	trainPause = $state(DEFAULTS.trainPause);
 	accentColor = $state(DEFAULTS.accentColor);
+	accentTexts = $state<Record<string, AccentText>>({});
 	personalThemes = $state<PersonalTheme[]>([]);
 	startPage = $state(DEFAULTS.startPage);
 	session = $state(DEFAULTS.session);
@@ -239,6 +244,15 @@ export class SettingsStore {
 			const pause = v('trainPause');
 			if (typeof pause === 'number' && pause >= -1) this.trainPause = pause;
 			if (typeof v('accentColor') === 'string') this.accentColor = v('accentColor') as string;
+			const texts = v('accentTexts');
+			if (texts && typeof texts === 'object') {
+				this.accentTexts = Object.fromEntries(
+					Object.entries(texts).flatMap(([id, x]) => {
+						const choice = accentTextFrom(x);
+						return choice ? [[id, choice]] : [];
+					})
+				);
+			}
 			const themes = v('personalThemes');
 			if (Array.isArray(themes)) this.personalThemes = themes.map(themeFromStored).filter((t): t is PersonalTheme => t !== null);
 			const start = v('startPage');
@@ -282,6 +296,17 @@ export class SettingsStore {
 		this.#save();
 	}
 
+	/** The theme with its text-over-accent choice. */
+	withAccentText<T extends Theme>(theme: T): T {
+		return theme.group === 'personal' ? theme : { ...theme, accentText: this.accentTexts[theme.id] };
+	}
+
+	/** Remembers the text over the accent for `theme` alone. */
+	setAccentText(theme: Theme, choice: AccentText): void {
+		if (theme.group === 'personal') this.saveTheme({ ...(theme as PersonalTheme), accentText: choice });
+		else this.set('accentTexts', { ...this.accentTexts, [theme.id]: choice });
+	}
+
 	deleteTheme(id: string): void {
 		this.personalThemes = this.personalThemes.filter((t) => t.id !== id);
 		if (this.theme === id) this.theme = 'spazio';
@@ -320,6 +345,7 @@ export class SettingsStore {
 			introAnimation: this.introAnimation,
 			trainPause: this.trainPause,
 			accentColor: this.accentColor,
+			accentTexts: this.accentTexts,
 			personalThemes: this.personalThemes,
 			startPage: this.startPage,
 			session: this.session,
@@ -345,6 +371,8 @@ export class SettingsStore {
 		stored[STORED_KEYS.grouping] = STORED_GROUP_MODES[values.grouping];
 		stored[STORED_KEYS.personalThemes] = values.personalThemes.map(themeToStored);
 		stored[STORED_KEYS.folderSizes] = STORED_FOLDER_SIZES[values.folderSizes];
+		// Never chosen: nothing to write, as before the choice existed.
+		if (Object.keys(values.accentTexts).length === 0) delete stored[STORED_KEYS.accentTexts];
 		stored[STORED_KEYS.shortcuts] = customToStored(values.shortcuts);
 		try {
 			this.storage?.setItem(KEY, JSON.stringify(stored));

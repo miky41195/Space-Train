@@ -14,6 +14,7 @@
 		FOLDER_STYLES,
 		folderStyleOf,
 		variablesFrom,
+		type AccentText,
 		themeById,
 		type Theme,
 		type PersonalTheme,
@@ -63,6 +64,7 @@
 	import { backgroundColor, pixelColor, fromHex, toHex, removeBackground } from '../transparency';
 	import { readPixels, writePng } from '../pixel';
 	import Icon from './Icon.svelte';
+	import AccentTextChoice from './AccentTextChoice.svelte';
 
 	let {
 		inWindow = false,
@@ -134,6 +136,7 @@
 	/** How each image moves on the rail, in the same order as `images`. */
 	let motions = $state<Motion[]>([]);
 	let pattern = $state('');
+	let accentText = $state<AccentText>('auto');
 	let animations = $state<Animations>(animationsOf(undefined));
 	let loading = $state(false);
 	let error = $state<string | null>(null);
@@ -180,6 +183,7 @@
 		paradeKind = images.length > 0 ? 'images' : figures.length > 0 ? 'figures' : 'train';
 		pattern = t.pattern ?? '';
 		animations = animationsOf(t.animations);
+		accentText = t.accentText ?? 'auto';
 	}
 
 	/** Changes an image's motion; picking a kind starts again from its values. */
@@ -226,7 +230,8 @@
 					? figures
 					: images.map((v, i) => withMotion(v, motions[i] ?? WALK)),
 		pattern: pattern || undefined,
-		animations: { ...animations, figure: animations.figure || undefined }
+		animations: { ...animations, figure: animations.figure || undefined },
+		accentText
 	});
 
 	/** The startup figure: the theme's own images first, then the built-in figures. */
@@ -488,6 +493,7 @@
 						</div>
 					{/each}
 				</div>
+				<AccentTextChoice accent={palette.plasma} value={accentText} onchange={(c) => (accentText = c)} />
 			</section>
 
 			<section>
@@ -1375,7 +1381,7 @@
 	.primary {
 		border-color: var(--accent);
 		background: var(--accent);
-		color: #fff;
+		color: var(--on-accent, #fff);
 	}
 	.primary:hover {
 		background: var(--accent);

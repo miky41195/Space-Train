@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import { t } from '../i18n';
 	import { getCurrentWindow } from '@tauri-apps/api/window';
 	import type { TabsStore } from '../stores/tabs.svelte';
@@ -11,7 +12,8 @@
 		onwhatsnew = undefined,
 		onsettings = undefined,
 		area = null,
-		onareas = undefined
+		onareas = undefined,
+		cargo = undefined
 	}: {
 		store: TabsStore;
 		/** Folder a drag is passing over. */
@@ -23,6 +25,8 @@
 		area?: string | null;
 		/** Opens the workspace menu under the button. */
 		onareas?: (e: MouseEvent) => void;
+		/** Parked on the rail before the window tools: the shelf. */
+		cargo?: Snippet;
 	} = $props();
 
 	const win = getCurrentWindow();
@@ -98,6 +102,8 @@
 			aria-label={t('Nuova scheda')}><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.5" /></svg></button
 		>
 	</div>
+
+	{@render cargo?.()}
 
 	{#if onwhatsnew || onsettings}
 		<!-- Window tools, before the lamps and set apart by a wire:

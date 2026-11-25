@@ -34,13 +34,10 @@ export const KIND_LABELS: Record<CleanupKind, string> = {
 };
 
 const DAY = 24 * 60 * 60 * 1000;
-/** A build folder used in the last week is still being worked on. */
-const IN_USE = 7 * DAY;
 
-/** What starts ticked: never what needs a look, never a project touched this week. */
-export function preselection(kind: CleanupKind, items: CleanupCandidate[], now: number): string[] {
-	if (kind === 'review') return [];
-	if (kind === 'projects') return items.filter((v) => now - v.used > IN_USE).map((v) => v.path);
+/** What starts ticked: never what needs a look, never projects: they must be installed or built again. */
+export function preselection(kind: CleanupKind, items: CleanupCandidate[]): string[] {
+	if (kind === 'review' || kind === 'projects') return [];
 	return items.map((v) => v.path);
 }
 

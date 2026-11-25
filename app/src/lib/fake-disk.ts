@@ -74,6 +74,9 @@ export class FakeDisk {
 	media = new Map<string, import('./ipc').MediaProps>();
 	/** Archive contents by archive path, for archive_list / archive_extract. */
 	archives = new Map<string, Array<{ path: string; size: number; dir: boolean; modified: number | null }>>();
+	/** Background actions run, and whether they fail. */
+	actionsRun: Array<{ template: string; paths: string[] }> = [];
+	actionFails = false;
 	/** Password of the encrypted archives. */
 	archivePasswords = new Map<string, string>();
 	/** Key combinations another program holds (shortcut_free answers false). */
@@ -300,6 +303,11 @@ export class FakeDisk {
 			case 'file_checksum':
 				// Like a real digest: lowercase, no prefix.
 				return `${args.algorithm}ff${this.contents.get(args.path as string) ?? ''}`.toLowerCase();
+			case 'action_lines':
+				return (args.paths as string[]).map((p) => (args.template as string).replace('{file}', `'${p}'`));
+			case 'action_run':
+				this.actionsRun.push({ template: args.template as string, paths: args.paths as string[] });
+				return { total: 1, failed: this.actionFails ? 1 : 0, detail: this.actionFails ? 'boom' : '' };
 			case 'archive_list':
 				this.#unlockArchive(args);
 				return this.archives.get(args.archive as string) ?? [];

@@ -43,6 +43,9 @@
 	import { WorkspacesStore, type Snapshot } from '$lib/stores/workspaces.svelte';
 	import { MediaStore } from '$lib/stores/media.svelte';
 	import { RulesStore } from '$lib/stores/rules.svelte';
+	import { ActionsStore, type CustomAction } from '$lib/stores/actions.svelte';
+	import { ShelfStore } from '$lib/stores/shelf.svelte';
+	import Wagon from '$lib/components/Wagon.svelte';
 	import RulesDialog from '$lib/components/RulesDialog.svelte';
 	import DiskCleanup from '$lib/components/DiskCleanup.svelte';
 	import FileCompare from '$lib/components/FileCompare.svelte';
@@ -94,7 +97,7 @@
 	import { animateFolder, animationsOf } from '$lib/animations';
 	import { appearanceOf } from '$lib/appearance';
 	import { readMotion } from '$lib/motion';
-	import {
+	import { actionItems, MENU_ACTIONS,
 		menuItems,
 		viewItems,
 		workspaceItems,
@@ -118,7 +121,7 @@
 	import ThemeEditor from '$lib/components/ThemeEditor.svelte';
 	import { EDITOR_EVENT, type EditorMessage } from '$lib/editor-window';
 	import { FOLDER_COLORS, ColorsStore, type ColorId } from '$lib/stores/colors.svelte';
-	import { actionWithCustom, keysOf } from '$lib/custom-shortcuts';
+	import { combination, actionWithCustom, keysOf } from '$lib/custom-shortcuts';
 	import {
 		TRASH,
 		THIS_PC,
@@ -166,6 +169,8 @@
 	let rulesOf = $state<string | null>(null);
 	const quickAccess = new QuickAccessStore();
 	const searches = new SearchesStore();
+	const actions = new ActionsStore();
+	const shelf = new ShelfStore();
 
 	/**
 	 * Which window this is. «main» is the one opened at startup; the
@@ -257,7 +262,7 @@
 			applyTheme(themePreview, themePreview.variables['--plasma']);
 			return;
 		}
-		applyTheme(activeTheme, accentColor(activeTheme, settings.accent, settings.accentColor));
+		applyTheme(settings.withAccentText(activeTheme), accentColor(activeTheme, settings.accent, settings.accentColor));
 	});
 
 	/** The colour the user gave a folder, if they gave it one. */
@@ -342,6 +347,7 @@
 			out.push({ kind: 'action', name: t('Trova duplicati qui'), detail: locationName(here), run: () => store.activeId !== null && void store.findDuplicates(store.activeId, store.showHidden) });
 			out.push({ kind: 'action', name: t('Confronta con un’altra cartella'), run: () => void compareWith(here) });
 		}
+		for (const a of fittingActions()) out.push({ kind: 'action', name: a.name, detail: t('Azioni'), keys: a.keys ?? undefined, run: () => void runCustomAction(a) });
 		const drive = here && /^[a-z]:\\/i.test(here) ? here.slice(0, 3) : SYSTEM_ROOT;
 		out.push({ kind: 'action', name: t('Pulizia disco'), detail: drive, run: () => void openCleanup(drive) });
 		out.push({ kind: 'action', name: t('Impostazioni'), run: () => (settingsOpen = true) });
@@ -1033,6 +1039,55 @@
 		else terminalAt = at ?? (store.activeTab && location === 'normal' ? store.activeTab.path : '');
 	}
 
+	// ── Custom actions ───────────────────────────────────────────────
+	/** Terminals opened by actions, under the list; each keeps its own shell. */
+	let actionTerminals = $state<Array<{ key: number; cwd: string; run: string }>>([]);
+	let nextTerminal = 1;
+
+	/** Real files only: what lives on another PC, a server or in an archive cannot be given to a program. */
+	function actionPaths(): string[] {
+		return location === 'normal' ? selectedEntries().map((e) => e.path).filter((p) => !p.startsWith('::')) : [];
+	}
+
+	function fittingActions(): CustomAction[] {
+		return location === 'normal' ? actions.fitting(selectedEntries()) : [];
+	}
+
+	async function runCustomAction(a: CustomAction) {
+		const paths = actionPaths();
+		const cwd = paths.length > 0 ? folderOf(paths[0]) : (store.activeTab?.path ?? '');
+		opError = null;
+		try {
+			if (a.mode === 'terminal') {
+				const run = (await tauriBackend.actionLines(a.command, paths)).join('; ');
+				actionTerminals = [...actionTerminals, { key: nextTerminal++, cwd, run }];
+				return;
+			}
+			notify(t('«{0}» è partita.', [a.name]));
+			const r = await tauriBackend.actionRun(a.command, paths, cwd);
+			if (r.failed === 0) notify(t('«{0}»: fatto.', [a.name]));
+			else opError = t('«{0}»: {1} di {2} non riusciti. {3}', [a.name, r.failed, r.total, r.detail]);
+			await reload();
+		} catch (e) {
+			opError = describeError(e);
+		}
+	}
+
+	// ── Shelf ────────────────────────────────────────────────────────
+	function putOnShelf(paths: string[]) {
+		const real = paths.filter((p) => !p.startsWith('::'));
+		if (real.length === 0) return;
+		const added = shelf.add(real);
+		notify(added === 1 ? t('1 elemento sulla mensola.') : t('{0} elementi sulla mensola.', [added]));
+	}
+
+	/** Copies or moves the shelf here; moved items leave it. */
+	async function unloadShelf(paths: string[], mode: 'copy' | 'move') {
+		const dest = store.activeTab?.path;
+		if (!dest || !writable) return;
+		await runTransfer(paths, dest, mode, true);
+	}
+
 	async function openCleanup(drive: string) {
 		const id = store.activeId;
 		if (id === null) return;
@@ -1517,10 +1572,15 @@
 		if (!arc) return;
 		const choices = selectedEntries();
 		const items = choices.length > 0 ? choices.map((e) => innerOf(e.path)) : (store.activeTab?.results ?? []).map((e) => innerOf(e.path));
-		return enqueue(t('Estrai da «{0}» → {1}', [nameOf(arc.file), locationName(dest)]), () => extractFromArchiveNow(arc.file, items, dest));
+		const title = t('Estrai da «{0}» → {1}', [nameOf(arc.file), locationName(dest)]);
+		// Asked outside the job: the queue goes on while the user types.
+		return withArchivePassword(arc.file, async (password) => {
+			const refused = await enqueue(title, () => extractFromArchiveNow(arc.file, items, dest, password));
+			if (refused) throw refused;
+		});
 	}
 
-	async function extractFromArchiveNow(file: string, items: string[], dest: string) {
+	async function extractFromArchiveNow(file: string, items: string[], dest: string, password: string | null): Promise<FsError | undefined> {
 		const opId = nextOpId++;
 		runningMode = 'extract';
 		runningOp = opId;
@@ -1530,17 +1590,12 @@
 			if (store.activeTab?.archive?.vault && store.activeTab.archive.file === file) {
 				await tauriBackend.vaultExtract(file, items, dest);
 				touch(file);
-			} else {
-				const done = await withArchivePassword(file, async (password) => {
-					await tauriBackend.archiveExtract({ opId, archive: file, items, dest, password, onProgress: (p) => (progress = p) });
-					return true;
-				});
-				if (!done) return;
-			}
+			} else await tauriBackend.archiveExtract({ opId, archive: file, items, dest, password, onProgress: (p) => (progress = p) });
 			notify(t('Estratto in {0}.', [dest]));
 			void store.refreshFolder(dest);
 			drivesRefresh++;
 		} catch (err) {
+			if ((err as FsError)?.kind === 'archivePassword') return err as FsError;
 			opError = describeError(err);
 		} finally {
 			runningOp = null;
@@ -1624,6 +1679,7 @@
 			if (origin === now) continue;
 			if (tabPath) favorites.rename(tabPath, nameOf(origin), nameOf(now));
 			colors.move(origin, now);
+			shelf.move(origin, now);
 			quickAccess.move(origin, now);
 		}
 		undo.record({ kind: 'batchRename', steps });
@@ -1640,6 +1696,7 @@
 			const created = await tauriBackend.renameEntry(item.path, newName);
 			if (store.activeTab) favorites.rename(store.activeTab.path, item.name, newName);
 			colors.move(item.path, created);
+			shelf.move(item.path, created);
 			quickAccess.move(item.path, created);
 			undo.record({ kind: 'rename', from: item.path, to: created });
 			if (store.activeId !== null) {
@@ -1926,7 +1983,8 @@
 		return paths.length === 1 ? t('«{0}»', [nameOf(paths[0])]) : t('{0} elementi', [paths.length]);
 	}
 	/** Transfer waiting for the user to resolve the name conflicts. */
-	let pendingConflicts = $state<{ sources: string[]; dest: string; mode: 'copy' | 'move' } | null>(null);
+	type TransferOp = { sources: string[]; dest: string; mode: 'copy' | 'move'; fromShelf?: boolean };
+	let pendingConflicts = $state<TransferOp | null>(null);
 	let conflicts = $state<string[]>([]);
 
 	let nextOpId = 1;
@@ -2039,7 +2097,7 @@
 	 * only if there are any it stops to ask. Without collisions no dialog
 	 * appears and the operation starts right away.
 	 */
-	async function runTransfer(sources: string[], dest: string, mode: 'copy' | 'move') {
+	async function runTransfer(sources: string[], dest: string, mode: 'copy' | 'move', fromShelf = false) {
 		// From another PC or a server it is always a copy, and taken names are
 		// numbered by themselves; into a server it passes through this PC.
 		if (sources.length > 0 && isLan(sources[0])) {
@@ -2049,11 +2107,11 @@
 		try {
 			const found = await tauriBackend.scanConflicts(sources, dest);
 			if (found.length > 0) {
-				pendingConflicts = { sources, dest, mode };
+				pendingConflicts = { sources, dest, mode, fromShelf };
 				conflicts = found;
 				return;
 			}
-			await run('rename', { sources, dest, mode });
+			await run('rename', { sources, dest, mode, fromShelf });
 		} catch (e) {
 			opError = describeError(e);
 		}
@@ -2061,7 +2119,7 @@
 
 	function run(
 		policy: ConflictPolicy,
-		op: { sources: string[]; dest: string; mode: 'copy' | 'move' } | null = pendingConflicts
+		op: TransferOp | null = pendingConflicts
 	) {
 		conflicts = [];
 		pendingConflicts = null;
@@ -2070,7 +2128,7 @@
 		return enqueue(title, () => runNow(policy, op));
 	}
 
-	async function runNow(policy: ConflictPolicy, op: { sources: string[]; dest: string; mode: 'copy' | 'move' }) {
+	async function runNow(policy: ConflictPolicy, op: TransferOp) {
 		if (store.activeId === null) return;
 
 		const { sources, dest, mode } = op;
@@ -2095,6 +2153,8 @@
 				for (const [from, a] of outcome.pairs) {
 					colors.move(from, a);
 					quickAccess.move(from, a);
+					if (op.fromShelf) shelf.remove(from);
+					else shelf.move(from, a);
 				}
 			}
 			else
@@ -2339,7 +2399,11 @@
 		const choices = selectedEntries();
 		if (!tab || choices.length === 0) return;
 		const title = kind === 'compress' ? t('Comprimi {0}', [count(choices.map((e) => e.path))]) : t('Estrai «{0}»', [choices[0].name]);
-		return enqueue(title, () => archiveNow(kind, tab.path, choices));
+		if (kind === 'compress') return enqueue(title, () => archiveNow(kind, tab.path, choices, null));
+		return withArchivePassword(choices[0].path, async (password) => {
+			const refused = await enqueue(title, () => archiveNow(kind, tab.path, choices, password));
+			if (refused) throw refused;
+		});
 	}
 
 	async function rotateImages(clockwise: boolean) {
@@ -2387,7 +2451,7 @@
 		});
 	}
 
-	async function archiveNow(kind: 'compress' | 'extract', folder: string, choices: Entry[]) {
+	async function archiveNow(kind: 'compress' | 'extract', folder: string, choices: Entry[], password: string | null): Promise<FsError | undefined> {
 		const opId = nextOpId++;
 		runningMode = kind;
 		runningOp = opId;
@@ -2402,15 +2466,12 @@
 							dest: folder,
 							onProgress: (p) => (progress = p)
 						})
-					: await withArchivePassword(choices[0].path, (password) =>
-							tauriBackend.extract({
-								opId,
-								archive: choices[0].path,
-								password,
-								onProgress: (p) => (progress = p)
-							})
-						);
-			if (createdFile === undefined) return;
+					: await tauriBackend.extract({
+							opId,
+							archive: choices[0].path,
+							password,
+							onProgress: (p) => (progress = p)
+						});
 			undo.record({
 				kind: 'create',
 				paths: [createdFile],
@@ -2422,6 +2483,7 @@
 			}
 			drivesRefresh++;
 		} catch (e) {
+			if ((e as FsError)?.kind === 'archivePassword') return e as FsError;
 			opError = describeError(e);
 		} finally {
 			runningOp = null;
@@ -2433,6 +2495,10 @@
 
 	/** Folder under the pointer during a drag. */
 	let dropTarget = $state<string | null>(null);
+	/** Files are being dragged over the window: the wagon shows where to drop them. */
+	let filesDragged = $state(false);
+	/** The wagon as a drop target. */
+	const SHELF = '::shelf';
 
 	/**
 	 * The dragged item enters the selection if it was not there: you drag
@@ -2471,6 +2537,7 @@
 	 */
 	function folderUnder(x: number, y: number): string | null {
 		const below = document.elementFromPoint(x, y);
+		if (below?.closest('[data-shelf]')) return SHELF;
 		const el = below?.closest<HTMLElement>('[data-folder]');
 		if (el) return el.dataset.folder ?? null;
 		return below?.closest('[data-new-tab]') ? NEW_TAB : null;
@@ -2494,8 +2561,9 @@
 	 */
 	async function release(paths: string[], x: number, y: number) {
 		dropTarget = null;
-		if (store.activeTab?.archive?.vault) return addToVault(paths);
 		const above = folderUnder(x, y);
+		if (above === SHELF) return putOnShelf(paths);
+		if (store.activeTab?.archive?.vault) return addToVault(paths);
 		if (above === NEW_TAB) return openInTabs(paths);
 		const dest = above ?? (writable ? (store.activeTab?.path ?? null) : null);
 		if (!dest || paths.length === 0) return;
@@ -2526,6 +2594,7 @@
 				.onDragDropEvent((event) => {
 					const p = event.payload;
 					const scale = window.devicePixelRatio || 1;
+					filesDragged = p.type === 'over' || p.type === 'enter';
 					if (p.type === 'over' || p.type === 'enter') {
 						dropTarget = folderUnder(p.position.x / scale, p.position.y / scale);
 					} else if (p.type === 'drop') {
@@ -2598,7 +2667,7 @@
 
 		// With a modal dialog open or a field being edited, the list
 		// shortcuts must not fire.
-		if (toTrash.length > 0 || toDelete || renaming !== null || conflicts.length > 0 || batchRename.length > 0 || checksumOf || paletteOpen || editing || welcomeOpen) return;
+		if (toTrash.length > 0 || toDelete || renaming !== null || conflicts.length > 0 || batchRename.length > 0 || checksumOf || paletteOpen || editing || welcomeOpen || settingsOpen || passwordAsks.length > 0) return;
 
 		// Inside a text field the keys are for typing. From the search field
 		// only those that move the selection or close it get through.
@@ -2609,6 +2678,13 @@
 			if (!search || !(allowed.includes(e.key) || (e.ctrlKey && e.key.toLowerCase() === 'f'))) return;
 		}
 
+		const combo = combination(e);
+		const custom = combo ? fittingActions().find((a) => a.keys === combo) : undefined;
+		if (custom) {
+			e.preventDefault();
+			void runCustomAction(custom);
+			return;
+		}
 		const action = actionWithCustom(e, settings.shortcuts);
 		if (action !== null) {
 			e.preventDefault();
@@ -2698,6 +2774,8 @@
 		if (store.activeTab?.archive && (action === 'up' || action === 'back') && upInArchive()) return;
 
 		switch (action) {
+			case 'shelf':
+				return putOnShelf(actionPaths());
 			case 'copy':
 				return putOnClipboard(false);
 			case 'cut':
@@ -3259,7 +3337,8 @@
 				isStartPage: isStartPageOf(choices),
 				atStartup: isAtStartup(choices),
 				otherPane: otherTab && !isVirtual(otherTab.path) ? otherTab.path : null,
-				protectedFolder: isProtected(menuFolder(choices))
+				protectedFolder: isProtected(menuFolder(choices)),
+				actions: fittingActions()
 			}),
 			x,
 			y
@@ -3349,6 +3428,11 @@
 		const tab = store.activeTab;
 
 		switch (kind) {
+			case 'action': {
+				const a = actions.items.find((x) => x.id === value);
+				if (a) void runCustomAction(a);
+				return true;
+			}
 			case 'new':
 				void newFile(value);
 				return true;
@@ -3637,6 +3721,12 @@
 					if (folder) toggleTerminal(folder);
 					break;
 				}
+				case 'shelf':
+					putOnShelf(actionPaths());
+					break;
+				case 'moreActions':
+					menu = { items: actionItems(fittingActions().slice(MENU_ACTIONS)), ...point };
+					break;
 				case 'edit':
 					if (choices[0]) editing = { path: choices[0].path, name: choices[0].name };
 					break;
@@ -3873,7 +3963,21 @@
 		onsettings={() => (settingsOpen = true)}
 		area={workspaces.current}
 		onareas={windowLabel === 'main' ? (e) => belowButton(e, workspaceItems(workspaces.areas, workspaces.current)) : undefined}
-	/>
+	>
+		{#snippet cargo()}
+			<Wagon
+				items={shelf.items}
+				dragging={filesDragged}
+				dropping={dropTarget === SHELF}
+				canUnload={writable}
+				backend={tauriBackend}
+				onmove={(p) => void unloadShelf(p, 'move')}
+				oncopy={(p) => void unloadShelf(p, 'copy')}
+				onremove={(p) => shelf.remove(p)}
+				onclear={() => shelf.clear()}
+			/>
+		{/snippet}
+	</TitleBar>
 
 	<!-- The main line: it runs the whole width below the header. It lights
 	     up when the system really moves something, and every now and then a
@@ -4289,6 +4393,14 @@
 					<HistoryPanel entries={undo.history} onundo={undoFromHistory} onclose={() => (historyOpen = false)} />
 				{/if}
 			</div>
+			{#each actionTerminals as a (a.key)}
+				<TerminalPanel
+					cwd={a.cwd}
+					run={a.run}
+					folder={store.activeTab && location === 'normal' ? store.activeTab.path : null}
+					onclose={() => (actionTerminals = actionTerminals.filter((x) => x.key !== a.key))}
+				/>
+			{/each}
 			{#if terminalAt !== null}
 				{#key terminalAt}
 					<TerminalPanel
@@ -4304,6 +4416,8 @@
 	{#if settingsOpen}
 		<SettingsWindow
 			settings={settings}
+			actions={actions}
+			selection={actionPaths()}
 			showHidden={store.showHidden}
 			onhidden={() => void store.setShowHidden(!store.showHidden)}
 			isDefault={isDefault}
@@ -4340,6 +4454,9 @@
 			personal={settings.personalThemes}
 			accent={settings.accent}
 			accentColor={settings.accentColor}
+			accentValue={accentColor(activeTheme, settings.accent, settings.accentColor)}
+			accentText={settings.withAccentText(activeTheme).accentText}
+			onaccenttext={(choice) => settings.setAccentText(activeTheme, choice)}
 			x={gallery.x}
 			y={gallery.y}
 			onpick={fromGallery}
@@ -4855,7 +4972,7 @@
 	.duplicates-summary button.primary {
 		background: var(--accent);
 		border-color: var(--accent);
-		color: #fff;
+		color: var(--on-accent, #fff);
 	}
 	.notice {
 		padding: 8px 16px;
@@ -4923,7 +5040,7 @@
 	.update button.primary {
 		background: var(--accent);
 		border-color: var(--accent);
-		color: #fff;
+		color: var(--on-accent, #fff);
 	}
 	/* A full drive is a warning, not news: signal orange instead of the current's cyan. */
 	.reminder {

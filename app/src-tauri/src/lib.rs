@@ -1,5 +1,6 @@
 pub mod friends;
 pub mod startup;
+mod actions;
 pub mod backup;
 pub mod app_windows;
 pub mod fs;
@@ -141,6 +142,8 @@ pub fn run() {
             ipc::text_read,
             ipc::text_write,
             ipc::terminal_open,
+            actions::action_lines,
+            actions::action_run,
             ipc::terminal_write,
             ipc::terminal_resize,
             ipc::terminal_close,

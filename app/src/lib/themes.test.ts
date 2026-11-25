@@ -6,6 +6,7 @@ import {
 	themeById,
 	accentColor,
 	variablesFrom,
+	textOnAccent,
 	FONTS,
 	BASE_SHAPES,
 	textScale,
@@ -281,5 +282,20 @@ describe('saved personal themes', () => {
 	it('ignores what is not a theme', () => {
 		expect(themeFromStored(null)).toBeNull();
 		expect(themeFromStored({ nome: 'senza id' })).toBeNull();
+	});
+});
+
+describe('text over the accent', () => {
+	it('by itself picks whichever reads better, and the choice wins', () => {
+		expect(textOnAccent('#7cf5ff')).toBe('#0c0a13');
+		expect(textOnAccent('#1d4ed8')).toBe('#ffffff');
+		expect(textOnAccent('#7cf5ff', 'light')).toBe('#ffffff');
+		expect(textOnAccent('#7cf5ff', '#ffe8a3')).toBe('#ffe8a3');
+	});
+
+	it('travels with a saved personal theme, and nonsense is dropped', () => {
+		const base = { id: 'x', nome: 'X', chiaro: false, gruppo: 'personale', variabili: {} };
+		expect(themeFromStored({ ...base, accentText: 'dark' })!.accentText).toBe('dark');
+		expect(themeFromStored({ ...base, accentText: 'red;}' })!.accentText).toBeUndefined();
 	});
 });

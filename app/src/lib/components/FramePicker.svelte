@@ -480,7 +480,7 @@
 		margin-left: 2px;
 		border-radius: 3px;
 		background: var(--accent);
-		color: var(--bg);
+		color: var(--on-accent, #fff);
 		font-size: calc(10px * var(--text-scale, 1));
 		font-weight: 600;
 		line-height: 14px;

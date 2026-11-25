@@ -405,7 +405,7 @@
 	.primary {
 		border-color: transparent !important;
 		background: var(--accent) !important;
-		color: #fff !important;
+		color: var(--on-accent, #fff) !important;
 	}
 	button:focus-visible,
 	input:focus-visible {

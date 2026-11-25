@@ -3469,6 +3469,57 @@ describe('low-disk reminder', () => {
 	});
 });
 
+describe('shelf', () => {
+	it('collects from one folder, unloads in another, and moved items leave it', async () => {
+		await mount();
+		await fireEvent.click(row('alfa.txt'));
+		key('m', { ctrl: true, shift: true });
+		await fireEvent.contextMenu(row('beta.txt'));
+		await fireEvent.click(await screen.findByRole('menuitem', { name: /Metti sulla mensola/ }));
+		await screen.findByRole('button', { name: 'Mensola: 2 elementi' });
+		// Nothing moved yet.
+		expect(disk.exists('C:\\alfa.txt')).toBe(true);
+
+		await enter('Dati');
+		await waitFor(() => expect(names()).toEqual(['interno.txt']));
+		await fireEvent.click(screen.getByRole('button', { name: 'Mensola: 2 elementi' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'Sposta qui' }));
+		await waitFor(() => expect(disk.exists('C:\\Dati\\alfa.txt')).toBe(true));
+		expect(disk.exists('C:\\alfa.txt')).toBe(false);
+		await waitFor(() => expect(screen.queryByRole('button', { name: /^Mensola:/ })).toBeNull());
+	});
+});
+
+describe('custom actions', () => {
+	const save = (over: object) =>
+		localStorage.setItem(
+			'space-train.actions',
+			JSON.stringify([{ id: 'x', name: 'Prova', command: 'tool {file}', mode: 'background', extensions: ['txt'], enabled: true, keys: 'Ctrl+Alt+K', ...over }])
+		);
+
+	it('shows in the menu only for matching files, and runs on them', async () => {
+		save({});
+		await mount();
+		await fireEvent.contextMenu(row('Dati'));
+		await screen.findByRole('menuitem', { name: /Copia percorso/ });
+		expect(screen.queryByRole('menuitem', { name: /Prova/ })).toBeNull();
+		key('Escape');
+		await fireEvent.contextMenu(row('alfa.txt'));
+		await fireEvent.click(await screen.findByRole('menuitem', { name: /Prova/ }));
+		await waitFor(() => expect(disk.actionsRun).toEqual([{ template: 'tool {file}', paths: ['C:\\alfa.txt'] }]));
+		await screen.findByText('«Prova»: fatto.');
+	});
+
+	it('runs from its shortcut and says what failed', async () => {
+		save({});
+		disk.actionFails = true;
+		await mount();
+		await fireEvent.click(row('alfa.txt'));
+		await fireEvent.keyDown(window, { key: 'k', code: 'KeyK', ctrlKey: true, altKey: true });
+		await screen.findByText(/«Prova»: 1 di 1 non riusciti\. boom/);
+	});
+});
+
 describe('transfer queue', () => {
 	it('queues copies behind the running one: count, list, move up, remove, pause', async () => {
 		let unblock = () => {};

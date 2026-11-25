@@ -312,7 +312,7 @@
 	.primary {
 		border-color: var(--accent);
 		background: var(--accent);
-		color: #fff;
+		color: var(--on-accent, #fff);
 	}
 	.primary:hover {
 		background: var(--accent);

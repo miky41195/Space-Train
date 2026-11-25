@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { t } from '../i18n';
 	import { convertFileSrc } from '@tauri-apps/api/core';
-	import type { Backend, Entry, MediaProps } from '../ipc';
+	import type { Backend, Entry, MediaProps, FsError } from '../ipc';
 	import { mediaLines } from '../media';
 	import { categoryFor } from '../icons';
 	import { describeType } from '../columns';
@@ -60,8 +60,10 @@
 	const NUMBER = /^-?[\d.,]+$/;
 
 	let archiveContents = $state<{ items: Entry[]; total: number } | null>(null);
+	let archiveLocked = $state(false);
 	$effect(() => {
 		archiveContents = null;
+		archiveLocked = false;
 		if (mode !== 'archive' || !item) return;
 		const file = item.path;
 		let valid = true;
@@ -70,7 +72,9 @@
 			.then((v) => {
 				if (valid) archiveContents = { items: level(v, '', file), total: v.filter((x) => !x.dir).length };
 			})
-			.catch(() => {});
+			.catch((e) => {
+				if (valid) archiveLocked = (e as FsError)?.kind === 'archivePassword';
+			});
 		return () => (valid = false);
 	});
 
@@ -172,6 +176,8 @@
 						{/each}
 					</ul>
 				</div>
+			{:else if archiveLocked}
+				<p class="empty">{t('L’archivio è protetto da password.')}</p>
 			{:else if readsText && loading}
 				<p class="empty">{t('Lettura…')}</p>
 			{:else}

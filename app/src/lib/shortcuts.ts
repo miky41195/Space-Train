@@ -37,6 +37,7 @@ export type KeyAction =
 	| 'palette'
 	| 'toggleTerminal'
 	| 'history'
+	| 'shelf'
 	| { tab: number }
 	/** Ctrl+Shift+1…8: Explorer's eight views, from the largest icons. */
 	| { view: number };
@@ -66,6 +67,7 @@ export function keyAction(e: KeyInput): KeyAction | null {
 		if (shift && k === 'x') return 'moveToOtherPane';
 		if (shift && k === 'p') return 'palette';
 		if (shift && k === 't') return 'toggleTerminal';
+		if (shift && k === 'm') return 'shelf';
 		const digit = /^Digit([1-8])$/.exec(e.code ?? '');
 		if (shift && digit) return { view: Number(digit[1]) - 1 };
 		if (shift) return null;
@@ -171,6 +173,7 @@ export const SHORTCUT_GROUPS: { name: string; items: ShortcutItem[] }[] = [
 			{ label: t('Elimina definitivamente'), keys: ['Maiusc+Canc'], action: 'deletePermanently' },
 			{ label: t('Annulla'), keys: ['Ctrl+Z'], action: 'undo' },
 			{ label: t('Cronologia delle operazioni'), keys: ['Ctrl+H'], action: 'history' },
+			{ label: t('Metti sulla mensola'), keys: ['Ctrl+Maiusc+M'], action: 'shelf' },
 			{ label: t('Proprietà'), keys: ['Alt+Invio'], action: 'properties' },
 			{ label: t('Anteprima'), keys: ['Alt+P'], action: 'preview' },
 			{ label: t('Aggiungi ai preferiti'), keys: ['Ctrl+D'], action: 'favorite' }
