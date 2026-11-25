@@ -15,6 +15,17 @@ export interface WhatsNew {
 
 export const WHATS_NEW: WhatsNew[] = [
 	{
+		version: '0.13.0',
+		items: [
+			t('Mensola: raccogli file da cartelle diverse in un vagone nella barra in alto (tasto destro, Ctrl+Maiusc+M o trascinandoli), poi spostali o copiali tutti insieme dove vuoi. Resta anche dopo la chiusura ed è la stessa in tutte le finestre.'),
+			t('Azioni: comandi tuoi sui file selezionati, nel menu del tasto destro, nella palette o con una scorciatoia. Girano nel terminale o in sottofondo; si creano in Impostazioni → Azioni, con l’anteprima del comando.'),
+			t('Testo sull’evidenziazione: Space Train sceglie chiaro o scuro perché si legga sempre, oppure lo scegli tu dalla galleria dei temi e dall’editor.'),
+			t('Archivi protetti da password: ZIP, 7z e RAR chiedono la password e si aprono. Con quella sbagliata i file già presenti restano come sono.'),
+			t('Pulizia disco: le cartelle di compilazione dei progetti non sono più scelte da sole, e «Apri la Pulizia» dall’avviso del disco quasi pieno ora funziona.'),
+			t('Ripristinando una versione precedente l’elenco si aggiorna subito; i menu degli archivi sono tradotti in inglese.')
+		]
+	},
+	{
 		version: '0.12.0',
 		items: [
 			t('Ricerca «Ovunque»: nella barra di ricerca un pulsante cerca per nome in tutti i dischi mentre scrivi. Space Train prepara l’indice da solo la prima volta, senza permessi di amministratore, e poi lo tiene aggiornato.'),
