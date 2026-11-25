@@ -147,7 +147,11 @@ try {
 	// A fresh profile is a first install: the welcome guide covers the app until skipped.
 	await step('the welcome guide shows at the first start and can be skipped', async () => {
 		const guide = `document.querySelector('[role=dialog][aria-label="Benvenuto in Space Train"]')`;
-		await until('welcome guide shown', () => run(`return !!${guide}`), 10000);
+		const saved = `return ['space-train.versione-vista', 'space-train.impostazioni', 'space-train.welcome-seen'].map((k) => k + '=' + String(localStorage.getItem(k)).slice(0, 60)).join(' | ')`;
+		console.log(`saved before the check: ${await run(saved)}`);
+		await until('welcome guide shown', () => run(`return !!${guide}`), 10000).catch(async (e) => {
+			throw new Error(`${e.message}; ${await run(saved)}`);
+		});
 		await run(`[...${guide}.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Salta').click()`);
 		await until('welcome guide gone', async () => !(await run(`return !!${guide}`)));
 	});
